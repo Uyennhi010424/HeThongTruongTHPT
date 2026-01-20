@@ -1,0 +1,12 @@
+# Build outputs
+backend/target/
+mobile/app/build/
+website/node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
