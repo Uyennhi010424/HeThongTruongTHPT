@@ -175,7 +175,7 @@ create table DANH_GIA_HK
 /*==============================================================*/
 create table DAN_TOC
 (
-   ID_DANTOC            int not null,
+      ID_DANTOC            int not null auto_increment,
    TEN_DANTOC           varchar(50),
    MO_TA                varchar(255),
    primary key (ID_DANTOC)
@@ -196,7 +196,7 @@ create table DAT
 /*==============================================================*/
 create table DIEM
 (
-   ID_DIEM              int not null,
+      ID_DIEM              int not null auto_increment,
    LOAI_DIEM            varchar(20),
    DIEM_SO              float,
    primary key (ID_DIEM)
@@ -239,7 +239,7 @@ create table GHI_NHAN_TRONG
 /*==============================================================*/
 create table GIAO_VIEN
 (
-   ID_GIAOVIEN          int not null,
+      ID_GIAOVIEN          int not null auto_increment,
    HO_TEN               varchar(100),
    NGAY_SINH            date,
    GIOI_TINH            bool,
@@ -266,7 +266,7 @@ create table GOM
 /*==============================================================*/
 create table HANH_KIEM
 (
-   ID_HANHKIEM          int not null,
+      ID_HANHKIEM          int not null auto_increment,
    XEP_LOAI             ENUM('TOT','KHA','TRUNG_BINH','YEU'),
    NHAN_XET             varchar(255),
    NGAY_DANH_GIA        date,
@@ -278,7 +278,7 @@ create table HANH_KIEM
 /*==============================================================*/
 create table HOC_BA
 (
-   ID_HOCBA             int not null,
+      ID_HOCBA             int not null auto_increment,
    ID_NAMHOC            int not null,
    HOC_LUC              varchar(20),
    HANH_KIEM            varchar(20),
@@ -291,7 +291,7 @@ create table HOC_BA
 /*==============================================================*/
 create table HOC_KY
 (
-   ID_HOCKY             int not null,
+      ID_HOCKY             int not null auto_increment,
    TEN_HOCKY            varchar(20),
    primary key (ID_HOCKY)
 );
@@ -301,7 +301,7 @@ create table HOC_KY
 /*==============================================================*/
 create table HOC_SINH
 (
-   ID_HOCSINH           int not null,
+      ID_HOCSINH           int not null auto_increment,
    ID_LOP               int not null,
    ID_HOCBA             int not null,
    ID_DANTOC            int not null,
@@ -314,6 +314,8 @@ create table HOC_SINH
    EMAIL                varchar(100),
    NAM_NHAP_HOC         Year,
    MA_BHYT              varchar(20),
+      DAN_TOC              varchar(100),
+      TON_GIAO             varchar(100),
    DIEN_CHINH_SACH      bool,
    TRANG_THAI           int,
    CREATED_AT           datetime,
@@ -326,7 +328,7 @@ create table HOC_SINH
 /*==============================================================*/
 create table KHEN_THUONG
 (
-   ID_KHENTHUONG        int not null,
+      ID_KHENTHUONG        int not null auto_increment,
    NOI_DUNG             varchar(255),
    NGAY_KHEN            date,
    primary key (ID_KHENTHUONG)
@@ -337,7 +339,7 @@ create table KHEN_THUONG
 /*==============================================================*/
 create table LICH_THI
 (
-   ID_LICHTHI           int not null,
+      ID_LICHTHI           int not null auto_increment,
    NGAY_THI             date,
    GIO_BAT_DAU          time,
    THOI_GIAN_THI        int,
@@ -361,7 +363,7 @@ create table LIEN_KET_TAI_KHOAN
 /*==============================================================*/
 create table LOP
 (
-   ID_LOP               int not null,
+      ID_LOP               int not null auto_increment,
    TEN_LOP              varchar(20),
    KHOI                 varchar(10),
    primary key (ID_LOP)
@@ -372,7 +374,7 @@ create table LOP
 /*==============================================================*/
 create table MON_HOC
 (
-   ID_MONHOC            int not null,
+      ID_MONHOC            int not null auto_increment,
    TEN_MONHOC           varchar(100),
    HE_SO                float,
    primary key (ID_MONHOC)
@@ -383,7 +385,7 @@ create table MON_HOC
 /*==============================================================*/
 create table NAM_HOC
 (
-   ID_NAMHOC            int not null,
+      ID_NAMHOC            int not null auto_increment,
    TEN_NAMHOC           varchar(9),
    primary key (ID_NAMHOC)
 );
@@ -426,7 +428,7 @@ create table PHAN_QUYEN
 /*==============================================================*/
 create table PHU_HUYNH
 (
-   ID_PHUHUYNH          int not null,
+      ID_PHUHUYNH          int not null auto_increment,
    HO_TEN               varchar(100),
    SO_DIEN_THOAI        varchar(15),
    EMAIL                varchar(100),
@@ -440,7 +442,7 @@ create table PHU_HUYNH
 /*==============================================================*/
 create table QUOC_TICH
 (
-   ID_QUOCTICH          int not null,
+      ID_QUOCTICH          int not null auto_increment,
    TEN_QUOCTICH         varchar(50),
    MO_TA                varchar(255),
    primary key (ID_QUOCTICH)
@@ -451,7 +453,7 @@ create table QUOC_TICH
 /*==============================================================*/
 create table ROLES
 (
-   ID_ROLES             int not null,
+      ID_ROLES             int not null auto_increment,
    ROLE_NAME            varchar(30),
    primary key (ID_ROLES)
 );
@@ -481,7 +483,7 @@ create table SU_DUNG_TAI_KHOAN
 /*==============================================================*/
 create table THOI_KHOA_BIEU
 (
-   ID_TKB               int not null,
+      ID_TKB               int not null auto_increment,
    THU                  int,
    TIET_BAT_DAU         int,
    SO_TIET              int,
@@ -494,7 +496,7 @@ create table THOI_KHOA_BIEU
 /*==============================================================*/
 create table THONG_BAO
 (
-   ID_THONGBAO          int not null,
+      ID_THONGBAO          int not null auto_increment,
    TIEU_DE              varchar(50),
    NOI_DUNG             varchar(255),
    DOI_TUONG            ENUM('HOC_SINH','GIAO_VIEN','PHU_HUYNH','ALL'),
@@ -519,9 +521,9 @@ create table TRONG
 /*==============================================================*/
 create table USER
 (
-   ID_USER              int not null,
+      ID_USER              int not null auto_increment,
    USER_NAME            varchar(100),
-   PASSWORD             varchar(50),
+      PASSWORD             varchar(255),
    EMAIL                varchar(100),
    STATUS               int,
    CREATE_AT            datetime,
@@ -534,7 +536,7 @@ create table USER
 /*==============================================================*/
 create table VAN_BAN
 (
-   ID_VANBAN            int not null,
+      ID_VANBAN            int not null auto_increment,
    SO_HIEU              varchar(20),
    LOAI_VAN_BAN         varchar(50),
    NGAY_BAN_HANH        date,
@@ -546,7 +548,7 @@ create table VAN_BAN
 /*==============================================================*/
 create table VI_PHAM
 (
-   ID_VIPHAM            int not null,
+      ID_VIPHAM            int not null auto_increment,
    NOI_DUNG             varchar(255),
    MUC_DO               ENUM('NHE','TRUNG_BINH','NGHIEM_TRONG'),
    NGAY_VI_PHAM         date,
