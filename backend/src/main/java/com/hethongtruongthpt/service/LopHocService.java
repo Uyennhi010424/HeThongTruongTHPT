@@ -20,7 +20,7 @@ public class LopHocService {
         return lopHocRepository.findAll();
     }
 
-    public LopHoc getById(Long id) {
+    public LopHoc getById(Integer id) {
         return lopHocRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học"));
     }
@@ -30,25 +30,25 @@ public class LopHocService {
         return lopHocRepository.save(lopHoc);
     }
 
-    public LopHoc update(Long id, LopHoc lopHoc) {
+    public LopHoc update(Integer id, LopHoc lopHoc) {
         getById(id);
         validateLopHoc(lopHoc);
         lopHoc.setId(id);
         return lopHocRepository.save(lopHoc);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         lopHocRepository.deleteById(id);
     }
 
     private void validateLopHoc(LopHoc lopHoc) {
         String tenLop = lopHoc.getTenLop() != null ? lopHoc.getTenLop().trim() : "";
-        String khoi = lopHoc.getKhoi() != null ? lopHoc.getKhoi().trim() : "";
+        Integer khoi = lopHoc.getKhoi();
 
         if (tenLop.isBlank()) {
             throw new ApiException("Tên lớp không được để trống");
         }
-        if (khoi.isBlank()) {
+        if (khoi == null) {
             throw new ApiException("Khối không được để trống");
         }
 
@@ -56,7 +56,7 @@ public class LopHocService {
         if (gradeFromName == null) {
             throw new ApiException("Tên lớp phải bắt đầu bằng 10, 11 hoặc 12");
         }
-        if (!gradeFromName.equals(khoi)) {
+        if (!gradeFromName.equals(String.valueOf(khoi))) {
             throw new ApiException("Tên lớp không khớp với khối đã chọn");
         }
     }

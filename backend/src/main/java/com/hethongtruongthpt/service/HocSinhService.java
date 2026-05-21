@@ -42,38 +42,37 @@ public class HocSinhService {
         return hocSinhRepository.findAll();
     }
 
-    public HocSinh getById(Long id) {
+    public HocSinh getById(Integer id) {
         return hocSinhRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh"));
     }
 
     public HocSinh create(HocSinh hocSinh) {
-        hocSinh.setLopHoc(resolveLopHoc(hocSinh));
+        hocSinh.setLop(resolveLop(hocSinh));
         String generatedUsername = generateUniqueUsername(hocSinh.getHoTen());
-        hocSinh.setEmail(generatedUsername);
         HocSinh saved = hocSinhRepository.save(hocSinh);
-        createStudentAccount(saved, generatedUsername);
+        createStudentAccount(generatedUsername);
         return getById(saved.getId());
     }
 
-    public HocSinh update(Long id, HocSinh hocSinh) {
+    public HocSinh update(Integer id, HocSinh hocSinh) {
         HocSinh existing = getById(id);
-        if (hocSinh.getLopHoc() != null && hocSinh.getLopHoc().getId() != null) {
-            hocSinh.setLopHoc(resolveLopHoc(hocSinh));
+        if (hocSinh.getLop() != null && hocSinh.getLop().getId() != null) {
+            hocSinh.setLop(resolveLop(hocSinh));
         } else {
-            hocSinh.setLopHoc(existing.getLopHoc());
+            hocSinh.setLop(existing.getLop());
         }
         hocSinh.setId(id);
         HocSinh saved = hocSinhRepository.save(hocSinh);
         return getById(saved.getId());
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         hocSinhRepository.deleteById(id);
     }
 
-    private LopHoc resolveLopHoc(HocSinh hocSinh) {
-        Long lopId = hocSinh.getLopHoc() != null ? hocSinh.getLopHoc().getId() : null;
+    private LopHoc resolveLop(HocSinh hocSinh) {
+        Integer lopId = hocSinh.getLop() != null ? hocSinh.getLop().getId() : null;
         if (lopId == null) {
             throw new ResourceNotFoundException("Vui lòng chọn lớp học hợp lệ");
         }
@@ -82,14 +81,13 @@ public class HocSinhService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học"));
     }
 
-    private void createStudentAccount(HocSinh hocSinh, String username) {
+    private void createStudentAccount(String username) {
         UserRequest request = new UserRequest();
         request.setUsername(username);
         request.setEmail(username);
         request.setPassword(DEFAULT_ACCOUNT_PASSWORD);
-        request.setStatus(hocSinh.getTrangThai() != null && hocSinh.getTrangThai() == 1 ? 1 : 0);
-        request.setRole(RoleEnum.HOCSINH.name());
-
+        request.setStatus(1);
+        request.setRole(RoleEnum.HOC_SINH.name());
         userService.create(request);
     }
 
@@ -135,12 +133,11 @@ public class HocSinhService {
     }
 
     private String normalizeAscii(String value) {
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replace('đ', 'd')
                 .replace('Đ', 'D')
                 .replaceAll("[^a-zA-Z0-9]", "")
                 .toLowerCase(Locale.ROOT);
-        return normalized;
     }
 }

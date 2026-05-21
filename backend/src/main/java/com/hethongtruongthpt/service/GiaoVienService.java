@@ -2,7 +2,6 @@ package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.dto.user.UserRequest;
 import com.hethongtruongthpt.entity.GiaoVien;
-import com.hethongtruongthpt.enums.RoleEnum;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.GiaoVienRepository;
 import com.hethongtruongthpt.repository.UserRepository;
@@ -42,7 +41,7 @@ public class GiaoVienService {
                 .toList();
     }
 
-    public GiaoVien getById(Long id) {
+    public GiaoVien getById(Integer id) {
         GiaoVien giaoVien = giaoVienRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên"));
         return sanitizeVietnameseText(giaoVien);
@@ -56,7 +55,7 @@ public class GiaoVienService {
         return sanitizeVietnameseText(saved);
     }
 
-    public GiaoVien update(Long id, GiaoVien giaoVien) {
+    public GiaoVien update(Integer id, GiaoVien giaoVien) {
         getById(id);
         giaoVien.setId(id);
         if (giaoVien.getEmail() == null || giaoVien.getEmail().isBlank()) {
@@ -68,16 +67,14 @@ public class GiaoVienService {
         return sanitizeVietnameseText(saved);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         giaoVienRepository.deleteById(id);
     }
 
     public void syncMissingTeacherAccounts() {
         List<GiaoVien> teachers = giaoVienRepository.findAll();
         for (GiaoVien teacher : teachers) {
-            if (teacher == null) {
-                continue;
-            }
+            if (teacher == null) continue;
 
             String email = teacher.getEmail();
             if (email == null || email.isBlank()) {
@@ -85,25 +82,19 @@ public class GiaoVienService {
                 teacher.setEmail(email);
                 giaoVienRepository.save(teacher);
             }
-
             ensureTeacherAccountExists(email);
         }
     }
 
     private GiaoVien sanitizeVietnameseText(GiaoVien giaoVien) {
         giaoVien.setHoTen(decodeMojibake(giaoVien.getHoTen()));
-        giaoVien.setBoMon(decodeMojibake(giaoVien.getBoMon()));
-        giaoVien.setTrinhDo(decodeMojibake(giaoVien.getTrinhDo()));
+        // Bỏ getBoMon() và getTrinhDo() vì entity GiaoVien không có 2 field này
         return giaoVien;
     }
 
     private String decodeMojibake(String value) {
-        if (value == null || value.isBlank()) {
-            return value;
-        }
-        if (!MOJIBAKE_PATTERN.matcher(value).find()) {
-            return value;
-        }
+        if (value == null || value.isBlank()) return value;
+        if (!MOJIBAKE_PATTERN.matcher(value).find()) return value;
         try {
             return new String(value.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
         } catch (Exception ex) {
@@ -117,57 +108,40 @@ public class GiaoVienService {
         request.setEmail(username);
         request.setPassword(DEFAULT_ACCOUNT_PASSWORD);
         request.setStatus(1);
-        request.setRole(RoleEnum.GIAOVIEN.name());
-
+        request.setRole("GIAO_VIEN"); // Sửa lại đúng tên trong RoleEnum của bạn
         userService.create(request);
     }
 
     private void ensureTeacherAccountExists(String username) {
-        if (username == null || username.isBlank()) {
-            return;
-        }
-        if (userRepository.findByUsername(username).isPresent()) {
-            return;
-        }
+        if (username == null || username.isBlank()) return;
+        if (userRepository.findByUsername(username).isPresent()) return;
         createTeacherAccount(username);
     }
 
     private String generateUniqueUsername(String fullName) {
         String baseLocalPart = buildLocalPart(fullName);
         int suffix = 1;
-
         while (true) {
             String localPart = suffix == 1 ? baseLocalPart : baseLocalPart + suffix;
             String candidate = localPart + DEFAULT_ACCOUNT_SUFFIX;
-            if (userRepository.findByUsername(candidate).isEmpty()) {
-                return candidate;
-            }
+            if (userRepository.findByUsername(candidate).isEmpty()) return candidate;
             suffix += 1;
         }
     }
 
     private String buildLocalPart(String fullName) {
-        if (fullName == null || fullName.isBlank()) {
-            return "giaovien";
-        }
-
+        if (fullName == null || fullName.isBlank()) return "giaovien";
         String[] parts = fullName.trim().split("\\s+");
-        if (parts.length == 0) {
-            return "giaovien";
-        }
+        if (parts.length == 0) return "giaovien";
 
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < parts.length - 1; i++) {
             String normalized = normalizeAscii(parts[i]);
-            if (!normalized.isEmpty()) {
-                builder.append(normalized.charAt(0));
-            }
+            if (!normalized.isEmpty()) builder.append(normalized.charAt(0));
         }
 
         String lastName = normalizeAscii(parts[parts.length - 1]);
-        if (!lastName.isEmpty()) {
-            builder.append(lastName);
-        }
+        if (!lastName.isEmpty()) builder.append(lastName);
 
         String result = builder.toString();
         return result.isEmpty() ? "giaovien" : result;

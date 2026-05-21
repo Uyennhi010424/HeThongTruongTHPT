@@ -3,21 +3,21 @@ package com.hethongtruongthpt.dto.user;
 import com.hethongtruongthpt.enums.RoleEnum;
 
 public class UserDTO {
-    private Long id;
+    private Integer id;
     private String username;
     private String email;
     private String fullName;
     private RoleEnum role;
     private Boolean active;
     private Integer status;
-    private java.time.Instant createdAt;
-    private java.time.Instant updatedAt;
+    private java.time.LocalDateTime createdAt;
+    private java.time.LocalDateTime updatedAt;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -69,19 +69,19 @@ public class UserDTO {
         this.status = status;
     }
 
-    public java.time.Instant getCreatedAt() {
+    public java.time.LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(java.time.Instant createdAt) {
+    public void setCreatedAt(java.time.LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
-    public java.time.Instant getUpdatedAt() {
+    public java.time.LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(java.time.Instant updatedAt) {
+    public void setUpdatedAt(java.time.LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
 }
