@@ -6,34 +6,75 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Entity
-@Table(name = "LICH_THI")
+@Table(name = "lich_thi")
 public class LichThi {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_LICHTHI")
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
-    @Column(name = "NGAY_THI")
+    @ManyToOne
+    @JoinColumn(name = "lop_id", nullable = false)
+    private LopHoc lop;
+
+    @ManyToOne
+    @JoinColumn(name = "mon_hoc_id", nullable = false)
+    private MonHoc monHoc;
+
+    @Column(name = "loai_kiem_tra", nullable = false)
+    private String loaiKiemTra; // GK, CK, TX
+
+    @Column(name = "ngay_thi", nullable = false)
     private LocalDate ngayThi;
 
-    @Column(name = "GIO_BAT_DAU")
+    @Column(name = "gio_bat_dau", nullable = false)
     private LocalTime gioBatDau;
 
-    @Column(name = "THOI_GIAN_THI")
-    private Integer thoiGianThi;
+    @Column(name = "thoi_gian_lam_bai", nullable = false)
+    private Integer thoiGianLamBai; // Phút
 
-    @Column(name = "PHONG_THI", length = 50)
+    @Column(name = "phong_thi", length = 20)
     private String phongThi;
 
-    @Column(name = "GHI_CHU", length = 255)
+    @Column(name = "ghi_chu")
     private String ghiChu;
 
-    public Long getId() {
+    @Column(name = "hoc_ky", nullable = false)
+    private Integer hocKy;
+
+    @Column(name = "nam_hoc", length = 9, nullable = false)
+    private String namHoc;
+
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
+    }
+
+    public LopHoc getLop() {
+        return lop;
+    }
+
+    public void setLop(LopHoc lop) {
+        this.lop = lop;
+    }
+
+    public MonHoc getMonHoc() {
+        return monHoc;
+    }
+
+    public void setMonHoc(MonHoc monHoc) {
+        this.monHoc = monHoc;
+    }
+
+    public String getLoaiKiemTra() {
+        return loaiKiemTra;
+    }
+
+    public void setLoaiKiemTra(String loaiKiemTra) {
+        this.loaiKiemTra = loaiKiemTra;
     }
 
     public LocalDate getNgayThi() {
@@ -52,12 +93,12 @@ public class LichThi {
         this.gioBatDau = gioBatDau;
     }
 
-    public Integer getThoiGianThi() {
-        return thoiGianThi;
+    public Integer getThoiGianLamBai() {
+        return thoiGianLamBai;
     }
 
-    public void setThoiGianThi(Integer thoiGianThi) {
-        this.thoiGianThi = thoiGianThi;
+    public void setThoiGianLamBai(Integer thoiGianLamBai) {
+        this.thoiGianLamBai = thoiGianLamBai;
     }
 
     public String getPhongThi() {
@@ -74,5 +115,21 @@ public class LichThi {
 
     public void setGhiChu(String ghiChu) {
         this.ghiChu = ghiChu;
+    }
+
+    public Integer getHocKy() {
+        return hocKy;
+    }
+
+    public void setHocKy(Integer hocKy) {
+        this.hocKy = hocKy;
+    }
+
+    public String getNamHoc() {
+        return namHoc;
+    }
+
+    public void setNamHoc(String namHoc) {
+        this.namHoc = namHoc;
     }
 }

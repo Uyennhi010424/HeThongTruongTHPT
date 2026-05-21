@@ -41,8 +41,16 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    const normalizedUsername = username.trim();
+    const normalizedPassword = password.trim();
+    if (!normalizedUsername || !normalizedPassword) {
+      setError("Vui lòng nhập đầy đủ tài khoản và mật khẩu.");
+      return;
+    }
+
     try {
-      const res = await login({ username, password });
+      const res = await login({ username: normalizedUsername, password: normalizedPassword });
       const token = res?.data?.data?.token || "";
       const role = res?.data?.data?.role || "";
       if (!token || !role) {
@@ -56,7 +64,8 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
       setAuth(token, role);
       window.location.href = roleRoutes[role] || "/login";
     } catch (err) {
-      setError("Đăng nhập thất bại");
+      const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
+      setError(backendMessage || "Đăng nhập thất bại");
     }
   };
 

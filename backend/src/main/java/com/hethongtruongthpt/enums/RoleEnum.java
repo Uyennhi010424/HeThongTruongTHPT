@@ -2,8 +2,7 @@ package com.hethongtruongthpt.enums;
 
 public enum RoleEnum {
     ADMIN,
-    GIAOVIEN,
-    HOCSINH,
-    PHUHUYNH,
-    VAN_THU
+    GIAO_VIEN,
+    HOC_SINH,
+    PHU_HUYNH
 }

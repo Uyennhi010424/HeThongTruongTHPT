@@ -1,51 +1,59 @@
 package com.hethongtruongthpt.entity;
 
+import com.hethongtruongthpt.enums.RoleEnum;
 import jakarta.persistence.*;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "USER")
+@Table(name = "users")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_USER")
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
-    @Column(name = "USER_NAME", length = 100)
+    @Column(name = "username", length = 50, nullable = false, unique = true)
     private String username;
 
-    @Column(name = "PASSWORD", length = 255)
+    @Column(name = "password", length = 255, nullable = false)
     private String password;
 
-    @Column(name = "EMAIL", length = 100)
-    private String email;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", length = 20, nullable = false)
+    private RoleEnum role;
 
-    @Column(name = "STATUS")
-    private Integer status;
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
-    @Column(name = "CREATE_AT")
-    private Instant createdAt;
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
 
-    @Column(name = "UPDATE_AT")
-    private Instant updatedAt;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = Instant.now();
-        this.updatedAt = Instant.now();
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        if (this.isActive == null) {
+            this.isActive = true;
+        }
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -65,35 +73,43 @@ public class User {
         this.password = password;
     }
 
-    public String getEmail() {
-        return email;
+    public RoleEnum getRole() {
+        return role;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public void setRole(RoleEnum role) {
+        this.role = role;
     }
 
-    public Integer getStatus() {
-        return status;
+    public Boolean getIsActive() {
+        return isActive;
     }
 
-    public void setStatus(Integer status) {
-        this.status = status;
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
     }
 
-    public Instant getCreatedAt() {
+    public LocalDateTime getLastLogin() {
+        return lastLogin;
+    }
+
+    public void setLastLogin(LocalDateTime lastLogin) {
+        this.lastLogin = lastLogin;
+    }
+
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
-    public Instant getUpdatedAt() {
+    public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

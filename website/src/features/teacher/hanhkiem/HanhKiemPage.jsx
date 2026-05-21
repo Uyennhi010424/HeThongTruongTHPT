@@ -1,177 +1,140 @@
 import { useEffect, useMemo, useState } from "react";
 import Header from "../../../components/common/Header.jsx";
-import SimpleModal from "../../../components/modal/SimpleModal.jsx";
-import {
-  createHanhKiem,
-  deleteHanhKiem,
-  getHanhKiem,
-  updateHanhKiem
-} from "../../../api/hanhkiemApi.js";
+import { getHocSinh } from "../../../api/hocsinhApi.js";
+import { getLop } from "../../../api/lopApi.js";
 
-const formatDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-};
+const STORAGE_KEY = "teacher_conduct_records_v2";
 
-const formatDateInput = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const getXepLoaiLabel = (value) => {
-  switch (value) {
-    case "TOT":
-      return "Tốt";
-    case "KHA":
-      return "Khá";
-    case "TRUNG_BINH":
-      return "Trung bình";
-    case "YEU":
-      return "Yếu";
-    default:
-      return "--";
-  }
-};
+const getRecordKey = (classId, studentId) => `${classId}_${studentId}`;
 
 export default function HanhKiemPage() {
-  const [conducts, setConducts] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [draftRecords, setDraftRecords] = useState({});
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(8);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingConduct, setEditingConduct] = useState(null);
-  const [formError, setFormError] = useState("");
-  const [form, setForm] = useState({
-    xepLoai: "TOT",
-    nhanXet: "",
-    ngayDanhGia: ""
-  });
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     let active = true;
 
-    const fetchConducts = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError("");
-        const response = await getHanhKiem();
+        const [studentsRes, classesRes] = await Promise.all([getHocSinh(), getLop()]);
         if (!active) return;
-        setConducts(response?.data?.data || []);
-      } catch (err) {
+
+        const classData = (classesRes?.data?.data || []).slice().sort((a, b) =>
+          String(a?.tenLop || "").localeCompare(String(b?.tenLop || ""), "vi", {
+            sensitivity: "base",
+            numeric: true
+          })
+        );
+
+        setStudents(studentsRes?.data?.data || []);
+        setClasses(classData);
+
+        if (classData.length > 0) {
+          setSelectedClassId(String(classData[0].id));
+        }
+      } catch {
         if (!active) return;
-        setError("Không thể tải danh sách hạnh kiểm.");
+        setError("Không thể tải dữ liệu hạnh kiểm.");
       } finally {
         if (active) setLoading(false);
       }
     };
 
-    fetchConducts();
+    fetchData();
 
     return () => {
       active = false;
     };
   }, []);
 
-  const stats = useMemo(() => {
-    const total = conducts.length;
-    const good = conducts.filter((item) => item.xepLoai === "TOT").length;
-    const average = conducts.filter((item) => item.xepLoai === "TRUNG_BINH").length;
-    return { total, good, average };
-  }, [conducts]);
-
-  const filteredConducts = useMemo(() => {
-    if (!keyword.trim()) return conducts;
-    const lower = keyword.toLowerCase();
-    return conducts.filter((item) =>
-      [item.xepLoai, item.nhanXet]
-        .filter(Boolean)
-        .some((field) => field.toLowerCase().includes(lower))
-    );
-  }, [keyword, conducts]);
-
-  const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(filteredConducts.length / pageSize));
-  }, [filteredConducts.length, pageSize]);
-
-  const pagedConducts = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredConducts.slice(start, start + pageSize);
-  }, [filteredConducts, page, pageSize]);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setDraftRecords(parsed);
+      }
+    } catch {
+      setDraftRecords({});
+    }
+  }, []);
 
   useEffect(() => {
-    setPage(1);
-  }, [keyword, pageSize]);
+    if (!saveMessage) return undefined;
+    const timer = window.setTimeout(() => setSaveMessage(""), 2500);
+    return () => window.clearTimeout(timer);
+  }, [saveMessage]);
 
-  const openCreate = () => {
-    setEditingConduct(null);
-    setForm({ xepLoai: "TOT", nhanXet: "", ngayDanhGia: "" });
-    setFormError("");
-    setModalOpen(true);
-  };
+  const selectedClass = useMemo(
+    () => classes.find((item) => String(item.id) === selectedClassId) || null,
+    [classes, selectedClassId]
+  );
 
-  const openEdit = (item) => {
-    setEditingConduct(item);
-    setForm({
-      xepLoai: item.xepLoai || "TOT",
-      nhanXet: item.nhanXet || "",
-      ngayDanhGia: formatDateInput(item.ngayDanhGia)
+  const filteredStudents = useMemo(() => {
+    if (!selectedClassId) return [];
+    return students.filter((student) => String(student?.lopHoc?.id || "") === selectedClassId);
+  }, [students, selectedClassId]);
+
+  const stats = useMemo(() => {
+    let tot = 0;
+    let kha = 0;
+    let trungBinh = 0;
+    let yeu = 0;
+
+    filteredStudents.forEach((student) => {
+      const key = getRecordKey(selectedClassId, student.id);
+      const rank = draftRecords[key]?.xepLoai || "TOT";
+      if (rank === "TOT") tot += 1;
+      if (rank === "KHA") kha += 1;
+      if (rank === "TRUNG_BINH") trungBinh += 1;
+      if (rank === "YEU") yeu += 1;
     });
-    setFormError("");
-    setModalOpen(true);
+
+    return { tot, kha, trungBinh, yeu };
+  }, [filteredStudents, draftRecords, selectedClassId]);
+
+  const updateRecord = (studentId, patch) => {
+    if (!selectedClassId) return;
+    const key = getRecordKey(selectedClassId, studentId);
+
+    setDraftRecords((prev) => {
+      const current = prev[key] || {
+        xepLoai: "TOT",
+        nhanXet: ""
+      };
+      return {
+        ...prev,
+        [key]: {
+          ...current,
+          ...patch
+        }
+      };
+    });
+
+    setIsDirty(true);
+    setSaveMessage("");
   };
 
-  const handleDelete = async (item) => {
-    if (!window.confirm(`Xóa đánh giá #${item.id}?`)) return;
+  const handleSave = () => {
     try {
-      await deleteHanhKiem(item.id);
-      setConducts((prev) => prev.filter((row) => row.id !== item.id));
-    } catch (err) {
-      setError("Không thể xóa đánh giá.");
-    }
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setFormError("");
-    if (!form.nhanXet.trim()) {
-      setFormError("Vui lòng nhập nhận xét.");
-      return;
-    }
-
-    const payload = {
-      xepLoai: form.xepLoai,
-      nhanXet: form.nhanXet.trim(),
-      ngayDanhGia: form.ngayDanhGia || null
-    };
-
-    try {
-      if (editingConduct) {
-        const response = await updateHanhKiem(editingConduct.id, payload);
-        const updated = response?.data?.data;
-        setConducts((prev) =>
-          prev.map((row) => (row.id === editingConduct.id ? updated : row))
-        );
-      } else {
-        const response = await createHanhKiem(payload);
-        const created = response?.data?.data;
-        setConducts((prev) => [created, ...prev]);
-      }
-      setModalOpen(false);
-    } catch (err) {
-      setFormError("Không thể lưu đánh giá. Vui lòng thử lại.");
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draftRecords));
+      setIsDirty(false);
+      setLastSavedAt(new Date().toLocaleString("vi-VN"));
+      setError("");
+      setSaveMessage("Đã lưu đánh giá hạnh kiểm.");
+    } catch {
+      setError("Không thể lưu đánh giá hạnh kiểm.");
+      setSaveMessage("");
     }
   };
 
@@ -181,171 +144,136 @@ export default function HanhKiemPage() {
 
       <div className="card users-toolbar">
         <div>
-          <div className="users-title">Đánh giá hạnh kiểm</div>
-          <div className="users-subtitle">Lưu nhận xét và xếp loại học sinh</div>
+          <div className="users-title">Đánh giá hạnh kiểm theo lớp</div>
+          <div className="users-subtitle">
+            Chọn lớp để hiển thị danh sách học sinh và đánh giá bằng combobox
+            {lastSavedAt ? ` · Cập nhật lúc ${lastSavedAt}` : ""}
+          </div>
         </div>
         <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm theo xếp loại hoặc nhận xét"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </div>
-          <button className="btn-primary" onClick={openCreate}>
-            Thêm đánh giá
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={!isDirty}>
+            Cập nhật
           </button>
+        </div>
+      </div>
+
+      <div className="card subject-tabs-wrap">
+        <div className="subject-tabs">
+          {classes.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`subject-tab ${String(item.id) === selectedClassId ? "active" : ""}`}
+              onClick={() => {
+                setSelectedClassId(String(item.id));
+                setSaveMessage("");
+              }}
+            >
+              {item.tenLop}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="users-stats">
         <div className="stat-card stat-blue">
-          <div className="stat-label">Tổng đánh giá</div>
-          <div className="stat-value">{loading ? "..." : stats.total}</div>
+          <div className="stat-label">Tốt</div>
+          <div className="stat-value">{loading ? "..." : stats.tot}</div>
         </div>
         <div className="stat-card stat-sky">
-          <div className="stat-label">Tốt</div>
-          <div className="stat-value">{loading ? "..." : stats.good}</div>
+          <div className="stat-label">Khá</div>
+          <div className="stat-value">{loading ? "..." : stats.kha}</div>
         </div>
         <div className="stat-card stat-ice">
           <div className="stat-label">Trung bình</div>
-          <div className="stat-value">{loading ? "..." : stats.average}</div>
+          <div className="stat-value">{loading ? "..." : stats.trungBinh}</div>
+        </div>
+        <div className="stat-card stat-navy">
+          <div className="stat-label">Yếu</div>
+          <div className="stat-value">{loading ? "..." : stats.yeu}</div>
         </div>
       </div>
 
       <div className="card users-table">
         <div className="table-header">
           <div>
-            <div className="panel-title">Danh sách đánh giá</div>
-            <div className="panel-subtitle">Dữ liệu lấy từ cơ sở dữ liệu</div>
+            <div className="panel-title">Danh sách học sinh {selectedClass?.tenLop || ""}</div>
+            <div className="panel-subtitle">Đánh giá hạnh kiểm: Tốt, Khá, Trung bình, Yếu</div>
           </div>
-          <div className="panel-pill">{filteredConducts.length} đánh giá</div>
+          <div className="panel-pill">{filteredStudents.length} học sinh</div>
         </div>
+
         {error && <div className="table-empty">{error}</div>}
-        {!error && !loading && filteredConducts.length === 0 && (
-          <div className="table-empty">Không tìm thấy đánh giá phù hợp.</div>
+        {!error && saveMessage && <div className="table-success">{saveMessage}</div>}
+        {!error && !loading && filteredStudents.length === 0 && (
+          <div className="table-empty">Lớp này chưa có học sinh.</div>
         )}
-        <div className="table-grid">
-          <div className="table-row table-head">
-            <div>ID</div>
-            <div>Xếp loại</div>
+
+        <div className="attendance-grid">
+          <div className="attendance-row attendance-head" style={{ gridTemplateColumns: "220px 200px 1.6fr" }}>
+            <div>Học sinh</div>
+            <div>Hạnh kiểm</div>
             <div>Nhận xét</div>
-            <div>Ngày đánh giá</div>
-            <div>Thao tác</div>
           </div>
+
           {loading
             ? Array.from({ length: 5 }).map((_, index) => (
-                <div className="table-row" key={`skeleton-${index}`}>
-                  <div className="skeleton" />
-                  <div className="skeleton" />
+                <div
+                  className="attendance-row"
+                  style={{ gridTemplateColumns: "220px 200px 1.6fr" }}
+                  key={`conduct-skeleton-${index}`}
+                >
                   <div className="skeleton" />
                   <div className="skeleton" />
                   <div className="skeleton" />
                 </div>
               ))
-            : pagedConducts.map((item) => (
-                <div className="table-row" key={item.id}>
-                  <div className="table-id">#{item.id}</div>
-                  <div>
-                    <span className="role-pill">{getXepLoaiLabel(item.xepLoai)}</span>
+            : filteredStudents.map((student) => {
+                const key = getRecordKey(selectedClassId, student.id);
+                const record = draftRecords[key] || {
+                  xepLoai: "TOT",
+                  nhanXet: ""
+                };
+
+                return (
+                  <div
+                    className="attendance-row"
+                    style={{ gridTemplateColumns: "220px 200px 1.6fr" }}
+                    key={student.id}
+                  >
+                    <div className="table-main">
+                      <div className="table-title">{student.hoTen}</div>
+                      <div className="table-meta">{student?.lopHoc?.tenLop || "--"}</div>
+                    </div>
+                    <div>
+                      <select
+                        className="attendance-input"
+                        value={record.xepLoai}
+                        onChange={(event) =>
+                          updateRecord(student.id, { xepLoai: event.target.value })
+                        }
+                      >
+                        <option value="TOT">Tốt</option>
+                        <option value="KHA">Khá</option>
+                        <option value="TRUNG_BINH">Trung bình</option>
+                        <option value="YEU">Yếu</option>
+                      </select>
+                    </div>
+                    <div>
+                      <input
+                        className="attendance-note"
+                        value={record.nhanXet}
+                        onChange={(event) =>
+                          updateRecord(student.id, { nhanXet: event.target.value })
+                        }
+                        placeholder="Nhận xét hạnh kiểm"
+                      />
+                    </div>
                   </div>
-                  <div className="table-title">{item.nhanXet}</div>
-                  <div className="table-date">{formatDate(item.ngayDanhGia) || "--"}</div>
-                  <div className="table-actions">
-                    <button
-                      className="btn-outline btn-sm"
-                      onClick={() => openEdit(item)}
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      className="btn-danger btn-sm"
-                      onClick={() => handleDelete(item)}
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-              ))}
-        </div>
-        <div className="pagination">
-          <button
-            className="btn-outline btn-sm"
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            disabled={page === 1}
-          >
-            Trước
-          </button>
-          <div className="pagination-info">
-            Trang {page} / {totalPages}
-          </div>
-          <button
-            className="btn-outline btn-sm"
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            disabled={page === totalPages}
-          >
-            Sau
-          </button>
+                );
+              })}
         </div>
       </div>
-
-      <SimpleModal
-        open={modalOpen}
-        title={editingConduct ? "Cập nhật hạnh kiểm" : "Thêm hạnh kiểm"}
-        onClose={() => setModalOpen(false)}
-      >
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <label className="form-field">
-            <span>Xếp loại</span>
-            <select
-              value={form.xepLoai}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, xepLoai: event.target.value }))
-              }
-            >
-              <option value="TOT">Tốt</option>
-              <option value="KHA">Khá</option>
-              <option value="TRUNG_BINH">Trung bình</option>
-              <option value="YEU">Yếu</option>
-            </select>
-          </label>
-          <label className="form-field">
-            <span>Nhận xét</span>
-            <textarea
-              rows={3}
-              value={form.nhanXet}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, nhanXet: event.target.value }))
-              }
-              placeholder="Nhận xét hạnh kiểm"
-            />
-          </label>
-          <label className="form-field">
-            <span>Ngày đánh giá</span>
-            <input
-              type="date"
-              value={form.ngayDanhGia}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, ngayDanhGia: event.target.value }))
-              }
-            />
-          </label>
-          {formError && <div className="form-error">{formError}</div>}
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={() => setModalOpen(false)}
-            >
-              Hủy
-            </button>
-            <button type="submit" className="btn-primary">
-              Lưu
-            </button>
-          </div>
-        </form>
-      </SimpleModal>
     </div>
   );
 }

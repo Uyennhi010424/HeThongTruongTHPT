@@ -3,6 +3,8 @@ import Header from "../../../components/common/Header.jsx";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
 import { getMonHoc } from "../../../api/monhocApi.js";
+import { getGiaoVien } from "../../../api/giaovienApi.js";
+import { getToken } from "../../../store/authStore.js";
 
 const STORAGE_KEY = "teacher_subject_scores_v2";
 
@@ -130,10 +132,26 @@ const getLearningLevelLabel = (value) => {
   }
 };
 
+const getCurrentUsername = () => {
+  const token = getToken();
+  if (!token) return "";
+
+  try {
+    const payloadPart = token.split(".")[1] || "";
+    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(window.atob(normalized));
+    return String(payload?.sub || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
 export default function NhapDiem() {
+  const currentUsername = useMemo(() => getCurrentUsername(), []);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [teachers, setTeachers] = useState([]);
 
   const [selectedGrade, setSelectedGrade] = useState("all");
   const [selectedClass, setSelectedClass] = useState("all");
@@ -155,10 +173,11 @@ export default function NhapDiem() {
       try {
         setLoading(true);
         setError("");
-        const [studentsRes, classesRes, subjectsRes] = await Promise.all([
+        const [studentsRes, classesRes, subjectsRes, teachersRes] = await Promise.all([
           getHocSinh(),
           getLop(),
-          getMonHoc()
+          getMonHoc(),
+          getGiaoVien()
         ]);
 
         if (!active) return;
@@ -167,6 +186,7 @@ export default function NhapDiem() {
         setStudents(studentsRes?.data?.data || []);
         setClasses(classesRes?.data?.data || []);
         setSubjects(subjectData);
+        setTeachers(teachersRes?.data?.data || []);
 
         if (subjectData.length > 0) {
           setSelectedSubjectId(String(subjectData[0].id));
@@ -224,9 +244,39 @@ export default function NhapDiem() {
     return classes.filter((item) => String(item?.khoi || "") === selectedGrade);
   }, [classes, selectedGrade]);
 
+  const currentTeacher = useMemo(() => {
+    return (
+      teachers.find(
+        (item) => String(item?.email || "").trim().toLowerCase() === currentUsername
+      ) || null
+    );
+  }, [teachers, currentUsername]);
+
+  const allowedSubjects = useMemo(() => {
+    const boMon = normalizeText(currentTeacher?.boMon || "");
+    if (!boMon) return [];
+
+    return subjects.filter((subject) => {
+      const subjectName = normalizeText(subject?.tenMon || "");
+      return subjectName.includes(boMon) || boMon.includes(subjectName);
+    });
+  }, [subjects, currentTeacher]);
+
+  useEffect(() => {
+    if (!allowedSubjects.length) {
+      setSelectedSubjectId("");
+      return;
+    }
+
+    const exists = allowedSubjects.some((subject) => String(subject.id) === selectedSubjectId);
+    if (!exists) {
+      setSelectedSubjectId(String(allowedSubjects[0].id));
+    }
+  }, [allowedSubjects, selectedSubjectId]);
+
   const selectedSubject = useMemo(
-    () => subjects.find((subject) => String(subject.id) === selectedSubjectId) || null,
-    [subjects, selectedSubjectId]
+    () => allowedSubjects.find((subject) => String(subject.id) === selectedSubjectId) || null,
+    [allowedSubjects, selectedSubjectId]
   );
 
   const selectedPolicy = useMemo(
@@ -342,7 +392,7 @@ export default function NhapDiem() {
       const commentResults = [];
       const numericAverages = [];
 
-      subjects.forEach((subject) => {
+      allowedSubjects.forEach((subject) => {
         const policy = getPolicyBySubjectName(subject.tenMon);
         const record = getFullRecord(student.id, subject);
 
@@ -362,7 +412,7 @@ export default function NhapDiem() {
     });
 
     return result;
-  }, [filteredStudents, subjects, draftRecords]);
+  }, [filteredStudents, allowedSubjects, draftRecords]);
 
   const scoreGridColumns = useMemo(() => {
     if (selectedPolicy.mode === "COMMENT") {
@@ -425,7 +475,7 @@ export default function NhapDiem() {
 
       <div className="card subject-tabs-wrap">
         <div className="subject-tabs">
-          {subjects.map((subject) => {
+          {allowedSubjects.map((subject) => {
             const active = String(subject.id) === selectedSubjectId;
             return (
               <button
@@ -441,9 +491,11 @@ export default function NhapDiem() {
         </div>
 
         <div className="table-meta">
-          {selectedSubject
-            ? `Quy định: ${selectedPolicy.label} · Công thức TBHK = (TĐĐGtx + 2 × GK + 3 × CK)/(số TX + 5), TBNH = (HK1 + 2 × HK2)/3`
-            : "Chưa có môn học"}
+          {!currentTeacher
+            ? "Không xác định được tài khoản giáo viên hiện tại."
+            : !allowedSubjects.length
+              ? `Chưa tìm thấy môn phù hợp với bộ môn: ${currentTeacher.boMon || "--"}`
+              : `Môn phụ trách: ${currentTeacher.boMon || "--"} · Quy định: ${selectedPolicy.label} · Công thức TBHK = (TĐĐGtx + 2 × GK + 3 × CK)/(số TX + 5), TBNH = (HK1 + 2 × HK2)/3`}
         </div>
       </div>
 

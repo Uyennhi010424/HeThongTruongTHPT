@@ -1,42 +1,69 @@
 package com.hethongtruongthpt.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "GIAO_VIEN")
+@Table(name = "giao_vien")
 public class GiaoVien {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_GIAOVIEN")
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
-    @Column(name = "HO_TEN", length = 100)
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "ma_giao_vien", length = 20, nullable = false, unique = true)
+    private String maGiaoVien;
+
+    @Column(name = "ho_ten", length = 100, nullable = false)
     private String hoTen;
 
-    @Column(name = "NGAY_SINH")
-    private java.time.LocalDate ngaySinh;
-
-    @Column(name = "GIOI_TINH")
-    private Boolean gioiTinh;
-
-    @Column(name = "BO_MON", length = 100)
-    private String boMon;
-
-    @Column(name = "TRINH_DO", length = 100)
-    private String trinhDo;
-
-    @Column(name = "SO_DIEN_THOAI", length = 15)
-    private String sdt;
-
-    @Column(name = "EMAIL", length = 100)
+    @Column(name = "email", length = 100, unique = true)
     private String email;
 
-    public Long getId() {
+    @Column(name = "so_dien_thoai", length = 15)
+    private String soDienThoai;
+
+    @Column(name = "ngay_sinh")
+    private LocalDate ngaySinh;
+
+    @Column(name = "dia_chi")
+    private String diaChi;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public String getMaGiaoVien() {
+        return maGiaoVien;
+    }
+
+    public void setMaGiaoVien(String maGiaoVien) {
+        this.maGiaoVien = maGiaoVien;
     }
 
     public String getHoTen() {
@@ -47,51 +74,43 @@ public class GiaoVien {
         this.hoTen = hoTen;
     }
 
-    public java.time.LocalDate getNgaySinh() {
-        return ngaySinh;
-    }
-
-    public void setNgaySinh(java.time.LocalDate ngaySinh) {
-        this.ngaySinh = ngaySinh;
-    }
-
-    public Boolean getGioiTinh() {
-        return gioiTinh;
-    }
-
-    public void setGioiTinh(Boolean gioiTinh) {
-        this.gioiTinh = gioiTinh;
-    }
-
-    public String getBoMon() {
-        return boMon;
-    }
-
-    public void setBoMon(String boMon) {
-        this.boMon = boMon;
-    }
-
-    public String getTrinhDo() {
-        return trinhDo;
-    }
-
-    public void setTrinhDo(String trinhDo) {
-        this.trinhDo = trinhDo;
-    }
-
-    public String getSdt() {
-        return sdt;
-    }
-
-    public void setSdt(String sdt) {
-        this.sdt = sdt;
-    }
-
     public String getEmail() {
         return email;
     }
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getSoDienThoai() {
+        return soDienThoai;
+    }
+
+    public void setSoDienThoai(String soDienThoai) {
+        this.soDienThoai = soDienThoai;
+    }
+
+    public LocalDate getNgaySinh() {
+        return ngaySinh;
+    }
+
+    public void setNgaySinh(LocalDate ngaySinh) {
+        this.ngaySinh = ngaySinh;
+    }
+
+    public String getDiaChi() {
+        return diaChi;
+    }
+
+    public void setDiaChi(String diaChi) {
+        this.diaChi = diaChi;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

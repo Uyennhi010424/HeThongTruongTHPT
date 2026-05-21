@@ -1,39 +1,54 @@
 package com.hethongtruongthpt.entity;
 
-import com.hethongtruongthpt.enums.ThongBaoDoiTuongEnum;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "THONG_BAO")
+@Table(name = "thong_bao")
 public class ThongBao {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_THONGBAO")
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
-    @Column(name = "TIEU_DE", length = 50)
+    @Column(name = "tieu_de", length = 255, nullable = false)
     private String tieuDe;
 
-    @Column(name = "NOI_DUNG", length = 255)
+    @Column(name = "noi_dung", nullable = false, columnDefinition = "TEXT")
     private String noiDung;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "DOI_TUONG")
-    private ThongBaoDoiTuongEnum doiTuong;
+    @Column(name = "loai", nullable = false)
+    private String loai; // CHUNG, LOP, CA_NHAN
 
-    @Column(name = "NGAY_DANG")
+    @ManyToOne
+    @JoinColumn(name = "lop_id")
+    private LopHoc lop;
+
+    @ManyToOne
+    @JoinColumn(name = "hoc_sinh_id")
+    private HocSinh hocSinh;
+
+    @ManyToOne
+    @JoinColumn(name = "nguoi_tao_id", nullable = false)
+    private User nguoiTao;
+
+    @Column(name = "ngay_dang", nullable = false)
     private LocalDateTime ngayDang;
 
-    @Column(name = "TRANG_THAI")
-    private Integer trangThai;
+    @Column(name = "han_hien_thi")
+    private LocalDateTime hanHienThi;
 
-    public Long getId() {
+    @PrePersist
+    public void prePersist() {
+        this.ngayDang = LocalDateTime.now();
+    }
+
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -53,12 +68,36 @@ public class ThongBao {
         this.noiDung = noiDung;
     }
 
-    public ThongBaoDoiTuongEnum getDoiTuong() {
-        return doiTuong;
+    public String getLoai() {
+        return loai;
     }
 
-    public void setDoiTuong(ThongBaoDoiTuongEnum doiTuong) {
-        this.doiTuong = doiTuong;
+    public void setLoai(String loai) {
+        this.loai = loai;
+    }
+
+    public LopHoc getLop() {
+        return lop;
+    }
+
+    public void setLop(LopHoc lop) {
+        this.lop = lop;
+    }
+
+    public HocSinh getHocSinh() {
+        return hocSinh;
+    }
+
+    public void setHocSinh(HocSinh hocSinh) {
+        this.hocSinh = hocSinh;
+    }
+
+    public User getNguoiTao() {
+        return nguoiTao;
+    }
+
+    public void setNguoiTao(User nguoiTao) {
+        this.nguoiTao = nguoiTao;
     }
 
     public LocalDateTime getNgayDang() {
@@ -69,11 +108,11 @@ public class ThongBao {
         this.ngayDang = ngayDang;
     }
 
-    public Integer getTrangThai() {
-        return trangThai;
+    public LocalDateTime getHanHienThi() {
+        return hanHienThi;
     }
 
-    public void setTrangThai(Integer trangThai) {
-        this.trangThai = trangThai;
+    public void setHanHienThi(LocalDateTime hanHienThi) {
+        this.hanHienThi = hanHienThi;
     }
 }

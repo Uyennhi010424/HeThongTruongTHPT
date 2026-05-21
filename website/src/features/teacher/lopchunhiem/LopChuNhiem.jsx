@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../../../components/common/Header.jsx";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
+import { getGiaoVien } from "../../../api/giaovienApi.js";
+import { getChuNhiem } from "../../../api/chunhiemApi.js";
+import { getToken } from "../../../store/authStore.js";
 
 const getGenderLabel = (value) => {
   if (value === true) return "Nam";
@@ -11,13 +14,29 @@ const getGenderLabel = (value) => {
 
 const getStatusLabel = (status) => (status === 1 ? "Đang học" : "Ngừng học");
 
+const getCurrentUsername = () => {
+  const token = getToken();
+  if (!token) return "";
+
+  try {
+    const payloadPart = token.split(".")[1] || "";
+    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(window.atob(normalized));
+    return String(payload?.sub || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
 export default function LopChuNhiem() {
+  const currentUsername = useMemo(() => getCurrentUsername(), []);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [homeroomAssignments, setHomeroomAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [keyword, setKeyword] = useState("");
-  const [selectedClass, setSelectedClass] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(8);
 
@@ -28,11 +47,18 @@ export default function LopChuNhiem() {
       try {
         setLoading(true);
         setError("");
-        const [hsRes, lopRes] = await Promise.all([getHocSinh(), getLop()]);
+        const [hsRes, lopRes, gvRes, cnRes] = await Promise.all([
+          getHocSinh(),
+          getLop(),
+          getGiaoVien(),
+          getChuNhiem()
+        ]);
         if (!active) return;
         setStudents(hsRes?.data?.data || []);
         setClasses(lopRes?.data?.data || []);
-      } catch (err) {
+        setTeachers(gvRes?.data?.data || []);
+        setHomeroomAssignments(cnRes?.data?.data || []);
+      } catch {
         if (!active) return;
         setError("Không thể tải dữ liệu lớp chủ nhiệm.");
       } finally {
@@ -47,28 +73,50 @@ export default function LopChuNhiem() {
     };
   }, []);
 
-  const stats = useMemo(() => {
-    const total = students.length;
-    const activeCount = students.filter((item) => item.trangThai === 1).length;
-    const maleCount = students.filter((item) => item.gioiTinh === true).length;
-    return { total, activeCount, maleCount };
-  }, [students]);
+  const currentTeacher = useMemo(() => {
+    return (
+      teachers.find(
+        (item) => String(item?.email || "").trim().toLowerCase() === currentUsername
+      ) || null
+    );
+  }, [teachers, currentUsername]);
+
+  const homeroomAssignment = useMemo(() => {
+    if (!currentTeacher?.id) return null;
+    return (
+      homeroomAssignments.find((item) => Number(item?.giaoVienId) === Number(currentTeacher.id)) ||
+      null
+    );
+  }, [homeroomAssignments, currentTeacher]);
+
+  const homeroomClassId = homeroomAssignment?.lopId ? String(homeroomAssignment.lopId) : "";
+
+  const homeroomClass = useMemo(() => {
+    if (!homeroomClassId) return null;
+    return classes.find((item) => String(item.id) === homeroomClassId) || null;
+  }, [classes, homeroomClassId]);
+
+  const homeroomStudents = useMemo(() => {
+    if (!homeroomClassId) return [];
+    return students.filter((item) => String(item?.lopHoc?.id || "") === homeroomClassId);
+  }, [students, homeroomClassId]);
 
   const filteredStudents = useMemo(() => {
-    let filtered = students;
-    if (selectedClass !== "all") {
-      filtered = filtered.filter((item) =>
-        item?.lopHoc?.id ? String(item.lopHoc.id) === selectedClass : false
-      );
-    }
-    if (!keyword.trim()) return filtered;
+    if (!keyword.trim()) return homeroomStudents;
     const lower = keyword.toLowerCase();
-    return filtered.filter((student) =>
+    return homeroomStudents.filter((student) =>
       [student.hoTen, student.sdt, student.email, student?.lopHoc?.tenLop]
         .filter(Boolean)
         .some((field) => field.toLowerCase().includes(lower))
     );
-  }, [students, selectedClass, keyword]);
+  }, [homeroomStudents, keyword]);
+
+  const stats = useMemo(() => {
+    const total = homeroomStudents.length;
+    const activeCount = homeroomStudents.filter((item) => item.trangThai === 1).length;
+    const maleCount = homeroomStudents.filter((item) => item.gioiTinh === true).length;
+    return { total, activeCount, maleCount };
+  }, [homeroomStudents]);
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(filteredStudents.length / pageSize));
@@ -81,7 +129,16 @@ export default function LopChuNhiem() {
 
   useEffect(() => {
     setPage(1);
-  }, [keyword, pageSize, selectedClass]);
+  }, [keyword, pageSize]);
+
+  if (!loading && !homeroomClassId) {
+    return (
+      <div className="page users-page">
+        <Header title="Lớp chủ nhiệm" />
+        <div className="card table-empty">Bạn chưa được phân công lớp chủ nhiệm.</div>
+      </div>
+    );
+  }
 
   return (
     <div className="page users-page">
@@ -90,7 +147,11 @@ export default function LopChuNhiem() {
       <div className="card users-toolbar">
         <div>
           <div className="users-title">Theo dõi lớp chủ nhiệm</div>
-          <div className="users-subtitle">Danh sách học sinh và trạng thái học tập</div>
+          <div className="users-subtitle">
+            {homeroomClass
+              ? `Lớp ${homeroomClass.tenLop}${homeroomClass.khoi ? ` · Khối ${homeroomClass.khoi}` : ""}`
+              : "Danh sách học sinh lớp chủ nhiệm"}
+          </div>
         </div>
         <div className="users-actions">
           <div className="dash-search users-search">
@@ -101,18 +162,6 @@ export default function LopChuNhiem() {
               onChange={(event) => setKeyword(event.target.value)}
             />
           </div>
-          <select
-            className="btn-outline"
-            value={selectedClass}
-            onChange={(event) => setSelectedClass(event.target.value)}
-          >
-            <option value="all">Tất cả lớp</option>
-            {classes.map((lop) => (
-              <option key={lop.id} value={String(lop.id)}>
-                {lop.tenLop}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
@@ -135,7 +184,7 @@ export default function LopChuNhiem() {
         <div className="table-header">
           <div>
             <div className="panel-title">Danh sách học sinh</div>
-            <div className="panel-subtitle">Dữ liệu lấy từ cơ sở dữ liệu</div>
+            <div className="panel-subtitle">Chỉ hiển thị lớp chủ nhiệm được phân công</div>
           </div>
           <div className="panel-pill">{filteredStudents.length} học sinh</div>
         </div>
@@ -166,14 +215,10 @@ export default function LopChuNhiem() {
                   <div className="table-id">#{student.id}</div>
                   <div className="table-main">
                     <div className="table-title">{student.hoTen}</div>
-                    <div className="table-meta">
-                      {getGenderLabel(student.gioiTinh)}
-                    </div>
+                    <div className="table-meta">{getGenderLabel(student.gioiTinh)}</div>
                   </div>
                   <div>
-                    <div className="table-title">
-                      {student?.lopHoc?.tenLop || "--"}
-                    </div>
+                    <div className="table-title">{student?.lopHoc?.tenLop || "--"}</div>
                     <div className="table-meta">
                       {student?.lopHoc?.khoi ? `Khối ${student.lopHoc.khoi}` : ""}
                     </div>

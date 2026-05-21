@@ -13,6 +13,7 @@ import {
   getChuNhiem,
   updateChuNhiemByGiaoVien
 } from "../../../api/chunhiemApi.js";
+import { createUser, getUsers } from "../../../api/userApi.js";
 
 const formatDate = (value) => {
   if (!value) return "";
@@ -46,6 +47,36 @@ const getApiErrorMessage = (err, fallback) => {
   return message || fallback;
 };
 
+const normalizeEmailPart = (value) =>
+  (value || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const buildTeacherEmailPreview = (fullName) => {
+  const normalized = normalizeEmailPart(fullName);
+  if (!normalized) return "";
+
+  const parts = normalized.split(" ").filter(Boolean);
+  if (!parts.length) return "";
+
+  const firstLetters = parts.slice(0, -1).map((part) => part[0]).join("");
+  const lastName = parts[parts.length - 1];
+  const localPart = `${firstLetters}${lastName}` || "giaovien";
+  return `${localPart}c3@tdn.edu.vn`;
+};
+
+const notifyUsersUpdated = () => {
+  window.dispatchEvent(new Event("users-updated"));
+  window.localStorage.setItem("usersUpdatedAt", String(Date.now()));
+};
+
 export default function GiaoVienList() {
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -70,6 +101,37 @@ export default function GiaoVienList() {
     chuNhiem: false,
     lopChuNhiemId: ""
   });
+
+  const ensureTeacherUserAccount = async (teacher, fallbackFullName = "") => {
+    const candidate =
+      String(teacher?.email || "").trim() || buildTeacherEmailPreview(fallbackFullName);
+
+    if (!candidate) return;
+
+    try {
+      const usersResponse = await getUsers();
+      const users = usersResponse?.data?.data || [];
+      const normalizedCandidate = candidate.toLowerCase();
+
+      const exists = users.some((user) => {
+        const username = String(user?.username || "").trim().toLowerCase();
+        const email = String(user?.email || "").trim().toLowerCase();
+        return username === normalizedCandidate || email === normalizedCandidate;
+      });
+
+      if (exists) return;
+
+      await createUser({
+        username: candidate,
+        email: candidate,
+        password: "Abc1234@",
+        status: 1,
+        role: "GIAOVIEN"
+      });
+    } catch {
+      // Keep teacher creation successful even if fallback account creation fails.
+    }
+  };
 
   const classNameById = useMemo(() => {
     return classes.reduce((acc, item) => {
@@ -251,7 +313,9 @@ export default function GiaoVienList() {
       boMon: form.boMon.trim() || null,
       trinhDo: form.trinhDo.trim() || null,
       sdt: form.sdt.trim() || null,
-      email: form.email.trim() || null
+      email: editingTeacher
+        ? form.email.trim() || null
+        : buildTeacherEmailPreview(form.hoTen) || null
     };
 
     try {
@@ -266,8 +330,14 @@ export default function GiaoVienList() {
       } else {
         const response = await createGiaoVien(payload);
         const created = response?.data?.data;
-        savedTeacher = created;
-        setTeachers((prev) => [created, ...prev]);
+        const normalizedCreated = {
+          ...created,
+          email: created?.email || buildTeacherEmailPreview(form.hoTen)
+        };
+        savedTeacher = normalizedCreated;
+        setTeachers((prev) => [normalizedCreated, ...prev]);
+        await ensureTeacherUserAccount(normalizedCreated, form.hoTen);
+        notifyUsersUpdated();
       }
 
       if (savedTeacher?.id) {
@@ -468,7 +538,11 @@ export default function GiaoVienList() {
             <input
               value={form.hoTen}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, hoTen: event.target.value }))
+                setForm((prev) => ({
+                  ...prev,
+                  hoTen: event.target.value,
+                  email: editingTeacher ? prev.email : buildTeacherEmailPreview(event.target.value)
+                }))
               }
               placeholder="vd: Nguyễn Văn A"
               required
@@ -535,11 +609,12 @@ export default function GiaoVienList() {
             <span>Email</span>
             <input
               type="email"
-              value={form.email}
+              value={editingTeacher ? form.email : buildTeacherEmailPreview(form.hoTen)}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, email: event.target.value }))
               }
-              placeholder="vd: teacher@school.edu"
+              placeholder="vd: nvanc3@tdn.edu.vn"
+              readOnly={!editingTeacher}
             />
           </label>
 

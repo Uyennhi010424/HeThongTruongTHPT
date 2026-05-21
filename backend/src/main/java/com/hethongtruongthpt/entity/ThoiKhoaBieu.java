@@ -3,31 +3,73 @@ package com.hethongtruongthpt.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "THOI_KHOA_BIEU")
+@Table(name = "thoi_khoa_bieu")
 public class ThoiKhoaBieu {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_TKB")
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
-    @Column(name = "THU")
-    private Integer thu;
+    @ManyToOne
+    @JoinColumn(name = "lop_id", nullable = false)
+    private LopHoc lop;
 
-    @Column(name = "TIET_BAT_DAU")
-    private Integer tietBatDau;
+    @ManyToOne
+    @JoinColumn(name = "mon_hoc_id", nullable = false)
+    private MonHoc monHoc;
 
-    @Column(name = "SO_TIET")
+    @ManyToOne
+    @JoinColumn(name = "giao_vien_id", nullable = false)
+    private GiaoVien giaoVien;
+
+    @Column(name = "thu", nullable = false)
+    private Integer thu; // Thứ trong tuần: 2-7
+
+    @Column(name = "tiet_bat_dau", nullable = false)
+    private Integer tietBatDau; // Tiết bắt đầu: 1-10
+
+    @Column(name = "so_tiet", nullable = false)
     private Integer soTiet;
 
-    @Column(name = "GHI_CHU", length = 255)
-    private String ghiChu;
+    @Column(name = "phong_hoc", length = 10)
+    private String phongHoc;
 
-    public Long getId() {
+    @Column(name = "hoc_ky", nullable = false)
+    private Integer hocKy;
+
+    @Column(name = "nam_hoc", length = 9, nullable = false)
+    private String namHoc;
+
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
+    }
+
+    public LopHoc getLop() {
+        return lop;
+    }
+
+    public void setLop(LopHoc lop) {
+        this.lop = lop;
+    }
+
+    public MonHoc getMonHoc() {
+        return monHoc;
+    }
+
+    public void setMonHoc(MonHoc monHoc) {
+        this.monHoc = monHoc;
+    }
+
+    public GiaoVien getGiaoVien() {
+        return giaoVien;
+    }
+
+    public void setGiaoVien(GiaoVien giaoVien) {
+        this.giaoVien = giaoVien;
     }
 
     public Integer getThu() {
@@ -54,11 +96,27 @@ public class ThoiKhoaBieu {
         this.soTiet = soTiet;
     }
 
-    public String getGhiChu() {
-        return ghiChu;
+    public String getPhongHoc() {
+        return phongHoc;
     }
 
-    public void setGhiChu(String ghiChu) {
-        this.ghiChu = ghiChu;
+    public void setPhongHoc(String phongHoc) {
+        this.phongHoc = phongHoc;
+    }
+
+    public Integer getHocKy() {
+        return hocKy;
+    }
+
+    public void setHocKy(Integer hocKy) {
+        this.hocKy = hocKy;
+    }
+
+    public String getNamHoc() {
+        return namHoc;
+    }
+
+    public void setNamHoc(String namHoc) {
+        this.namHoc = namHoc;
     }
 }

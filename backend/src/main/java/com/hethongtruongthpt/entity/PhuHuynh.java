@@ -3,34 +3,46 @@ package com.hethongtruongthpt.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "PHU_HUYNH")
+@Table(name = "phu_huynh")
 public class PhuHuynh {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_PHUHUYNH")
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
-    @Column(name = "HO_TEN", length = 100)
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "ho_ten", length = 100, nullable = false)
     private String hoTen;
 
-    @Column(name = "SO_DIEN_THOAI", length = 15)
+    @Column(name = "so_dien_thoai", length = 15, nullable = false)
     private String soDienThoai;
 
-    @Column(name = "EMAIL", length = 100)
+    @Column(name = "email", length = 100)
     private String email;
 
-    @Column(name = "DIA_CHI", length = 255)
-    private String diaChi;
+    @Column(name = "quan_he", nullable = false)
+    private String quanHe; // CHA, ME, NGUOI_GIAM_HO
 
-    @Column(name = "NGHE_NGHIEP", length = 100)
-    private String ngheNghiep;
+    @Column(name = "is_sms_active", nullable = false)
+    private Boolean isSmSActive = true;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public String getHoTen() {
@@ -57,19 +69,19 @@ public class PhuHuynh {
         this.email = email;
     }
 
-    public String getDiaChi() {
-        return diaChi;
+    public String getQuanHe() {
+        return quanHe;
     }
 
-    public void setDiaChi(String diaChi) {
-        this.diaChi = diaChi;
+    public void setQuanHe(String quanHe) {
+        this.quanHe = quanHe;
     }
 
-    public String getNgheNghiep() {
-        return ngheNghiep;
+    public Boolean getIsSmSActive() {
+        return isSmSActive;
     }
 
-    public void setNgheNghiep(String ngheNghiep) {
-        this.ngheNghiep = ngheNghiep;
+    public void setIsSmSActive(Boolean isSmSActive) {
+        this.isSmSActive = isSmSActive;
     }
 }

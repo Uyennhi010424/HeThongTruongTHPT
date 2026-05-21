@@ -1,78 +1,79 @@
 package com.hethongtruongthpt.entity;
 
 import jakarta.persistence.*;
-
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "HOC_SINH")
+@Table(name = "hoc_sinh")
 public class HocSinh {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_HOCSINH")
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "ID_LOP")
-    private LopHoc lopHoc;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(name = "ID_HOCBA")
-    private Long hocBaId;
+    @Column(name = "ma_hoc_sinh", length = 20, nullable = false, unique = true)
+    private String maHocSinh;
 
-    @Column(name = "ID_DANTOC")
-    private Long danTocId;
-
-    @Column(name = "DAN_TOC", length = 100)
-    private String danToc;
-
-    @Column(name = "ID_PHUHUYNH")
-    private Long phuHuynhId;
-
-    @Column(name = "TON_GIAO", length = 100)
-    private String tonGiao;
-
-    @Column(name = "HO_TEN", length = 100)
+    @Column(name = "ho_ten", length = 100, nullable = false)
     private String hoTen;
 
-    @Column(name = "NGAY_SINH")
+    @Column(name = "ngay_sinh", nullable = false)
     private LocalDate ngaySinh;
 
-    @Column(name = "GIOI_TINH")
-    private Boolean gioiTinh;
+    @Column(name = "gioi_tinh", nullable = false)
+    private String gioiTinh; // NAM or NU
 
-    @Column(name = "DIA_CHI", length = 255)
+    @ManyToOne
+    @JoinColumn(name = "lop_id")
+    private LopHoc lop;
+
+    @Column(name = "dia_chi")
     private String diaChi;
 
-    @Column(name = "SO_DIEN_THOAI", length = 15)
-    private String sdt;
-
-    @Column(name = "EMAIL", length = 100)
-    private String email;
-
-    @Column(name = "NAM_NHAP_HOC")
+    @Column(name = "nam_nhap_hoc", nullable = false)
     private Integer namNhapHoc;
 
-    @Column(name = "MA_BHYT", length = 20)
-    private String maBhyt;
+    @Column(name = "anh_dai_dien", length = 255)
+    private String anhDaiDien;
 
-    @Column(name = "DIEN_CHINH_SACH")
-    private Boolean dienChinhSach;
+    @Column(name = "fcm_token", length = 500)
+    private String fcmToken;
 
-    @Column(name = "TRANG_THAI")
-    private Integer trangThai;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @Column(name = "CREATED_AT")
-    private java.time.LocalDateTime createdAt;
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
 
-    @Column(name = "UPDATED_AT")
-    private java.time.LocalDateTime updatedAt;
-
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public String getMaHocSinh() {
+        return maHocSinh;
+    }
+
+    public void setMaHocSinh(String maHocSinh) {
+        this.maHocSinh = maHocSinh;
     }
 
     public String getHoTen() {
@@ -91,12 +92,20 @@ public class HocSinh {
         this.ngaySinh = ngaySinh;
     }
 
-    public Boolean getGioiTinh() {
+    public String getGioiTinh() {
         return gioiTinh;
     }
 
-    public void setGioiTinh(Boolean gioiTinh) {
+    public void setGioiTinh(String gioiTinh) {
         this.gioiTinh = gioiTinh;
+    }
+
+    public LopHoc getLop() {
+        return lop;
+    }
+
+    public void setLop(LopHoc lop) {
+        this.lop = lop;
     }
 
     public String getDiaChi() {
@@ -107,70 +116,6 @@ public class HocSinh {
         this.diaChi = diaChi;
     }
 
-    public String getSdt() {
-        return sdt;
-    }
-
-    public void setSdt(String sdt) {
-        this.sdt = sdt;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public LopHoc getLopHoc() {
-        return lopHoc;
-    }
-
-    public void setLopHoc(LopHoc lopHoc) {
-        this.lopHoc = lopHoc;
-    }
-
-    public Long getHocBaId() {
-        return hocBaId;
-    }
-
-    public void setHocBaId(Long hocBaId) {
-        this.hocBaId = hocBaId;
-    }
-
-    public Long getDanTocId() {
-        return danTocId;
-    }
-
-    public void setDanTocId(Long danTocId) {
-        this.danTocId = danTocId;
-    }
-
-    public String getDanToc() {
-        return danToc;
-    }
-
-    public void setDanToc(String danToc) {
-        this.danToc = danToc;
-    }
-
-    public Long getPhuHuynhId() {
-        return phuHuynhId;
-    }
-
-    public void setPhuHuynhId(Long phuHuynhId) {
-        this.phuHuynhId = phuHuynhId;
-    }
-
-    public String getTonGiao() {
-        return tonGiao;
-    }
-
-    public void setTonGiao(String tonGiao) {
-        this.tonGiao = tonGiao;
-    }
-
     public Integer getNamNhapHoc() {
         return namNhapHoc;
     }
@@ -179,43 +124,27 @@ public class HocSinh {
         this.namNhapHoc = namNhapHoc;
     }
 
-    public String getMaBhyt() {
-        return maBhyt;
+    public String getAnhDaiDien() {
+        return anhDaiDien;
     }
 
-    public void setMaBhyt(String maBhyt) {
-        this.maBhyt = maBhyt;
+    public void setAnhDaiDien(String anhDaiDien) {
+        this.anhDaiDien = anhDaiDien;
     }
 
-    public Boolean getDienChinhSach() {
-        return dienChinhSach;
+    public String getFcmToken() {
+        return fcmToken;
     }
 
-    public void setDienChinhSach(Boolean dienChinhSach) {
-        this.dienChinhSach = dienChinhSach;
+    public void setFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
     }
 
-    public Integer getTrangThai() {
-        return trangThai;
-    }
-
-    public void setTrangThai(Integer trangThai) {
-        this.trangThai = trangThai;
-    }
-
-    public java.time.LocalDateTime getCreatedAt() {
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(java.time.LocalDateTime createdAt) {
+    public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public java.time.LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(java.time.LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }
