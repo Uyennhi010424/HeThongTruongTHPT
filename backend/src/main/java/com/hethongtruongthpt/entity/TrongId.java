@@ -8,35 +8,35 @@ import java.io.Serializable;
 @Embeddable
 public class TrongId implements Serializable {
     @Column(name = "ID_HANHKIEM")
-    private Long hanhKiemId;
+    private Integer hanhKiemId;
 
     @Column(name = "ID_HOCKY")
-    private Long hocKyId;
+    private Integer hocKyId;
 
     @Column(name = "ID_NAMHOC")
-    private Long namHocId;
+    private Integer namHocId;
 
-    public Long getHanhKiemId() {
+    public Integer getHanhKiemId() {
         return hanhKiemId;
     }
 
-    public void setHanhKiemId(Long hanhKiemId) {
+    public void setHanhKiemId(Integer hanhKiemId) {
         this.hanhKiemId = hanhKiemId;
     }
 
-    public Long getHocKyId() {
+    public Integer getHocKyId() {
         return hocKyId;
     }
 
-    public void setHocKyId(Long hocKyId) {
+    public void setHocKyId(Integer hocKyId) {
         this.hocKyId = hocKyId;
     }
 
-    public Long getNamHocId() {
+    public Integer getNamHocId() {
         return namHocId;
     }
 
-    public void setNamHocId(Long namHocId) {
+    public void setNamHocId(Integer namHocId) {
         this.namHocId = namHocId;
     }
 }

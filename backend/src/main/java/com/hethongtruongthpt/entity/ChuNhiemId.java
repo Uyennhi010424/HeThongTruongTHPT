@@ -1,32 +1,31 @@
 package com.hethongtruongthpt.entity;
+import java.io.Serializable;
+import java.util.Objects;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 
-import java.io.Serializable;
-import java.util.Objects;
-
 @Embeddable
 public class ChuNhiemId implements Serializable {
     @Column(name = "ID_GIAOVIEN")
-    private Long giaoVienId;
+    private Integer giaoVienId;
 
     @Column(name = "ID_LOP")
-    private Long lopId;
+    private Integer lopId;
 
-    public Long getGiaoVienId() {
+    public Integer getGiaoVienId() {
         return giaoVienId;
     }
 
-    public void setGiaoVienId(Long giaoVienId) {
+    public void setGiaoVienId(Integer giaoVienId) {
         this.giaoVienId = giaoVienId;
     }
 
-    public Long getLopId() {
+    public Integer getLopId() {
         return lopId;
     }
 
-    public void setLopId(Long lopId) {
+    public void setLopId(Integer lopId) {
         this.lopId = lopId;
     }
 

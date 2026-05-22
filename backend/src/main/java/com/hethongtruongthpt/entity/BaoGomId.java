@@ -8,46 +8,46 @@ import java.io.Serializable;
 @Embeddable
 public class BaoGomId implements Serializable {
     @Column(name = "ID_TKB")
-    private Long tkbId;
+    private Integer tkbId;
 
     @Column(name = "ID_HOCKY")
-    private Long hocKyId;
+    private Integer hocKyId;
 
     @Column(name = "ID_NAMHOC")
-    private Long namHocId;
+    private Integer namHocId;
 
     @Column(name = "ID_LICHTHI")
-    private Long lichThiId;
+    private Integer lichThiId;
 
-    public Long getTkbId() {
+    public Integer getTkbId() {
         return tkbId;
     }
 
-    public void setTkbId(Long tkbId) {
+    public void setTkbId(Integer tkbId) {
         this.tkbId = tkbId;
     }
 
-    public Long getHocKyId() {
+    public Integer getHocKyId() {
         return hocKyId;
     }
 
-    public void setHocKyId(Long hocKyId) {
+    public void setHocKyId(Integer hocKyId) {
         this.hocKyId = hocKyId;
     }
 
-    public Long getNamHocId() {
+    public Integer getNamHocId() {
         return namHocId;
     }
 
-    public void setNamHocId(Long namHocId) {
+    public void setNamHocId(Integer namHocId) {
         this.namHocId = namHocId;
     }
 
-    public Long getLichThiId() {
+    public Integer getLichThiId() {
         return lichThiId;
     }
 
-    public void setLichThiId(Long lichThiId) {
+    public void setLichThiId(Integer lichThiId) {
         this.lichThiId = lichThiId;
     }
 }

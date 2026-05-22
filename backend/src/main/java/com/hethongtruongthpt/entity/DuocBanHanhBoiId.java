@@ -8,24 +8,24 @@ import java.io.Serializable;
 @Embeddable
 public class DuocBanHanhBoiId implements Serializable {
     @Column(name = "ID_VANBAN")
-    private Long vanBanId;
+    private Integer vanBanId;
 
     @Column(name = "ID_USER")
-    private Long userId;
+    private Integer userId;
 
-    public Long getVanBanId() {
+    public Integer getVanBanId() {
         return vanBanId;
     }
 
-    public void setVanBanId(Long vanBanId) {
+    public void setVanBanId(Integer vanBanId) {
         this.vanBanId = vanBanId;
     }
 
-    public Long getUserId() {
+    public Integer getUserId() {
         return userId;
     }
 
-    public void setUserId(Long userId) {
+    public void setUserId(Integer userId) {
         this.userId = userId;
     }
 }

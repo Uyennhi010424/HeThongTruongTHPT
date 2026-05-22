@@ -5,7 +5,7 @@ import com.hethongtruongthpt.entity.PhanQuyenId;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PhanQuyenRepository extends JpaRepository<PhanQuyen, PhanQuyenId> {
-	java.util.List<PhanQuyen> findByIdUserId(Long userId);
+	java.util.List<PhanQuyen> findByIdUserId(Integer userId);
 
-	void deleteByIdUserId(Long userId);
+	void deleteByIdUserId(Integer userId);
 }

@@ -5,28 +5,28 @@ import com.hethongtruongthpt.enums.HanhKiemEnum;
 import java.time.LocalDate;
 
 public class HanhKiemDTO {
-    private Long id;
-    private Long hocSinhId;
+    private Integer id;
+    private Integer hocSinhId;
     private Integer hocKy;
     private String namHoc;
     private String nhanXet;
     private HanhKiemEnum xepLoai;
-    private Long giaoVienId;
+    private Integer giaoVienId;
     private LocalDate ngayDanhGia;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
-    public Long getHocSinhId() {
+    public Integer getHocSinhId() {
         return hocSinhId;
     }
 
-    public void setHocSinhId(Long hocSinhId) {
+    public void setHocSinhId(Integer hocSinhId) {
         this.hocSinhId = hocSinhId;
     }
 
@@ -62,11 +62,11 @@ public class HanhKiemDTO {
         this.xepLoai = xepLoai;
     }
 
-    public Long getGiaoVienId() {
+    public Integer getGiaoVienId() {
         return giaoVienId;
     }
 
-    public void setGiaoVienId(Long giaoVienId) {
+    public void setGiaoVienId(Integer giaoVienId) {
         this.giaoVienId = giaoVienId;
     }
 

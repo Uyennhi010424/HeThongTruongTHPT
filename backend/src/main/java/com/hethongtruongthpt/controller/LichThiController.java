@@ -23,7 +23,7 @@ public class LichThiController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<LichThi>> getById(@PathVariable Long id) {
+	public ResponseEntity<ApiResponse<LichThi>> getById(@PathVariable Integer id) {
 		return ResponseEntity.ok(ApiResponse.ok(lichThiService.getById(id)));
 	}
 
@@ -33,12 +33,12 @@ public class LichThiController {
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<ApiResponse<LichThi>> update(@PathVariable Long id, @RequestBody LichThi lichThi) {
+	public ResponseEntity<ApiResponse<LichThi>> update(@PathVariable Integer id, @RequestBody LichThi lichThi) {
 		return ResponseEntity.ok(ApiResponse.ok(lichThiService.update(id, lichThi)));
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Long id) {
+	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Integer id) {
 		lichThiService.delete(id);
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}

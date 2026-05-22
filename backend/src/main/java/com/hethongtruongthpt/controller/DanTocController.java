@@ -23,7 +23,7 @@ public class DanTocController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<DanToc>> getById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<DanToc>> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.ok(danTocService.getById(id)));
     }
 
@@ -33,12 +33,12 @@ public class DanTocController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<DanToc>> update(@PathVariable Long id, @RequestBody DanToc danToc) {
+    public ResponseEntity<ApiResponse<DanToc>> update(@PathVariable Integer id, @RequestBody DanToc danToc) {
         return ResponseEntity.ok(ApiResponse.ok(danTocService.update(id, danToc)));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Integer id) {
         danTocService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
     }

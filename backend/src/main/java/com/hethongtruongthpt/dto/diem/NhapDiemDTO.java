@@ -5,37 +5,37 @@ import com.hethongtruongthpt.enums.LoaiDiemEnum;
 import java.time.LocalDate;
 
 public class NhapDiemDTO {
-    private Long id;
-    private Long hocSinhId;
-    private Long monHocId;
+    private Integer id;
+    private Integer hocSinhId;
+    private Integer monHocId;
     private LoaiDiemEnum loaiDiem;
     private Double diem;
     private Integer hocKy;
     private String namHoc;
-    private Long giaoVienId;
+    private Integer giaoVienId;
     private LocalDate ngayNhap;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
-    public Long getHocSinhId() {
+    public Integer getHocSinhId() {
         return hocSinhId;
     }
 
-    public void setHocSinhId(Long hocSinhId) {
+    public void setHocSinhId(Integer hocSinhId) {
         this.hocSinhId = hocSinhId;
     }
 
-    public Long getMonHocId() {
+    public Integer getMonHocId() {
         return monHocId;
     }
 
-    public void setMonHocId(Long monHocId) {
+    public void setMonHocId(Integer monHocId) {
         this.monHocId = monHocId;
     }
 
@@ -71,11 +71,11 @@ public class NhapDiemDTO {
         this.namHoc = namHoc;
     }
 
-    public Long getGiaoVienId() {
+    public Integer getGiaoVienId() {
         return giaoVienId;
     }
 
-    public void setGiaoVienId(Long giaoVienId) {
+    public void setGiaoVienId(Integer giaoVienId) {
         this.giaoVienId = giaoVienId;
     }
 

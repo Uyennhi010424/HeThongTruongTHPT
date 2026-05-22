@@ -8,7 +8,7 @@ public class DanToc {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_DANTOC")
-    private Long id;
+    private Integer id;
 
     @Column(name = "TEN_DANTOC", length = 50)
     private String tenDanToc;
@@ -16,11 +16,11 @@ public class DanToc {
     @Column(name = "MO_TA", length = 255)
     private String moTa;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

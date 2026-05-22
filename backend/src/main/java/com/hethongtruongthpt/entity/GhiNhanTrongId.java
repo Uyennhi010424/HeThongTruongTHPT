@@ -8,24 +8,24 @@ import java.io.Serializable;
 @Embeddable
 public class GhiNhanTrongId implements Serializable {
     @Column(name = "ID_DIEM")
-    private Long diemId;
+    private Integer diemId;
 
     @Column(name = "ID_NAMHOC")
-    private Long namHocId;
+    private Integer namHocId;
 
-    public Long getDiemId() {
+    public Integer getDiemId() {
         return diemId;
     }
 
-    public void setDiemId(Long diemId) {
+    public void setDiemId(Integer diemId) {
         this.diemId = diemId;
     }
 
-    public Long getNamHocId() {
+    public Integer getNamHocId() {
         return namHocId;
     }
 
-    public void setNamHocId(Long namHocId) {
+    public void setNamHocId(Integer namHocId) {
         this.namHocId = namHocId;
     }
 }

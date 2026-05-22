@@ -24,7 +24,7 @@ public class UserController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<UserDTO>> getById(@PathVariable("id") Long id) {
+	public ResponseEntity<ApiResponse<UserDTO>> getById(@PathVariable("id") Integer id) {
 		return ResponseEntity.ok(ApiResponse.ok(userService.getById(id)));
 	}
 
@@ -35,14 +35,14 @@ public class UserController {
 
 	@PutMapping("/{id}")
 	public ResponseEntity<ApiResponse<UserDTO>> update(
-		    @PathVariable("id") Long id,
+		    @PathVariable("id") Integer id,
 			@RequestBody UserRequest request
 	) {
 		return ResponseEntity.ok(ApiResponse.ok(userService.update(id, request)));
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable("id") Long id) {
+	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable("id") Integer id) {
 		userService.delete(id);
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}

@@ -19,7 +19,7 @@ public class ThongBaoService {
         return thongBaoRepository.findAll();
     }
 
-    public ThongBao getById(Long id) {
+    public ThongBao getById(Integer id) {
         return thongBaoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông báo"));
     }
@@ -28,13 +28,13 @@ public class ThongBaoService {
         return thongBaoRepository.save(thongBao);
     }
 
-    public ThongBao update(Long id, ThongBao thongBao) {
+    public ThongBao update(Integer id, ThongBao thongBao) {
         getById(id);
         thongBao.setId(id);
         return thongBaoRepository.save(thongBao);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         thongBaoRepository.deleteById(id);
     }
 }

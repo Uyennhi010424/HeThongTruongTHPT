@@ -8,46 +8,46 @@ import java.io.Serializable;
 @Embeddable
 public class ApDungTrongId implements Serializable {
     @Column(name = "ID_LOP")
-    private Long lopId;
+    private Integer lopId;
 
     @Column(name = "ID_NAMHOC")
-    private Long namHocId;
+    private Integer namHocId;
 
     @Column(name = "ID_TKB")
-    private Long tkbId;
+    private Integer tkbId;
 
     @Column(name = "ID_LICHTHI")
-    private Long lichThiId;
+    private Integer lichThiId;
 
-    public Long getLopId() {
+    public Integer getLopId() {
         return lopId;
     }
 
-    public void setLopId(Long lopId) {
+    public void setLopId(Integer lopId) {
         this.lopId = lopId;
     }
 
-    public Long getNamHocId() {
+    public Integer getNamHocId() {
         return namHocId;
     }
 
-    public void setNamHocId(Long namHocId) {
+    public void setNamHocId(Integer namHocId) {
         this.namHocId = namHocId;
     }
 
-    public Long getTkbId() {
+    public Integer getTkbId() {
         return tkbId;
     }
 
-    public void setTkbId(Long tkbId) {
+    public void setTkbId(Integer tkbId) {
         this.tkbId = tkbId;
     }
 
-    public Long getLichThiId() {
+    public Integer getLichThiId() {
         return lichThiId;
     }
 
-    public void setLichThiId(Long lichThiId) {
+    public void setLichThiId(Integer lichThiId) {
         this.lichThiId = lichThiId;
     }
 }

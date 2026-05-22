@@ -23,7 +23,7 @@ public class DiemController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<Diem>> getById(@PathVariable Long id) {
+	public ResponseEntity<ApiResponse<Diem>> getById(@PathVariable Integer id) {
 		return ResponseEntity.ok(ApiResponse.ok(diemService.getById(id)));
 	}
 
@@ -33,12 +33,12 @@ public class DiemController {
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<ApiResponse<Diem>> update(@PathVariable Long id, @RequestBody Diem diem) {
+	public ResponseEntity<ApiResponse<Diem>> update(@PathVariable Integer id, @RequestBody Diem diem) {
 		return ResponseEntity.ok(ApiResponse.ok(diemService.update(id, diem)));
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Long id) {
+	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Integer id) {
 		diemService.delete(id);
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}

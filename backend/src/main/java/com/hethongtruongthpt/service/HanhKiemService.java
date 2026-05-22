@@ -19,7 +19,7 @@ public class HanhKiemService {
         return hanhKiemRepository.findAll();
     }
 
-    public HanhKiem getById(Long id) {
+    public HanhKiem getById(Integer id) {
         return hanhKiemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hạnh kiểm"));
     }
@@ -28,13 +28,13 @@ public class HanhKiemService {
         return hanhKiemRepository.save(hanhKiem);
     }
 
-    public HanhKiem update(Long id, HanhKiem hanhKiem) {
+    public HanhKiem update(Integer id, HanhKiem hanhKiem) {
         getById(id);
         hanhKiem.setId(id);
         return hanhKiemRepository.save(hanhKiem);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         hanhKiemRepository.deleteById(id);
     }
 }

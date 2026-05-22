@@ -19,7 +19,7 @@ public class DanTocService {
         return danTocRepository.findAll();
     }
 
-    public DanToc getById(Long id) {
+    public DanToc getById(Integer id) {
         return danTocRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dân tộc"));
     }
@@ -28,13 +28,13 @@ public class DanTocService {
         return danTocRepository.save(danToc);
     }
 
-    public DanToc update(Long id, DanToc danToc) {
+    public DanToc update(Integer id, DanToc danToc) {
         getById(id);
         danToc.setId(id);
         return danTocRepository.save(danToc);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         danTocRepository.deleteById(id);
     }
 }

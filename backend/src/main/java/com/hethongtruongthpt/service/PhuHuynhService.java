@@ -19,7 +19,7 @@ public class PhuHuynhService {
         return phuHuynhRepository.findAll();
     }
 
-    public PhuHuynh getById(Long id) {
+    public PhuHuynh getById(Integer id) {
         return phuHuynhRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phụ huynh"));
     }
@@ -28,13 +28,13 @@ public class PhuHuynhService {
         return phuHuynhRepository.save(phuHuynh);
     }
 
-    public PhuHuynh update(Long id, PhuHuynh phuHuynh) {
+    public PhuHuynh update(Integer id, PhuHuynh phuHuynh) {
         getById(id);
         phuHuynh.setId(id);
         return phuHuynhRepository.save(phuHuynh);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         phuHuynhRepository.deleteById(id);
     }
 }

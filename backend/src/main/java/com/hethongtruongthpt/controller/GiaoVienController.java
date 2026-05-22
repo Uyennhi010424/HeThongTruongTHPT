@@ -23,7 +23,7 @@ public class GiaoVienController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<GiaoVien>> getById(@PathVariable("id") Long id) {
+	public ResponseEntity<ApiResponse<GiaoVien>> getById(@PathVariable("id") Integer id) {
 		return ResponseEntity.ok(ApiResponse.ok(giaoVienService.getById(id)));
 	}
 
@@ -34,14 +34,14 @@ public class GiaoVienController {
 
 	@PutMapping("/{id}")
 	public ResponseEntity<ApiResponse<GiaoVien>> update(
-			@PathVariable("id") Long id,
+			@PathVariable("id") Integer id,
 			@RequestBody GiaoVien giaoVien
 	) {
 		return ResponseEntity.ok(ApiResponse.ok(giaoVienService.update(id, giaoVien)));
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable("id") Long id) {
+	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable("id") Integer id) {
 		giaoVienService.delete(id);
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}

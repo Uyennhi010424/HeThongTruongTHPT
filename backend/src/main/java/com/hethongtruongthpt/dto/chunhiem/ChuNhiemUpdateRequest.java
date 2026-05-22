@@ -1,13 +1,13 @@
 package com.hethongtruongthpt.dto.chunhiem;
 
 public class ChuNhiemUpdateRequest {
-    private Long lopId;
+    private Integer lopId;
 
-    public Long getLopId() {
+    public Integer getLopId() {
         return lopId;
     }
 
-    public void setLopId(Long lopId) {
+    public void setLopId(Integer lopId) {
         this.lopId = lopId;
     }
 }

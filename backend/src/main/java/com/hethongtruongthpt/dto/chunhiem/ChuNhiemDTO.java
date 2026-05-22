@@ -1,22 +1,22 @@
 package com.hethongtruongthpt.dto.chunhiem;
 
 public class ChuNhiemDTO {
-    private Long giaoVienId;
-    private Long lopId;
+    private Integer giaoVienId;
+    private Integer lopId;
 
-    public Long getGiaoVienId() {
+    public Integer getGiaoVienId() {
         return giaoVienId;
     }
 
-    public void setGiaoVienId(Long giaoVienId) {
+    public void setGiaoVienId(Integer giaoVienId) {
         this.giaoVienId = giaoVienId;
     }
 
-    public Long getLopId() {
+    public Integer getLopId() {
         return lopId;
     }
 
-    public void setLopId(Long lopId) {
+    public void setLopId(Integer lopId) {
         this.lopId = lopId;
     }
 }

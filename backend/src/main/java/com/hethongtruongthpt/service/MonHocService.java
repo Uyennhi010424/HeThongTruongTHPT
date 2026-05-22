@@ -19,7 +19,7 @@ public class MonHocService {
         return monHocRepository.findAll();
     }
 
-    public MonHoc getById(Long id) {
+    public MonHoc getById(Integer id) {
         return monHocRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy môn học"));
     }
@@ -28,13 +28,13 @@ public class MonHocService {
         return monHocRepository.save(monHoc);
     }
 
-    public MonHoc update(Long id, MonHoc monHoc) {
+    public MonHoc update(Integer id, MonHoc monHoc) {
         getById(id);
         monHoc.setId(id);
         return monHocRepository.save(monHoc);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         monHocRepository.deleteById(id);
     }
 }

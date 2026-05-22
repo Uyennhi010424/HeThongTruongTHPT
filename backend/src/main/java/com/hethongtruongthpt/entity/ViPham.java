@@ -11,7 +11,7 @@ public class ViPham {
     @Id
     @Column(name = "ID_VIPHAM")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(name = "NOI_DUNG", length = 255)
     private String noiDung;
@@ -23,11 +23,11 @@ public class ViPham {
     @Column(name = "NGAY_VI_PHAM")
     private LocalDate ngayViPham;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

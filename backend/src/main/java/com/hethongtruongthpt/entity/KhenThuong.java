@@ -10,7 +10,7 @@ public class KhenThuong {
     @Id
     @Column(name = "ID_KHENTHUONG")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(name = "NOI_DUNG", length = 255)
     private String noiDung;
@@ -18,11 +18,11 @@ public class KhenThuong {
     @Column(name = "NGAY_KHEN")
     private LocalDate ngayKhen;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

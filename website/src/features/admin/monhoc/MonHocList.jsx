@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../../components/common/Header.jsx";
+import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
   createMonHoc,
@@ -246,32 +246,28 @@ export default function MonHocList() {
 
   return (
     <div className="page users-page">
-      <Header title="Danh mục môn học" />
-
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">Quản lý môn học</div>
-          <div className="users-subtitle">
-            Theo dõi, cập nhật thông tin và hình thức đánh giá môn
+      <PageHeader
+        title="Danh mục môn học"
+        description="Theo dõi, cập nhật thông tin và hình thức đánh giá môn."
+        actions={
+          <div className="users-actions">
+            <div className="dash-search users-search">
+              <span className="dot" />
+              <input
+                placeholder="Tìm theo tên môn hoặc hình thức đánh giá"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+              />
+            </div>
+            <button className="btn-primary" onClick={openCreate}>
+              Thêm môn học
+            </button>
+            <button className="btn-outline" onClick={handleAddStandardSubjects}>
+              Bổ sung đủ môn theo quy định
+            </button>
           </div>
-        </div>
-        <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm theo tên môn hoặc hình thức đánh giá"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </div>
-          <button className="btn-primary" onClick={openCreate}>
-            Thêm môn học
-          </button>
-          <button className="btn-outline" onClick={handleAddStandardSubjects}>
-            Bổ sung đủ môn theo quy định
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="users-stats">
         <div className="stat-card stat-blue">

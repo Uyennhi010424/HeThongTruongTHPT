@@ -8,57 +8,57 @@ import java.io.Serializable;
 @Embeddable
 public class PhanCongGiangDayId implements Serializable {
     @Column(name = "ID_GIAOVIEN")
-    private Long giaoVienId;
+    private Integer giaoVienId;
 
     @Column(name = "ID_MONHOC")
-    private Long monHocId;
+    private Integer monHocId;
 
     @Column(name = "ID_LOP")
-    private Long lopId;
+    private Integer lopId;
 
     @Column(name = "ID_NAMHOC")
-    private Long namHocId;
+    private Integer namHocId;
 
     @Column(name = "ID_TKB")
-    private Long tkbId;
+    private Integer tkbId;
 
-    public Long getGiaoVienId() {
+    public Integer getGiaoVienId() {
         return giaoVienId;
     }
 
-    public void setGiaoVienId(Long giaoVienId) {
+    public void setGiaoVienId(Integer giaoVienId) {
         this.giaoVienId = giaoVienId;
     }
 
-    public Long getMonHocId() {
+    public Integer getMonHocId() {
         return monHocId;
     }
 
-    public void setMonHocId(Long monHocId) {
+    public void setMonHocId(Integer monHocId) {
         this.monHocId = monHocId;
     }
 
-    public Long getLopId() {
+    public Integer getLopId() {
         return lopId;
     }
 
-    public void setLopId(Long lopId) {
+    public void setLopId(Integer lopId) {
         this.lopId = lopId;
     }
 
-    public Long getNamHocId() {
+    public Integer getNamHocId() {
         return namHocId;
     }
 
-    public void setNamHocId(Long namHocId) {
+    public void setNamHocId(Integer namHocId) {
         this.namHocId = namHocId;
     }
 
-    public Long getTkbId() {
+    public Integer getTkbId() {
         return tkbId;
     }
 
-    public void setTkbId(Long tkbId) {
+    public void setTkbId(Integer tkbId) {
         this.tkbId = tkbId;
     }
 }

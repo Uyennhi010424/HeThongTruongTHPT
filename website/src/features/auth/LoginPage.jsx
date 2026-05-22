@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../../api/authApi";
 import { setAuth } from "../../store/authStore";
+import MaterialIcon from "../../components/edu/MaterialIcon.jsx";
 
 export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }) {
   const [username, setUsername] = useState("");
@@ -33,24 +34,23 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
   );
 
   useEffect(() => {
-    if (expectedRole) {
-      setSelectedRole(expectedRole);
-    }
+    if (expectedRole) setSelectedRole(expectedRole);
   }, [expectedRole]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
     const normalizedUsername = username.trim();
     const normalizedPassword = password.trim();
     if (!normalizedUsername || !normalizedPassword) {
       setError("Vui lòng nhập đầy đủ tài khoản và mật khẩu.");
       return;
     }
-
     try {
-      const res = await login({ username: normalizedUsername, password: normalizedPassword });
+      const res = await login({
+        username: normalizedUsername,
+        password: normalizedPassword
+      });
       const token = res?.data?.data?.token || "";
       const role = res?.data?.data?.role || "";
       if (!token || !role) {
@@ -70,55 +70,71 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
   };
 
   return (
-    <div className="page login-page">
-      <div className="card login-card">
-        <div className="login-header">
-          <div className="login-badge">HT</div>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest p-8 shadow-[0_18px_40px_rgba(11,28,48,0.12)]">
+        <div className="mb-8 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-on-primary">
+            <MaterialIcon name="school" className="text-2xl" />
+          </div>
           <div>
-            <h2>{title}</h2>
-            <div className="login-subtitle">Hệ thống quản lý trường THPT</div>
+            <h1 className="text-headline-md font-bold text-primary">EduManager Pro</h1>
+            <p className="text-label-sm text-on-surface-variant">{title}</p>
           </div>
         </div>
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label className="form-field">
-            <span>Vai trò</span>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="mb-1 block font-label-md text-on-surface-variant">Vai trò</label>
             <select
               value={selectedRole}
-              onChange={(event) => {
-                const value = event.target.value;
+              onChange={(e) => {
+                const value = e.target.value;
                 setSelectedRole(value);
-                const next = loginRoutes[value] || "/login";
-                navigate(next);
+                navigate(loginRoutes[value] || "/login");
               }}
+              className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5 font-body-md focus:border-secondary focus:ring-2 focus:ring-secondary/20"
             >
               <option value="ADMIN">Quản trị</option>
               <option value="GIAOVIEN">Giáo viên</option>
               <option value="HOCSINH">Học sinh</option>
               <option value="PHUHUYNH">Phụ huynh</option>
             </select>
-          </label>
-          <label className="form-field">
-            <span>Tài khoản</span>
+          </div>
+          <div>
+            <label className="mb-1 block font-label-md text-on-surface-variant">Tài khoản</label>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="vd: admin"
+              className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5 font-body-md focus:border-secondary focus:ring-2 focus:ring-secondary/20"
             />
-          </label>
-          <label className="form-field">
-            <span>Mật khẩu</span>
+          </div>
+          <div>
+            <label className="mb-1 block font-label-md text-on-surface-variant">Mật khẩu</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••"
+              className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5 font-body-md focus:border-secondary focus:ring-2 focus:ring-secondary/20"
             />
-          </label>
-          {error && <div className="form-error">{error}</div>}
-          <button className="btn-primary" type="submit">
+          </div>
+          {error && (
+            <p className="rounded-lg bg-error-container px-3 py-2 text-body-sm text-on-error-container">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-label-md text-on-primary shadow-md transition-all hover:brightness-110 active:scale-[0.98]"
+          >
+            <MaterialIcon name="login" />
             Đăng nhập
           </button>
         </form>
+        <p className="mt-6 text-center text-label-sm text-outline">
+          Hệ thống quản lý giáo dục THPT
+        </p>
       </div>
     </div>
   );

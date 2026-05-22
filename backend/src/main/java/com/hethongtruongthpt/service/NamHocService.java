@@ -19,26 +19,26 @@ public class NamHocService {
         return namHocRepository.findAll();
     }
 
-    public NamHoc getById(Long id) {
+    public NamHoc getById(Integer id) {
         return namHocRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy năm học"));
     }
 
     public NamHoc create(NamHoc namHoc) {
         if (namHoc.getId() == null) {
-            Long maxId = namHocRepository.findMaxId();
+            Integer maxId = namHocRepository.findMaxId();
             namHoc.setId(maxId + 1);
         }
         return namHocRepository.save(namHoc);
     }
 
-    public NamHoc update(Long id, NamHoc namHoc) {
+    public NamHoc update(Integer id, NamHoc namHoc) {
         getById(id);
         namHoc.setId(id);
         return namHocRepository.save(namHoc);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         namHocRepository.deleteById(id);
     }
 }

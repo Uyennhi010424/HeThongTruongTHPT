@@ -140,38 +140,38 @@ public class SampleDataSeeder implements CommandLineRunner {
     }
 
     private void seedNamHoc() {
-        if (namHocRepository.count() > 0) return;
+    if (namHocRepository.count() > 0) return;
 
-        NamHoc nam202324 = new NamHoc();
-        nam202324.setTenNamHoc("2023-2024");
-        nam202324.setHk1NgayBatDau(LocalDate.of(2023, 9, 1));
-        nam202324.setHk1NgayKetThuc(LocalDate.of(2023, 12, 30));
-        nam202324.setHk2NgayBatDau(LocalDate.of(2024, 1, 5));
-        nam202324.setHk2NgayKetThuc(LocalDate.of(2024, 5, 31));
-        nam202324.setDeadlineNhapDiemHk1(LocalDate.of(2024, 1, 10));
-        nam202324.setDeadlineNhapDiemHk2(LocalDate.of(2024, 6, 15));
-        nam202324.setTrangThai("DA_DONG");
+    NamHoc nam202324 = new NamHoc();
+    nam202324.setTenNamHoc("2023-2024");
+    nam202324.setNgayBatDauHk1(LocalDate.of(2023, 9, 1));       // sửa
+    nam202324.setNgayKetThucHk1(LocalDate.of(2023, 12, 30));    // sửa
+    nam202324.setNgayBatDauHk2(LocalDate.of(2024, 1, 5));       // sửa
+    nam202324.setNgayKetThucHk2(LocalDate.of(2024, 5, 31));     // sửa
+    nam202324.setDeadlineNhapDiemHk1(LocalDate.of(2024, 1, 10));
+    nam202324.setDeadlineNhapDiemHk2(LocalDate.of(2024, 6, 15));
+    nam202324.setTrangThai("DA_DONG");
 
-        NamHoc nam202425 = new NamHoc();
-        nam202425.setTenNamHoc("2024-2025");
-        nam202425.setHk1NgayBatDau(LocalDate.of(2024, 9, 1));
-        nam202425.setHk1NgayKetThuc(LocalDate.of(2024, 12, 30));
-        nam202425.setHk2NgayBatDau(LocalDate.of(2025, 1, 5));
-        nam202425.setHk2NgayKetThuc(LocalDate.of(2025, 5, 31));
-        nam202425.setDeadlineNhapDiemHk1(LocalDate.of(2025, 1, 10));
-        nam202425.setDeadlineNhapDiemHk2(LocalDate.of(2025, 6, 15));
-        nam202425.setTrangThai("DA_DONG");
+    NamHoc nam202425 = new NamHoc();
+    nam202425.setTenNamHoc("2024-2025");
+    nam202425.setNgayBatDauHk1(LocalDate.of(2024, 9, 1));
+    nam202425.setNgayKetThucHk1(LocalDate.of(2024, 12, 30));
+    nam202425.setNgayBatDauHk2(LocalDate.of(2025, 1, 5));
+    nam202425.setNgayKetThucHk2(LocalDate.of(2025, 5, 31));
+    nam202425.setDeadlineNhapDiemHk1(LocalDate.of(2025, 1, 10));
+    nam202425.setDeadlineNhapDiemHk2(LocalDate.of(2025, 6, 15));
+    nam202425.setTrangThai("DA_DONG");
 
-        NamHoc nam202526 = new NamHoc();
-        nam202526.setTenNamHoc("2025-2026");
-        nam202526.setHk1NgayBatDau(LocalDate.of(2025, 9, 1));
-        nam202526.setHk1NgayKetThuc(LocalDate.of(2025, 12, 30));
-        nam202526.setHk2NgayBatDau(LocalDate.of(2026, 1, 5));
-        nam202526.setHk2NgayKetThuc(LocalDate.of(2026, 5, 31));
-        nam202526.setDeadlineNhapDiemHk1(LocalDate.of(2026, 1, 10));
-        nam202526.setDeadlineNhapDiemHk2(LocalDate.of(2026, 6, 15));
-        nam202526.setTrangThai("DANG_MO");
+    NamHoc nam202526 = new NamHoc();
+    nam202526.setTenNamHoc("2025-2026");
+    nam202526.setNgayBatDauHk1(LocalDate.of(2025, 9, 1));
+    nam202526.setNgayKetThucHk1(LocalDate.of(2025, 12, 30));
+    nam202526.setNgayBatDauHk2(LocalDate.of(2026, 1, 5));
+    nam202526.setNgayKetThucHk2(LocalDate.of(2026, 5, 31));
+    nam202526.setDeadlineNhapDiemHk1(LocalDate.of(2026, 1, 10));
+    nam202526.setDeadlineNhapDiemHk2(LocalDate.of(2026, 6, 15));
+    nam202526.setTrangThai("DANG_MO");
 
-        namHocRepository.saveAll(List.of(nam202324, nam202425, nam202526));
-    }
+    namHocRepository.saveAll(List.of(nam202324, nam202425, nam202526));
+}
 }

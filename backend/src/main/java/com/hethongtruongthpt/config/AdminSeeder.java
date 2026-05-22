@@ -29,6 +29,15 @@ public class AdminSeeder implements CommandLineRunner {
         String username = "admin";
         String rawPassword = "admin123@";
 
+        try {
+            seedAdmin(username, rawPassword);
+        } catch (Exception ex) {
+            org.slf4j.LoggerFactory.getLogger(AdminSeeder.class)
+                    .error("Không thể seed tài khoản admin. Kiểm tra CSDL hethongthpt và bảng users.", ex);
+        }
+    }
+
+    private void seedAdmin(String username, String rawPassword) {
         User existing = userRepository.findByUsername(username).orElse(null);
         if (existing == null) {
             User admin = new User();

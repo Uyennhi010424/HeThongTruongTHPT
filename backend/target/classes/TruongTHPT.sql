@@ -1,731 +1,297 @@
-/*==============================================================*/
-/* DBMS name:      MySQL 5.0                                    */
-/* Created on:     1/20/2026 6:30:02 PM                         */
-/*==============================================================*/
-
-
-drop table if exists AP_DUNG;
-
-drop table if exists AP_DUNG_TRONG;
-
-drop table if exists BAO_GOM;
-
-drop table if exists CHU_NHIEM;
-
-drop table if exists CO;
-
-drop table if exists DANG_TAO;
-
-drop table if exists DANH_GIA;
-
-drop table if exists DANH_GIA_HK;
-
-drop table if exists DAN_TOC;
-
-drop table if exists DAT;
-
-drop table if exists DIEM;
-
-drop table if exists DUOC_BAN_HANH_BOI;
-
-drop table if exists DUOC_DANH_GIA;
-
-drop table if exists GHI_NHAN_TRONG;
-
-drop table if exists GIAO_VIEN;
-
-drop table if exists GOM;
-
-drop table if exists HANH_KIEM;
-
-drop table if exists HOC_BA;
-
-drop table if exists HOC_KY;
-
-drop table if exists HOC_SINH;
-
-drop table if exists KHEN_THUONG;
-
-drop table if exists LICH_THI;
-
-drop table if exists LIEN_KET_TAI_KHOAN;
-
-drop table if exists LOP;
-
-drop table if exists MON_HOC;
-
-drop table if exists NAM_HOC;
-
-drop table if exists NHAM_DEN;
-
-drop table if exists PHAN_CONG_GIANG_DAY;
-
-drop table if exists PHAN_QUYEN;
-
-drop table if exists PHU_HUYNH;
-
-drop table if exists QUOC_TICH;
-
-drop table if exists ROLES;
-
-drop table if exists SO_HUU_TAI_KHOAN;
-
-drop table if exists SU_DUNG_TAI_KHOAN;
-
-drop table if exists THOI_KHOA_BIEU;
-
-drop table if exists THONG_BAO;
-
-drop table if exists TRONG;
-
-drop table if exists USER;
-
-drop table if exists VAN_BAN;
-
-drop table if exists VI_PHAM;
-
-/*==============================================================*/
-/* Table: AP_DUNG                                               */
-/*==============================================================*/
-create table AP_DUNG
-(
-   ID_DIEM              int not null,
-   ID_HOCKY             int not null,
-   primary key (ID_DIEM, ID_HOCKY)
-);
-
-/*==============================================================*/
-/* Table: AP_DUNG_TRONG                                         */
-/*==============================================================*/
-create table AP_DUNG_TRONG
-(
-   ID_LOP               int not null,
-   ID_NAMHOC            int not null,
-   ID_TKB               int not null,
-   ID_LICHTHI           int not null,
-   primary key (ID_LOP, ID_NAMHOC, ID_TKB, ID_LICHTHI)
-);
-
-/*==============================================================*/
-/* Table: BAO_GOM                                               */
-/*==============================================================*/
-create table BAO_GOM
-(
-   ID_TKB               int not null,
-   ID_HOCKY             int not null,
-   ID_NAMHOC            int not null,
-   ID_LICHTHI           int not null,
-   primary key (ID_TKB, ID_HOCKY, ID_NAMHOC, ID_LICHTHI)
-);
-
-/*==============================================================*/
-/* Table: CHU_NHIEM                                             */
-/*==============================================================*/
-create table CHU_NHIEM
-(
-   ID_GIAOVIEN          int not null,
-   ID_LOP               int not null,
-   primary key (ID_GIAOVIEN, ID_LOP)
-);
-
-/*==============================================================*/
-/* Table: CO                                                    */
-/*==============================================================*/
-create table CO
-(
-   ID_HOCSINH           int not null,
-   ID_QUOCTICH          int not null,
-   primary key (ID_HOCSINH, ID_QUOCTICH)
-);
-
-/*==============================================================*/
-/* Table: DANG_TAO                                              */
-/*==============================================================*/
-create table DANG_TAO
-(
-   ID_USER              int not null,
-   ID_THONGBAO          int not null,
-   primary key (ID_USER, ID_THONGBAO)
-);
-
-/*==============================================================*/
-/* Table: DANH_GIA                                              */
-/*==============================================================*/
-create table DANH_GIA
-(
-   ID_MONHOC            int not null,
-   ID_DIEM              int not null,
-   primary key (ID_MONHOC, ID_DIEM)
-);
-
-/*==============================================================*/
-/* Table: DANH_GIA_HK                                           */
-/*==============================================================*/
-create table DANH_GIA_HK
-(
-   ID_HANHKIEM          int not null,
-   ID_GIAOVIEN          int not null,
-   ID_VIPHAM            int not null,
-   ID_KHENTHUONG        int not null,
-   primary key (ID_HANHKIEM, ID_GIAOVIEN, ID_VIPHAM, ID_KHENTHUONG)
-);
-
-/*==============================================================*/
-/* Table: DAN_TOC                                               */
-/*==============================================================*/
-create table DAN_TOC
-(
-      ID_DANTOC            int not null auto_increment,
-   TEN_DANTOC           varchar(50),
-   MO_TA                varchar(255),
-   primary key (ID_DANTOC)
-);
-
-/*==============================================================*/
-/* Table: DAT                                                   */
-/*==============================================================*/
-create table DAT
-(
-   ID_HOCSINH           int not null,
-   ID_DIEM              int not null,
-   primary key (ID_HOCSINH, ID_DIEM)
-);
-
-/*==============================================================*/
-/* Table: DIEM                                                  */
-/*==============================================================*/
-create table DIEM
-(
-      ID_DIEM              int not null auto_increment,
-   LOAI_DIEM            varchar(20),
-   DIEM_SO              float,
-   primary key (ID_DIEM)
-);
-
-/*==============================================================*/
-/* Table: DUOC_BAN_HANH_BOI                                     */
-/*==============================================================*/
-create table DUOC_BAN_HANH_BOI
-(
-   ID_VANBAN            int not null,
-   ID_USER              int not null,
-   primary key (ID_VANBAN, ID_USER)
-);
-
-/*==============================================================*/
-/* Table: DUOC_DANH_GIA                                         */
-/*==============================================================*/
-create table DUOC_DANH_GIA
-(
-   ID_HANHKIEM          int not null,
-   ID_HOCSINH           int not null,
-   ID_VIPHAM            int not null,
-   ID_KHENTHUONG        int not null,
-   primary key (ID_HANHKIEM, ID_HOCSINH, ID_VIPHAM, ID_KHENTHUONG)
-);
-
-/*==============================================================*/
-/* Table: GHI_NHAN_TRONG                                        */
-/*==============================================================*/
-create table GHI_NHAN_TRONG
-(
-   ID_DIEM              int not null,
-   ID_NAMHOC            int not null,
-   primary key (ID_DIEM, ID_NAMHOC)
-);
-
-/*==============================================================*/
-/* Table: GIAO_VIEN                                             */
-/*==============================================================*/
-create table GIAO_VIEN
-(
-      ID_GIAOVIEN          int not null auto_increment,
-   HO_TEN               varchar(100),
-   NGAY_SINH            date,
-   GIOI_TINH            bool,
-   BO_MON               varchar(100),
-   TRINH_DO             varchar(100),
-   SO_DIEN_THOAI        varchar(15),
-   EMAIL                varchar(100),
-   primary key (ID_GIAOVIEN)
-);
-
-/*==============================================================*/
-/* Table: GOM                                                   */
-/*==============================================================*/
-create table GOM
-(
-   ID_TKB               int not null,
-   ID_MONHOC            int not null,
-   ID_LICHTHI           int not null,
-   primary key (ID_TKB, ID_MONHOC, ID_LICHTHI)
-);
-
-/*==============================================================*/
-/* Table: HANH_KIEM                                             */
-/*==============================================================*/
-create table HANH_KIEM
-(
-      ID_HANHKIEM          int not null auto_increment,
-   XEP_LOAI             ENUM('TOT','KHA','TRUNG_BINH','YEU'),
-   NHAN_XET             varchar(255),
-   NGAY_DANH_GIA        date,
-   primary key (ID_HANHKIEM)
-);
-
-/*==============================================================*/
-/* Table: HOC_BA                                                */
-/*==============================================================*/
-create table HOC_BA
-(
-      ID_HOCBA             int not null auto_increment,
-   ID_NAMHOC            int not null,
-   HOC_LUC              varchar(20),
-   HANH_KIEM            varchar(20),
-   GHI_CHU              varchar(255),
-   primary key (ID_HOCBA)
-);
-
-/*==============================================================*/
-/* Table: HOC_KY                                                */
-/*==============================================================*/
-create table HOC_KY
-(
-      ID_HOCKY             int not null auto_increment,
-   TEN_HOCKY            varchar(20),
-   primary key (ID_HOCKY)
-);
-
-/*==============================================================*/
-/* Table: HOC_SINH                                              */
-/*==============================================================*/
-create table HOC_SINH
-(
-      ID_HOCSINH           int not null auto_increment,
-   ID_LOP               int not null,
-   ID_HOCBA             int not null,
-   ID_DANTOC            int not null,
-   ID_PHUHUYNH          int not null,
-   HO_TEN               varchar(100),
-   NGAY_SINH            date,
-   GIOI_TINH            bool,
-   DIA_CHI              varchar(255),
-   SO_DIEN_THOAI        varchar(15),
-   EMAIL                varchar(100),
-   NAM_NHAP_HOC         Year,
-   MA_BHYT              varchar(20),
-      DAN_TOC              varchar(100),
-      TON_GIAO             varchar(100),
-   DIEN_CHINH_SACH      bool,
-   TRANG_THAI           int,
-   CREATED_AT           datetime,
-   UPDATED_AT           datetime,
-   primary key (ID_HOCSINH)
-);
-
-/*==============================================================*/
-/* Table: KHEN_THUONG                                           */
-/*==============================================================*/
-create table KHEN_THUONG
-(
-      ID_KHENTHUONG        int not null auto_increment,
-   NOI_DUNG             varchar(255),
-   NGAY_KHEN            date,
-   primary key (ID_KHENTHUONG)
-);
-
-/*==============================================================*/
-/* Table: LICH_THI                                              */
-/*==============================================================*/
-create table LICH_THI
-(
-      ID_LICHTHI           int not null auto_increment,
-   NGAY_THI             date,
-   GIO_BAT_DAU          time,
-   THOI_GIAN_THI        int,
-   PHONG_THI            varchar(50),
-   GHI_CHU              varchar(255),
-   primary key (ID_LICHTHI)
-);
-
-/*==============================================================*/
-/* Table: LIEN_KET_TAI_KHOAN                                    */
-/*==============================================================*/
-create table LIEN_KET_TAI_KHOAN
-(
-   ID_PHUHUYNH          int not null,
-   ID_USER              int not null,
-   primary key (ID_PHUHUYNH, ID_USER)
-);
-
-/*==============================================================*/
-/* Table: LOP                                                   */
-/*==============================================================*/
-create table LOP
-(
-      ID_LOP               int not null auto_increment,
-   TEN_LOP              varchar(20),
-   KHOI                 varchar(10),
-   primary key (ID_LOP)
-);
-
-/*==============================================================*/
-/* Table: MON_HOC                                               */
-/*==============================================================*/
-create table MON_HOC
-(
-      ID_MONHOC            int not null auto_increment,
-   TEN_MONHOC           varchar(100),
-   HE_SO                float,
-   primary key (ID_MONHOC)
-);
-
-/*==============================================================*/
-/* Table: NAM_HOC                                               */
-/*==============================================================*/
-create table NAM_HOC
-(
-      ID_NAMHOC            int not null auto_increment,
-   TEN_NAMHOC           varchar(9),
-   primary key (ID_NAMHOC)
-);
-
-/*==============================================================*/
-/* Table: NHAM_DEN                                              */
-/*==============================================================*/
-create table NHAM_DEN
-(
-   ID_THONGBAO          int not null,
-   ID_ROLES             int not null,
-   primary key (ID_THONGBAO, ID_ROLES)
-);
-
-/*==============================================================*/
-/* Table: PHAN_CONG_GIANG_DAY                                   */
-/*==============================================================*/
-create table PHAN_CONG_GIANG_DAY
-(
-   ID_GIAOVIEN          int not null,
-   ID_MONHOC            int not null,
-   ID_LOP               int not null,
-   ID_NAMHOC            int not null,
-   ID_TKB               int not null,
-   primary key (ID_GIAOVIEN, ID_MONHOC, ID_LOP, ID_NAMHOC, ID_TKB)
-);
-
-/*==============================================================*/
-/* Table: PHAN_QUYEN                                            */
-/*==============================================================*/
-create table PHAN_QUYEN
-(
-   ID_ROLES             int not null,
-   ID_USER              int not null,
-   primary key (ID_ROLES, ID_USER)
-);
-
-/*==============================================================*/
-/* Table: PHU_HUYNH                                             */
-/*==============================================================*/
-create table PHU_HUYNH
-(
-      ID_PHUHUYNH          int not null auto_increment,
-   HO_TEN               varchar(100),
-   SO_DIEN_THOAI        varchar(15),
-   EMAIL                varchar(100),
-   DIA_CHI              varchar(255),
-   NGHE_NGHIEP          varchar(100),
-   primary key (ID_PHUHUYNH)
-);
-
-/*==============================================================*/
-/* Table: QUOC_TICH                                             */
-/*==============================================================*/
-create table QUOC_TICH
-(
-      ID_QUOCTICH          int not null auto_increment,
-   TEN_QUOCTICH         varchar(50),
-   MO_TA                varchar(255),
-   primary key (ID_QUOCTICH)
-);
-
-/*==============================================================*/
-/* Table: ROLES                                                 */
-/*==============================================================*/
-create table ROLES
-(
-      ID_ROLES             int not null auto_increment,
-   ROLE_NAME            varchar(30),
-   primary key (ID_ROLES)
-);
-
-/*==============================================================*/
-/* Table: SO_HUU_TAI_KHOAN                                      */
-/*==============================================================*/
-create table SO_HUU_TAI_KHOAN
-(
-   ID_USER              int not null,
-   ID_HOCSINH           int not null,
-   primary key (ID_USER, ID_HOCSINH)
-);
-
-/*==============================================================*/
-/* Table: SU_DUNG_TAI_KHOAN                                     */
-/*==============================================================*/
-create table SU_DUNG_TAI_KHOAN
-(
-   ID_USER              int not null,
-   ID_GIAOVIEN          int not null,
-   primary key (ID_USER, ID_GIAOVIEN)
-);
-
-/*==============================================================*/
-/* Table: THOI_KHOA_BIEU                                        */
-/*==============================================================*/
-create table THOI_KHOA_BIEU
-(
-      ID_TKB               int not null auto_increment,
-   THU                  int,
-   TIET_BAT_DAU         int,
-   SO_TIET              int,
-   GHI_CHU              varchar(255),
-   primary key (ID_TKB)
-);
-
-/*==============================================================*/
-/* Table: THONG_BAO                                             */
-/*==============================================================*/
-create table THONG_BAO
-(
-      ID_THONGBAO          int not null auto_increment,
-   TIEU_DE              varchar(50),
-   NOI_DUNG             varchar(255),
-   DOI_TUONG            ENUM('HOC_SINH','GIAO_VIEN','PHU_HUYNH','ALL'),
-   NGAY_DANG            datetime,
-   TRANG_THAI           int,
-   primary key (ID_THONGBAO)
-);
-
-/*==============================================================*/
-/* Table: TRONG                                                 */
-/*==============================================================*/
-create table TRONG
-(
-   ID_HANHKIEM          int not null,
-   ID_HOCKY             int not null,
-   ID_NAMHOC            int not null,
-   primary key (ID_HANHKIEM, ID_HOCKY, ID_NAMHOC)
-);
-
-/*==============================================================*/
-/* Table: USER                                                  */
-/*==============================================================*/
-create table USER
-(
-      ID_USER              int not null auto_increment,
-   USER_NAME            varchar(100),
-      PASSWORD             varchar(255),
-   EMAIL                varchar(100),
-   STATUS               int,
-   CREATE_AT            datetime,
-   UPDATE_AT            datetime,
-   primary key (ID_USER)
-);
-
-/*==============================================================*/
-/* Table: VAN_BAN                                               */
-/*==============================================================*/
-create table VAN_BAN
-(
-      ID_VANBAN            int not null auto_increment,
-   SO_HIEU              varchar(20),
-   LOAI_VAN_BAN         varchar(50),
-   NGAY_BAN_HANH        date,
-   primary key (ID_VANBAN)
-);
-
-/*==============================================================*/
-/* Table: VI_PHAM                                               */
-/*==============================================================*/
-create table VI_PHAM
-(
-      ID_VIPHAM            int not null auto_increment,
-   NOI_DUNG             varchar(255),
-   MUC_DO               ENUM('NHE','TRUNG_BINH','NGHIEM_TRONG'),
-   NGAY_VI_PHAM         date,
-   primary key (ID_VIPHAM)
-);
-
-alter table AP_DUNG add constraint FK_AP_DUNG foreign key (ID_HOCKY)
-      references HOC_KY (ID_HOCKY) on delete restrict on update restrict;
-
-alter table AP_DUNG add constraint FK_AP_DUNG2 foreign key (ID_DIEM)
-      references DIEM (ID_DIEM) on delete restrict on update restrict;
-
-alter table AP_DUNG_TRONG add constraint FK_AP_DUNG_TRONG foreign key (ID_LICHTHI)
-      references LICH_THI (ID_LICHTHI) on delete restrict on update restrict;
-
-alter table AP_DUNG_TRONG add constraint FK_AP_DUNG_TRONG2 foreign key (ID_LOP)
-      references LOP (ID_LOP) on delete restrict on update restrict;
-
-alter table AP_DUNG_TRONG add constraint FK_AP_DUNG_TRONG3 foreign key (ID_NAMHOC)
-      references NAM_HOC (ID_NAMHOC) on delete restrict on update restrict;
-
-alter table AP_DUNG_TRONG add constraint FK_AP_DUNG_TRONG4 foreign key (ID_TKB)
-      references THOI_KHOA_BIEU (ID_TKB) on delete restrict on update restrict;
-
-alter table BAO_GOM add constraint FK_BAO_GOM foreign key (ID_LICHTHI)
-      references LICH_THI (ID_LICHTHI) on delete restrict on update restrict;
-
-alter table BAO_GOM add constraint FK_BAO_GOM2 foreign key (ID_TKB)
-      references THOI_KHOA_BIEU (ID_TKB) on delete restrict on update restrict;
-
-alter table BAO_GOM add constraint FK_BAO_GOM3 foreign key (ID_HOCKY)
-      references HOC_KY (ID_HOCKY) on delete restrict on update restrict;
-
-alter table BAO_GOM add constraint FK_BAO_GOM4 foreign key (ID_NAMHOC)
-      references NAM_HOC (ID_NAMHOC) on delete restrict on update restrict;
-
-alter table CHU_NHIEM add constraint FK_CHU_NHIEM foreign key (ID_LOP)
-      references LOP (ID_LOP) on delete restrict on update restrict;
-
-alter table CHU_NHIEM add constraint FK_CHU_NHIEM2 foreign key (ID_GIAOVIEN)
-      references GIAO_VIEN (ID_GIAOVIEN) on delete restrict on update restrict;
-
-alter table CO add constraint FK_CO foreign key (ID_QUOCTICH)
-      references QUOC_TICH (ID_QUOCTICH) on delete restrict on update restrict;
-
-alter table CO add constraint FK_CO2 foreign key (ID_HOCSINH)
-      references HOC_SINH (ID_HOCSINH) on delete restrict on update restrict;
-
-alter table DANG_TAO add constraint FK_DANG_TAO foreign key (ID_THONGBAO)
-      references THONG_BAO (ID_THONGBAO) on delete restrict on update restrict;
-
-alter table DANG_TAO add constraint FK_DANG_TAO2 foreign key (ID_USER)
-      references USER (ID_USER) on delete restrict on update restrict;
-
-alter table DANH_GIA add constraint FK_DANH_GIA foreign key (ID_DIEM)
-      references DIEM (ID_DIEM) on delete restrict on update restrict;
-
-alter table DANH_GIA add constraint FK_DANH_GIA2 foreign key (ID_MONHOC)
-      references MON_HOC (ID_MONHOC) on delete restrict on update restrict;
-
-alter table DANH_GIA_HK add constraint FK_DANH_GIA_HK foreign key (ID_KHENTHUONG)
-      references KHEN_THUONG (ID_KHENTHUONG) on delete restrict on update restrict;
-
-alter table DANH_GIA_HK add constraint FK_DANH_GIA_HK2 foreign key (ID_HANHKIEM)
-      references HANH_KIEM (ID_HANHKIEM) on delete restrict on update restrict;
-
-alter table DANH_GIA_HK add constraint FK_DANH_GIA_HK3 foreign key (ID_GIAOVIEN)
-      references GIAO_VIEN (ID_GIAOVIEN) on delete restrict on update restrict;
-
-alter table DANH_GIA_HK add constraint FK_DANH_GIA_HK4 foreign key (ID_VIPHAM)
-      references VI_PHAM (ID_VIPHAM) on delete restrict on update restrict;
-
-alter table DAT add constraint FK_DAT foreign key (ID_DIEM)
-      references DIEM (ID_DIEM) on delete restrict on update restrict;
-
-alter table DAT add constraint FK_DAT2 foreign key (ID_HOCSINH)
-      references HOC_SINH (ID_HOCSINH) on delete restrict on update restrict;
-
-alter table DUOC_BAN_HANH_BOI add constraint FK_DUOC_BAN_HANH_BOI foreign key (ID_USER)
-      references USER (ID_USER) on delete restrict on update restrict;
-
-alter table DUOC_BAN_HANH_BOI add constraint FK_DUOC_BAN_HANH_BOI2 foreign key (ID_VANBAN)
-      references VAN_BAN (ID_VANBAN) on delete restrict on update restrict;
-
-alter table DUOC_DANH_GIA add constraint FK_DUOC_DANH_GIA foreign key (ID_KHENTHUONG)
-      references KHEN_THUONG (ID_KHENTHUONG) on delete restrict on update restrict;
-
-alter table DUOC_DANH_GIA add constraint FK_DUOC_DANH_GIA2 foreign key (ID_HANHKIEM)
-      references HANH_KIEM (ID_HANHKIEM) on delete restrict on update restrict;
-
-alter table DUOC_DANH_GIA add constraint FK_DUOC_DANH_GIA3 foreign key (ID_HOCSINH)
-      references HOC_SINH (ID_HOCSINH) on delete restrict on update restrict;
-
-alter table DUOC_DANH_GIA add constraint FK_DUOC_DANH_GIA4 foreign key (ID_VIPHAM)
-      references VI_PHAM (ID_VIPHAM) on delete restrict on update restrict;
-
-alter table GHI_NHAN_TRONG add constraint FK_GHI_NHAN_TRONG foreign key (ID_NAMHOC)
-      references NAM_HOC (ID_NAMHOC) on delete restrict on update restrict;
-
-alter table GHI_NHAN_TRONG add constraint FK_GHI_NHAN_TRONG2 foreign key (ID_DIEM)
-      references DIEM (ID_DIEM) on delete restrict on update restrict;
-
-alter table GOM add constraint FK_GOM foreign key (ID_LICHTHI)
-      references LICH_THI (ID_LICHTHI) on delete restrict on update restrict;
-
-alter table GOM add constraint FK_GOM2 foreign key (ID_TKB)
-      references THOI_KHOA_BIEU (ID_TKB) on delete restrict on update restrict;
-
-alter table GOM add constraint FK_GOM3 foreign key (ID_MONHOC)
-      references MON_HOC (ID_MONHOC) on delete restrict on update restrict;
-
-alter table HOC_BA add constraint FK_TONG_KET foreign key (ID_NAMHOC)
-      references NAM_HOC (ID_NAMHOC) on delete restrict on update restrict;
-
-alter table HOC_SINH add constraint FK_GIAM_HO foreign key (ID_PHUHUYNH)
-      references PHU_HUYNH (ID_PHUHUYNH) on delete restrict on update restrict;
-
-alter table HOC_SINH add constraint FK_KET_QUA_HOC_TAP foreign key (ID_HOCBA)
-      references HOC_BA (ID_HOCBA) on delete restrict on update restrict;
-
-alter table HOC_SINH add constraint FK_QUAN_LY foreign key (ID_LOP)
-      references LOP (ID_LOP) on delete restrict on update restrict;
-
-alter table HOC_SINH add constraint FK_THUOC foreign key (ID_DANTOC)
-      references DAN_TOC (ID_DANTOC) on delete restrict on update restrict;
-
-alter table LIEN_KET_TAI_KHOAN add constraint FK_LIEN_KET_TAI_KHOAN foreign key (ID_USER)
-      references USER (ID_USER) on delete restrict on update restrict;
-
-alter table LIEN_KET_TAI_KHOAN add constraint FK_LIEN_KET_TAI_KHOAN2 foreign key (ID_PHUHUYNH)
-      references PHU_HUYNH (ID_PHUHUYNH) on delete restrict on update restrict;
-
-alter table NHAM_DEN add constraint FK_NHAM_DEN foreign key (ID_ROLES)
-      references ROLES (ID_ROLES) on delete restrict on update restrict;
-
-alter table NHAM_DEN add constraint FK_NHAM_DEN2 foreign key (ID_THONGBAO)
-      references THONG_BAO (ID_THONGBAO) on delete restrict on update restrict;
-
-alter table PHAN_CONG_GIANG_DAY add constraint FK_PHAN_CONG_GIANG_DAY foreign key (ID_TKB)
-      references THOI_KHOA_BIEU (ID_TKB) on delete restrict on update restrict;
-
-alter table PHAN_CONG_GIANG_DAY add constraint FK_PHAN_CONG_GIANG_DAY2 foreign key (ID_GIAOVIEN)
-      references GIAO_VIEN (ID_GIAOVIEN) on delete restrict on update restrict;
-
-alter table PHAN_CONG_GIANG_DAY add constraint FK_PHAN_CONG_GIANG_DAY3 foreign key (ID_MONHOC)
-      references MON_HOC (ID_MONHOC) on delete restrict on update restrict;
-
-alter table PHAN_CONG_GIANG_DAY add constraint FK_PHAN_CONG_GIANG_DAY4 foreign key (ID_LOP)
-      references LOP (ID_LOP) on delete restrict on update restrict;
-
-alter table PHAN_CONG_GIANG_DAY add constraint FK_PHAN_CONG_GIANG_DAY5 foreign key (ID_NAMHOC)
-      references NAM_HOC (ID_NAMHOC) on delete restrict on update restrict;
-
-alter table PHAN_QUYEN add constraint FK_PHAN_QUYEN foreign key (ID_USER)
-      references USER (ID_USER) on delete restrict on update restrict;
-
-alter table PHAN_QUYEN add constraint FK_PHAN_QUYEN2 foreign key (ID_ROLES)
-      references ROLES (ID_ROLES) on delete restrict on update restrict;
-
-alter table SO_HUU_TAI_KHOAN add constraint FK_SO_HUU_TAI_KHOAN foreign key (ID_HOCSINH)
-      references HOC_SINH (ID_HOCSINH) on delete restrict on update restrict;
-
-alter table SO_HUU_TAI_KHOAN add constraint FK_SO_HUU_TAI_KHOAN2 foreign key (ID_USER)
-      references USER (ID_USER) on delete restrict on update restrict;
-
-alter table SU_DUNG_TAI_KHOAN add constraint FK_SU_DUNG_TAI_KHOAN foreign key (ID_GIAOVIEN)
-      references GIAO_VIEN (ID_GIAOVIEN) on delete restrict on update restrict;
-
-alter table SU_DUNG_TAI_KHOAN add constraint FK_SU_DUNG_TAI_KHOAN2 foreign key (ID_USER)
-      references USER (ID_USER) on delete restrict on update restrict;
-
-alter table TRONG add constraint FK_TRONG foreign key (ID_NAMHOC)
-      references NAM_HOC (ID_NAMHOC) on delete restrict on update restrict;
-
-alter table TRONG add constraint FK_TRONG2 foreign key (ID_HANHKIEM)
-      references HANH_KIEM (ID_HANHKIEM) on delete restrict on update restrict;
-
-alter table TRONG add constraint FK_TRONG3 foreign key (ID_HOCKY)
-      references HOC_KY (ID_HOCKY) on delete restrict on update restrict;
-
+﻿CREATE TABLE users (
+  id INT NOT NULL AUTO_INCREMENT,
+  username VARCHAR(50) NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  role ENUM('ADMIN','GIAO_VIEN','HOC_SINH','PHU_HUYNH') NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  last_login DATETIME DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_users_username (username),
+  KEY idx_users_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE giao_vien (
+  id INT NOT NULL AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  ma_giao_vien VARCHAR(20) NOT NULL,
+  ho_ten VARCHAR(100) NOT NULL,
+  email VARCHAR(100) DEFAULT NULL,
+  so_dien_thoai VARCHAR(15) DEFAULT NULL,
+  ngay_sinh DATE DEFAULT NULL,
+  dia_chi TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_gv_ma (ma_giao_vien),
+  UNIQUE KEY uq_gv_email (email),
+  KEY fk_gv_user (user_id),
+  CONSTRAINT fk_gv_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE lop (
+  id INT NOT NULL AUTO_INCREMENT,
+  ten_lop VARCHAR(20) NOT NULL,
+  khoi INT NOT NULL,
+  nam_hoc VARCHAR(9) NOT NULL,
+  gvcn_id INT DEFAULT NULL,
+  si_so INT NOT NULL DEFAULT 0,
+  phong_hoc VARCHAR(10) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_lop_ten_namhoc (ten_lop, nam_hoc),
+  KEY fk_lop_gvcn (gvcn_id),
+  CONSTRAINT fk_lop_gvcn FOREIGN KEY (gvcn_id) REFERENCES giao_vien (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE hoc_sinh (
+  id INT NOT NULL AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  ma_hoc_sinh VARCHAR(20) NOT NULL,
+  ho_ten VARCHAR(100) NOT NULL,
+  ngay_sinh DATE NOT NULL,
+  gioi_tinh ENUM('NAM','NU') NOT NULL,
+  lop_id INT DEFAULT NULL,
+  dia_chi TEXT,
+  nam_nhap_hoc YEAR NOT NULL,
+  anh_dai_dien VARCHAR(255) DEFAULT NULL,
+  fcm_token VARCHAR(500) DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hs_ma (ma_hoc_sinh),
+  KEY fk_hs_user (user_id),
+  KEY idx_hs_lop (lop_id),
+  KEY idx_hs_nam_nhap (nam_nhap_hoc),
+  CONSTRAINT fk_hs_lop FOREIGN KEY (lop_id) REFERENCES lop (id),
+  CONSTRAINT fk_hs_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE phu_huynh (
+  id INT NOT NULL AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  ho_ten VARCHAR(100) NOT NULL,
+  so_dien_thoai VARCHAR(15) NOT NULL,
+  email VARCHAR(100) DEFAULT NULL,
+  quan_he ENUM('CHA','ME','NGUOI_GIAM_HO') NOT NULL,
+  is_sms_active TINYINT(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (id),
+  KEY fk_ph_user (user_id),
+  CONSTRAINT fk_ph_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE phu_huynh_hoc_sinh (
+  id INT NOT NULL AUTO_INCREMENT,
+  phu_huynh_id INT NOT NULL,
+  hoc_sinh_id INT NOT NULL,
+  quan_he ENUM('CHA','ME','NGUOI_GIAM_HO') NOT NULL,
+  la_nguoi_lien_he_chinh TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_ph_hs (phu_huynh_id, hoc_sinh_id),
+  KEY fk_phhs_hs (hoc_sinh_id),
+  CONSTRAINT fk_phhs_hs FOREIGN KEY (hoc_sinh_id) REFERENCES hoc_sinh (id),
+  CONSTRAINT fk_phhs_ph FOREIGN KEY (phu_huynh_id) REFERENCES phu_huynh (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE mon_hoc (
+  id INT NOT NULL AUTO_INCREMENT,
+  ten_mon VARCHAR(100) NOT NULL,
+  ma_mon VARCHAR(20) NOT NULL,
+  nhom_danh_gia ENUM('DIEM_SO','NHAN_XET') NOT NULL,
+  so_dtx_hoc_ky INT NOT NULL,
+  khoi_ap_dung VARCHAR(20) NOT NULL,
+  mo_ta TEXT,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_mon_ten (ten_mon),
+  UNIQUE KEY uq_mon_ma (ma_mon)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE nam_hoc (
+  id INT NOT NULL AUTO_INCREMENT,
+  ten_nam_hoc VARCHAR(9) NOT NULL,
+  ngay_bat_dau_hk1 DATE NOT NULL,
+  ngay_ket_thuc_hk1 DATE NOT NULL,
+  ngay_bat_dau_hk2 DATE NOT NULL,
+  ngay_ket_thuc_hk2 DATE NOT NULL,
+  deadline_nhap_diem_hk1 DATE NOT NULL,
+  deadline_nhap_diem_hk2 DATE NOT NULL,
+  trang_thai ENUM('DANG_MO','DA_DONG') NOT NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE thoi_khoa_bieu (
+  id INT NOT NULL AUTO_INCREMENT,
+  lop_id INT NOT NULL,
+  mon_hoc_id INT NOT NULL,
+  giao_vien_id INT NOT NULL,
+  thu INT NOT NULL,
+  tiet_bat_dau INT NOT NULL,
+  so_tiet INT NOT NULL,
+  phong_hoc VARCHAR(10) DEFAULT NULL,
+  hoc_ky INT NOT NULL,
+  nam_hoc VARCHAR(9) NOT NULL,
+  PRIMARY KEY (id),
+  KEY fk_tkb_mon (mon_hoc_id),
+  KEY idx_tkb_lop_hk (lop_id, hoc_ky, nam_hoc),
+  KEY idx_tkb_gv_hk (giao_vien_id, hoc_ky, nam_hoc),
+  CONSTRAINT fk_tkb_gv FOREIGN KEY (giao_vien_id) REFERENCES giao_vien (id),
+  CONSTRAINT fk_tkb_lop FOREIGN KEY (lop_id) REFERENCES lop (id),
+  CONSTRAINT fk_tkb_mon FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE lich_thi (
+  id INT NOT NULL AUTO_INCREMENT,
+  lop_id INT NOT NULL,
+  mon_hoc_id INT NOT NULL,
+  loai_kiem_tra ENUM('GK','CK','TX') NOT NULL,
+  ngay_thi DATE NOT NULL,
+  gio_bat_dau TIME NOT NULL,
+  thoi_gian_lam_bai SMALLINT NOT NULL,
+  phong_thi VARCHAR(20) DEFAULT NULL,
+  ghi_chu TEXT,
+  hoc_ky INT NOT NULL,
+  nam_hoc VARCHAR(9) NOT NULL,
+  PRIMARY KEY (id),
+  KEY fk_lt_mon (mon_hoc_id),
+  KEY idx_lt_lop_hk (lop_id, hoc_ky, nam_hoc),
+  CONSTRAINT fk_lt_lop FOREIGN KEY (lop_id) REFERENCES lop (id),
+  CONSTRAINT fk_lt_mon FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE phan_cong_day (
+  id INT NOT NULL AUTO_INCREMENT,
+  giao_vien_id INT NOT NULL,
+  mon_hoc_id INT NOT NULL,
+  lop_id INT NOT NULL,
+  hoc_ky INT NOT NULL,
+  nam_hoc VARCHAR(9) NOT NULL,
+  ngay_bat_dau DATE DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_pcd (giao_vien_id, mon_hoc_id, lop_id, hoc_ky),
+  KEY fk_pcd_mon (mon_hoc_id),
+  KEY idx_pcd_namhoc_hk (nam_hoc, hoc_ky),
+  KEY idx_pcd_lop (lop_id),
+  CONSTRAINT fk_pcd_gv FOREIGN KEY (giao_vien_id) REFERENCES giao_vien (id),
+  CONSTRAINT fk_pcd_lop FOREIGN KEY (lop_id) REFERENCES lop (id),
+  CONSTRAINT fk_pcd_mon FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE diem (
+  id INT NOT NULL AUTO_INCREMENT,
+  hoc_sinh_id INT NOT NULL,
+  mon_hoc_id INT NOT NULL,
+  phan_cong_day_id INT NOT NULL,
+  loai_diem ENUM('TX','GK','CK') NOT NULL,
+  so_thu_tu INT NOT NULL DEFAULT 0,
+  hoc_ky INT NOT NULL,
+  nam_hoc VARCHAR(9) NOT NULL,
+  gia_tri DECIMAL(4,1) DEFAULT NULL,
+  nhan_xet ENUM('DAT','CHUA_DAT') DEFAULT NULL,
+  status ENUM('DRAFT','CONFIRMED','LOCKED') NOT NULL DEFAULT 'DRAFT',
+  ngay_nhap DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  giao_vien_nhap_id INT NOT NULL,
+  ghi_chu TEXT,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_diem_hs (hoc_sinh_id, mon_hoc_id, loai_diem, so_thu_tu, hoc_ky, nam_hoc),
+  KEY fk_diem_mon (mon_hoc_id),
+  KEY fk_diem_gvn (giao_vien_nhap_id),
+  KEY idx_diem_hs_mon (hoc_sinh_id, mon_hoc_id),
+  KEY idx_diem_hk_namhoc (hoc_ky, nam_hoc),
+  KEY idx_diem_status (status),
+  KEY idx_diem_pcd (phan_cong_day_id),
+  CONSTRAINT fk_diem_gvn FOREIGN KEY (giao_vien_nhap_id) REFERENCES giao_vien (id),
+  CONSTRAINT fk_diem_hs FOREIGN KEY (hoc_sinh_id) REFERENCES hoc_sinh (id),
+  CONSTRAINT fk_diem_mon FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc (id),
+  CONSTRAINT fk_diem_pcd FOREIGN KEY (phan_cong_day_id) REFERENCES phan_cong_day (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE diem_audit_log (
+  id INT NOT NULL AUTO_INCREMENT,
+  diem_id INT NOT NULL,
+  hoc_sinh_id INT NOT NULL,
+  mon_hoc_id INT NOT NULL,
+  gia_tri_cu DECIMAL(4,1) DEFAULT NULL,
+  gia_tri_moi DECIMAL(4,1) DEFAULT NULL,
+  hanh_dong ENUM('INSERT','UPDATE','DELETE') NOT NULL,
+  giao_vien_id INT NOT NULL,
+  thoi_gian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ly_do TEXT,
+  ip_address VARCHAR(45) DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY fk_dal_diem (diem_id),
+  KEY fk_dal_mon (mon_hoc_id),
+  KEY fk_dal_gv (giao_vien_id),
+  KEY idx_dal_hs_mon (hoc_sinh_id, mon_hoc_id),
+  KEY idx_dal_thoi_gian (thoi_gian),
+  CONSTRAINT fk_dal_diem FOREIGN KEY (diem_id) REFERENCES diem (id),
+  CONSTRAINT fk_dal_gv FOREIGN KEY (giao_vien_id) REFERENCES giao_vien (id),
+  CONSTRAINT fk_dal_hs FOREIGN KEY (hoc_sinh_id) REFERENCES hoc_sinh (id),
+  CONSTRAINT fk_dal_mon FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE thong_bao (
+  id INT NOT NULL AUTO_INCREMENT,
+  tieu_de VARCHAR(255) NOT NULL,
+  noi_dung TEXT NOT NULL,
+  loai ENUM('CHUNG','LOP','CA_NHAN') NOT NULL,
+  lop_id INT DEFAULT NULL,
+  hoc_sinh_id INT DEFAULT NULL,
+  nguoi_tao_id INT NOT NULL,
+  ngay_dang DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  han_hien_thi DATETIME DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY fk_tb_lop (lop_id),
+  KEY fk_tb_hs (hoc_sinh_id),
+  KEY fk_tb_nguoitao (nguoi_tao_id),
+  CONSTRAINT fk_tb_hs FOREIGN KEY (hoc_sinh_id) REFERENCES hoc_sinh (id),
+  CONSTRAINT fk_tb_lop FOREIGN KEY (lop_id) REFERENCES lop (id),
+  CONSTRAINT fk_tb_nguoitao FOREIGN KEY (nguoi_tao_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE sms_log (
+  id INT NOT NULL AUTO_INCREMENT,
+  phu_huynh_id INT NOT NULL,
+  hoc_sinh_id INT NOT NULL,
+  so_dien_thoai VARCHAR(15) NOT NULL,
+  noi_dung TEXT NOT NULL,
+  trang_thai ENUM('PENDING','SENT','FAILED','RETRY') NOT NULL,
+  so_lan_thu INT NOT NULL DEFAULT 0,
+  thoi_gian_gui DATETIME DEFAULT NULL,
+  ma_giao_dich VARCHAR(100) DEFAULT NULL,
+  thang_nam VARCHAR(7) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY fk_sms_ph (phu_huynh_id),
+  KEY idx_sms_trang_thai (trang_thai),
+  KEY idx_sms_thang_nam (thang_nam),
+  KEY idx_sms_hs (hoc_sinh_id),
+  CONSTRAINT fk_sms_hs FOREIGN KEY (hoc_sinh_id) REFERENCES hoc_sinh (id),
+  CONSTRAINT fk_sms_ph FOREIGN KEY (phu_huynh_id) REFERENCES phu_huynh (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE ai_suggestions (
+  id INT NOT NULL AUTO_INCREMENT,
+  hoc_sinh_id INT NOT NULL,
+  noi_dung_json TEXT NOT NULL,
+  hoc_ky INT NOT NULL,
+  nam_hoc VARCHAR(9) NOT NULL,
+  ngay_tao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  het_han DATETIME NOT NULL,
+  mo_hinh_ai VARCHAR(50) NOT NULL DEFAULT 'gemini-1.5-flash',
+  PRIMARY KEY (id),
+  KEY idx_ai_het_han (het_han),
+  KEY idx_ai_hs_hk (hoc_sinh_id, hoc_ky, nam_hoc),
+  CONSTRAINT fk_ai_hs FOREIGN KEY (hoc_sinh_id) REFERENCES hoc_sinh (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE admin_config (
+  id INT NOT NULL AUTO_INCREMENT,
+  config_key VARCHAR(100) NOT NULL,
+  config_value TEXT NOT NULL,
+  description VARCHAR(255) DEFAULT NULL,
+  updated_by INT DEFAULT NULL,
+  updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_cfg_key (config_key),
+  KEY fk_cfg_user (updated_by),
+  CONSTRAINT fk_cfg_user FOREIGN KEY (updated_by) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

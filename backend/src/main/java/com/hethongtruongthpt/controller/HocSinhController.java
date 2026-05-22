@@ -23,7 +23,7 @@ public class HocSinhController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<HocSinh>> getById(@PathVariable("id") Long id) {
+	public ResponseEntity<ApiResponse<HocSinh>> getById(@PathVariable("id") Integer id) {
 		return ResponseEntity.ok(ApiResponse.ok(hocSinhService.getById(id)));
 	}
 
@@ -33,12 +33,12 @@ public class HocSinhController {
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<ApiResponse<HocSinh>> update(@PathVariable("id") Long id, @RequestBody HocSinh hocSinh) {
+	public ResponseEntity<ApiResponse<HocSinh>> update(@PathVariable("id") Integer id, @RequestBody HocSinh hocSinh) {
 		return ResponseEntity.ok(ApiResponse.ok(hocSinhService.update(id, hocSinh)));
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable("id") Long id) {
+	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable("id") Integer id) {
 		hocSinhService.delete(id);
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}

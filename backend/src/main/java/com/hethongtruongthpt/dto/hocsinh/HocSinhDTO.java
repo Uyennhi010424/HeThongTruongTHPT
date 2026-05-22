@@ -3,7 +3,7 @@ package com.hethongtruongthpt.dto.hocsinh;
 import java.time.LocalDate;
 
 public class HocSinhDTO {
-    private Long id;
+    private Integer id;
     private String maHocSinh;
     private String hoTen;
     private LocalDate ngaySinh;
@@ -12,13 +12,13 @@ public class HocSinhDTO {
     private String sdt;
     private String email;
     private String chinhSach;
-    private Long lopHocId;
+    private Integer lopHocId;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -86,11 +86,11 @@ public class HocSinhDTO {
         this.chinhSach = chinhSach;
     }
 
-    public Long getLopHocId() {
+    public Integer getLopHocId() {
         return lopHocId;
     }
 
-    public void setLopHocId(Long lopHocId) {
+    public void setLopHocId(Integer lopHocId) {
         this.lopHocId = lopHocId;
     }
 }

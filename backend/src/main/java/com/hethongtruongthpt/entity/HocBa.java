@@ -7,10 +7,10 @@ import jakarta.persistence.*;
 public class HocBa {
     @Id
     @Column(name = "ID_HOCBA")
-    private Long id;
+    private Integer id;
 
     @Column(name = "ID_NAMHOC")
-    private Long namHocId;
+    private Integer namHocId;
 
     @Column(name = "HOC_LUC", length = 20)
     private String hocLuc;
@@ -21,19 +21,19 @@ public class HocBa {
     @Column(name = "GHI_CHU", length = 255)
     private String ghiChu;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
-    public Long getNamHocId() {
+    public Integer getNamHocId() {
         return namHocId;
     }
 
-    public void setNamHocId(Long namHocId) {
+    public void setNamHocId(Integer namHocId) {
         this.namHocId = namHocId;
     }
 

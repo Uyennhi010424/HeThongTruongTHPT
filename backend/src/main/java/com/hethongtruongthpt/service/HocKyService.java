@@ -19,26 +19,26 @@ public class HocKyService {
         return hocKyRepository.findAll();
     }
 
-    public HocKy getById(Long id) {
+    public HocKy getById(Integer id) {
         return hocKyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học kỳ"));
     }
 
     public HocKy create(HocKy hocKy) {
         if (hocKy.getId() == null) {
-            Long maxId = hocKyRepository.findMaxId();
+            Integer maxId = hocKyRepository.findMaxId();
             hocKy.setId(maxId + 1);
         }
         return hocKyRepository.save(hocKy);
     }
 
-    public HocKy update(Long id, HocKy hocKy) {
+    public HocKy update(Integer id, HocKy hocKy) {
         getById(id);
         hocKy.setId(id);
         return hocKyRepository.save(hocKy);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         hocKyRepository.deleteById(id);
     }
 }

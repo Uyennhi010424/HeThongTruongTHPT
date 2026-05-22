@@ -8,24 +8,24 @@ import java.io.Serializable;
 @Embeddable
 public class PhanQuyenId implements Serializable {
     @Column(name = "ID_ROLES")
-    private Long rolesId;
+    private Integer rolesId;
 
     @Column(name = "ID_USER")
-    private Long userId;
+    private Integer userId;
 
-    public Long getRolesId() {
+    public Integer getRolesId() {
         return rolesId;
     }
 
-    public void setRolesId(Long rolesId) {
+    public void setRolesId(Integer rolesId) {
         this.rolesId = rolesId;
     }
 
-    public Long getUserId() {
+    public Integer getUserId() {
         return userId;
     }
 
-    public void setUserId(Long userId) {
+    public void setUserId(Integer userId) {
         this.userId = userId;
     }
 }

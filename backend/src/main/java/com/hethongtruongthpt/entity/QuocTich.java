@@ -8,7 +8,7 @@ public class QuocTich {
     @Id
     @Column(name = "ID_QUOCTICH")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(name = "TEN_QUOCTICH", length = 50)
     private String tenQuocTich;
@@ -16,11 +16,11 @@ public class QuocTich {
     @Column(name = "MO_TA", length = 255)
     private String moTa;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

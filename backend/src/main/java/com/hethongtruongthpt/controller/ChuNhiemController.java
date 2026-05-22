@@ -34,7 +34,7 @@ public class ChuNhiemController {
 
     @GetMapping("/giaovien/{giaoVienId}")
         public ResponseEntity<ApiResponse<ChuNhiemDTO>> getByGiaoVien(
-            @PathVariable("giaoVienId") Long giaoVienId
+            @PathVariable("giaoVienId") Integer giaoVienId
         ) {
         try {
             return ResponseEntity.ok(ApiResponse.ok(chuNhiemService.getByGiaoVienId(giaoVienId)));
@@ -46,7 +46,7 @@ public class ChuNhiemController {
 
     @PutMapping("/giaovien/{giaoVienId}")
     public ResponseEntity<ApiResponse<ChuNhiemDTO>> updateByGiaoVien(
-            @PathVariable("giaoVienId") Long giaoVienId,
+            @PathVariable("giaoVienId") Integer giaoVienId,
             @RequestBody ChuNhiemUpdateRequest request
     ) {
         ChuNhiemDTO result = chuNhiemService.assignByGiaoVienId(giaoVienId, request.getLopId());
@@ -55,7 +55,7 @@ public class ChuNhiemController {
 
     @DeleteMapping("/giaovien/{giaoVienId}")
     public ResponseEntity<ApiResponse<Object>> clearByGiaoVien(
-            @PathVariable("giaoVienId") Long giaoVienId
+            @PathVariable("giaoVienId") Integer giaoVienId
     ) {
         chuNhiemService.clearByGiaoVienId(giaoVienId);
         return ResponseEntity.ok(ApiResponse.ok("Đã bỏ phân công chủ nhiệm", null));

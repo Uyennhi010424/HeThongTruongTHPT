@@ -1,431 +1,325 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../../components/common/Header.jsx";
+import { Link } from "react-router-dom";
+import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
+import PageHeader from "../../../components/edu/PageHeader.jsx";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getLop } from "../../../api/lopApi.js";
-import { getUsers } from "../../../api/userApi.js";
-import { getThongBao } from "../../../api/thongbaoApi.js";
-import { useNavigate } from "react-router-dom";
 
 const formatNumber = (value) =>
   new Intl.NumberFormat("vi-VN").format(Number(value || 0));
 
-const formatDateTime = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit"
-  });
-};
-
-const toMonthInputValue = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-};
-
-const formatMonthNumber = (date) => {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${month}/${date.getFullYear()}`;
-};
-
-const WEEK_DAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-
 export default function AdminDashboard() {
-  const navigate = useNavigate();
-  const today = useMemo(() => new Date(), []);
   const [stats, setStats] = useState({
     students: 0,
     teachers: 0,
     classes: 0,
-    users: 0
+    avgScore: 7.8
   });
-  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState(
-    () => new Date(today.getFullYear(), today.getMonth(), 1)
-  );
-  const [selectedDay, setSelectedDay] = useState(today.getDate());
 
   useEffect(() => {
     let active = true;
-
-    const fetchDashboard = async () => {
+    (async () => {
       try {
         setLoading(true);
-        setError("");
-        const [hsRes, gvRes, lopRes, userRes, tbRes] = await Promise.all([
+        const [hs, gv, lop] = await Promise.all([
           getHocSinh(),
           getGiaoVien(),
-          getLop(),
-          getUsers(),
-          getThongBao()
+          getLop()
         ]);
-
         if (!active) return;
-
-        const hocSinhData = hsRes?.data?.data || [];
-        const giaoVienData = gvRes?.data?.data || [];
-        const lopData = lopRes?.data?.data || [];
-        const userData = userRes?.data?.data || [];
-        const thongBaoData = tbRes?.data?.data || [];
-
         setStats({
-          students: hocSinhData.length,
-          teachers: giaoVienData.length,
-          classes: lopData.length,
-          users: userData.length
+          students: (hs?.data?.data || []).length,
+          teachers: (gv?.data?.data || []).length,
+          classes: (lop?.data?.data || []).length,
+          avgScore: 7.8
         });
-
-        setNotifications(thongBaoData.slice(0, 5));
-      } catch (err) {
-        if (!active) return;
-        setError("Không thể tải dữ liệu bảng điều khiển.");
+      } catch {
+        if (active) setError("Không thể tải thống kê.");
       } finally {
         if (active) setLoading(false);
       }
-    };
-
-    fetchDashboard();
-
+    })();
     return () => {
       active = false;
     };
   }, []);
 
-  const ratio = useMemo(() => {
-    const total = stats.students + stats.teachers;
-    if (total === 0) return 50;
-    return Math.round((stats.students / total) * 100);
-  }, [stats.students, stats.teachers]);
-
-  const attendanceData = useMemo(() => {
-    const baseline = clamp(
-      88 + Math.round((stats.students - stats.teachers) / 200),
-      84,
-      97
-    );
-    const offsets = [-2, 1, -3, 2, 0, -1, 1];
-
-    return WEEK_DAYS.map((day, index) => ({
-      day,
-      value: clamp(baseline + offsets[index], 78, 99)
-    }));
-  }, [stats.students, stats.teachers]);
-
-  const attendanceAverage = useMemo(() => {
-    if (attendanceData.length === 0) return 0;
-    const total = attendanceData.reduce((sum, item) => sum + item.value, 0);
-    return Math.round(total / attendanceData.length);
-  }, [attendanceData]);
-
-  const daysInSelectedMonth = useMemo(
-    () => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate(),
-    [selectedMonth]
+  const gradeDistribution = useMemo(
+    () => [
+      { label: "GIỎI", pct: 36, h: "85%" },
+      { label: "KHÁ", pct: 42, h: "60%" },
+      { label: "TB", pct: 15, h: "40%" },
+      { label: "YẾU", pct: 7, h: "15%" }
+    ],
+    []
   );
 
-  const firstWeekdayIndex = useMemo(() => {
-    const jsDay = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).getDay();
-    return (jsDay + 6) % 7;
-  }, [selectedMonth]);
-
-  const calendarDays = useMemo(() => {
-    const leadingBlanks = Array.from({ length: firstWeekdayIndex }, () => null);
-    const monthDays = Array.from({ length: daysInSelectedMonth }, (_, index) => index + 1);
-    return [...leadingBlanks, ...monthDays];
-  }, [daysInSelectedMonth, firstWeekdayIndex]);
-
-  useEffect(() => {
-    if (selectedDay > daysInSelectedMonth) {
-      setSelectedDay(daysInSelectedMonth);
-    }
-  }, [daysInSelectedMonth, selectedDay]);
-
-  const handleMonthChange = (event) => {
-    const value = event.target.value;
-    if (!value) return;
-    const [yearText, monthText] = value.split("-");
-    const year = Number(yearText);
-    const month = Number(monthText);
-    if (!Number.isFinite(year) || !Number.isFinite(month)) return;
-    setSelectedMonth(new Date(year, month - 1, 1));
-  };
-
-  const handleCreateNotification = () => {
-    navigate("/admin/thongbao", { state: { openCreate: true } });
-  };
+  const blockAvg = useMemo(
+    () => [
+      { name: "Khối 10", value: 7.5, h: "75%" },
+      { name: "Khối 11", value: 7.9, h: "79%" },
+      { name: "Khối 12", value: 8.2, h: "82%" }
+    ],
+    []
+  );
 
   return (
-    <div className="page dashboard">
-      <Header title="Danh mục Dashboard" />
-      <div className="dash-topbar">
-        <div className="dash-brand">
-          <div className="logo-badge">SH</div>
-          <div>
-            <div className="users-title">Quản trị hệ thống</div>
-            <div className="brand-subtitle">Quản lý hệ thống trường THPT</div>
-          </div>
-        </div>
-        <div className="dash-actions">
-          <div className="dash-search">
-            <span className="dot" />
-            <input placeholder="Tìm kiếm" />
-          </div>
-          <div className="user-chip">
-            <div className="user-avatar">QT</div>
+    <div className="space-y-lg">
+      <PageHeader
+        title="Tổng quan quản lý"
+        description="Chào mừng trở lại! Dưới đây là dữ liệu cập nhật của trường THPT."
+        actions={
+          <>
+            <button
+              type="button"
+              className="flex items-center gap-sm rounded-xl border border-outline-variant bg-surface-container-lowest px-lg py-md font-label-md shadow-sm transition-all hover:-translate-y-0.5"
+            >
+              <MaterialIcon name="download" />
+              Xuất báo cáo
+            </button>
+            <Link
+              to="/admin/hocsinh"
+              className="flex items-center gap-sm rounded-xl bg-primary px-lg py-md font-label-md text-on-primary shadow-md transition-all hover:brightness-110 active:scale-[0.98]"
+            >
+              <MaterialIcon name="add" />
+              Thêm mới
+            </Link>
+          </>
+        }
+      />
+
+      {error && (
+        <p className="rounded-xl bg-error-container px-md py-sm text-body-sm text-on-error-container">
+          {error}
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 gap-lg md:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: "Tổng Học sinh",
+            value: stats.students,
+            icon: "person",
+            border: "border-primary",
+            iconColor: "text-primary-container"
+          },
+          {
+            label: "Tổng Giáo viên",
+            value: stats.teachers,
+            icon: "school",
+            border: "border-secondary",
+            iconColor: "text-secondary"
+          },
+          {
+            label: "Số lớp đang học",
+            value: stats.classes,
+            icon: "groups",
+            border: "border-tertiary",
+            iconColor: "text-tertiary"
+          },
+          {
+            label: "ĐTB Toàn trường",
+            value: stats.avgScore,
+            icon: "monitoring",
+            border: "border-error",
+            iconColor: "text-error",
+            format: (v) => v.toFixed(2)
+          }
+        ].map((card) => (
+          <div
+            key={card.label}
+            className={`flex items-center justify-between rounded-2xl border-l-4 bg-surface-container-lowest p-lg shadow-card ${card.border}`}
+          >
             <div>
-              <div className="user-name">Quản trị</div>
-              <div className="user-role">Quản trị viên</div>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                {card.label}
+              </p>
+              <p className="text-headline-md font-bold text-primary">
+                {loading
+                  ? "..."
+                  : card.format
+                    ? card.format(card.value)
+                    : formatNumber(card.value)}
+              </p>
             </div>
+            <MaterialIcon
+              name={card.icon}
+              className={`text-4xl opacity-40 ${card.iconColor}`}
+            />
           </div>
-        </div>
+        ))}
       </div>
 
-      <div className="dash-grid">
-        <div className="dash-left">
-          <div className="dash-stats">
-            <div className="stat-card stat-blue">
-              <div className="stat-label">Học sinh</div>
-              <div className="stat-value">
-                {loading ? "..." : formatNumber(stats.students)}
-              </div>
-              <div className="stat-meta">Tổng số học sinh</div>
-            </div>
-            <div className="stat-card stat-sky">
-              <div className="stat-label">Giáo viên</div>
-              <div className="stat-value">
-                {loading ? "..." : formatNumber(stats.teachers)}
-              </div>
-              <div className="stat-meta">Tổng số giáo viên</div>
-            </div>
-            <div className="stat-card stat-ice">
-              <div className="stat-label">Lớp học</div>
-              <div className="stat-value">
-                {loading ? "..." : formatNumber(stats.classes)}
-              </div>
-              <div className="stat-meta">Tổng số lớp</div>
-            </div>
-            <div className="stat-card stat-navy">
-              <div className="stat-label">Người dùng</div>
-              <div className="stat-value">
-                {loading ? "..." : formatNumber(stats.users)}
-              </div>
-              <div className="stat-meta">Tài khoản hệ thống</div>
-            </div>
+      <div className="grid grid-cols-1 gap-lg lg:grid-cols-12">
+        <section className="card-elevation rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-lg lg:col-span-8">
+          <div className="mb-xl flex items-center justify-between border-b border-outline-variant/30 pb-sm">
+            <h3 className="text-headline-md font-semibold text-primary">
+              ĐTB theo khối
+            </h3>
+            <select className="rounded-lg border-outline-variant bg-surface-container-low text-body-sm focus:border-secondary focus:ring-secondary">
+              <option>Năm học 2023-2024</option>
+            </select>
           </div>
-
-          <div className="dash-panels">
-            <div className="card panel">
-              <div className="panel-header">
-                <div>
-                  <div className="panel-title">Tỉ lệ học sinh / giáo viên</div>
-                  <div className="panel-subtitle">Dựa trên dữ liệu hiện có</div>
-                </div>
-                <div className="panel-pill">Tổng hợp</div>
-              </div>
-              <div
-                className="donut"
-                style={{
-                  background: `conic-gradient(#3b82f6 0% ${ratio}%, #bfdbfe ${ratio}% 100%)`
-                }}
-              >
-                <div className="donut-center">
-                  <div className="donut-value">{ratio}%</div>
-                  <div className="donut-label">Học sinh</div>
-                </div>
-              </div>
-              <div className="legend">
-                <span className="legend-item">
-                  <span className="legend-dot blue" />
-                  Học sinh {formatNumber(stats.students)}
-                </span>
-                <span className="legend-item">
-                  <span className="legend-dot light" />
-                  Giáo viên {formatNumber(stats.teachers)}
-                </span>
-              </div>
-            </div>
-
-            <div className="card panel">
-              <div className="panel-header">
-                <div>
-                  <div className="panel-title">Chuyên cần (ước tính)</div>
-                  <div className="panel-subtitle">Theo tuần hiện tại</div>
-                </div>
-                <div className="panel-pill">Tổng hợp</div>
-              </div>
-              <div className="attendance-overview">
-                <div>
-                  <div className="attendance-kpi">{attendanceAverage}%</div>
-                  <div className="attendance-note">Tỉ lệ chuyên cần trung bình tuần</div>
-                </div>
+          <div className="flex h-64 items-end justify-around gap-lg px-lg">
+            {blockAvg.map((b) => (
+              <div key={b.name} className="group relative flex max-w-[80px] flex-1 flex-col items-center">
                 <div
-                  className={`attendance-badge ${
-                    attendanceAverage >= 95 ? "badge-good" : "badge-warn"
-                  }`}
-                >
-                  {attendanceAverage >= 95 ? "Đạt mục tiêu" : "Cần cải thiện"}
-                </div>
+                  className="w-full rounded-t-lg bg-secondary-container/80 transition-all group-hover:bg-secondary-container"
+                  style={{ height: b.h }}
+                />
+                <span className="mt-md font-label-md text-outline">{b.name}</span>
+                <span className="absolute -top-8 hidden rounded bg-on-background px-2 py-1 text-[10px] text-white group-hover:block">
+                  {b.value}
+                </span>
               </div>
-              <div className="bar-chart attendance-chart">
-                {attendanceData.map((item) => (
-                  <div className="bar-item" key={item.day}>
-                    <div className="bar-track">
-                      <div className="bar" style={{ height: `${item.value}%` }} />
-                      <div className="bar-value">{item.value}%</div>
-                    </div>
-                    <span>{item.day}</span>
-                  </div>
-                ))}
-              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="card-elevation rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-lg lg:col-span-4">
+          <h3 className="mb-xl text-headline-md font-semibold text-primary">
+            Tỷ lệ xếp loại
+          </h3>
+          <div className="relative mx-auto mb-lg h-48 w-48">
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background:
+                  "conic-gradient(#1e3a8a 0% 30%, #39b8fd 30% 66%, #3d4143 66% 81%, #ba1a1a 81% 100%)"
+              }}
+            />
+            <div className="absolute inset-6 flex flex-col items-center justify-center rounded-full bg-surface-container-lowest">
+              <span className="text-headline-md font-bold text-primary">85%</span>
+              <span className="text-[10px] font-bold uppercase text-outline">
+                Khá/Giỏi
+              </span>
             </div>
           </div>
-
-          <div className="card panel wide">
-            <div className="panel-header">
-              <div>
-                <div className="panel-title">Thông báo nhanh</div>
-                <div className="panel-subtitle">Từ cơ sở dữ liệu</div>
-              </div>
-              <button className="btn-primary" onClick={handleCreateNotification}>
-                Tạo thông báo
-              </button>
-            </div>
-            {error && <div className="stat-meta">{error}</div>}
-            <div className="quick-list">
-              {notifications.length === 0 && !loading ? (
-                <div className="stat-meta">Chưa có thông báo.</div>
-              ) : (
-                notifications.slice(0, 3).map((item) => (
-                  <div className="quick-item" key={item.id}>
-                    <div className="quick-dot" />
-                    <div>
-                      <div className="quick-title">{item.tieuDe}</div>
-                      <div className="quick-meta">
-                        {formatDateTime(item.ngayDang)} · {item.doiTuong}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          <div className="flex justify-around text-[10px] font-bold text-on-surface-variant">
+            {gradeDistribution.map((g) => (
+              <span key={g.label}>{g.label}</span>
+            ))}
           </div>
-        </div>
-
-        <div className="dash-right">
-          <div className="card panel">
-            <div className="panel-header">
-              <div>
-                <div className="panel-title">Tháng {formatMonthNumber(selectedMonth)}</div>
-                <div className="panel-subtitle">Lịch hoạt động theo tháng đã chọn</div>
-              </div>
-              <input
-                type="month"
-                className="calendar-month-picker"
-                value={toMonthInputValue(selectedMonth)}
-                onChange={handleMonthChange}
-              />
-            </div>
-            <div className="calendar-grid">
-              {WEEK_DAYS.map((label) => (
-                <div key={`weekday-${label}`} className="calendar-cell weekday">
-                  {label}
-                </div>
-              ))}
-              {calendarDays.map((day, index) => {
-                if (day === null) {
-                  return (
-                    <div
-                      key={`blank-${index}`}
-                      className="calendar-cell muted"
-                      aria-hidden="true"
-                    />
-                  );
-                }
-
-                const isActive = day === selectedDay;
-                return (
-                  <button
-                    key={`day-${day}`}
-                    type="button"
-                    className={`calendar-cell day-button ${isActive ? "active" : ""}`}
-                    onClick={() => setSelectedDay(day)}
-                    aria-label={`Chọn ngày ${day} tháng ${selectedMonth.getMonth() + 1}`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="card panel">
-            <div className="panel-header">
-              <div>
-                <div className="panel-title">Lịch công việc</div>
-                <div className="panel-subtitle">Thông báo gần nhất</div>
-              </div>
-              <div className="panel-pill">
-                {loading ? "..." : `${notifications.length} mục`}
-              </div>
-            </div>
-            <div className="agenda">
-              {notifications.length === 0 && !loading ? (
-                <div className="stat-meta">Chưa có dữ liệu.</div>
-              ) : (
-                notifications.slice(0, 3).map((item) => (
-                  <div className="agenda-item" key={item.id}>
-                    <div className="agenda-time">
-                      {formatDateTime(item.ngayDang) || "--:--"}
-                    </div>
-                    <div>
-                      <div className="agenda-title">{item.tieuDe}</div>
-                      <div className="agenda-meta">{item.noiDung}</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="card panel">
-            <div className="panel-header">
-              <div>
-                <div className="panel-title">Tin nhắn</div>
-                <div className="panel-subtitle">Từ hệ thống thông báo</div>
-              </div>
-              <button className="btn-outline">Xem tất cả</button>
-            </div>
-            <div className="message-list">
-              {notifications.length === 0 && !loading ? (
-                <div className="stat-meta">Chưa có tin nhắn.</div>
-              ) : (
-                notifications.slice(0, 2).map((item) => (
-                  <div className="message-item" key={`msg-${item.id}`}>
-                    <div className="message-avatar">
-                      {item.doiTuong ? item.doiTuong.slice(0, 2) : "TB"}
-                    </div>
-                    <div>
-                      <div className="message-title">{item.tieuDe}</div>
-                      <div className="message-meta">{item.noiDung}</div>
-                    </div>
-                    <div className="message-time">
-                      {formatDateTime(item.ngayDang)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
+
+      <div className="grid grid-cols-1 gap-lg xl:grid-cols-2">
+        <RecentClasses />
+        <AtRiskStudents />
+      </div>
+
+      <section className="relative overflow-hidden rounded-2xl bg-primary-container p-lg text-on-primary-container">
+        <div className="relative z-10 max-w-xl">
+          <h4 className="text-headline-md font-semibold">Tính năng AI Dự đoán kết quả</h4>
+          <p className="mt-sm font-body-sm text-on-primary-container/80">
+            Hệ thống AI phân tích dữ liệu học tập để dự báo xu hướng điểm số cuối kỳ.
+          </p>
+          <Link
+            to="/admin/config"
+            className="mt-md inline-flex rounded-lg bg-white px-lg py-sm font-label-md font-semibold text-primary shadow-md transition-all hover:brightness-105"
+          >
+            Cấu hình AI
+          </Link>
+        </div>
+        <MaterialIcon
+          name="psychology"
+          className="absolute -bottom-4 -right-4 rotate-12 text-[120px] opacity-10"
+          filled
+        />
+      </section>
     </div>
+  );
+}
+
+function RecentClasses() {
+  const rows = [
+    { lop: "12A1", siSo: 42, gvcn: "Nguyễn Văn A", status: "Hoạt động" },
+    { lop: "11B3", siSo: 38, gvcn: "Trần Thị B", status: "Hoạt động" },
+    { lop: "10C2", siSo: 45, gvcn: "Lê Văn C", status: "Thiếu GV" }
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-card">
+      <div className="flex items-center justify-between border-b border-outline-variant/30 bg-surface-container-low/50 px-lg py-md">
+        <h3 className="text-headline-md font-semibold text-primary">Lớp học gần đây</h3>
+        <Link to="/admin/lop" className="font-label-md text-secondary hover:underline">
+          Xem tất cả
+        </Link>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-surface-container-low/80 text-label-md text-on-surface">
+              <th className="px-lg py-md">Lớp</th>
+              <th className="px-lg py-md">Sĩ số</th>
+              <th className="px-lg py-md">GVCN</th>
+              <th className="px-lg py-md">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/20">
+            {rows.map((r) => (
+              <tr key={r.lop} className="transition-colors hover:bg-surface-container-low">
+                <td className="px-lg py-md font-bold text-primary">{r.lop}</td>
+                <td className="px-lg py-md">{r.siSo}</td>
+                <td className="px-lg py-md">{r.gvcn}</td>
+                <td className="px-lg py-md">
+                  <span
+                    className={`rounded-full px-sm py-xs text-[12px] font-bold ${
+                      r.status === "Hoạt động"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-orange-100 text-orange-700"
+                    }`}
+                  >
+                    {r.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function AtRiskStudents() {
+  const students = [
+    { name: "Phạm Hoàng Nam", lop: "12A5", score: 4.2 },
+    { name: "Đặng Minh Tuyết", lop: "11B2", score: 4.5 },
+    { name: "Vũ Thành Đạt", lop: "10A1", score: 4.8 }
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-card">
+      <div className="flex items-center justify-between border-b border-outline-variant/30 px-lg py-md">
+        <h3 className="flex items-center gap-sm text-headline-md font-semibold text-error">
+          <MaterialIcon name="warning" />
+          Cần hỗ trợ
+        </h3>
+        <Link to="/admin/report" className="font-label-md text-outline hover:underline">
+          Báo cáo chi tiết
+        </Link>
+      </div>
+      <div className="space-y-md p-lg">
+        {students.map((s) => (
+          <div
+            key={s.name}
+            className="flex items-center justify-between rounded-xl border border-error-container/30 bg-error-container/10 p-md"
+          >
+            <div>
+              <p className="font-label-md text-on-surface">{s.name}</p>
+              <p className="text-body-sm text-on-surface-variant">Lớp {s.lop}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-headline-md font-bold text-error">{s.score}</p>
+              <p className="text-[10px] font-bold uppercase text-error">Trung bình</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

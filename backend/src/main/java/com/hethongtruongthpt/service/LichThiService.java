@@ -19,7 +19,7 @@ public class LichThiService {
         return lichThiRepository.findAll();
     }
 
-    public LichThi getById(Long id) {
+    public LichThi getById(Integer id) {
         return lichThiRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch thi"));
     }
@@ -28,13 +28,13 @@ public class LichThiService {
         return lichThiRepository.save(lichThi);
     }
 
-    public LichThi update(Long id, LichThi lichThi) {
+    public LichThi update(Integer id, LichThi lichThi) {
         getById(id);
         lichThi.setId(id);
         return lichThiRepository.save(lichThi);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         lichThiRepository.deleteById(id);
     }
 }

@@ -7,16 +7,16 @@ import jakarta.persistence.*;
 public class Roles {
     @Id
     @Column(name = "ID_ROLES")
-    private Long id;
+    private Integer id;
 
     @Column(name = "ROLE_NAME", length = 30)
     private String roleName;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

@@ -19,8 +19,8 @@ public class SchemaMigrationRunner {
 
     @PostConstruct
     public void migrate() {
-        addColumnIfMissing("HOC_SINH", "DAN_TOC", "ALTER TABLE HOC_SINH ADD COLUMN DAN_TOC VARCHAR(100) NULL");
-        addColumnIfMissing("HOC_SINH", "TON_GIAO", "ALTER TABLE HOC_SINH ADD COLUMN TON_GIAO VARCHAR(100) NULL");
+        addColumnIfMissing("hoc_sinh", "dan_toc", "ALTER TABLE hoc_sinh ADD COLUMN dan_toc VARCHAR(100) NULL");
+        addColumnIfMissing("hoc_sinh", "ton_giao", "ALTER TABLE hoc_sinh ADD COLUMN ton_giao VARCHAR(100) NULL");
     }
 
     private void addColumnIfMissing(String tableName, String columnName, String alterSql) {

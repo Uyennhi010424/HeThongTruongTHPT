@@ -10,7 +10,7 @@ public class VanBan {
     @Id
     @Column(name = "ID_VANBAN")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(name = "SO_HIEU", length = 20)
     private String soHieu;
@@ -21,11 +21,11 @@ public class VanBan {
     @Column(name = "NGAY_BAN_HANH")
     private LocalDate ngayBanHanh;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

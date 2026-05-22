@@ -19,7 +19,7 @@ public class DiemService {
         return diemRepository.findAll();
     }
 
-    public Diem getById(Long id) {
+    public Diem getById(Integer id) {
         return diemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy điểm"));
     }
@@ -28,13 +28,13 @@ public class DiemService {
         return diemRepository.save(diem);
     }
 
-    public Diem update(Long id, Diem diem) {
+    public Diem update(Integer id, Diem diem) {
         getById(id);
         diem.setId(id);
         return diemRepository.save(diem);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         diemRepository.deleteById(id);
     }
 }

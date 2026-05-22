@@ -40,7 +40,7 @@ public class ChuNhiemService {
         }
     }
 
-    public ChuNhiemDTO getByGiaoVienId(Long giaoVienId) {
+    public ChuNhiemDTO getByGiaoVienId(Integer giaoVienId) {
         try {
             return chuNhiemRepository.findById_GiaoVienId(giaoVienId).stream()
                     .findFirst()
@@ -53,7 +53,7 @@ public class ChuNhiemService {
     }
 
     @Transactional
-    public ChuNhiemDTO assignByGiaoVienId(Long giaoVienId, Long lopId) {
+    public ChuNhiemDTO assignByGiaoVienId(Integer giaoVienId, Integer lopId) {
         if (lopId == null) {
             clearByGiaoVienId(giaoVienId);
             return null;
@@ -66,7 +66,6 @@ public class ChuNhiemService {
             throw new ResourceNotFoundException("Không tìm thấy lớp học");
         }
 
-        // Mỗi giáo viên chỉ chủ nhiệm 1 lớp và mỗi lớp chỉ có 1 GVCN.
         chuNhiemRepository.deleteById_GiaoVienId(giaoVienId);
         chuNhiemRepository.deleteById_LopId(lopId);
 
@@ -82,7 +81,7 @@ public class ChuNhiemService {
     }
 
     @Transactional
-    public void clearByGiaoVienId(Long giaoVienId) {
+    public void clearByGiaoVienId(Integer giaoVienId) {
         chuNhiemRepository.deleteById_GiaoVienId(giaoVienId);
     }
 

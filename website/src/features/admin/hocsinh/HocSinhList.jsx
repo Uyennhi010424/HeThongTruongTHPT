@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import Header from "../../../components/common/Header.jsx";
+import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
   createHocSinh,
@@ -34,12 +34,13 @@ const formatDateInput = (value) => {
 };
 
 const getGenderLabel = (value) => {
-  if (value === true) return "Nam";
-  if (value === false) return "Nữ";
+  const normalized = String(value ?? "").toLowerCase();
+  if (value === true || normalized === "true" || normalized === "nam") return "Nam";
+  if (value === false || normalized === "false" || normalized === "nu") return "Nữ";
   return "--";
 };
 
-const getStatusLabel = (status) => (status === 1 ? "Đang học" : "Ngừng học");
+const getStatusLabel = (status) => (Number(status) === 1 ? "Đang học" : "Ngừng học");
 
 const normalizeEmailPart = (value) =>
   (value || "")
@@ -72,9 +73,12 @@ const notifyUsersUpdated = () => {
 };
 
 const compareClassThenName = (a, b) => {
-  const classA = String(a?.lopHoc?.tenLop || "").trim();
-  const classB = String(b?.lopHoc?.tenLop || "").trim();
-  const classCompare = classA.localeCompare(classB, "vi", { numeric: true, sensitivity: "base" });
+  const classA = String(a?.lopHoc?.tenLop || a?.lop?.tenLop || "").trim();
+  const classB = String(b?.lopHoc?.tenLop || b?.lop?.tenLop || "").trim();
+  const classCompare = classA.localeCompare(classB, "vi", {
+    numeric: true,
+    sensitivity: "base"
+  });
   if (classCompare !== 0) return classCompare;
 
   const nameA = String(a?.hoTen || "").trim();
@@ -104,7 +108,6 @@ const EXCEL_TEMPLATE_COLUMNS = [
   "Phụ huynh - Nghề nghiệp",
   "ID phụ huynh (tùy chọn)"
 ];
-
 const EXCEL_FIELD_ALIASES = {
   hoTen: ["Họ tên", "HO_TEN"],
   ngaySinh: ["Ngày sinh", "NGAY_SINH"],
@@ -206,7 +209,7 @@ const normalizeDateCell = (value) => {
     const [first, second, third] = parts.map((part) => Number(part));
     if ([first, second, third].every((item) => Number.isFinite(item))) {
       const year = first > 31 ? first : third;
-      const month = first > 31 ? second : second;
+      const month = second;
       const day = first > 31 ? third : first;
       return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     }
@@ -221,21 +224,6 @@ const normalizeDateCell = (value) => {
 };
 
 export default function HocSinhList() {
-  const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [parents, setParents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("all");
-  const [classFilter, setClassFilter] = useState("all");
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(8);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [excelModalOpen, setExcelModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState(null);
-  const [formError, setFormError] = useState("");
   const [excelError, setExcelError] = useState("");
   const [excelSuccess, setExcelSuccess] = useState("");
   const [importing, setImporting] = useState(false);
@@ -259,6 +247,22 @@ export default function HocSinhList() {
     dienChinhSach: "false",
     trangThai: 1
   });
+
+  const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [parents, setParents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("all");
+  const [classFilter, setClassFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(8);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [formError, setFormError] = useState("");
 
   const ensureStudentUserAccount = async (student, fallbackFullName = "") => {
     const candidate =
@@ -793,67 +797,63 @@ export default function HocSinhList() {
 
   return (
     <div className="page users-page">
-      <Header title="Danh mục học sinh" />
-
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">Quản lý hồ sơ học sinh</div>
-          <div className="users-subtitle">
-            Theo dõi, cập nhật thông tin và trạng thái học sinh
-          </div>
-        </div>
-        <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm theo tên, lớp, SĐT hoặc email"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </div>
-          <label className="form-field">
-            <span>Khối</span>
-            <select
-              value={gradeFilter}
-              onChange={(event) => setGradeFilter(event.target.value)}
-            >
-              <option value="all">Tất cả khối</option>
-              {classesByGrade.map((group) => (
-                <option key={group.grade} value={group.grade}>
-                  Khối {group.grade}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="form-field">
-            <span>Lớp</span>
-            <select
-              value={classFilter}
-              onChange={(event) => setClassFilter(event.target.value)}
-            >
-              <option value="all">Tất cả lớp</option>
-              {filteredClasses
-                .slice()
-                .sort((a, b) =>
-                  String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", {
-                    sensitivity: "base"
-                  })
-                )
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.tenLop}
+      <PageHeader
+        title="Danh mục học sinh"
+        description="Theo dõi, cập nhật thông tin và trạng thái học sinh."
+        actions={
+          <div className="users-actions">
+            <div className="dash-search users-search">
+              <span className="dot" />
+              <input
+                placeholder="Tìm theo tên, lớp, SĐT hoặc email"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+              />
+            </div>
+            <label className="form-field users-filter-field">
+              <span>Khối</span>
+              <select
+                value={gradeFilter}
+                onChange={(event) => setGradeFilter(event.target.value)}
+              >
+                <option value="all">Tất cả khối</option>
+                {classesByGrade.map((group) => (
+                  <option key={group.grade} value={group.grade}>
+                    Khối {group.grade}
                   </option>
                 ))}
-            </select>
-          </label>
-          <button className="btn-primary" onClick={openCreate}>
-            Thêm học sinh
-          </button>
-          <button className="btn-outline" onClick={() => setExcelModalOpen(true)}>
-            Thêm bằng Excel
-          </button>
-        </div>
-      </div>
+              </select>
+            </label>
+            <label className="form-field users-filter-field">
+              <span>Lớp</span>
+              <select
+                value={classFilter}
+                onChange={(event) => setClassFilter(event.target.value)}
+              >
+                <option value="all">Tất cả lớp</option>
+                {filteredClasses
+                  .slice()
+                  .sort((a, b) =>
+                    String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", {
+                      sensitivity: "base"
+                    })
+                  )
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.tenLop}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button className="btn-primary" onClick={openCreate}>
+              Thêm học sinh
+            </button>
+            <button className="btn-outline" onClick={() => setExcelModalOpen(true)}>
+              Thêm bằng Excel
+            </button>
+          </div>
+        }
+      />
 
       <div className="users-stats">
         <div className="stat-card stat-blue">
@@ -980,7 +980,7 @@ export default function HocSinhList() {
         open={modalOpen}
         title={editingStudent ? "Cập nhật học sinh" : "Thêm học sinh"}
         onClose={() => setModalOpen(false)}
-        width={860}
+        width={720}
       >
         <form className="form-grid form-grid-student" onSubmit={handleSubmit}>
           <label className="form-field">

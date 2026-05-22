@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../../components/common/Header.jsx";
+import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import { createLop, deleteLop, getLop, updateLop } from "../../../api/lopApi.js";
 
@@ -183,38 +183,37 @@ export default function LopList() {
 
   return (
     <div className="page users-page">
-      <Header title="Danh mục lớp" />
-
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">Quản lý lớp học</div>
-          <div className="users-subtitle">
-            Theo dõi, cập nhật thông tin lớp và khối
+      <PageHeader
+        title="Danh mục lớp"
+        description="Theo dõi, cập nhật thông tin lớp và khối."
+        actions={
+          <div className="users-actions">
+            <div className="dash-search users-search">
+              <span className="dot" />
+              <input
+                placeholder="Tìm theo tên lớp hoặc khối"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+              />
+            </div>
+            <label className="form-field users-filter-field">
+              <span>Khối</span>
+              <select
+                value={gradeFilter}
+                onChange={(event) => setGradeFilter(event.target.value)}
+              >
+                <option value="all">Tất cả khối</option>
+                <option value="10">Khối 10</option>
+                <option value="11">Khối 11</option>
+                <option value="12">Khối 12</option>
+              </select>
+            </label>
+            <button className="btn-primary" onClick={openCreate}>
+              Thêm lớp
+            </button>
           </div>
-        </div>
-        <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm theo tên lớp hoặc khối"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </div>
-          <label className="form-field">
-            <span>Khối</span>
-            <select value={gradeFilter} onChange={(event) => setGradeFilter(event.target.value)}>
-              <option value="all">Tất cả khối</option>
-              <option value="10">Khối 10</option>
-              <option value="11">Khối 11</option>
-              <option value="12">Khối 12</option>
-            </select>
-          </label>
-          <button className="btn-primary" onClick={openCreate}>
-            Thêm lớp
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="users-stats">
         <div className="stat-card stat-blue">

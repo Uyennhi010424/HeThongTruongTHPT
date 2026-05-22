@@ -11,7 +11,7 @@ public class HanhKiem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_HANHKIEM")
-    private Long id;
+    private Integer id;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "XEP_LOAI")
@@ -23,11 +23,11 @@ public class HanhKiem {
     @Column(name = "NGAY_DANH_GIA")
     private LocalDate ngayDanhGia;
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

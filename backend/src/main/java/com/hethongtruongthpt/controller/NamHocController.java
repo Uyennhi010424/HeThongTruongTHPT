@@ -23,7 +23,7 @@ public class NamHocController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<NamHoc>> getById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<NamHoc>> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.ok(namHocService.getById(id)));
     }
 
@@ -33,12 +33,12 @@ public class NamHocController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<NamHoc>> update(@PathVariable Long id, @RequestBody NamHoc namHoc) {
+    public ResponseEntity<ApiResponse<NamHoc>> update(@PathVariable Integer id, @RequestBody NamHoc namHoc) {
         return ResponseEntity.ok(ApiResponse.ok(namHocService.update(id, namHoc)));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Integer id) {
         namHocService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
     }

@@ -23,7 +23,7 @@ public class HocKyController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<HocKy>> getById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<HocKy>> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.ok(hocKyService.getById(id)));
     }
 
@@ -33,12 +33,12 @@ public class HocKyController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<HocKy>> update(@PathVariable Long id, @RequestBody HocKy hocKy) {
+    public ResponseEntity<ApiResponse<HocKy>> update(@PathVariable Integer id, @RequestBody HocKy hocKy) {
         return ResponseEntity.ok(ApiResponse.ok(hocKyService.update(id, hocKy)));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Integer id) {
         hocKyService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
     }

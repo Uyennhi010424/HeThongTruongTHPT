@@ -23,7 +23,7 @@ public class HanhKiemController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<HanhKiem>> getById(@PathVariable Long id) {
+	public ResponseEntity<ApiResponse<HanhKiem>> getById(@PathVariable Integer id) {
 		return ResponseEntity.ok(ApiResponse.ok(hanhKiemService.getById(id)));
 	}
 
@@ -33,12 +33,12 @@ public class HanhKiemController {
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<ApiResponse<HanhKiem>> update(@PathVariable Long id, @RequestBody HanhKiem hanhKiem) {
+	public ResponseEntity<ApiResponse<HanhKiem>> update(@PathVariable Integer id, @RequestBody HanhKiem hanhKiem) {
 		return ResponseEntity.ok(ApiResponse.ok(hanhKiemService.update(id, hanhKiem)));
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Long id) {
+	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Integer id) {
 		hanhKiemService.delete(id);
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}

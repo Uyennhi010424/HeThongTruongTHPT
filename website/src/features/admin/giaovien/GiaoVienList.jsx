@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../../components/common/Header.jsx";
+import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
   createGiaoVien,
@@ -14,27 +14,6 @@ import {
   updateChuNhiemByGiaoVien
 } from "../../../api/chunhiemApi.js";
 import { createUser, getUsers } from "../../../api/userApi.js";
-
-const formatDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-};
-
-const formatDateInput = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const getGenderLabel = (value) => {
   if (value === true) return "Nam";
@@ -373,29 +352,25 @@ export default function GiaoVienList() {
 
   return (
     <div className="page users-page">
-      <Header title="Danh mục giáo viên" />
-
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">Quản lý hồ sơ giáo viên</div>
-          <div className="users-subtitle">
-            Theo dõi, cập nhật thông tin và bộ môn giảng dạy
+      <PageHeader
+        title="Danh mục giáo viên"
+        description="Theo dõi, cập nhật thông tin giáo viên và phân công chủ nhiệm."
+        actions={
+          <div className="users-actions">
+            <div className="dash-search users-search">
+              <span className="dot" />
+              <input
+                placeholder="Tìm theo tên, bộ môn, trình độ, SĐT hoặc email"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+              />
+            </div>
+            <button className="btn-primary" onClick={openCreate}>
+              Thêm giáo viên
+            </button>
           </div>
-        </div>
-        <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm theo tên, bộ môn, trình độ, SĐT hoặc email"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </div>
-          <button className="btn-primary" onClick={openCreate}>
-            Thêm giáo viên
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="users-stats">
         <div className="stat-card stat-blue">

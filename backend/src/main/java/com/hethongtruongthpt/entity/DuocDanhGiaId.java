@@ -8,46 +8,46 @@ import java.io.Serializable;
 @Embeddable
 public class DuocDanhGiaId implements Serializable {
     @Column(name = "ID_HANHKIEM")
-    private Long hanhKiemId;
+    private Integer hanhKiemId;
 
     @Column(name = "ID_HOCSINH")
-    private Long hocSinhId;
+    private Integer hocSinhId;
 
     @Column(name = "ID_VIPHAM")
-    private Long viPhamId;
+    private Integer viPhamId;
 
     @Column(name = "ID_KHENTHUONG")
-    private Long khenThuongId;
+    private Integer khenThuongId;
 
-    public Long getHanhKiemId() {
+    public Integer getHanhKiemId() {
         return hanhKiemId;
     }
 
-    public void setHanhKiemId(Long hanhKiemId) {
+    public void setHanhKiemId(Integer hanhKiemId) {
         this.hanhKiemId = hanhKiemId;
     }
 
-    public Long getHocSinhId() {
+    public Integer getHocSinhId() {
         return hocSinhId;
     }
 
-    public void setHocSinhId(Long hocSinhId) {
+    public void setHocSinhId(Integer hocSinhId) {
         this.hocSinhId = hocSinhId;
     }
 
-    public Long getViPhamId() {
+    public Integer getViPhamId() {
         return viPhamId;
     }
 
-    public void setViPhamId(Long viPhamId) {
+    public void setViPhamId(Integer viPhamId) {
         this.viPhamId = viPhamId;
     }
 
-    public Long getKhenThuongId() {
+    public Integer getKhenThuongId() {
         return khenThuongId;
     }
 
-    public void setKhenThuongId(Long khenThuongId) {
+    public void setKhenThuongId(Integer khenThuongId) {
         this.khenThuongId = khenThuongId;
     }
 }

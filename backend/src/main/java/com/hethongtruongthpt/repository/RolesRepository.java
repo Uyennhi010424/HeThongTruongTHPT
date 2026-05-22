@@ -6,9 +6,9 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
 
-public interface RolesRepository extends JpaRepository<Roles, Long> {
+public interface RolesRepository extends JpaRepository<Roles, Integer> {
 	Optional<Roles> findByRoleName(String roleName);
 
 	@Query("select coalesce(max(r.id), 0) from Roles r")
-	Long findMaxId();
+	Integer findMaxId();
 }

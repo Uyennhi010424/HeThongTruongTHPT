@@ -19,7 +19,7 @@ public class ThoiKhoaBieuService {
         return thoiKhoaBieuRepository.findAll();
     }
 
-    public ThoiKhoaBieu getById(Long id) {
+    public ThoiKhoaBieu getById(Integer id) {
         return thoiKhoaBieuRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thời khóa biểu"));
     }
@@ -28,13 +28,13 @@ public class ThoiKhoaBieuService {
         return thoiKhoaBieuRepository.save(thoiKhoaBieu);
     }
 
-    public ThoiKhoaBieu update(Long id, ThoiKhoaBieu thoiKhoaBieu) {
+    public ThoiKhoaBieu update(Integer id, ThoiKhoaBieu thoiKhoaBieu) {
         getById(id);
         thoiKhoaBieu.setId(id);
         return thoiKhoaBieuRepository.save(thoiKhoaBieu);
     }
 
-    public void delete(Long id) {
+    public void delete(Integer id) {
         thoiKhoaBieuRepository.deleteById(id);
     }
 }
