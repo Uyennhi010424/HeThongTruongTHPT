@@ -39,6 +39,13 @@ public class LopHocService {
         getById(id);
         validateLopHoc(lopHoc);
         lopHoc.setId(id);
+        String tenLop = lopHoc.getTenLop().trim();
+        String namHoc = lopHoc.getNamHoc().trim();
+        lopHocRepository.findByTenLopAndNamHoc(tenLop, namHoc)
+                .filter(existing -> !id.equals(existing.getId()))
+                .ifPresent(existing -> {
+                    throw new ApiException("Lớp đã tồn tại cho năm học này");
+                });
         return lopHocRepository.save(lopHoc);
     }
 

@@ -13,6 +13,12 @@ const extractGradeFromClassName = (tenLop) => {
   return match ? match[1] : null;
 };
 
+const getCurrentAcademicYear = () => {
+  const now = new Date();
+  const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${year}-${year + 1}`;
+};
+
 export default function LopList() {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +31,8 @@ export default function LopList() {
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
     tenLop: "",
-    khoi: "10"
+    khoi: "10",
+    namHoc: getCurrentAcademicYear()
   });
 
   useEffect(() => {
@@ -101,7 +108,7 @@ export default function LopList() {
 
   const openCreate = () => {
     setEditingClass(null);
-    setForm({ tenLop: "", khoi: "10" });
+    setForm({ tenLop: "", khoi: "10", namHoc: getCurrentAcademicYear() });
     setFormError("");
     setSuccessMessage("");
     setModalOpen(true);
@@ -111,7 +118,8 @@ export default function LopList() {
     setEditingClass(item);
     setForm({
       tenLop: item.tenLop || "",
-      khoi: item.khoi || "10"
+      khoi: item.khoi || "10",
+      namHoc: item.namHoc || getCurrentAcademicYear()
     });
     setFormError("");
     setSuccessMessage("");
@@ -142,6 +150,10 @@ export default function LopList() {
       setFormError("Vui lòng chọn khối.");
       return;
     }
+    if (!form.namHoc.trim()) {
+      setFormError("Vui lòng nhập năm học.");
+      return;
+    }
 
     const gradeInName = extractGradeFromClassName(form.tenLop);
     if (!gradeInName) {
@@ -155,7 +167,8 @@ export default function LopList() {
 
     const payload = {
       tenLop: form.tenLop.trim(),
-      khoi: form.khoi
+      khoi: form.khoi,
+      namHoc: form.namHoc.trim()
     };
 
     try {
@@ -325,6 +338,16 @@ export default function LopList() {
               <option value="11">Khối 11</option>
               <option value="12">Khối 12</option>
             </select>
+          </label>
+          <label className="form-field">
+            <span>Năm học</span>
+            <input
+              value={form.namHoc}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, namHoc: event.target.value }))
+              }
+              placeholder="vd: 2025-2026"
+            />
           </label>
           {formError && <div className="form-error">{formError}</div>}
           <div className="form-actions">
