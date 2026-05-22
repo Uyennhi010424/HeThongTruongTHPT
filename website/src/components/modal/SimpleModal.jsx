@@ -32,11 +32,12 @@ export default function SimpleModal({ open, title, children, onClose, width = 48
         background: "rgba(0,0,0,0.4)",
         display: "flex",
         alignItems: "center",
-        justifyContent: "center"
+        justifyContent: "center",
+        zIndex: 2000
       }}
       onClick={onClose}
     >
-      <div className="card" style={cardStyle} onClick={(e) => e.stopPropagation()}>
+      <div className="card" style={{ ...cardStyle, zIndex: 2001 }} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
           <h3 style={{ margin: 0 }}>{title}</h3>
         </div>
