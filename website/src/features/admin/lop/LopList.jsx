@@ -118,7 +118,7 @@ export default function LopList() {
     setEditingClass(item);
     setForm({
       tenLop: item.tenLop || "",
-      khoi: item.khoi || "10",
+      khoi: String(item.khoi || "10"),
       namHoc: item.namHoc || getCurrentAcademicYear()
     });
     setFormError("");
@@ -160,7 +160,7 @@ export default function LopList() {
       setFormError("Tên lớp phải bắt đầu bằng 10, 11 hoặc 12. Ví dụ: 10A1.");
       return;
     }
-    if (gradeInName !== form.khoi) {
+    if (gradeInName !== String(form.khoi)) {
       setFormError(`Tên lớp ${form.tenLop.trim()} không thuộc khối ${form.khoi}.`);
       return;
     }
