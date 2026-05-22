@@ -49,12 +49,16 @@ public class LopHocService {
     private void validateLopHoc(LopHoc lopHoc) {
         String tenLop = lopHoc.getTenLop() != null ? lopHoc.getTenLop().trim() : "";
         Integer khoi = lopHoc.getKhoi();
+        String namHoc = lopHoc.getNamHoc() != null ? lopHoc.getNamHoc().trim() : "";
 
         if (tenLop.isBlank()) {
             throw new ApiException("Tên lớp không được để trống");
         }
         if (khoi == null) {
             throw new ApiException("Khối không được để trống");
+        }
+        if (namHoc.isBlank()) {
+            throw new ApiException("Năm học không được để trống");
         }
 
         String gradeFromName = extractGradePrefix(tenLop);
