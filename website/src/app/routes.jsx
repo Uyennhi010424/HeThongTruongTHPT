@@ -53,15 +53,15 @@ const routes = [
   },
   {
     path: "/login/teacher",
-    element: <LoginPage title="Đăng nhập giáo viên" expectedRole="GIAOVIEN" />
+    element: <LoginPage title="Đăng nhập giáo viên" expectedRole="GIAO_VIEN" />
   },
   {
     path: "/login/student",
-    element: <LoginPage title="Đăng nhập học sinh" expectedRole="HOCSINH" />
+    element: <LoginPage title="Đăng nhập học sinh" expectedRole="HOC_SINH" />
   },
   {
     path: "/login/parent",
-    element: <LoginPage title="Đăng nhập phụ huynh" expectedRole="PHUHUYNH" />
+    element: <LoginPage title="Đăng nhập phụ huynh" expectedRole="PHU_HUYNH" />
   },
   {
     path: "/admin",

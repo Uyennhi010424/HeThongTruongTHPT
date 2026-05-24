@@ -14,9 +14,9 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
   const roleRoutes = useMemo(
     () => ({
       ADMIN: "/admin/dashboard",
-      GIAOVIEN: "/teacher/dashboard",
-      HOCSINH: "/student/home",
-      PHUHUYNH: "/parent/home",
+      GIAO_VIEN: "/teacher/dashboard",
+      HOC_SINH: "/student/home",
+      PHU_HUYNH: "/parent/home",
       VAN_THU: "/admin/dashboard"
     }),
     []
@@ -25,9 +25,9 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
   const loginRoutes = useMemo(
     () => ({
       ADMIN: "/login/admin",
-      GIAOVIEN: "/login/teacher",
-      HOCSINH: "/login/student",
-      PHUHUYNH: "/login/parent",
+      GIAO_VIEN: "/login/teacher",
+      HOC_SINH: "/login/student",
+      PHU_HUYNH: "/login/parent",
       VAN_THU: "/login/admin"
     }),
     []
@@ -66,8 +66,13 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
       const findRoute = (map, r) => map[r] || map[r.replace(/_/g, "")] || map[r.replace(/[^A-Z0-9]/g, "")];
       window.location.href = findRoute(roleRoutes, role) || "/login";
     } catch (err) {
-      const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
-      setError(backendMessage || "Đăng nhập thất bại");
+      console.log("=== LOGIN ERROR ===", err);
+    console.log("status:", err?.response?.status);
+    console.log("response data:", err?.response?.data);
+    const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
+    setError(backendMessage || "Đăng nhập thất bại");
+      // const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
+      // setError(backendMessage || "Đăng nhập thất bại");
     }
   };
 
@@ -97,9 +102,9 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
               className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5 font-body-md focus:border-secondary focus:ring-2 focus:ring-secondary/20"
             >
               <option value="ADMIN">Quản trị</option>
-              <option value="GIAOVIEN">Giáo viên</option>
-              <option value="HOCSINH">Học sinh</option>
-              <option value="PHUHUYNH">Phụ huynh</option>
+              <option value="GIAO_VIEN">Giáo viên</option>
+              <option value="HOC_SINH">Học sinh</option>
+              <option value="PHU_HUYNH">Phụ huynh</option>
             </select>
           </div>
           <div>

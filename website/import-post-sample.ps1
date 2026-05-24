@@ -3,7 +3,7 @@ foreach ($s in $json) {
   $body = $s | ConvertTo-Json -Depth 10
   try {
     Write-Output ("Posting: " + $s.hoTen)
-    $r = Invoke-RestMethod -Uri 'http://localhost:8081/api/hocsinh' -Method Post -Body $body -ContentType 'application/json; charset=utf-8'
+    $r = Invoke-RestMethod -Uri 'http://localhost:8080/api/hocsinh' -Method Post -Body $body -ContentType 'application/json; charset=utf-8'
     $r | ConvertTo-Json -Depth 6 | Write-Output
   } catch {
     Write-Output ("ERROR creating " + $s.hoTen + ": " + $_.Exception.Message)
@@ -17,6 +17,6 @@ foreach ($s in $json) {
   }
 }
 Write-Output "Fetch matches"
-$all = Invoke-RestMethod -Uri 'http://localhost:8081/api/hocsinh' -Method Get -UseBasicParsing
+$all = Invoke-RestMethod -Uri 'http://localhost:8080/api/hocsinh' -Method Get -UseBasicParsing
 $matches = $all.data | Where-Object { $_.hoTen -like 'Auto Excel*' }
 $matches | ConvertTo-Json -Depth 6 | Write-Output
