@@ -972,8 +972,9 @@ a {
 
 .table-row {
   display: grid;
-  grid-template-columns: 80px 1.1fr 1.5fr 130px 130px 140px 160px;
-  align-items: center;
+  /* 8 columns: STT, main, email, password, role, status, date, actions */
+  grid-template-columns: 80px 1.1fr 1.5fr 130px 130px 140px 140px 160px;
+  align-items: start;
   gap: 12px;
   background: #f8fbff;
   border: 1px solid #e7efff;
@@ -1017,6 +1018,19 @@ a {
 
 .table-email {
   color: #334155;
+}
+
+.table-password {
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .table-date {
@@ -1091,7 +1105,9 @@ a {
 .table-actions {
   display: flex;
   gap: 8px;
-  justify-content: flex-start;
+  justify-content: flex-end;
+  justify-self: end;
+  align-self: start;
 }
 
 .btn-sm {

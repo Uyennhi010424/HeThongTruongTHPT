@@ -19,17 +19,33 @@ const formatDate = (value) => {
   });
 };
 
+const DEFAULT_ACCOUNT_PASSWORD = "Abc1234@";
+
+const getDefaultTeacherPassword = (username) => {
+  if (!username) return "--";
+  const local = username.includes("@") ? username.split("@")[0] : username;
+  return `${local}gv123@`;
+};
+
+const getDisplayedPassword = (user) => {
+  if (!user) return "--";
+  if (user.password) return user.password;
+  if (user.role === "HOC_SINH") return DEFAULT_ACCOUNT_PASSWORD;
+  if (user.role === "GIAO_VIEN") return getDefaultTeacherPassword(user.username);
+  return "--";
+};
+
 const getStatusLabel = (status) => (status === 1 ? "Hoạt động" : "Tạm khóa");
 
 const getRoleLabel = (role) => {
   switch (role) {
-    case "GIAOVIEN":
+    case "GIAO_VIEN":
       return "Giáo viên";
-    case "HOCSINH":
+    case "HOC_SINH":
       return "Học sinh";
     case "VAN_THU":
       return "Văn thư";
-    case "PHUHUYNH":
+    case "PHU_HUYNH":
       return "Phụ huynh";
     case "ADMIN":
       return "Quản trị";
@@ -40,11 +56,11 @@ const getRoleLabel = (role) => {
 
 const getRoleClassName = (role) => {
   switch (role) {
-    case "HOCSINH":
+    case "HOC_SINH":
       return "role-hocsinh";
-    case "GIAOVIEN":
+    case "GIAO_VIEN":
       return "role-giaovien";
-    case "PHUHUYNH":
+    case "PHU_HUYNH":
       return "role-phuhuynh";
     default:
       return "";
@@ -66,7 +82,7 @@ export default function UserList() {
     email: "",
     password: "",
     status: 1,
-    role: "HOCSINH"
+    role: "HOC_SINH"
   });
   const [formError, setFormError] = useState("");
 
@@ -174,7 +190,7 @@ export default function UserList() {
       email: "",
       password: "",
       status: 1,
-      role: "HOCSINH"
+      role: "HOC_SINH"
     });
     setFormError("");
     setModalOpen(true);
@@ -187,7 +203,7 @@ export default function UserList() {
       email: user.email || "",
       password: "",
       status: user.status ?? 1,
-      role: user.role || "HOCSINH"
+      role: user.role || "HOC_SINH"
     });
     setFormError("");
     setModalOpen(true);
@@ -202,6 +218,8 @@ export default function UserList() {
       setError("Không thể xóa tài khoản.");
     }
   };
+
+  // Reset password action removed; show password column directly.
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -270,9 +288,9 @@ export default function UserList() {
               onChange={(event) => setRoleFilter(event.target.value)}
             >
               <option value="all">Tất cả</option>
-              <option value="HOCSINH">Học sinh</option>
-              <option value="GIAOVIEN">Giáo viên</option>
-              <option value="PHUHUYNH">Phụ huynh</option>
+              <option value="HOC_SINH">Học sinh</option>
+              <option value="GIAO_VIEN">Giáo viên</option>
+              <option value="PHU_HUYNH">Phụ huynh</option>
             </select>
           </label>
           <button className="btn-primary" onClick={openCreate}>
@@ -313,14 +331,16 @@ export default function UserList() {
             <div>STT</div>
             <div>Tên đăng nhập</div>
             <div>Email</div>
+            <div>Mật khẩu</div>
             <div>Phân quyền</div>
             <div>Trạng thái</div>
             <div>Ngày tạo</div>
             <div>Thao tác</div>
           </div>
           {loading
-            ? Array.from({ length: 5 }).map((_, index) => (
+              ? Array.from({ length: 5 }).map((_, index) => (
                 <div className="table-row" key={`skeleton-${index}`}>
+                  <div className="skeleton" />
                   <div className="skeleton" />
                   <div className="skeleton" />
                   <div className="skeleton" />
@@ -338,6 +358,7 @@ export default function UserList() {
                     <div className="table-meta">Mã: {user.id}</div>
                   </div>
                   <div className="table-email">{user.email || "--"}</div>
+                  <div className="table-password">{getDisplayedPassword(user)}</div>
                   <div>
                     <span className={`role-pill ${getRoleClassName(user.role)}`}>
                       {getRoleLabel(user.role)}
@@ -362,6 +383,7 @@ export default function UserList() {
                     >
                       Sửa
                     </button>
+                    {/* Reset password removed */}
                     <button
                       className="btn-danger btn-sm"
                       onClick={() => handleDelete(user)}
@@ -459,10 +481,10 @@ export default function UserList() {
               }
             >
               <option value="ADMIN">Quản trị</option>
-              <option value="HOCSINH">Học sinh</option>
-              <option value="GIAOVIEN">Giáo viên</option>
+              <option value="HOC_SINH">Học sinh</option>
+              <option value="GIAO_VIEN">Giáo viên</option>
               <option value="VAN_THU">Văn thư</option>
-              <option value="PHUHUYNH">Phụ huynh</option>
+              <option value="PHU_HUYNH">Phụ huynh</option>
             </select>
           </label>
           {formError && <div className="form-error">{formError}</div>}

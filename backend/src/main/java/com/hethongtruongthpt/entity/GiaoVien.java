@@ -27,6 +27,15 @@ public class GiaoVien {
     @Column(name = "so_dien_thoai", length = 15)
     private String soDienThoai;
 
+    @Column(name = "bo_mon", length = 100)
+    private String boMon;
+
+    @Column(name = "trinh_do", length = 100)
+    private String trinhDo;
+
+    @Column(name = "gioi_tinh")
+    private Boolean gioiTinh;
+
     @Column(name = "ngay_sinh")
     private LocalDate ngaySinh;
 
@@ -87,6 +96,30 @@ public class GiaoVien {
 
     public void setSoDienThoai(String soDienThoai) {
         this.soDienThoai = soDienThoai;
+    }
+
+    public String getBoMon() {
+        return boMon;
+    }
+
+    public void setBoMon(String boMon) {
+        this.boMon = boMon;
+    }
+
+    public String getTrinhDo() {
+        return trinhDo;
+    }
+
+    public void setTrinhDo(String trinhDo) {
+        this.trinhDo = trinhDo;
+    }
+
+    public Boolean getGioiTinh() {
+        return gioiTinh;
+    }
+
+    public void setGioiTinh(Boolean gioiTinh) {
+        this.gioiTinh = gioiTinh;
     }
 
     public LocalDate getNgaySinh() {

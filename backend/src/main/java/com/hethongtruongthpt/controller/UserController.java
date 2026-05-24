@@ -46,4 +46,10 @@ public class UserController {
 		userService.delete(id);
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}
+
+	@PostMapping("/{id}/reset-password")
+	public ResponseEntity<ApiResponse<Object>> resetPassword(@PathVariable("id") Integer id) {
+		userService.resetPasswordToDefault(id);
+		return ResponseEntity.ok(ApiResponse.ok("Đặt lại mật khẩu thành công", null));
+	}
 }

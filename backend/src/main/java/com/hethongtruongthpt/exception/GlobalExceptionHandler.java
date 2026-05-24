@@ -32,7 +32,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleOther(Exception ex) {
         logger.error("Unhandled exception", ex);
+        String detail = ex.getMessage() == null ? ex.toString() : ex.getMessage();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Lỗi hệ thống"));
+            .body(ApiResponse.error("Lỗi hệ thống: " + detail));
     }
 }

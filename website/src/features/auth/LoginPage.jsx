@@ -57,12 +57,14 @@ export default function LoginPage({ title = "Đăng nhập", expectedRole = "" }
         setError("Tài khoản chưa được phân quyền.");
         return;
       }
-      if (expectedRole && role !== expectedRole) {
+      const normalize = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (expectedRole && normalize(role) !== normalize(expectedRole)) {
         setError("Bạn đang đăng nhập sai vai trò.");
         return;
       }
       setAuth(token, role);
-      window.location.href = roleRoutes[role] || "/login";
+      const findRoute = (map, r) => map[r] || map[r.replace(/_/g, "")] || map[r.replace(/[^A-Z0-9]/g, "")];
+      window.location.href = findRoute(roleRoutes, role) || "/login";
     } catch (err) {
       const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
       setError(backendMessage || "Đăng nhập thất bại");

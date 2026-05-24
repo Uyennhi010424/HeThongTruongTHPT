@@ -60,11 +60,13 @@ export default function LopList() {
     };
   }, []);
 
+  const normalize = (v) => String(v ?? "").trim();
+
   const stats = useMemo(() => {
     const total = classes.length;
-    const grade10 = classes.filter((item) => item.khoi === "10").length;
-    const grade11 = classes.filter((item) => item.khoi === "11").length;
-    const grade12 = classes.filter((item) => item.khoi === "12").length;
+    const grade10 = classes.filter((item) => normalize(item.khoi) === "10").length;
+    const grade11 = classes.filter((item) => normalize(item.khoi) === "11").length;
+    const grade12 = classes.filter((item) => normalize(item.khoi) === "12").length;
     return { total, grade10, grade11, grade12 };
   }, [classes]);
 
@@ -74,8 +76,8 @@ export default function LopList() {
       const matchKeyword = !keyword.trim()
         ? true
         : [item.tenLop, item.khoi]
-            .filter(Boolean)
-            .some((field) => field.toLowerCase().includes(lower));
+            .filter((field) => field !== null && field !== undefined)
+            .some((field) => String(field).toLowerCase().includes(lower));
 
       const matchGrade = gradeFilter === "all" ? true : String(item.khoi || "") === gradeFilter;
 

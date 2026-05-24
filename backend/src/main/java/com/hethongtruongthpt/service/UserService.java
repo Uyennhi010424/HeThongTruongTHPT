@@ -8,6 +8,7 @@ import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.hethongtruongthpt.exception.ApiException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -24,6 +25,27 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    private static final String DEFAULT_ACCOUNT_PASSWORD = "Abc1234@";
+
+    public void resetPasswordToDefault(Integer id) {
+        try {
+            User existing = userRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
+            String newRaw;
+            if (existing.getRole() == RoleEnum.GIAO_VIEN && existing.getUsername() != null) {
+                String username = existing.getUsername();
+                String local = username.contains("@") ? username.substring(0, username.indexOf('@')) : username;
+                newRaw = local + "gv123@";
+            } else {
+                newRaw = DEFAULT_ACCOUNT_PASSWORD;
+            }
+            existing.setPassword(passwordEncoder.encode(newRaw));
+            userRepository.save(existing);
+        } catch (Exception ex) {
+            throw new ApiException("Không thể đặt lại mật khẩu: " + ex.getMessage());
+        }
+    }
+
     public List<UserDTO> getAll() {
         return userRepository.findAll().stream()
                 .map(this::toDto)
@@ -37,8 +59,18 @@ public class UserService {
     }
 
     public UserDTO create(UserRequest request) {
+        String username = request.getUsername() == null ? null : request.getUsername().trim();
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("Username không được để trống");
+        }
+
+        if (userRepository.findByUsername(username).isPresent()) {
+            // Reuse existing account to keep import flow idempotent.
+            return toDto(userRepository.findByUsername(username).get());
+        }
+
         User user = new User();
-        user.setUsername(request.getUsername());
+        user.setUsername(username);
         user.setPassword(normalizePassword(request.getPassword()));
         user.setRole(resolveRole(request.getRole()));
         user.setIsActive(resolveActive(request.getStatus()));
@@ -87,7 +119,28 @@ public class UserService {
         if (roleName == null || roleName.isBlank()) {
             return null;
         }
-        return RoleEnum.valueOf(roleName.trim().toUpperCase());
+        String raw = roleName.trim().toUpperCase();
+        try {
+            return RoleEnum.valueOf(raw);
+        } catch (IllegalArgumentException ignored) {
+        }
+
+        // Accept frontend variants like "GIAOVIEN", "HOCSINH", "PHUHUYNH", "VAN_THU", etc.
+        String cleaned = raw.replaceAll("[^A-Z0-9]", "");
+        switch (cleaned) {
+            case "GIAOVIEN":
+                return RoleEnum.GIAO_VIEN;
+            case "HOCSINH":
+                return RoleEnum.HOC_SINH;
+            case "PHUHUYNH":
+                return RoleEnum.PHU_HUYNH;
+            case "VANTHU":
+                return RoleEnum.VAN_THU;
+            case "ADMIN":
+                return RoleEnum.ADMIN;
+            default:
+                throw new IllegalArgumentException("Unknown role: " + roleName);
+        }
     }
 
     private boolean resolveActive(Integer status) {

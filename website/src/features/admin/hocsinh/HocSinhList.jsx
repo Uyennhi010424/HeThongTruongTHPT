@@ -9,7 +9,8 @@ import {
   updateHocSinh
 } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
-import { createPhuHuynh, getPhuHuynh } from "../../../api/phuhuynhApi.js";
+import { createPhuHuynh, getPhuHuynh, updatePhuHuynh } from "../../../api/phuhuynhApi.js";
+import { getParentsForStudent } from "../../../api/phuhuynhHocSinhApi.js";
 import { createUser, getUsers } from "../../../api/userApi.js";
 
 const formatDate = (value) => {
@@ -42,6 +43,18 @@ const getGenderLabel = (value) => {
 
 const getStatusLabel = (status) => (Number(status) === 1 ? "Đang học" : "Ngừng học");
 
+const getStudentStatus = (student) => {
+  if (student == null) return 1;
+  if (student.trangThai !== undefined && student.trangThai !== null) {
+    return Number(student.trangThai) === 1 ? 1 : 0;
+  }
+  // Fallback: derive from linked user active flag when backend doesn't store trangThai
+  if (student.user && typeof student.user.isActive !== "undefined") {
+    return student.user.isActive ? 1 : 0;
+  }
+  return 1;
+};
+
 const normalizeEmailPart = (value) =>
   (value || "")
     .toString()
@@ -67,12 +80,18 @@ const buildStudentEmailPreview = (fullName) => {
   return `${localPart}@tdn.edu.vn`;
 };
 
+const buildParentEmailPreview = (fullName, phone) => {
+  const base = normalizeEmailPart(fullName) || "phuhuynh";
+  const suffix = phone ? phone.replace(/[^0-9]/g, "") : "";
+  return `${base}${suffix}@tdn.edu.vn`;
+};
+
 const notifyUsersUpdated = () => {
   window.dispatchEvent(new Event("users-updated"));
   window.localStorage.setItem("usersUpdatedAt", String(Date.now()));
 };
 
-const compareClassThenName = (a, b) => {
+const compareClassThenGivenName = (a, b) => {
   const classA = String(a?.lopHoc?.tenLop || a?.lop?.tenLop || "").trim();
   const classB = String(b?.lopHoc?.tenLop || b?.lop?.tenLop || "").trim();
   const classCompare = classA.localeCompare(classB, "vi", {
@@ -83,10 +102,32 @@ const compareClassThenName = (a, b) => {
 
   const nameA = String(a?.hoTen || "").trim();
   const nameB = String(b?.hoTen || "").trim();
+
+  const getGiven = (fullName) => {
+    if (!fullName) return "";
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : fullName;
+  };
+
+  const givenA = getGiven(nameA).toString();
+  const givenB = getGiven(nameB).toString();
+
+  const givenCompare = givenA.localeCompare(givenB, "vi", { sensitivity: "base" });
+  if (givenCompare !== 0) return givenCompare;
+
+  // Fallback: compare full name, then id
   const nameCompare = nameA.localeCompare(nameB, "vi", { sensitivity: "base" });
   if (nameCompare !== 0) return nameCompare;
 
   return Number(a?.id || 0) - Number(b?.id || 0);
+};
+
+const normalizeStudent = (student) => {
+  if (!student) return student;
+  return {
+    ...student,
+    lopHoc: student.lopHoc || student.lop || null
+  };
 };
 
 const EXCEL_TEMPLATE_COLUMNS = [
@@ -108,12 +149,13 @@ const EXCEL_TEMPLATE_COLUMNS = [
   "Phụ huynh - Nghề nghiệp",
   "ID phụ huynh (tùy chọn)"
 ];
+
 const EXCEL_FIELD_ALIASES = {
-  hoTen: ["Họ tên", "HO_TEN"],
+  hoTen: ["Họ tên", "Họ và tên", "HO_TEN"],
   ngaySinh: ["Ngày sinh", "NGAY_SINH"],
   gioiTinh: ["Giới tính", "GIOI_TINH"],
-  lop: ["Lớp", "LOP"],
-  sdt: ["Số điện thoại", "SDT", "SO_DIEN_THOAI"],
+  lop: ["Lớp", "Lớp học", "LOP"],
+  sdt: ["Số điện thoại", "Điện thoại", "SDT", "SO_DIEN_THOAI"],
   email: ["Email", "EMAIL"],
   diaChi: ["Địa chỉ", "DIA_CHI"],
   namNhapHoc: ["Năm nhập học", "NAM_NHAP_HOC"],
@@ -161,9 +203,34 @@ const parseBoolean = (value, fallback = false) => {
   return fallback;
 };
 
+// Normalize phone values coming from Excel or loose input.
+// Preserve leading zero if a 9-digit number is provided (common when Excel trims the 0).
+const normalizePhone = (value) => {
+  if (value === null || value === undefined) return "";
+  let s = String(value).trim();
+  if (!s) return "";
+  // remove all non-digit characters but keep leading + for detection
+  s = s.replace(/[^0-9]/g, "");
+  // If number lost the leading 0 (e.g. 912345678 -> 0912345678), add it back when length is 9
+  if (s.length === 9) return `0${s}`;
+  // If it looks like a vietnam country code without leading zero (84912345678), convert to 0...
+  if (s.length === 11 && s.startsWith("84")) return `0${s.slice(2)}`;
+  return s;
+};
+
+const formatPhoneDisplay = (value) => {
+  if (!value && value !== 0) return "";
+  const s = String(value).trim();
+  if (!s) return "";
+  const digits = s.replace(/[^0-9]/g, "");
+  if (digits.length === 9) return `0${digits}`;
+  if (digits.length === 11 && digits.startsWith("84")) return `0${digits.slice(2)}`;
+  return digits;
+};
+
 const parseStatus = (value) => {
   const normalized = normalizeText(value);
-  if (["1", "danghoc", "danghoc", "active"].includes(normalized)) return 1;
+  if (["1", "danghoc", "active"].includes(normalized)) return 1;
   if (["0", "ngunghoc", "inactive"].includes(normalized)) return 0;
   return 1;
 };
@@ -190,20 +257,41 @@ const extractBackendError = (err) => {
   return "không thể lưu dữ liệu";
 };
 
+// ✅ FIX: Xử lý đầy đủ Date object, số serial Excel, và chuỗi ngày tháng
 const normalizeDateCell = (value) => {
   if (value === null || value === undefined || value === "") return null;
+
+  // ✅ Xử lý JS Date object (do cellDates: true trả về)
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  // Xử lý số serial Excel (fallback nếu không dùng cellDates)
   if (typeof value === "number") {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (!parsed) return null;
-    const month = String(parsed.m).padStart(2, "0");
-    const day = String(parsed.d).padStart(2, "0");
-    return `${parsed.y}-${month}-${day}`;
+    try {
+      // Excel lưu ngày dạng số nguyên (ngày tính từ 1899-12-30, có bug năm nhuận 1900)
+      const epoch = new Date(Date.UTC(1899, 11, 30));
+      const jsDate = new Date(epoch.getTime() + Math.round(value) * 24 * 60 * 60 * 1000);
+      const year = jsDate.getUTCFullYear();
+      const month = String(jsDate.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(jsDate.getUTCDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    } catch {
+      return null;
+    }
   }
 
   const text = String(value).trim();
   if (!text) return null;
+
+  // Định dạng ISO: yyyy-mm-dd
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
 
+  // Định dạng dd/mm/yyyy hoặc dd-mm-yyyy hoặc dd.mm.yyyy
   const parts = text.split(/[\/\-.]/);
   if (parts.length === 3) {
     const [first, second, third] = parts.map((part) => Number(part));
@@ -211,12 +299,14 @@ const normalizeDateCell = (value) => {
       const year = first > 31 ? first : third;
       const month = second;
       const day = first > 31 ? third : first;
-      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      if (year > 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
     }
   }
 
   const parsedDate = new Date(text);
-  if (Number.isNaN(parsedDate.getTime())) return null;
+  if (isNaN(parsedDate.getTime())) return null;
   const year = parsedDate.getFullYear();
   const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
   const day = String(parsedDate.getDate()).padStart(2, "0");
@@ -291,7 +381,7 @@ export default function HocSinhList() {
         role: "HOCSINH"
       });
     } catch {
-      // Keep student creation successful even if fallback account creation fails.
+      // Giữ tạo học sinh thành công dù tạo tài khoản fallback thất bại
     }
   };
 
@@ -309,7 +399,7 @@ export default function HocSinhList() {
         ]);
         if (!active) return;
         if (hsRes.status === "fulfilled") {
-          setStudents(hsRes.value?.data?.data || []);
+          setStudents((hsRes.value?.data?.data || []).map(normalizeStudent));
         }
         if (lopRes.status === "fulfilled") {
           setClasses(lopRes.value?.data?.data || []);
@@ -338,7 +428,7 @@ export default function HocSinhList() {
 
   const stats = useMemo(() => {
     const total = students.length;
-    const activeCount = students.filter((item) => item.trangThai === 1).length;
+    const activeCount = students.filter((item) => getStudentStatus(item) === 1).length;
     const pausedCount = total - activeCount;
     return { total, activeCount, pausedCount };
   }, [students]);
@@ -353,7 +443,7 @@ export default function HocSinhList() {
         : true;
 
       const studentGrade = String(student?.lopHoc?.khoi || "");
-      const studentClassId = String(student?.lopHoc?.id || "");
+      const studentClassId = String(student?.lopHoc?.id || student?.lop?.id || "");
 
       const matchGrade = gradeFilter === "all" ? true : studentGrade === gradeFilter;
       const matchClass = classFilter === "all" ? true : studentClassId === classFilter;
@@ -361,7 +451,7 @@ export default function HocSinhList() {
       return matchKeyword && matchGrade && matchClass;
     });
 
-    return [...source].sort(compareClassThenName);
+    return [...source].sort(compareClassThenGivenName);
   }, [keyword, students, gradeFilter, classFilter]);
 
   const classesByGrade = useMemo(() => {
@@ -376,7 +466,9 @@ export default function HocSinhList() {
       .sort(([a], [b]) => Number(a) - Number(b))
       .map(([grade, items]) => ({
         grade,
-        items: [...items].sort((x, y) => String(x.tenLop || "").localeCompare(String(y.tenLop || "")))
+        items: [...items].sort((x, y) =>
+          String(x.tenLop || "").localeCompare(String(y.tenLop || ""))
+        )
       }));
   }, [classes]);
 
@@ -405,6 +497,19 @@ export default function HocSinhList() {
       setClassFilter("all");
     }
   }, [filteredClasses, classFilter]);
+
+  // When user picks a specific class, update the grade filter to match that class's `khoi`.
+  const handleClassSelect = (classId) => {
+    setClassFilter(classId);
+    if (classId === "all") {
+      setGradeFilter("all");
+      return;
+    }
+    const found = classes.find((c) => String(c.id) === String(classId));
+    if (found && found.khoi !== undefined && found.khoi !== null) {
+      setGradeFilter(String(found.khoi));
+    }
+  };
 
   useEffect(() => {
     if (!successMessage) return undefined;
@@ -444,18 +549,46 @@ export default function HocSinhList() {
       (item) => String(item.id) === String(student?.phuHuynhId || "")
     );
     setEditingStudent(student);
-    setForm({
+    // If phuHuynhId isn't present on the student, try fetching linked parents
+    (async () => {
+      let parentToUse = selectedParent;
+      if (!parentToUse) {
+        try {
+          const res = await getParentsForStudent(student.id);
+          const fetched = res?.data?.data || [];
+          if (fetched.length) {
+            parentToUse = fetched[0];
+            // ensure parent is in local parents list so selects show it
+            setParents((prev) => {
+              const exists = prev.some((p) => String(p.id) === String(parentToUse.id));
+              return exists ? prev : [parentToUse, ...prev];
+            });
+          }
+        } catch (e) {
+          // ignore fetch errors — proceed with whatever we have
+        }
+      }
+
+      setForm({
       hoTen: student.hoTen || "",
       ngaySinh: formatDateInput(student.ngaySinh),
       gioiTinh: String(student.gioiTinh ?? true),
-      lopHocId: student?.lopHoc?.id ? String(student.lopHoc.id) : "",
+      lopHocId: student?.lopHoc?.id
+        ? String(student.lopHoc.id)
+        : student?.lop?.id
+        ? String(student.lop.id)
+        : "",
       danTocTen: student?.danToc || "",
       tonGiao: student?.tonGiao || "",
-      phuHuynhId: student?.phuHuynhId ? String(student.phuHuynhId) : "",
-      phuHuynhHoTen: selectedParent?.hoTen || "",
-      phuHuynhSdt: selectedParent?.soDienThoai || "",
-      phuHuynhEmail: selectedParent?.email || "",
-      phuHuynhNgheNghiep: selectedParent?.ngheNghiep || "",
+      phuHuynhId: student?.phuHuynhId
+        ? String(student.phuHuynhId)
+        : parentToUse?.id
+        ? String(parentToUse.id)
+        : "",
+      phuHuynhHoTen: parentToUse?.hoTen || selectedParent?.hoTen || "",
+      phuHuynhSdt: formatPhoneDisplay(parentToUse?.soDienThoai || selectedParent?.soDienThoai || ""),
+      phuHuynhEmail: parentToUse?.email || selectedParent?.email || "",
+      phuHuynhNgheNghiep: parentToUse?.ngheNghiep || selectedParent?.ngheNghiep || "",
       sdt: student.sdt || "",
       email: student.email || "",
       diaChi: student.diaChi || "",
@@ -465,11 +598,12 @@ export default function HocSinhList() {
           : "",
       maBhyt: student.maBhyt || "",
       dienChinhSach: String(student.dienChinhSach ?? false),
-      trangThai: student.trangThai ?? 1
+      trangThai: student.trangThai ?? (student.user?.isActive ? 1 : 0)
     });
-    setFormError("");
-    setSuccessMessage("");
-    setModalOpen(true);
+      setFormError("");
+      setSuccessMessage("");
+      setModalOpen(true);
+    })();
   };
 
   const handleDelete = async (student) => {
@@ -480,7 +614,7 @@ export default function HocSinhList() {
       setError("");
       setSuccessMessage("Xóa học sinh thành công.");
     } catch (err) {
-      setError("Không thể xóa học sinh.");
+      setError("Không thể xóa học sinh.");Chu
       setSuccessMessage("");
     }
   };
@@ -514,13 +648,44 @@ export default function HocSinhList() {
 
       if (hasParentContact) {
         try {
-          const phRes = await createPhuHuynh({
+          const candidateEmail =
+            form.phuHuynhEmail.trim() ||
+            buildParentEmailPreview(form.phuHuynhHoTen, form.phuHuynhSdt);
+          let createdUserId = null;
+          try {
+            const userRes = await createUser({
+              username: candidateEmail,
+              email: candidateEmail,
+              password: "Abc1234@",
+              status: 1,
+              role: "PHU_HUYNH"
+            });
+            createdUserId = userRes?.data?.data?.id;
+          } catch {
+            try {
+              const usersRes = await getUsers();
+              const found = (usersRes?.data?.data || []).find((u) => {
+                const email = String(u?.email || "").toLowerCase();
+                return email === candidateEmail.toLowerCase();
+              });
+              if (found?.id) createdUserId = found.id;
+            } catch {
+              // ignore
+            }
+          }
+
+          const phPayload = {
             hoTen: form.phuHuynhHoTen.trim() || null,
             soDienThoai: form.phuHuynhSdt.trim() || null,
             email: form.phuHuynhEmail.trim() || null,
             diaChi: null,
-            ngheNghiep: form.phuHuynhNgheNghiep.trim() || null
-          });
+            ngheNghiep: form.phuHuynhNgheNghiep.trim() || null,
+            quanHe: "CHA",
+            isSmSActive: true
+          };
+          if (createdUserId) phPayload.user = { id: Number(createdUserId) };
+
+          const phRes = await createPhuHuynh(phPayload);
           const createdParent = phRes?.data?.data;
           if (createdParent?.id) {
             phuHuynhId = Number(createdParent.id);
@@ -549,7 +714,7 @@ export default function HocSinhList() {
       hoTen: form.hoTen.trim(),
       ngaySinh: form.ngaySinh || null,
       gioiTinh: form.gioiTinh === "true",
-      lopHoc: form.lopHocId ? { id: Number(form.lopHocId) } : null,
+      lop: form.lopHocId ? { id: Number(form.lopHocId) } : null,
       hocBaId: editingStudent?.hocBaId || 1,
       danTocId,
       danToc: ethnicityName,
@@ -569,17 +734,19 @@ export default function HocSinhList() {
     try {
       if (editingStudent) {
         const response = await updateHocSinh(editingStudent.id, payload);
-        const updated = response?.data?.data;
+        const updated = normalizeStudent(response?.data?.data);
         setStudents((prev) =>
           prev.map((item) => (item.id === editingStudent.id ? updated : item))
         );
       } else {
         const response = await createHocSinh(payload);
-        const created = response?.data?.data;
-        const selectedClass = classes.find((item) => String(item.id) === String(form.lopHocId));
+        const created = normalizeStudent(response?.data?.data);
+        const selectedClass = classes.find(
+          (item) => String(item.id) === String(form.lopHocId)
+        );
         const normalizedCreated = {
           ...created,
-          lopHoc: created?.lopHoc?.tenLop ? created.lopHoc : selectedClass || null,
+          lopHoc: created?.lopHoc || created?.lop || selectedClass || null,
           email: created?.email || buildStudentEmailPreview(form.hoTen)
         };
         setStudents((prev) => [normalizedCreated, ...prev]);
@@ -621,7 +788,9 @@ export default function HocSinhList() {
       }
     ];
 
-    const worksheet = XLSX.utils.json_to_sheet(templateRows, { header: EXCEL_TEMPLATE_COLUMNS });
+    const worksheet = XLSX.utils.json_to_sheet(templateRows, {
+      header: EXCEL_TEMPLATE_COLUMNS
+    });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "HocSinh");
     XLSX.writeFile(workbook, "mau_nhap_hoc_sinh_viet_hoa.xlsx");
@@ -637,21 +806,115 @@ export default function HocSinhList() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
+
+      // ✅ FIX: Thêm cellDates: true để SheetJS tự convert số serial thành JS Date
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      // Đọc toàn bộ dưới dạng mảng thô để phát hiện header
+      const allRows = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        defval: "",
+        raw: false  // ✅ FIX: raw: false giúp giá trị Date được format đúng khi dùng với cellDates
+      });
+
+      if (!allRows || allRows.length === 0) {
+        setExcelError("File Excel không có dữ liệu.");
+        return;
+      }
+
+      // Tìm dòng header trong 5 dòng đầu
+      let headerRowIndex = -1;
+      let headerArray = null;
+
+      for (let i = 0; i < Math.min(5, allRows.length); i += 1) {
+        const hdr = allRows[i] || [];
+        const normalized = new Set(hdr.map((h) => normalizeText(String(h || ""))));
+        const hasAll = REQUIRED_EXCEL_FIELDS.every((field) =>
+          EXCEL_FIELD_ALIASES[field].some((alias) => normalized.has(normalizeText(alias)))
+        );
+        if (hasAll) {
+          headerRowIndex = i;
+          headerArray = hdr.map((h) => String(h || ""));
+          break;
+        }
+      }
+
+      // Nếu không tìm thấy, thử gộp 2-3 dòng đầu
+      if (headerRowIndex === -1) {
+        const maxCombine = Math.min(3, allRows.length - 1);
+        for (let span = 1; span <= maxCombine && headerRowIndex === -1; span += 1) {
+          const maxCols = Math.max(...allRows.slice(0, span + 1).map((r) => (r || []).length));
+          const combined = [];
+          for (let c = 0; c < maxCols; c += 1) {
+            const parts = [];
+            for (let r = 0; r <= span; r += 1) {
+              const cell = (allRows[r] || [])[c];
+              if (cell !== undefined && cell !== null && String(cell || "").trim() !== "") {
+                parts.push(String(cell));
+              }
+            }
+            combined[c] = parts.join(" ").trim();
+          }
+
+          const normalizedCombined = new Set(
+            combined.map((h) => normalizeText(String(h || "")))
+          );
+          const hasAll = REQUIRED_EXCEL_FIELDS.every((field) =>
+            EXCEL_FIELD_ALIASES[field].some((alias) =>
+              normalizedCombined.has(normalizeText(alias))
+            )
+          );
+          if (hasAll) {
+            headerRowIndex = span;
+            headerArray = combined;
+            break;
+          }
+        }
+      }
+
+      let rows = [];
+      let baseRowNumber = 2;
+
+      if (headerRowIndex >= 0) {
+        const header =
+          headerArray || allRows[headerRowIndex].map((h) => String(h || ""));
+        const dataRows = allRows.slice(headerRowIndex + 1);
+        rows = dataRows.map((r) => {
+          const obj = {};
+          for (let c = 0; c < header.length; c += 1) {
+            const key = header[c] || `COL_${c}`;
+            obj[key] = r[c] === undefined ? "" : r[c];
+          }
+          return obj;
+        });
+        baseRowNumber = headerRowIndex + 2;
+      } else {
+        // Fallback: dùng dòng đầu làm header
+        const tmp = XLSX.utils.sheet_to_json(worksheet, { defval: "", raw: false });
+        if (!tmp.length) {
+          setExcelError("File Excel không có dữ liệu.");
+          return;
+        }
+        rows = tmp;
+        baseRowNumber = 2;
+      }
 
       if (!rows.length) {
-        setExcelError("File Excel không có dữ liệu.");
+        setExcelError("File Excel không có dữ liệu (sau khi xử lý header).");
         return;
       }
 
       const normalizedHeaders = new Set(
         Object.keys(rows[0] || {}).map((header) => normalizeText(header))
       );
-      const missingFields = REQUIRED_EXCEL_FIELDS.filter((field) =>
-        !EXCEL_FIELD_ALIASES[field].some((alias) => normalizedHeaders.has(normalizeText(alias)))
+      const missingFields = REQUIRED_EXCEL_FIELDS.filter(
+        (field) =>
+          !EXCEL_FIELD_ALIASES[field].some((alias) =>
+            normalizedHeaders.has(normalizeText(alias))
+          )
       );
       if (missingFields.length) {
         const missingLabels = missingFields.map((field) => EXCEL_FIELD_ALIASES[field][0]);
@@ -664,100 +927,221 @@ export default function HocSinhList() {
         classMap.set(normalizeText(lop.tenLop), lop);
       });
 
+      const fuzzyFindClass = (normName) => {
+        if (!normName) return null;
+        if (classMap.has(normName)) return classMap.get(normName);
+        for (const [key, lop] of classMap.entries()) {
+          if (key.includes(normName) || normName.includes(key)) return lop;
+        }
+        const simple = normName.replace(/[^a-z0-9]/g, "");
+        for (const [key, lop] of classMap.entries()) {
+          if (key.includes(simple) || simple.includes(key)) return lop;
+        }
+        return null;
+      };
+
+      // ✅ FIX: Cache phụ huynh đã tạo trong lần import để tránh tạo trùng
+      const createdParentCache = new Map(); // key: email hoặc sdt → phuHuynhId
+
       const createdStudents = [];
       const failedRows = [];
+      const originalRowNumbers = rows.map((_, i) => baseRowNumber + i);
+      let totalNonEmptyRows = 0;
 
       for (let index = 0; index < rows.length; index += 1) {
         const row = rows[index];
-        const rowNumber = index + 2;
+        const rowNumber = originalRowNumbers[index];
 
-        const className = String(findColumnValue(row, EXCEL_FIELD_ALIASES.lop) || "").trim();
-        const classMatch = classMap.get(normalizeText(className));
-        const fullName = String(findColumnValue(row, EXCEL_FIELD_ALIASES.hoTen) || "").trim();
+        // Bỏ qua dòng trống hoàn toàn
+        const isEmptyRow = Object.values(row || {}).every(
+          (v) => v === null || v === undefined || String(v || "").trim() === ""
+        );
+        if (isEmptyRow) continue;
+        totalNonEmptyRows += 1;
+
+        const className = String(
+          findColumnValue(row, EXCEL_FIELD_ALIASES.lop) || ""
+        ).trim();
+        const normClassName = normalizeText(className);
+        let classMatch = classMap.get(normClassName);
+        if (!classMatch) classMatch = fuzzyFindClass(normClassName);
+
+        const fullName = String(
+          findColumnValue(row, EXCEL_FIELD_ALIASES.hoTen) || ""
+        ).trim();
 
         if (!fullName) {
-          failedRows.push(`Dòng ${rowNumber}: thiếu cột Họ tên`);
-          continue;
-        }
-
-        if (!classMatch) {
-          failedRows.push(`Dòng ${rowNumber}: không tìm thấy lớp '${className || "(trống)"}'`);
-          continue;
-        }
-
-        const hocBaId = parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.hocBaId)) ?? 1;
-        const danTocId = parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.danTocId)) ?? 1;
-
-        const parentName = String(
-          findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhHoTen) || ""
-        ).trim();
-        const parentPhone = String(
-          findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhSdt) || ""
-        ).trim();
-        const parentEmail = String(
-          findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhEmail) || ""
-        ).trim();
-        const parentJob = String(
-          findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhNgheNghiep) || ""
-        ).trim();
-
-        let phuHuynhId =
-          parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhIdOptional)) ??
-          parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhId));
-
-        if (!phuHuynhId && (parentName || parentPhone || parentEmail)) {
-          try {
-            const phRes = await createPhuHuynh({
-              hoTen: parentName || null,
-              soDienThoai: parentPhone || null,
-              email: parentEmail || null,
-              diaChi: null,
-              ngheNghiep: parentJob || null
-            });
-            const createdParent = phRes?.data?.data;
-            if (createdParent?.id) {
-              phuHuynhId = Number(createdParent.id);
-              setParents((prev) => [createdParent, ...prev]);
-            }
-          } catch {
-            failedRows.push(`Dòng ${rowNumber}: không thể tạo thông tin phụ huynh`);
-            continue;
-          }
-        }
-
-        if (!phuHuynhId) {
-          const fallbackParent = parents[0];
-          if (fallbackParent?.id) {
-            phuHuynhId = Number(fallbackParent.id);
-          }
-        }
-
-        if (!phuHuynhId) {
+          const preview = Object.entries(row || {})
+            .slice(0, 6)
+            .map(([k, v]) => `${String(k).slice(0, 40)}:${String(v).slice(0, 40)}`)
+            .join(" | ");
           failedRows.push(
-            `Dòng ${rowNumber}: thiếu phụ huynh (nhập ID phụ huynh hoặc thông tin liên hệ phụ huynh)`
+            `Dòng ${rowNumber}: thiếu cột Họ tên — dữ liệu: ${preview}`
           );
           continue;
         }
 
-        const payload = {
+        if (!classMatch) {
+          const preview = Object.entries(row || {})
+            .slice(0, 6)
+            .map(([k, v]) => `${String(k).slice(0, 40)}:${String(v).slice(0, 40)}`)
+            .join(" | ");
+          failedRows.push(
+            `Dòng ${rowNumber}: không tìm thấy lớp '${className || "(trống)"}' — dữ liệu: ${preview}`
+          );
+          continue;
+        }
+
+        const hocBaId =
+          parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.hocBaId)) ?? 1;
+        const danTocId =
+          parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.danTocId)) ?? 1;
+
+        // Xử lý phụ huynh: ưu tiên ID có sẵn → cache → tạo mới
+        let phuHuynhId =
+          parseNullableNumber(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhIdOptional)
+          ) ??
+          parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhId)) ??
+          null;
+
+        if (!phuHuynhId) {
+          const phHoTen = String(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhHoTen) || ""
+          ).trim();
+          const phSdt = normalizePhone(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhSdt) || ""
+          );
+          const phEmail = String(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhEmail) || ""
+          ).trim();
+          const phNgheNghiep = String(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhNgheNghiep) || ""
+          ).trim();
+
+          // ✅ FIX: Dùng email hoặc SĐT làm cache key, tránh tạo trùng phụ huynh
+          const cacheKey = phEmail || phSdt || phHoTen;
+
+          if (cacheKey && createdParentCache.has(cacheKey)) {
+            // Tái sử dụng phụ huynh đã tạo trong lần import này
+            phuHuynhId = createdParentCache.get(cacheKey);
+          } else if (phHoTen || phSdt || phEmail) {
+            try {
+              // Kiểm tra phụ huynh đã tồn tại trong DB chưa (theo email hoặc SĐT)
+              const existingParent = parents.find((p) => {
+                if (phEmail && String(p.email || "").toLowerCase() === phEmail.toLowerCase())
+                  return true;
+                if (phSdt && String(p.soDienThoai || "") === phSdt) return true;
+                return false;
+              });
+
+              if (existingParent?.id) {
+                phuHuynhId = Number(existingParent.id);
+                if (cacheKey) createdParentCache.set(cacheKey, phuHuynhId);
+                // If parent exists but ngheNghiep provided in Excel, update parent to persist profession
+                try {
+                  if (phNgheNghiep && String(existingParent.ngheNghiep || "").trim() === "") {
+                    await updatePhuHuynh(existingParent.id, { ...existingParent, ngheNghiep: phNgheNghiep || null });
+                    setParents((prev) =>
+                      prev.map((p) => (p.id === existingParent.id ? { ...p, ngheNghiep: phNgheNghiep || null } : p))
+                    );
+                  }
+                } catch {
+                  // ignore update failure
+                }
+              } else {
+                // Tạo user cho phụ huynh
+                const candidateEmail =
+                  phEmail || buildParentEmailPreview(phHoTen, phSdt);
+                let createdUserId = null;
+                try {
+                  const userRes = await createUser({
+                    username: candidateEmail,
+                    email: candidateEmail,
+                    password: "Abc1234@",
+                    status: 1,
+                    role: "PHU_HUYNH"
+                  });
+                  createdUserId = userRes?.data?.data?.id;
+                } catch {
+                  try {
+                    const usersRes = await getUsers();
+                    const found = (usersRes?.data?.data || []).find(
+                      (u) =>
+                        String(u?.email || "").toLowerCase() ===
+                        candidateEmail.toLowerCase()
+                    );
+                    if (found?.id) createdUserId = found.id;
+                  } catch {
+                    // ignore
+                  }
+                }
+
+                      const phPayload = {
+                        hoTen: phHoTen || null,
+                        soDienThoai: phSdt || null,
+                        email: phEmail || null,
+                        diaChi: null,
+                        ngheNghiep: phNgheNghiep || null,
+                        quanHe: "CHA",
+                        isSmSActive: true
+                      };
+                if (createdUserId) phPayload.user = { id: Number(createdUserId) };
+
+                const phRes = await createPhuHuynh(phPayload);
+                const createdParent = phRes?.data?.data;
+                if (createdParent?.id) {
+                  phuHuynhId = Number(createdParent.id);
+                  setParents((prev) => [createdParent, ...prev]);
+                  if (cacheKey) createdParentCache.set(cacheKey, phuHuynhId);
+                }
+              }
+            } catch {
+              // Nếu không tạo được phụ huynh, dùng fallback
+            }
+          }
+        }
+
+        // Fallback cuối: dùng phụ huynh đầu tiên trong danh sách
+        if (!phuHuynhId) {
+          phuHuynhId = parents[0]?.id ? Number(parents[0].id) : 1;
+        }
+
+        // ✅ FIX: Dùng normalizeDateCell đã được fix để xử lý Date object
+        const ngaySinhRaw = findColumnValue(row, EXCEL_FIELD_ALIASES.ngaySinh);
+        const ngaySinhNormalized = normalizeDateCell(ngaySinhRaw);
+
+          const payload = {
           hoTen: fullName,
-          ngaySinh: normalizeDateCell(findColumnValue(row, EXCEL_FIELD_ALIASES.ngaySinh)),
-          gioiTinh: parseBoolean(findColumnValue(row, EXCEL_FIELD_ALIASES.gioiTinh), true),
-          lopHoc: { id: Number(classMatch.id) },
+          ngaySinh: ngaySinhNormalized,
+          gioiTinh: parseBoolean(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.gioiTinh),
+            true
+          ),
+          lop: { id: Number(classMatch.id) },
           hocBaId,
           danTocId,
-          danToc: String(findColumnValue(row, EXCEL_FIELD_ALIASES.danToc) || "").trim() || null,
+          danToc:
+            String(findColumnValue(row, EXCEL_FIELD_ALIASES.danToc) || "").trim() || null,
           phuHuynhId,
-          sdt: String(findColumnValue(row, EXCEL_FIELD_ALIASES.sdt) || "").trim() || null,
+          sdt: normalizePhone(findColumnValue(row, EXCEL_FIELD_ALIASES.sdt) || "") || null,
           email:
             String(findColumnValue(row, EXCEL_FIELD_ALIASES.email) || "").trim() ||
             buildStudentEmailPreview(fullName) ||
             null,
-          diaChi: String(findColumnValue(row, EXCEL_FIELD_ALIASES.diaChi) || "").trim() || null,
-          namNhapHoc: parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.namNhapHoc)),
-          maBhyt: String(findColumnValue(row, EXCEL_FIELD_ALIASES.maBhyt) || "").trim() || null,
-          tonGiao: String(findColumnValue(row, EXCEL_FIELD_ALIASES.tonGiao) || "").trim() || null,
-          dienChinhSach: parseBoolean(findColumnValue(row, EXCEL_FIELD_ALIASES.dienChinhSach), false),
+          diaChi:
+            String(findColumnValue(row, EXCEL_FIELD_ALIASES.diaChi) || "").trim() || null,
+          namNhapHoc: parseNullableNumber(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.namNhapHoc)
+          ),
+          maBhyt:
+            String(findColumnValue(row, EXCEL_FIELD_ALIASES.maBhyt) || "").trim() || null,
+          tonGiao:
+            String(findColumnValue(row, EXCEL_FIELD_ALIASES.tonGiao) || "").trim() || null,
+          dienChinhSach: parseBoolean(
+            findColumnValue(row, EXCEL_FIELD_ALIASES.dienChinhSach),
+            false
+          ),
           trangThai: parseStatus(findColumnValue(row, EXCEL_FIELD_ALIASES.trangThai))
         };
 
@@ -773,21 +1157,25 @@ export default function HocSinhList() {
       if (createdStudents.length) {
         setStudents((prev) => [...createdStudents, ...prev]);
         await Promise.allSettled(
-          createdStudents.map((student) => ensureStudentUserAccount(student, student?.hoTen || ""))
+          createdStudents.map((student) =>
+            ensureStudentUserAccount(student, student?.hoTen || "")
+          )
         );
         notifyUsersUpdated();
       }
 
       if (failedRows.length) {
         setExcelError(
-          `Nhập thành công ${createdStudents.length}/${rows.length}. ${failedRows
+          `Nhập thành công ${createdStudents.length}/${totalNonEmptyRows || 0}. ${failedRows
             .slice(0, 3)
             .join(" | ")}`
         );
       } else {
-        setExcelSuccess(`Đã nhập thành công ${createdStudents.length} học sinh từ Excel.`);
+        setExcelSuccess(
+          `Đã nhập thành công ${createdStudents.length} học sinh từ Excel.`
+        );
       }
-    } catch {
+    } catch (err) {
       setExcelError("Không thể đọc file Excel. Vui lòng kiểm tra lại biểu mẫu.");
     } finally {
       setImporting(false);
@@ -828,7 +1216,7 @@ export default function HocSinhList() {
               <span>Lớp</span>
               <select
                 value={classFilter}
-                onChange={(event) => setClassFilter(event.target.value)}
+                onChange={(event) => handleClassSelect(event.target.value)}
               >
                 <option value="all">Tất cả lớp</option>
                 {filteredClasses
@@ -879,7 +1267,9 @@ export default function HocSinhList() {
           <div className="panel-pill">{filteredStudents.length} học sinh</div>
         </div>
         {error && <div className="table-empty">{error}</div>}
-        {!error && successMessage && <div className="table-success">{successMessage}</div>}
+        {!error && successMessage && (
+          <div className="table-success">{successMessage}</div>
+        )}
         {!error && !loading && filteredStudents.length === 0 && (
           <div className="table-empty">Không tìm thấy học sinh phù hợp.</div>
         )}
@@ -911,32 +1301,34 @@ export default function HocSinhList() {
                   <div className="table-main">
                     <div className="table-title">{student.hoTen}</div>
                     <div className="table-meta">
-                      {formatDate(student.ngaySinh) || "--"} • {getGenderLabel(student.gioiTinh)}
+                      {formatDate(student.ngaySinh) || "--"} •{" "}
+                      {getGenderLabel(student.gioiTinh)}
                     </div>
                   </div>
                   <div>
                     <div className="table-title">
-                      {student?.lopHoc?.tenLop || "--"}
+                      {student?.lopHoc?.tenLop || student?.lop?.tenLop || "--"}
                     </div>
                     <div className="table-meta">
-                      {student?.lopHoc?.khoi ? `Khối ${student.lopHoc.khoi}` : ""}
+                      {student?.lopHoc?.khoi || student?.lop?.khoi
+                        ? `Khối ${student.lopHoc?.khoi || student.lop?.khoi}`
+                        : ""}
                     </div>
                   </div>
                   <div className="table-email">
-                    {student.sdt || "--"}
+                      {formatPhoneDisplay(student.sdt) || "--"}
                     <div className="table-meta">{student.email || ""}</div>
                   </div>
-                  <div className="table-date">
-                    {student.namNhapHoc || "--"}
-                  </div>
+                  <div className="table-date">{student.namNhapHoc || "--"}</div>
                   <div>
-                    <span
-                      className={`status-pill ${
-                        student.trangThai === 1 ? "status-active" : "status-locked"
-                      }`}
-                    >
-                      {getStatusLabel(student.trangThai)}
-                    </span>
+                    {(() => {
+                      const st = getStudentStatus(student);
+                      return (
+                        <span className={`status-pill ${st === 1 ? "status-active" : "status-locked"}`}>
+                          {getStatusLabel(st)}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="table-actions">
                     <button
@@ -1068,7 +1460,9 @@ export default function HocSinhList() {
           <label className="form-field">
             <span>Email</span>
             <input
-              value={editingStudent ? form.email : buildStudentEmailPreview(form.hoTen)}
+              value={
+                editingStudent ? form.email : buildStudentEmailPreview(form.hoTen)
+              }
               readOnly
               placeholder="Tự động tạo theo tên học sinh"
             />
@@ -1144,7 +1538,7 @@ export default function HocSinhList() {
               {parents.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.hoTen || `Phụ huynh #${item.id}`}
-                  {item.soDienThoai ? ` - ${item.soDienThoai}` : ""}
+                  {item.soDienThoai ? ` - ${formatPhoneDisplay(item.soDienThoai)}` : ""}
                 </option>
               ))}
             </select>
@@ -1184,7 +1578,10 @@ export default function HocSinhList() {
             <input
               value={form.phuHuynhNgheNghiep}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, phuHuynhNgheNghiep: event.target.value }))
+                setForm((prev) => ({
+                  ...prev,
+                  phuHuynhNgheNghiep: event.target.value
+                }))
               }
               placeholder="vd: Kinh doanh"
             />
@@ -1213,8 +1610,8 @@ export default function HocSinhList() {
       >
         <div className="excel-import-wrap">
           <div className="table-meta">
-            Dùng đúng biểu mẫu Việt hóa. Cột bắt buộc: Họ tên, Lớp. Các cột ID học bạ / ID dân tộc /
-            ID phụ huynh sẽ mặc định là 1 nếu để trống.
+            Dùng đúng biểu mẫu Việt hóa. Cột bắt buộc: Họ tên, Lớp. Các cột ID học bạ /
+            ID dân tộc / ID phụ huynh sẽ mặc định là 1 nếu để trống.
           </div>
 
           <div className="excel-actions">
@@ -1236,7 +1633,11 @@ export default function HocSinhList() {
           {excelSuccess && <div className="table-success">{excelSuccess}</div>}
 
           <div className="form-actions">
-            <button type="button" className="btn-outline" onClick={() => setExcelModalOpen(false)}>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => setExcelModalOpen(false)}
+            >
               Đóng
             </button>
           </div>

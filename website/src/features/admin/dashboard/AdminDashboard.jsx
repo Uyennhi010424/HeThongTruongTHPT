@@ -8,12 +8,16 @@ import { getLop } from "../../../api/lopApi.js";
 
 const formatNumber = (value) =>
   new Intl.NumberFormat("vi-VN").format(Number(value || 0));
+const normalizeGrade = (value) => String(value ?? "").trim();
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     students: 0,
     teachers: 0,
     classes: 0,
+    grade10: 0,
+    grade11: 0,
+    grade12: 0,
     avgScore: 7.8
   });
   const [loading, setLoading] = useState(true);
@@ -30,10 +34,14 @@ export default function AdminDashboard() {
           getLop()
         ]);
         if (!active) return;
+        const classesArr = lop?.data?.data || [];
         setStats({
           students: (hs?.data?.data || []).length,
           teachers: (gv?.data?.data || []).length,
-          classes: (lop?.data?.data || []).length,
+          classes: classesArr.length,
+          grade10: classesArr.filter((item) => normalizeGrade(item.khoi) === "10").length,
+          grade11: classesArr.filter((item) => normalizeGrade(item.khoi) === "11").length,
+          grade12: classesArr.filter((item) => normalizeGrade(item.khoi) === "12").length,
           avgScore: 7.8
         });
       } catch {
@@ -100,33 +108,32 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-lg md:grid-cols-2 xl:grid-cols-4">
         {[
           {
-            label: "Tổng Học sinh",
-            value: stats.students,
-            icon: "person",
+            label: "Tổng lớp",
+            value: stats.classes,
+            icon: "groups",
             border: "border-primary",
             iconColor: "text-primary-container"
           },
           {
-            label: "Tổng Giáo viên",
-            value: stats.teachers,
-            icon: "school",
+            label: "Khối 10",
+            value: stats.grade10,
+            icon: "groups",
             border: "border-secondary",
             iconColor: "text-secondary"
           },
           {
-            label: "Số lớp đang học",
-            value: stats.classes,
+            label: "Khối 11",
+            value: stats.grade11,
             icon: "groups",
             border: "border-tertiary",
             iconColor: "text-tertiary"
           },
           {
-            label: "ĐTB Toàn trường",
-            value: stats.avgScore,
-            icon: "monitoring",
+            label: "Khối 12",
+            value: stats.grade12,
+            icon: "groups",
             border: "border-error",
-            iconColor: "text-error",
-            format: (v) => v.toFixed(2)
+            iconColor: "text-error"
           }
         ].map((card) => (
           <div

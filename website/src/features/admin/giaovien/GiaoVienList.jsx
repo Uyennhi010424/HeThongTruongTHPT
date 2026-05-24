@@ -15,6 +15,35 @@ import {
 } from "../../../api/chunhiemApi.js";
 import { createUser, getUsers } from "../../../api/userApi.js";
 
+const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+};
+
+const formatDateInput = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeTeacher = (teacher) => {
+  if (!teacher) return teacher;
+  return {
+    ...teacher,
+    sdt: teacher.sdt || teacher.soDienThoai || ""
+  };
+};
+
 const getGenderLabel = (value) => {
   if (value === true) return "Nam";
   if (value === false) return "Nữ";
@@ -161,7 +190,7 @@ export default function GiaoVienList() {
           return;
         }
 
-        setTeachers(teacherResult.value?.data?.data || []);
+        setTeachers((teacherResult.value?.data?.data || []).map(normalizeTeacher));
         setClasses(
           classResult.status === "fulfilled" ? classResult.value?.data?.data || [] : []
         );
@@ -291,7 +320,7 @@ export default function GiaoVienList() {
       gioiTinh: form.gioiTinh === "true",
       boMon: form.boMon.trim() || null,
       trinhDo: form.trinhDo.trim() || null,
-      sdt: form.sdt.trim() || null,
+      soDienThoai: form.sdt.trim() || null,
       email: editingTeacher
         ? form.email.trim() || null
         : buildTeacherEmailPreview(form.hoTen) || null
@@ -301,14 +330,14 @@ export default function GiaoVienList() {
       let savedTeacher = null;
       if (editingTeacher) {
         const response = await updateGiaoVien(editingTeacher.id, payload);
-        const updated = response?.data?.data;
+        const updated = normalizeTeacher(response?.data?.data);
         savedTeacher = updated;
         setTeachers((prev) =>
           prev.map((item) => (item.id === editingTeacher.id ? updated : item))
         );
       } else {
         const response = await createGiaoVien(payload);
-        const created = response?.data?.data;
+        const created = normalizeTeacher(response?.data?.data);
         const normalizedCreated = {
           ...created,
           email: created?.email || buildTeacherEmailPreview(form.hoTen)

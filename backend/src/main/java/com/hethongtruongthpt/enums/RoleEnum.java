@@ -4,5 +4,6 @@ public enum RoleEnum {
     ADMIN,
     GIAO_VIEN,
     HOC_SINH,
-    PHU_HUYNH
+    PHU_HUYNH,
+    VAN_THU
 }

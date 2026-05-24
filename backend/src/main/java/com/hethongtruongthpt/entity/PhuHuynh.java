@@ -23,6 +23,9 @@ public class PhuHuynh {
     @Column(name = "email", length = 100)
     private String email;
 
+    @Column(name = "nghe_nghiep", length = 200)
+    private String ngheNghiep;
+
     @Column(name = "quan_he", nullable = false)
     private String quanHe; // CHA, ME, NGUOI_GIAM_HO
 
@@ -67,6 +70,14 @@ public class PhuHuynh {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getNgheNghiep() {
+        return ngheNghiep;
+    }
+
+    public void setNgheNghiep(String ngheNghiep) {
+        this.ngheNghiep = ngheNghiep;
     }
 
     public String getQuanHe() {

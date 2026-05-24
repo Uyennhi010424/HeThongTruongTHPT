@@ -15,7 +15,12 @@ export default function PhanCongPage() {
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [toast, setToast] = useState(false);
+  const [assignments, setAssignments] = useState(DEMO_ROWS);
+  const [selectedHocKy, setSelectedHocKy] = useState("Học kỳ 1");
 
   useEffect(() => {
     Promise.all([getGiaoVien(), getMonHoc(), getLop()]).then(([gv, mh, lop]) => {
@@ -26,6 +31,30 @@ export default function PhanCongPage() {
   }, []);
 
   const confirmAssign = () => {
+    // Validate selection
+    const teacher = teachers.find((t) => String(t.id) === String(selectedTeacherId));
+    if (!teacher) {
+      alert("Vui lòng chọn giáo viên trước khi xác nhận.");
+      return;
+    }
+    if (!selectedSubject) {
+      alert("Vui lòng chọn môn học.");
+      return;
+    }
+    if (!selectedClassId) {
+      alert("Vui lòng chọn lớp học.");
+      return;
+    }
+
+    const newRow = {
+      gv: teacher.hoTen,
+      ma: teacher.maGiaoVien || "",
+      mon: selectedSubject,
+      lop: classes.find((c) => String(c.id) === String(selectedClassId))?.tenLop || String(selectedClassId),
+      hk: selectedHocKy
+    };
+
+    setAssignments((prev) => [newRow, ...(prev || [])]);
     setToast(true);
     setTimeout(() => setToast(false), 3000);
   };
@@ -46,10 +75,39 @@ export default function PhanCongPage() {
             </h3>
           </div>
           <div className="flex flex-1 flex-col space-y-md p-lg">
-            <SelectField label="Chọn Giáo viên" options={teachers.map((t) => t.hoTen)} />
+            <SelectField
+              label="Chọn Giáo viên"
+              options={teachers.map((t) => ({ value: t.id, label: t.hoTen }))}
+              value={selectedTeacherId}
+              onChange={(v) => {
+                setSelectedTeacherId(v);
+                setSelectedSubject("");
+                setSelectedClassId("");
+              }}
+            />
             <div className="grid grid-cols-2 gap-md">
-              <SelectField label="Môn học" options={subjects.map((m) => m.tenMon)} />
-              <SelectField label="Lớp học" options={classes.map((l) => l.tenLop)} />
+              <SelectField
+                label="Môn học"
+                options={(() => {
+                  const teacher = teachers.find((x) => String(x.id) === String(selectedTeacherId));
+                  if (teacher && teacher.boMon) {
+                    const parts = String(teacher.boMon)
+                      .split(/[,;\/|]+/)
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    if (parts.length) return parts.map((p) => ({ value: p, label: p }));
+                  }
+                  return subjects.map((m) => ({ value: m.tenMon, label: m.tenMon }));
+                })()}
+                value={selectedSubject}
+                onChange={(v) => setSelectedSubject(v)}
+              />
+              <SelectField
+                label="Lớp học"
+                options={classes.map((l) => ({ value: l.id, label: l.tenLop }))}
+                value={selectedClassId}
+                onChange={(v) => setSelectedClassId(v)}
+              />
             </div>
             <div>
               <span className="mb-sm block font-label-md text-on-surface-variant">Học kỳ</span>
@@ -84,7 +142,7 @@ export default function PhanCongPage() {
               Danh sách phân công hiện tại
             </h3>
           </div>
-          <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-surface-container-low">
                 <tr className="text-label-md uppercase text-on-surface-variant">
@@ -96,8 +154,8 @@ export default function PhanCongPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                {DEMO_ROWS.map((r) => (
-                  <tr key={`${r.ma}-${r.lop}`} className="group transition-colors hover:bg-secondary-fixed/10">
+                {(assignments || []).map((r, idx) => (
+                  <tr key={`${r.ma || idx}-${r.lop || idx}`} className="group transition-colors hover:bg-secondary-fixed/10">
                     <td className="px-lg py-md">
                       <p className="font-label-md">{r.gv}</p>
                       <p className="text-label-sm text-on-surface-variant">{r.ma}</p>
@@ -116,6 +174,7 @@ export default function PhanCongPage() {
                     <td className="px-lg py-md text-right">
                       <button
                         type="button"
+                        onClick={() => setAssignments((prev) => prev.filter((_, i) => i !== idx))}
                         className="rounded-lg p-sm text-error opacity-0 transition-all group-hover:opacity-100 hover:bg-error-container"
                         title="Xóa"
                       >
@@ -142,17 +201,32 @@ export default function PhanCongPage() {
   );
 }
 
-function SelectField({ label, options }) {
+function SelectField({ label, options, value, onChange }) {
   return (
     <div>
       <label className="mb-sm block font-label-md text-on-surface-variant">{label}</label>
-      <select className="w-full cursor-pointer appearance-none rounded-xl border border-outline-variant bg-surface-container-lowest px-md py-md focus:border-secondary focus:ring-2 focus:ring-secondary">
+      <select
+        value={value || ""}
+        onChange={(e) => onChange && onChange(e.target.value)}
+        className="w-full cursor-pointer appearance-none rounded-xl border border-outline-variant bg-surface-container-lowest px-md py-md focus:border-secondary focus:ring-2 focus:ring-secondary"
+      >
         <option value="">Chọn...</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
+        {options.map((o) => {
+          if (typeof o === "string") {
+            return (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            );
+          }
+          const val = o.value ?? o;
+          const lbl = o.label ?? o.value ?? o;
+          return (
+            <option key={String(val)} value={String(val)}>
+              {lbl}
+            </option>
+          );
+        })}
       </select>
     </div>
   );

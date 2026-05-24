@@ -21,6 +21,10 @@ public class SchemaMigrationRunner {
     public void migrate() {
         addColumnIfMissing("hoc_sinh", "dan_toc", "ALTER TABLE hoc_sinh ADD COLUMN dan_toc VARCHAR(100) NULL");
         addColumnIfMissing("hoc_sinh", "ton_giao", "ALTER TABLE hoc_sinh ADD COLUMN ton_giao VARCHAR(100) NULL");
+        addColumnIfMissing("phu_huynh", "nghe_nghiep", "ALTER TABLE phu_huynh ADD COLUMN nghe_nghiep VARCHAR(200) NULL");
+        addColumnIfMissing("giao_vien", "bo_mon", "ALTER TABLE giao_vien ADD COLUMN bo_mon VARCHAR(100) NULL");
+        addColumnIfMissing("giao_vien", "trinh_do", "ALTER TABLE giao_vien ADD COLUMN trinh_do VARCHAR(100) NULL");
+        addColumnIfMissing("giao_vien", "gioi_tinh", "ALTER TABLE giao_vien ADD COLUMN gioi_tinh TINYINT(1) NULL");
     }
 
     private void addColumnIfMissing(String tableName, String columnName, String alterSql) {

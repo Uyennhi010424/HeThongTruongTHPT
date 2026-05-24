@@ -28,7 +28,11 @@ export default function NamHocHocKyPage() {
         const yData = yRes?.data?.data || [];
         setYears(yData);
         setHocKyList(hkRes?.data?.data || []);
-        if (yData.length) setSelectedYear(yData[0]);
+        if (yData.length) {
+          // Prefer the year with trangThai === 'DANG_MO' (currently open)
+          const activeYear = yData.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO");
+          setSelectedYear(activeYear || yData[0]);
+        }
       } finally {
         if (active) setLoading(false);
       }

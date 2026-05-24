@@ -2,6 +2,8 @@ package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.dto.user.UserRequest;
 import com.hethongtruongthpt.entity.GiaoVien;
+import com.hethongtruongthpt.entity.User;
+import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.GiaoVienRepository;
 import com.hethongtruongthpt.repository.UserRepository;
@@ -48,22 +50,59 @@ public class GiaoVienService {
     }
 
     public GiaoVien create(GiaoVien giaoVien) {
+        if (giaoVien.getHoTen() == null || giaoVien.getHoTen().isBlank()) {
+            throw new ApiException("Thiếu họ tên giáo viên");
+        }
+
         String generatedUsername = generateUniqueUsername(giaoVien.getHoTen());
-        giaoVien.setEmail(generatedUsername);
+        String username = (giaoVien.getEmail() == null || giaoVien.getEmail().isBlank())
+                ? generatedUsername
+                : giaoVien.getEmail().trim();
+
+        giaoVien.setEmail(username);
+        if (giaoVien.getUser() == null || giaoVien.getUser().getId() == null) {
+            giaoVien.setUser(ensureTeacherAccountExists(username));
+        }
+        if (giaoVien.getMaGiaoVien() == null || giaoVien.getMaGiaoVien().isBlank()) {
+            giaoVien.setMaGiaoVien(generateUniqueTeacherCode());
+        }
+
         GiaoVien saved = giaoVienRepository.save(giaoVien);
-        ensureTeacherAccountExists(generatedUsername);
         return sanitizeVietnameseText(saved);
     }
 
     public GiaoVien update(Integer id, GiaoVien giaoVien) {
-        getById(id);
-        giaoVien.setId(id);
-        if (giaoVien.getEmail() == null || giaoVien.getEmail().isBlank()) {
-            String generatedUsername = generateUniqueUsername(giaoVien.getHoTen());
-            giaoVien.setEmail(generatedUsername);
+        GiaoVien existing = giaoVienRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên"));
+
+        if (giaoVien.getHoTen() != null) {
+            existing.setHoTen(giaoVien.getHoTen());
         }
-        GiaoVien saved = giaoVienRepository.save(giaoVien);
-        ensureTeacherAccountExists(saved.getEmail());
+        existing.setNgaySinh(giaoVien.getNgaySinh());
+        existing.setDiaChi(giaoVien.getDiaChi());
+        existing.setSoDienThoai(giaoVien.getSoDienThoai());
+        existing.setGioiTinh(giaoVien.getGioiTinh());
+        existing.setBoMon(giaoVien.getBoMon());
+        existing.setTrinhDo(giaoVien.getTrinhDo());
+
+        String username = giaoVien.getEmail();
+        if (username == null || username.isBlank()) {
+            username = existing.getEmail();
+        }
+        if (username == null || username.isBlank()) {
+            username = generateUniqueUsername(existing.getHoTen());
+        }
+        username = username.trim();
+        existing.setEmail(username);
+
+        if (existing.getUser() == null || existing.getUser().getId() == null) {
+            existing.setUser(ensureTeacherAccountExists(username));
+        }
+        if (existing.getMaGiaoVien() == null || existing.getMaGiaoVien().isBlank()) {
+            existing.setMaGiaoVien(generateUniqueTeacherCode());
+        }
+
+        GiaoVien saved = giaoVienRepository.save(existing);
         return sanitizeVietnameseText(saved);
     }
 
@@ -88,7 +127,8 @@ public class GiaoVienService {
 
     private GiaoVien sanitizeVietnameseText(GiaoVien giaoVien) {
         giaoVien.setHoTen(decodeMojibake(giaoVien.getHoTen()));
-        // Bỏ getBoMon() và getTrinhDo() vì entity GiaoVien không có 2 field này
+        giaoVien.setBoMon(decodeMojibake(giaoVien.getBoMon()));
+        giaoVien.setTrinhDo(decodeMojibake(giaoVien.getTrinhDo()));
         return giaoVien;
     }
 
@@ -108,14 +148,31 @@ public class GiaoVienService {
         request.setEmail(username);
         request.setPassword(DEFAULT_ACCOUNT_PASSWORD);
         request.setStatus(1);
-        request.setRole("GIAO_VIEN"); // Sửa lại đúng tên trong RoleEnum của bạn
+        request.setRole("GIAO_VIEN");
         userService.create(request);
     }
 
-    private void ensureTeacherAccountExists(String username) {
-        if (username == null || username.isBlank()) return;
-        if (userRepository.findByUsername(username).isPresent()) return;
-        createTeacherAccount(username);
+    private User ensureTeacherAccountExists(String username) {
+        if (username == null || username.isBlank()) {
+            throw new ApiException("Thiếu username/email tài khoản giáo viên");
+        }
+        return userRepository.findByUsername(username)
+                .orElseGet(() -> {
+                    createTeacherAccount(username);
+                    return userRepository.findByUsername(username)
+                            .orElseThrow(() -> new ApiException("Không thể tạo tài khoản giáo viên"));
+                });
+    }
+
+    private String generateUniqueTeacherCode() {
+        int suffix = 1;
+        while (true) {
+            String candidate = String.format("GV%04d", suffix);
+            if (giaoVienRepository.findByMaGiaoVien(candidate).isEmpty()) {
+                return candidate;
+            }
+            suffix += 1;
+        }
     }
 
     private String generateUniqueUsername(String fullName) {
