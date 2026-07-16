@@ -1,86 +1,69 @@
-import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
-import PageHeader from "../../../components/edu/PageHeader.jsx";
+const fs = require('fs');
+const path = require('path');
 
-const SCHEDULE = [
-  { mon: "Toán học", gv: "Thầy Hùng", color: "bg-blue-50 border-blue-100 text-on-primary-fixed-variant" },
-  { mon: "Ngữ văn", gv: "Cô Lan", color: "bg-emerald-50 border-emerald-100 text-emerald-800" },
-  { mon: "Vật lý", gv: "Thầy Nam", color: "bg-amber-50 border-amber-100 text-amber-800" }
-];
+const brainDir = 'C:\\Users\\Admin\\.gemini\\antigravity\\brain';
 
-export default function AdminThoiKhoaBieuPage() {
-  return (
-    <div className="space-y-lg">
-      <PageHeader title="Thời khóa biểu" description="Xem và cập nhật TKB theo lớp và học kỳ." />
+function findExactTimetableStyle() {
+  try {
+    const convos = fs.readdirSync(brainDir);
+    console.log(`Đang quét ${convos.length} hội thoại để tìm nhãn tiếng Việt đặc thù của giao diện TKB tổng hợp...`);
+    const candidates = [];
 
-      <section className="flex flex-wrap items-end gap-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-lg shadow-card">
-        <Filter label="Chọn Lớp học" options={["Lớp 12A1", "Lớp 10A1"]} />
-        <Filter label="Chọn Học kỳ" options={["Học kỳ I - 2023-2024"]} />
-        <div className="ml-auto flex gap-sm">
-          <button
-            type="button"
-            className="flex items-center gap-sm rounded-lg border border-outline px-lg py-2 font-label-md text-primary hover:bg-primary-fixed-dim"
-          >
-            <MaterialIcon name="print" />
-            In TKB
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-sm rounded-lg bg-primary px-lg py-2 font-label-md text-on-primary shadow-md hover:brightness-110"
-          >
-            <MaterialIcon name="edit_calendar" />
-            Cập nhật
-          </button>
-        </div>
-      </section>
+    for (const convo of convos) {
+      const logPath = path.join(brainDir, convo, '.system_generated', 'logs', 'transcript_full.jsonl');
+      if (!fs.existsSync(logPath)) continue;
 
-      <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-card">
-        <div className="grid grid-cols-[80px_repeat(6,1fr)] border-b border-outline-variant bg-surface-container-high">
-          <div className="p-md text-center font-label-md text-outline">Tiết</div>
-          {["THỨ 2", "THỨ 3", "THỨ 4", "THỨ 5", "THỨ 6", "THỨ 7"].map((d) => (
-            <div key={d} className="border-l border-outline-variant/30 p-md text-center font-label-md text-primary">
-              {d}
-            </div>
-          ))}
-        </div>
-        {[1, 2, 3].map((tiet) => (
-          <div key={tiet} className="grid grid-cols-[80px_repeat(6,1fr)] border-b border-outline-variant/30 hover:bg-surface-container">
-            <div className="flex flex-col items-center justify-center border-r border-outline-variant/30 p-md">
-              <span className="font-bold text-primary">{tiet}</span>
-              <span className="text-[10px] text-outline">07:00</span>
-            </div>
-            {[0, 1, 2, 3, 4, 5].map((col) => {
-              const lesson = col < 3 ? SCHEDULE[col] : null;
-              return (
-                <div key={col} className="border-r border-outline-variant/30 p-sm last:border-r-0">
-                  {lesson ? (
-                    <div className={`h-full rounded-lg border p-2 transition-all hover:-translate-y-0.5 ${lesson.color}`}>
-                      <p className="font-label-md">{lesson.mon}</p>
-                      <p className="text-[12px] opacity-70">{lesson.gv}</p>
-                    </div>
-                  ) : (
-                    <div className="flex h-full min-h-[72px] items-center justify-center italic text-outline/40">
-                      Trống
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </section>
-    </div>
-  );
+      try {
+        const fileContent = fs.readFileSync(logPath, 'utf8');
+        const lines = fileContent.split('\n');
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          // Tìm các nhãn đặc trưng trong bức ảnh mới:
+          // "Thời khóa biểu theo lớp" hoặc "Bấm vào tên lớp để xem" hoặc "Buổi sáng" / "Buổi chiều"
+          if (line.includes("Thời khóa biểu theo lớp") || line.includes("Bấm vào tên lớp để xem")) {
+            try {
+              const stepObj = JSON.parse(line);
+              const toolCalls = stepObj.tool_calls || [];
+              for (const tc of toolCalls) {
+                const args = tc.args || {};
+                const code = args.CodeContent || args.ReplacementContent || "";
+                if (code.includes("export default function AdminThoiKhoaBieuPage") || code.includes("function AdminThoiKhoaBieuPage")) {
+                  candidates.push({
+                    convo,
+                    step: stepObj.step_index,
+                    len: code.length,
+                    lines: code.split('\n').length,
+                    code
+                  });
+                }
+              }
+            } catch (e) {
+              // Bỏ qua
+            }
+          }
+        }
+      } catch (err) {
+        // Bỏ qua
+      }
+    }
+
+    console.log(`Số bản ứng viên TKB tổng hợp tìm thấy: ${candidates.length}`);
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => b.len - a.len);
+      const best = candidates[0];
+      console.log(`\n--> KHÔI PHỤC BẢN PHÙ HỢP NHẤT: Convo ${best.convo} bước ${best.step} (Số dòng: ${best.lines})`);
+      const targetPath = 'd:\\C++\\LuanVanTN\\HETHONGTRUONGTHPT\\website\\src\\features\\admin\\thoikhoabieu\\AdminThoiKhoaBieuPage.jsx';
+      fs.writeFileSync(targetPath, best.code, 'utf8');
+      console.log("ĐÃ PHỤC HỒI THÀNH CÔNG GIAO DIỆN TKB TỔNG HỢP!");
+    } else {
+      console.log("Không tìm thấy bản code nào chứa nhãn tiếng Việt đặc thù trong log.");
+    }
+  } catch (err) {
+    console.error("Lỗi:", err.message);
+  }
 }
 
-function Filter({ label, options }) {
-  return (
-    <div className="min-w-[200px] space-y-sm">
-      <label className="text-label-sm text-on-surface-variant">{label}</label>
-      <select className="w-full rounded-lg border-outline-variant bg-surface-container-lowest p-3 focus:border-secondary focus:ring-secondary/20">
-        {options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
+findExactTimetableStyle();
