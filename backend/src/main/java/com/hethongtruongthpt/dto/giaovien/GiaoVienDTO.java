@@ -1,12 +1,19 @@
 package com.hethongtruongthpt.dto.giaovien;
 
+import java.time.LocalDate;
+
 public class GiaoVienDTO {
     private Integer id;
     private String maGiaoVien;
     private String hoTen;
-    private String chuyenMon;
-    private String sdt;
     private String email;
+    private String sdt;
+    private String boMon;
+    private String trinhDo;
+    private Boolean gioiTinh;
+    private LocalDate ngaySinh;
+    private String diaChi;
+    private String username;
 
     public Integer getId() {
         return id;
@@ -32,12 +39,12 @@ public class GiaoVienDTO {
         this.hoTen = hoTen;
     }
 
-    public String getChuyenMon() {
-        return chuyenMon;
+    public String getEmail() {
+        return email;
     }
 
-    public void setChuyenMon(String chuyenMon) {
-        this.chuyenMon = chuyenMon;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public String getSdt() {
@@ -48,11 +55,51 @@ public class GiaoVienDTO {
         this.sdt = sdt;
     }
 
-    public String getEmail() {
-        return email;
+    public String getBoMon() {
+        return boMon;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public void setBoMon(String boMon) {
+        this.boMon = boMon;
+    }
+
+    public String getTrinhDo() {
+        return trinhDo;
+    }
+
+    public void setTrinhDo(String trinhDo) {
+        this.trinhDo = trinhDo;
+    }
+
+    public Boolean getGioiTinh() {
+        return gioiTinh;
+    }
+
+    public void setGioiTinh(Boolean gioiTinh) {
+        this.gioiTinh = gioiTinh;
+    }
+
+    public LocalDate getNgaySinh() {
+        return ngaySinh;
+    }
+
+    public void setNgaySinh(LocalDate ngaySinh) {
+        this.ngaySinh = ngaySinh;
+    }
+
+    public String getDiaChi() {
+        return diaChi;
+    }
+
+    public void setDiaChi(String diaChi) {
+        this.diaChi = diaChi;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 }

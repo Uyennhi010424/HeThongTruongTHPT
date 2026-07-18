@@ -39,7 +39,7 @@ export default function SimpleModal({ open, title, children, onClose, width = 48
     >
       <div className="card" style={{ ...cardStyle, zIndex: 2001 }} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
-          <h3 style={{ margin: 0 }}>{title}</h3>
+          <h3 style={{ margin: 0, fontWeight: 700, fontSize: "18px", color: "var(--navy-900)" }}>{title}</h3>
         </div>
         <div style={bodyStyle}>{children}</div>
       </div>

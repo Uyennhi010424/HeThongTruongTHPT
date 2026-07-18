@@ -3,6 +3,10 @@ package com.hethongtruongthpt.service;
 import com.hethongtruongthpt.entity.HocKy;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.HocKyRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,16 +23,19 @@ public class HocKyService {
         return hocKyRepository.findAll();
     }
 
+    public Page<HocKy> getAllPaged(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("tenHocKy").ascending());
+        return hocKyRepository.findAll(pageable);
+    }
+
     public HocKy getById(Integer id) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
         return hocKyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học kỳ"));
     }
 
+    @SuppressWarnings("null")
     public HocKy create(HocKy hocKy) {
-        if (hocKy.getId() == null) {
-            Integer maxId = hocKyRepository.findMaxId();
-            hocKy.setId(maxId + 1);
-        }
         return hocKyRepository.save(hocKy);
     }
 
@@ -39,6 +46,7 @@ public class HocKyService {
     }
 
     public void delete(Integer id) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
         hocKyRepository.deleteById(id);
     }
 }

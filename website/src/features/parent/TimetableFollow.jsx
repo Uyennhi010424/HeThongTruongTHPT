@@ -1,86 +1,101 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../components/common/Header.jsx";
 import { getThoiKhoaBieu } from "../../api/thoikhoabieuApi.js";
-import { getLichThi } from "../../api/lichthiApi.js";
-
-const getDayLabel = (value) => {
-  switch (value) {
-    case 2:
-      return "Thứ 2";
-    case 3:
-      return "Thứ 3";
-    case 4:
-      return "Thứ 4";
-    case 5:
-      return "Thứ 5";
-    case 6:
-      return "Thứ 6";
-    case 7:
-      return "Thứ 7";
-    case 8:
-      return "Chủ nhật";
-    default:
-      return "--";
-  }
-};
-
-const formatDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-};
+import { getNamHoc } from "../../api/namhocApi.js";
+import { formatDate, getDayLabel } from "../../utils/helpers.js";
+import { getLichThi, getLichThiByLop } from "../../api/lichthiApi.js";
+import useParentStudents from "../../hooks/useParentStudents.js";
+import StudentSelector from "./StudentSelector.jsx";
 
 export default function TimetableFollow() {
+  const { students, currentStudent, selectedIndex, selectStudent, loading: studentsLoading, error: studentsError } = useParentStudents();
   const [timetable, setTimetable] = useState([]);
   const [exams, setExams] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataError, setDataError] = useState("");
+  const [selectedTuan, setSelectedTuan] = useState(1);
+
+  const getDefaultTuan = (ngayBatDauHk1) => {
+    if (!ngayBatDauHk1) return 1;
+    const schoolStart = new Date(ngayBatDauHk1 + "T00:00:00");
+    const dayOfWeek = schoolStart.getDay();
+    const monday = new Date(schoolStart);
+    monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    const now = new Date();
+    const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 1;
+    return Math.max(1, Math.floor(diffDays / 7) + 1);
+  };
 
   useEffect(() => {
+    if (!currentStudent) return;
     let active = true;
 
     const fetchData = async () => {
       try {
-        setLoading(true);
-        setError("");
+        setDataLoading(true);
+        setDataError("");
+
+        const lopId = currentStudent?.lop?.id;
+
+        let ngayBatDauHk1 = null;
+        try {
+          const namHocRes = await getNamHoc();
+          const years = namHocRes?.data?.data || [];
+          const currentYear = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1];
+          ngayBatDauHk1 = currentYear?.ngayBatDauHk1 || null;
+        } catch { /* ignore */ }
+
+        setSelectedTuan(getDefaultTuan(ngayBatDauHk1));
+
         const [tkbRes, examRes] = await Promise.all([
-          getThoiKhoaBieu(),
-          getLichThi()
+          lopId ? getThoiKhoaBieu({ lopId }) : getThoiKhoaBieu(),
+          lopId ? getLichThiByLop(lopId) : getLichThi()
         ]);
         if (!active) return;
         setTimetable(tkbRes?.data?.data || []);
         setExams(examRes?.data?.data || []);
-      } catch (err) {
+      } catch {
         if (!active) return;
-        setError("Không thể tải lịch học hoặc lịch thi.");
+        setDataError("Không thể tải lịch học hoặc lịch thi.");
       } finally {
-        if (active) setLoading(false);
+        if (active) setDataLoading(false);
       }
     };
 
     fetchData();
+    return () => { active = false; };
+  }, [currentStudent?.id]);
 
-    return () => {
-      active = false;
-    };
-  }, []);
+  const loading = studentsLoading || dataLoading;
+  const error = studentsError || dataError;
+
+  const filteredTimetable = useMemo(() => {
+    return timetable.filter((item) => Number(item?.tuan) === selectedTuan);
+  }, [timetable, selectedTuan]);
 
   const stats = useMemo(() => {
-    const totalLessons = timetable.length;
+    const totalLessons = filteredTimetable.length;
     const totalExams = exams.length;
     return { totalLessons, totalExams };
-  }, [timetable, exams]);
+  }, [filteredTimetable, exams]);
 
   return (
-    <div className="page users-page">
-      <Header title="Theo dõi thời khóa biểu" />
+    <div className="page users-page student-page">
+      <section className="student-hero card">
+        <div className="student-hero-copy">
+          <div className="student-hero-kicker">EduManager Pro</div>
+          <h2 className="student-hero-title">Thời khóa biểu</h2>
+          <p className="student-hero-subtitle">Xem lịch học và lịch thi của con em.</p>
+        </div>
+        <div className="student-hero-metrics">
+          <div className="student-hero-chip">{loading ? "..." : stats.totalLessons} tiết học</div>
+          <div className="student-hero-chip">{loading ? "..." : stats.totalExams} lịch thi</div>
+        </div>
+      </section>
 
-      <div className="users-stats">
+      <StudentSelector students={students} selectedIndex={selectedIndex} onSelect={selectStudent} />
+
+      <div className="users-stats student-stats">
         <div className="stat-card stat-blue">
           <div className="stat-label">Lịch học</div>
           <div className="stat-value">{loading ? "..." : stats.totalLessons}</div>
@@ -93,20 +108,25 @@ export default function TimetableFollow() {
 
       {error && <div className="card table-empty">{error}</div>}
 
-      <div className="card users-table">
+      <div className="card users-table student-card">
         <div className="table-header">
           <div>
             <div className="panel-title">Thời khóa biểu</div>
             <div className="panel-subtitle">Lịch học theo tuần</div>
           </div>
-          <div className="panel-pill">{timetable.length} tiết</div>
+          <div className="panel-pill">Tuần {selectedTuan} · {filteredTimetable.length} tiết</div>
         </div>
-        {!error && !loading && timetable.length === 0 && (
-          <div className="table-empty">Chưa có thời khóa biểu.</div>
-        )}
+        <div className="timetable-week-toolbar">
+          <button className="btn-outline btn-sm" type="button" onClick={() => setSelectedTuan((prev) => Math.max(1, prev - 1))}>
+            Tuần trước
+          </button>
+          <button className="btn-outline btn-sm" type="button" onClick={() => setSelectedTuan((prev) => prev + 1)}>
+            Tuần sau
+          </button>
+        </div>
         <div className="table-grid">
           <div className="table-row table-head">
-            <div>ID</div>
+            <div>STT</div>
             <div>Thứ</div>
             <div>Tiết bắt đầu</div>
             <div>Số tiết</div>
@@ -122,9 +142,9 @@ export default function TimetableFollow() {
                   <div className="skeleton" />
                 </div>
               ))
-            : timetable.map((item) => (
+            : filteredTimetable.map((item, index) => (
                 <div className="table-row" key={item.id}>
-                  <div className="table-id">#{item.id}</div>
+                  <div className="table-id">{index + 1}</div>
                   <div className="table-title">{getDayLabel(item.thu)}</div>
                   <div className="table-title">{item.tietBatDau ?? "--"}</div>
                   <div className="table-title">{item.soTiet ?? "--"}</div>
@@ -134,7 +154,7 @@ export default function TimetableFollow() {
         </div>
       </div>
 
-      <div className="card users-table">
+      <div className="card users-table student-card">
         <div className="table-header">
           <div>
             <div className="panel-title">Lịch thi</div>
@@ -147,7 +167,7 @@ export default function TimetableFollow() {
         )}
         <div className="table-grid">
           <div className="table-row table-head">
-            <div>ID</div>
+            <div>STT</div>
             <div>Ngày thi</div>
             <div>Giờ bắt đầu</div>
             <div>Thời gian (phút)</div>
@@ -163,12 +183,12 @@ export default function TimetableFollow() {
                   <div className="skeleton" />
                 </div>
               ))
-            : exams.map((item) => (
+            : exams.map((item, index) => (
                 <div className="table-row" key={item.id}>
-                  <div className="table-id">#{item.id}</div>
+                  <div className="table-id">{index + 1}</div>
                   <div className="table-title">{formatDate(item.ngayThi) || "--"}</div>
                   <div className="table-title">{item.gioBatDau || "--"}</div>
-                  <div className="table-title">{item.thoiGianThi ?? "--"}</div>
+                  <div className="table-title">{item.thoiGianLamBai ?? "--"}</div>
                   <div className="table-title">{item.phongThi || "--"}</div>
                 </div>
               ))}

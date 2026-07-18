@@ -1,6 +1,6 @@
 import axiosClient from "./axiosClient";
 
-export const getChuNhiem = () => axiosClient.get("/chunhiem");
+export const getChuNhiem = () => axiosClient.get("/chunhiem", { skipCache: true });
 export const getChuNhiemByGiaoVien = (giaoVienId) =>
   axiosClient.get(`/chunhiem/giaovien/${giaoVienId}`);
 export const updateChuNhiemByGiaoVien = (giaoVienId, data) =>

@@ -7,4 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 public interface HocKyRepository extends JpaRepository<HocKy, Integer> {
 	@Query("select coalesce(max(h.id), 0) from HocKy h")
 	Integer findMaxId();
+
+	boolean existsByNamHocId(Integer namHocId);
+
+	void deleteByNamHocId(Integer namHocId);
 }

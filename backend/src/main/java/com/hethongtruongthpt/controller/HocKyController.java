@@ -3,13 +3,15 @@ package com.hethongtruongthpt.controller;
 import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.entity.HocKy;
 import com.hethongtruongthpt.service.HocKyService;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/hocky")
+@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
 public class HocKyController {
     private final HocKyService hocKyService;
 
@@ -18,7 +20,13 @@ public class HocKyController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<HocKy>>> getAll() {
+    public ResponseEntity<ApiResponse<?>> getAll(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page != null && size != null) {
+            Page<HocKy> result = hocKyService.getAllPaged(page, size);
+            return ResponseEntity.ok(ApiResponse.ok(result));
+        }
         return ResponseEntity.ok(ApiResponse.ok(hocKyService.getAll()));
     }
 
@@ -28,12 +36,12 @@ public class HocKyController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<HocKy>> create(@RequestBody HocKy hocKy) {
+    public ResponseEntity<ApiResponse<HocKy>> create(@Valid @RequestBody HocKy hocKy) {
         return ResponseEntity.ok(ApiResponse.ok(hocKyService.create(hocKy)));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<HocKy>> update(@PathVariable Integer id, @RequestBody HocKy hocKy) {
+    public ResponseEntity<ApiResponse<HocKy>> update(@PathVariable Integer id, @Valid @RequestBody HocKy hocKy) {
         return ResponseEntity.ok(ApiResponse.ok(hocKyService.update(id, hocKy)));
     }
 

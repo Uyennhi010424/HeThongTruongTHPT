@@ -4,16 +4,19 @@ import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.dto.chunhiem.ChuNhiemDTO;
 import com.hethongtruongthpt.dto.chunhiem.ChuNhiemUpdateRequest;
 import com.hethongtruongthpt.service.ChuNhiemService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/chunhiem")
+@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
 public class ChuNhiemController {
     private static final Logger logger = LoggerFactory.getLogger(ChuNhiemController.class);
     private final ChuNhiemService chuNhiemService;
@@ -23,8 +26,14 @@ public class ChuNhiemController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ChuNhiemDTO>>> getAll() {
+    public ResponseEntity<ApiResponse<?>> getAll(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
         try {
+            if (page != null && size != null) {
+                Page<ChuNhiemDTO> result = chuNhiemService.getAllPaged(page, size);
+                return ResponseEntity.ok(ApiResponse.ok(result));
+            }
             return ResponseEntity.ok(ApiResponse.ok(chuNhiemService.getAll()));
         } catch (Exception ex) {
             logger.error("Lỗi khi lấy danh sách chủ nhiệm", ex);
@@ -47,7 +56,7 @@ public class ChuNhiemController {
     @PutMapping("/giaovien/{giaoVienId}")
     public ResponseEntity<ApiResponse<ChuNhiemDTO>> updateByGiaoVien(
             @PathVariable("giaoVienId") Integer giaoVienId,
-            @RequestBody ChuNhiemUpdateRequest request
+            @Valid @RequestBody ChuNhiemUpdateRequest request
     ) {
         ChuNhiemDTO result = chuNhiemService.assignByGiaoVienId(giaoVienId, request.getLopId());
         return ResponseEntity.ok(ApiResponse.ok(result));

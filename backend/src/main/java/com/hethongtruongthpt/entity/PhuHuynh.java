@@ -1,6 +1,7 @@
 package com.hethongtruongthpt.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 
 @Entity
 @Table(name = "phu_huynh")
@@ -14,12 +15,17 @@ public class PhuHuynh {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @NotBlank(message = "Họ tên không được để trống")
+    @Size(max = 100, message = "Họ tên tối đa 100 ký tự")
     @Column(name = "ho_ten", length = 100, nullable = false)
     private String hoTen;
 
+    @NotBlank(message = "Số điện thoại không được để trống")
+    @Pattern(regexp = "^0[0-9]{9}$", message = "Số điện thoại phải có 10 chữ số bắt đầu bằng 0")
     @Column(name = "so_dien_thoai", length = 15, nullable = false)
     private String soDienThoai;
 
+    @Email(message = "Email không hợp lệ")
     @Column(name = "email", length = 100)
     private String email;
 

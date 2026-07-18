@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../../components/common/Header.jsx";
+import PageHeader from "../../../components/edu/PageHeader.jsx";
+import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
   createUser,
@@ -7,6 +8,7 @@ import {
   getUsers,
   updateUser
 } from "../../../api/userApi.js";
+import { notifySuccess, notifyError } from "../../../utils/notify.js";
 
 const formatDate = (value) => {
   if (!value) return "";
@@ -17,22 +19,6 @@ const formatDate = (value) => {
     month: "2-digit",
     year: "numeric"
   });
-};
-
-const DEFAULT_ACCOUNT_PASSWORD = "Abc1234@";
-
-const getDefaultTeacherPassword = (username) => {
-  if (!username) return "--";
-  const local = username.includes("@") ? username.split("@")[0] : username;
-  return `${local}gv123@`;
-};
-
-const getDisplayedPassword = (user) => {
-  if (!user) return "--";
-  if (user.password) return user.password;
-  if (user.role === "HOC_SINH") return DEFAULT_ACCOUNT_PASSWORD;
-  if (user.role === "GIAO_VIEN") return getDefaultTeacherPassword(user.username);
-  return "--";
 };
 
 const getStatusLabel = (status) => (status === 1 ? "Hoạt động" : "Tạm khóa");
@@ -86,54 +72,61 @@ export default function UserList() {
   });
   const [formError, setFormError] = useState("");
 
-  const fetchUsers = async () => {
+  const fetchUsers = async ({ silent = false } = {}) => {
+    const shouldShowError = !silent;
     try {
-      setLoading(true);
-      setError("");
+      if (!silent) {
+        setLoading(true);
+        setError("");
+      }
       const response = await getUsers();
       const data = response?.data?.data || [];
       const sorted = [...data].sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
       setUsers(sorted);
     } catch (err) {
-      setError("Không thể tải danh sách tài khoản.");
+      if (shouldShowError || users.length === 0) {
+        setError("Không thể tải danh sách tài khoản.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     let active = true;
 
-    const fetchUsersSafe = async () => {
+    const fetchUsersSafe = async (options = {}) => {
       if (!active) return;
-      await fetchUsers();
+      await fetchUsers(options);
     };
 
     fetchUsersSafe();
 
     const handleUsersUpdated = () => {
-      fetchUsersSafe();
+      fetchUsersSafe({ silent: true });
     };
 
     const handleStorage = (event) => {
       if (event.key === "usersUpdatedAt") {
-        fetchUsersSafe();
+        fetchUsersSafe({ silent: true });
       }
     };
 
     const handleWindowFocus = () => {
-      fetchUsersSafe();
+      fetchUsersSafe({ silent: true });
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        fetchUsersSafe();
+        fetchUsersSafe({ silent: true });
       }
     };
 
     const refreshTimer = window.setInterval(() => {
-      fetchUsersSafe();
-    }, 5000);
+      fetchUsersSafe({ silent: true });
+    }, 30000);
 
     window.addEventListener("users-updated", handleUsersUpdated);
     window.addEventListener("storage", handleStorage);
@@ -248,56 +241,62 @@ export default function UserList() {
         const response = await updateUser(editingUser.id, payload);
         const updated = response?.data?.data;
         setUsers((prev) =>
-          prev.map((item) => (item.id === editingUser.id ? updated : item))
+          prev.map((item) => (item.id === editingUser.id ? (updated || item) : item))
         );
+        const pwMsg = form.password.trim() ? " (mật khẩu đã được cập nhật)" : "";
+        notifySuccess(`Cập nhật tài khoản thành công${pwMsg}.`);
       } else {
         const response = await createUser(payload);
         const created = response?.data?.data;
-        setUsers((prev) => [created, ...prev]);
+        if (created) setUsers((prev) => [created, ...prev]);
+        notifySuccess("Tạo tài khoản thành công.");
       }
       setModalOpen(false);
     } catch (err) {
-      setFormError("Không thể lưu tài khoản. Vui lòng thử lại.");
+      const msg = err?.response?.data?.message || "Không thể lưu tài khoản. Vui lòng thử lại.";
+      setFormError(msg);
     }
   };
 
   return (
     <div className="page users-page">
-      <Header title="Danh mục tài khoản" />
-
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">Quản lý tài khoản hệ thống</div>
-          <div className="users-subtitle">
-            Tìm kiếm, theo dõi trạng thái và cập nhật tài khoản
+      <PageHeader
+        title="Danh mục tài khoản"
+        actions={
+          <div className="flex items-center gap-4">
+            <div className="dash-search users-search" style={{ margin: 0, width: 280 }}>
+              <span className="dot" />
+              <input
+                placeholder="Tìm tên đăng nhập hoặc email..."
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value)}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid var(--stroke)",
+                  fontSize: "13px",
+                  background: "#fff",
+                  outline: "none"
+                }}
+              >
+                <option value="all">Tất cả nhóm</option>
+                <option value="HOC_SINH">Học sinh</option>
+                <option value="GIAO_VIEN">Giáo viên</option>
+                <option value="PHU_HUYNH">Phụ huynh</option>
+              </select>
+            </div>
+            <button className="btn-primary" onClick={openCreate}>
+              Thêm tài khoản
+            </button>
           </div>
-        </div>
-        <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm theo tên đăng nhập hoặc email"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </div>
-          <label className="form-field users-filter-field">
-            <span>Nhóm tài khoản</span>
-            <select
-              value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
-            >
-              <option value="all">Tất cả</option>
-              <option value="HOC_SINH">Học sinh</option>
-              <option value="GIAO_VIEN">Giáo viên</option>
-              <option value="PHU_HUYNH">Phụ huynh</option>
-            </select>
-          </label>
-          <button className="btn-primary" onClick={openCreate}>
-            Thêm tài khoản
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="users-stats">
         <div className="stat-card stat-blue">
@@ -318,7 +317,6 @@ export default function UserList() {
         <div className="table-header">
           <div>
             <div className="panel-title">Danh sách tài khoản</div>
-            <div className="panel-subtitle">Dữ liệu lấy từ cơ sở dữ liệu</div>
           </div>
           <div className="panel-pill">{filteredUsers.length} tài khoản</div>
         </div>
@@ -331,7 +329,6 @@ export default function UserList() {
             <div>STT</div>
             <div>Tên đăng nhập</div>
             <div>Email</div>
-            <div>Mật khẩu</div>
             <div>Phân quyền</div>
             <div>Trạng thái</div>
             <div>Ngày tạo</div>
@@ -340,7 +337,6 @@ export default function UserList() {
           {loading
               ? Array.from({ length: 5 }).map((_, index) => (
                 <div className="table-row" key={`skeleton-${index}`}>
-                  <div className="skeleton" />
                   <div className="skeleton" />
                   <div className="skeleton" />
                   <div className="skeleton" />
@@ -358,7 +354,6 @@ export default function UserList() {
                     <div className="table-meta">Mã: {user.id}</div>
                   </div>
                   <div className="table-email">{user.email || "--"}</div>
-                  <div className="table-password">{getDisplayedPassword(user)}</div>
                   <div>
                     <span className={`role-pill ${getRoleClassName(user.role)}`}>
                       {getRoleLabel(user.role)}
@@ -383,12 +378,28 @@ export default function UserList() {
                     >
                       Sửa
                     </button>
-                    {/* Reset password removed */}
                     <button
-                      className="btn-danger btn-sm"
-                      onClick={() => handleDelete(user)}
+                      className="btn-outline btn-sm"
+                      style={{ background: "#f59e0b", color: "#fff", borderColor: "#f59e0b" }}
+                      onClick={async () => {
+                        if (window.confirm(`Bạn muốn cấp lại mật khẩu mặc định cho tài khoản ${user.username}?`)) {
+                          try {
+                            await resetPassword(user.id);
+                            notifySuccess("Đã đặt lại mật khẩu về mặc định thành công.");
+                          } catch {
+                            notifyError("Không thể đặt lại mật khẩu.");
+                          }
+                        }
+                      }}
                     >
-                      Xóa
+                      Cấp lại MK
+                    </button>
+                    <button
+                      className="rounded-lg p-sm text-outline hover:bg-red-50 hover:text-red-600"
+                      onClick={() => handleDelete(user)}
+                      title="Xóa"
+                    >
+                      <MaterialIcon name="delete" className="text-[20px]" />
                     </button>
                   </div>
                 </div>

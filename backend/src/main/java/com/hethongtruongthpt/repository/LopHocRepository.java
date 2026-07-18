@@ -13,4 +13,6 @@ public interface LopHocRepository extends JpaRepository<LopHoc, Integer> {
     List<LopHoc> findByKhoi(Integer khoi);
     List<LopHoc> findByNamHoc(String namHoc);
     List<LopHoc> findByGvcnId(Integer gvcnId);
+    List<LopHoc> findByToHopId(Integer toHopId);
+    long countByToHopId(Integer toHopId);
 }

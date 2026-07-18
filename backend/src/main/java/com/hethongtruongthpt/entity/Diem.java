@@ -1,12 +1,16 @@
 package com.hethongtruongthpt.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "diem", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"hoc_sinh_id", "mon_hoc_id", "loai_diem", "so_thu_tu", "hoc_ky", "nam_hoc"})
+}, indexes = {
+    @Index(name = "idx_diem_nam_hoc", columnList = "nam_hoc")
 })
 public class Diem {
     @Id
@@ -22,22 +26,32 @@ public class Diem {
     @JoinColumn(name = "mon_hoc_id", nullable = false)
     private MonHoc monHoc;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "phan_cong_day_id", nullable = false)
+    @JsonIgnore
     private PhanCongDay phanCongDay;
 
+    @NotBlank(message = "Loại điểm không được để trống")
     @Column(name = "loai_diem", nullable = false)
     private String loaiDiem; // TX, GK, CK
 
+    @NotNull(message = "Số thứ tự không được để trống")
     @Column(name = "so_thu_tu", nullable = false)
     private Integer soThuTu = 0; // TX1/TX2/TX3/TX4; dùng 0 cho GK và CK
 
+    @NotNull(message = "Học kỳ không được để trống")
+    @Min(value = 1, message = "Học kỳ phải là 1 hoặc 2")
+    @Max(value = 2, message = "Học kỳ phải là 1 hoặc 2")
     @Column(name = "hoc_ky", nullable = false)
     private Integer hocKy;
 
+    @NotBlank(message = "Năm học không được để trống")
+    @Size(min = 9, max = 9, message = "Năm học phải có định dạng YYYY-YYYY")
     @Column(name = "nam_hoc", length = 9, nullable = false)
     private String namHoc;
 
+    @DecimalMin(value = "0.0", message = "Điểm phải >= 0")
+    @DecimalMax(value = "10.0", message = "Điểm phải <= 10")
     @Column(name = "gia_tri", precision = 4, scale = 1)
     private BigDecimal giaTriDiem;
 

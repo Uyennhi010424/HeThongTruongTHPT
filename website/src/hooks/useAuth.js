@@ -10,11 +10,13 @@ export default function useAuth() {
       setToken(getToken());
       setRole(getRole());
     };
-    window.addEventListener("storage", sync);
-    window.addEventListener("focus", sync);
+    window.addEventListener("storage", sync); // cross-tab sync
+    window.addEventListener("focus", sync);    // focus sync
+    window.addEventListener("auth-change", sync); // same-tab sync
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("focus", sync);
+      window.removeEventListener("auth-change", sync);
     };
   }, []);
 

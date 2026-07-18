@@ -1,170 +1,141 @@
-import { useEffect, useMemo, useState } from "react";
-import Header from "../../../components/common/Header.jsx";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { getAdminConfig } from "../../../api/adminConfigApi.js";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
 import { getMonHoc } from "../../../api/monhocApi.js";
-import { getGiaoVien } from "../../../api/giaovienApi.js";
-import { getToken } from "../../../store/authStore.js";
+import { getGiaoVien, getCurrentGiaoVien } from "../../../api/giaovienApi.js";
+import { getPhanCongDay } from "../../../api/phancongDayApi.js";
+import { getDiem, saveAllDiem } from "../../../api/diemApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
+import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import { getStudentClass, getStudentClassId, sortStudentsByGivenName } from "../../../utils/helpers.js";
+import { isScoreColumnLocked, readScoreLocks } from "../../../utils/scoreLocks.js";
+import { getCurrentUsernameFromToken, findTeacherByUsername } from "../../../utils/teacherProfile.js";
+import {
+  getPolicyBySubjectName,
+  getRecordKey,
+  toScore,
+  createEmptySemester,
+  calcSemesterAverage,
+  calcYearAverage,
+  getOverallLearningLevel,
+  getLearningLevelLabel
+} from "../../../utils/scorePolicy.js";
+import { normalizeSubjectText } from "../../../utils/normalizeText.js";
 
 const STORAGE_KEY = "teacher_subject_scores_v2";
 
-const COMMENT_ONLY_SUBJECTS = [
-  "giao duc the chat",
-  "am nhac",
-  "noi dung giao duc dia phuong",
-  "hoat dong trai nghiem",
-  "huong nghiep"
-];
+const convertDiemRowsToDraft = (diemRows) => {
+  const records = {};
+  const ids = {};
 
-const TX2_SUBJECTS = ["gdqp-an", "gdqp an", "giao duc quoc phong", "an ninh"];
-const TX4_SUBJECTS = ["toan", "ngu van", "tieng anh"];
-const TX3_SUBJECTS = [
-  "vat li",
-  "hoa hoc",
-  "sinh hoc",
-  "lich su",
-  "dia li",
-  "gdkt&pl",
-  "gdkt",
-  "tin hoc",
-  "cong nghe"
-];
+  diemRows.forEach((row) => {
+    const studentId = row?.hocSinh?.id ?? row?.hocSinhId;
+    const subjectId = row?.monHoc?.id ?? row?.monHocId;
+    if (!studentId || !subjectId) return;
 
-const normalizeText = (value) =>
-  (value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9&\-\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    const key = getRecordKey(studentId, subjectId);
+    const semester = row.hocKy === 1 ? "HK1" : "HK2";
 
-const createEmptySemester = (txCount) => ({
-  tx: Array.from({ length: txCount }, () => ""),
-  gk: "",
-  ck: "",
-  nhanXet: "DAT"
-});
+    if (!records[key]) {
+      records[key] = { HK1: null, HK2: null };
+    }
+    if (!records[key][semester]) {
+      records[key][semester] = { tx: ["", "", "", ""], gk: "", ck: "", nhanXet: "DAT" };
+    }
 
-const getPolicyBySubjectName = (subjectName) => {
-  const normalized = normalizeText(subjectName);
+    const sem = records[key][semester];
+    const val = row.giaTriDiem !== null && row.giaTriDiem !== undefined ? String(row.giaTriDiem) : "";
 
-  if (COMMENT_ONLY_SUBJECTS.some((item) => normalized.includes(item))) {
-    return { mode: "COMMENT", txCount: 0, label: "Đánh giá bằng nhận xét" };
-  }
+    if (row.loaiDiem === "TX" && row.soThuTu >= 1 && row.soThuTu <= 4) {
+      sem.tx[row.soThuTu - 1] = val;
+    } else if (row.loaiDiem === "GK") {
+      sem.gk = val;
+    } else if (row.loaiDiem === "CK") {
+      sem.ck = val;
+    }
 
-  if (TX2_SUBJECTS.some((item) => normalized.includes(item))) {
-    return { mode: "SCORE", txCount: 2, label: "2 điểm đánh giá thường xuyên" };
-  }
+    if (row.nhanXet) {
+      sem.nhanXet = row.nhanXet;
+    }
 
-  if (TX4_SUBJECTS.some((item) => normalized.includes(item))) {
-    return { mode: "SCORE", txCount: 4, label: "4 điểm đánh giá thường xuyên" };
-  }
+    // Track DB IDs for update
+    const idKey = `${key}_${row.loaiDiem}_${row.soThuTu || 0}_${semester}`;
+    if (row.id) {
+      ids[idKey] = row.id;
+    }
+  });
 
-  if (TX3_SUBJECTS.some((item) => normalized.includes(item))) {
-    return { mode: "SCORE", txCount: 3, label: "3 điểm đánh giá thường xuyên" };
-  }
+  // Fill null semesters with empty
+  Object.keys(records).forEach((key) => {
+    if (!records[key].HK1) records[key].HK1 = { tx: ["", "", "", ""], gk: "", ck: "", nhanXet: "DAT" };
+    if (!records[key].HK2) records[key].HK2 = { tx: ["", "", "", ""], gk: "", ck: "", nhanXet: "DAT" };
+  });
 
-  return { mode: "SCORE", txCount: 3, label: "3 điểm đánh giá thường xuyên" };
-};
-
-const getRecordKey = (studentId, subjectId) => `${studentId}_${subjectId}`;
-
-const toScore = (value) => {
-  if (value === "" || value === null || value === undefined) return null;
-  const score = Number(value);
-  if (Number.isNaN(score)) return null;
-  return Math.max(0, Math.min(10, score));
-};
-
-const calcSemesterAverage = (semesterData) => {
-  const txScores = (semesterData.tx || []).map(toScore).filter((item) => item !== null);
-  const gk = toScore(semesterData.gk);
-  const ck = toScore(semesterData.ck);
-
-  if (txScores.length === 0 || gk === null || ck === null) return null;
-
-  const sumTx = txScores.reduce((acc, curr) => acc + curr, 0);
-  const avg = (sumTx + 2 * gk + 3 * ck) / (txScores.length + 5);
-  return Number(avg.toFixed(2));
-};
-
-const calcYearAverage = (hk1Avg, hk2Avg) => {
-  if (hk1Avg === null || hk2Avg === null) return null;
-  return Number(((hk1Avg + 2 * hk2Avg) / 3).toFixed(2));
-};
-
-const getOverallLearningLevel = ({ commentResults, numericAverages }) => {
-  const totalCommentSubjects = commentResults.length;
-  const commentNotReached = commentResults.filter((item) => item !== "DAT").length;
-  const numericValid = numericAverages.filter((item) => item !== null);
-
-  if (numericValid.length !== numericAverages.length) return "CHUA_DAT";
-
-  const allCommentReached = commentNotReached === 0;
-  const allAbove65 = numericValid.every((item) => item >= 6.5);
-  const allAbove50 = numericValid.every((item) => item >= 5);
-  const allAbove35 = numericValid.every((item) => item >= 3.5);
-  const countAbove80 = numericValid.filter((item) => item >= 8).length;
-  const countAbove65 = numericValid.filter((item) => item >= 6.5).length;
-  const countAbove50 = numericValid.filter((item) => item >= 5).length;
-
-  if (allCommentReached && allAbove65 && countAbove80 >= 6) return "TOT";
-  if (allCommentReached && allAbove50 && countAbove65 >= 6) return "KHA";
-
-  const maxOneCommentFailed = totalCommentSubjects > 0 ? commentNotReached <= 1 : true;
-  if (maxOneCommentFailed && countAbove50 >= 6 && allAbove35) return "DAT";
-
-  return "CHUA_DAT";
-};
-
-const getLearningLevelLabel = (value) => {
-  switch (value) {
-    case "TOT":
-      return "Tốt";
-    case "KHA":
-      return "Khá";
-    case "DAT":
-      return "Đạt";
-    default:
-      return "Chưa đạt";
-  }
-};
-
-const getCurrentUsername = () => {
-  const token = getToken();
-  if (!token) return "";
-
-  try {
-    const payloadPart = token.split(".")[1] || "";
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(window.atob(normalized));
-    return String(payload?.sub || "").trim().toLowerCase();
-  } catch {
-    return "";
-  }
+  return { records, ids };
 };
 
 export default function NhapDiem() {
-  const currentUsername = useMemo(() => getCurrentUsername(), []);
+  const currentUsername = useMemo(() => getCurrentUsernameFromToken(), []);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [teachers, setTeachers] = useState([]);
 
   const [selectedGrade, setSelectedGrade] = useState("all");
-  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedClass, setSelectedClass] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("HK1");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [namHocList, setNamHocList] = useState([]);
+  const [selectedNamHoc, setSelectedNamHoc] = useState("");
 
   const [draftRecords, setDraftRecords] = useState({});
+  const [savedRecordIds, setSavedRecordIds] = useState({});
+  const [phanCongData, setPhanCongData] = useState([]);
+  const [namHoc, setNamHoc] = useState("");
+  const [scoreLocks, setScoreLocks] = useState(() => readScoreLocks());
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef(null);
+  const PAGE_SIZE = 20;
+
+  useEffect(() => {
+    let active = true;
+    const fetchLocks = async () => {
+      try {
+        const res = await getAdminConfig("score_locks");
+        if (!active) return;
+        const val = res?.data?.data?.configValue;
+        if (val) {
+          const parsed = JSON.parse(val);
+          setScoreLocks(parsed);
+          window.localStorage.setItem("admin_score_locks_v1", val);
+        }
+      } catch (err) {
+        // ignore config not found
+      }
+    };
+    fetchLocks();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handleClick = (e) => {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [filterOpen]);
 
   useEffect(() => {
     let active = true;
@@ -173,23 +144,125 @@ export default function NhapDiem() {
       try {
         setLoading(true);
         setError("");
-        const [studentsRes, classesRes, subjectsRes, teachersRes] = await Promise.all([
+        const [studentsRes, classesRes, subjectsRes, teachersRes, phanCongRes, currentGvRes, namHocRes] = await Promise.all([
           getHocSinh(),
           getLop(),
           getMonHoc(),
-          getGiaoVien()
+          getGiaoVien(),
+          getPhanCongDay(),
+          getCurrentGiaoVien(),
+          getNamHoc().catch(() => null)
         ]);
 
         if (!active) return;
 
         const subjectData = subjectsRes?.data?.data || [];
+        const allClasses = classesRes?.data?.data || [];
+        const currentTeacherData = currentGvRes?.data?.data || null;
+        const phanCong = phanCongRes?.data?.data || [];
+
+        // Determine current nam hoc
+        const allNamHoc = namHocRes?.data?.data || [];
+        const years = allNamHoc
+          .map((item) => item?.tenNamHoc || "")
+          .filter(Boolean)
+          .sort((a, b) => {
+            const yearA = Number(String(a).match(/(\d{4})/)?.[1] || 0);
+            const yearB = Number(String(b).match(/(\d{4})/)?.[1] || 0);
+            return yearB - yearA;
+          });
+        setNamHocList(years);
+        const activeNamHoc = allNamHoc.find((nh) => nh.trangThai === "DANG_MO") || allNamHoc[allNamHoc.length - 1];
+        const currentNamHoc = activeNamHoc?.tenNamHoc || "";
+        setSelectedNamHoc((prev) => prev || currentNamHoc);
+
+        setApiTeacher(currentTeacherData);
+
+        let visibleClasses = allClasses;
+        if (currentTeacherData) {
+          const assignedClassIds = new Set(
+            phanCong
+              .filter((p) => {
+                const entryTeacherId = p?.giaoVienId ?? p?.giaoVien?.id;
+                return (
+                  entryTeacherId !== undefined &&
+                  entryTeacherId !== null &&
+                  String(entryTeacherId).trim() !== "" &&
+                  Number(entryTeacherId) === Number(currentTeacherData.id)
+                );
+              })
+              .map((p) => String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? ""))
+              .filter(Boolean)
+          );
+
+          if (assignedClassIds.size > 0) {
+            visibleClasses = allClasses.filter((c) => assignedClassIds.has(String(c.id)));
+          }
+        }
+
         setStudents(studentsRes?.data?.data || []);
-        setClasses(classesRes?.data?.data || []);
+        setClasses(visibleClasses);
         setSubjects(subjectData);
         setTeachers(teachersRes?.data?.data || []);
+        setPhanCongData(phanCong);
+        setNamHoc(currentNamHoc);
 
         if (subjectData.length > 0) {
           setSelectedSubjectId(String(subjectData[0].id));
+        }
+
+        // Load existing scores from DB
+        if (currentTeacherData?.id && currentNamHoc) {
+          try {
+            const [hk1Res, hk2Res] = await Promise.all([
+              getDiem({ giaoVienId: currentTeacherData.id, hocKy: 1, namHoc: currentNamHoc }),
+              getDiem({ giaoVienId: currentTeacherData.id, hocKy: 2, namHoc: currentNamHoc })
+            ]);
+
+            if (!active) return;
+
+            const allDiem = [
+              ...(hk1Res?.data?.data || []),
+              ...(hk2Res?.data?.data || [])
+            ];
+
+            const { records, ids } = convertDiemRowsToDraft(allDiem);
+            setSavedRecordIds(ids);
+
+            // Merge with localStorage cache
+            try {
+              const cached = window.localStorage.getItem(STORAGE_KEY);
+              if (cached) {
+                const cachedRecords = JSON.parse(cached);
+                if (cachedRecords && typeof cachedRecords === "object") {
+                  // DB data takes priority, but fill gaps from cache
+                  const merged = { ...cachedRecords };
+                  Object.keys(records).forEach((key) => {
+                    merged[key] = records[key];
+                  });
+                  setDraftRecords(merged);
+                  return;
+                }
+              }
+            } catch {
+              // ignore cache errors
+            }
+
+            setDraftRecords(records);
+          } catch {
+            // If DB load fails, fall back to localStorage
+            try {
+              const raw = window.localStorage.getItem(STORAGE_KEY);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === "object") {
+                  setDraftRecords(parsed);
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
         }
       } catch {
         if (!active) return;
@@ -207,16 +280,13 @@ export default function NhapDiem() {
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        setDraftRecords(parsed);
-      }
-    } catch {
-      setDraftRecords({});
-    }
+    const syncLocks = () => setScoreLocks(readScoreLocks());
+    window.addEventListener("storage", syncLocks);
+    window.addEventListener("score_locks_changed", syncLocks);
+    return () => {
+      window.removeEventListener("storage", syncLocks);
+      window.removeEventListener("score_locks_changed", syncLocks);
+    };
   }, []);
 
   useEffect(() => {
@@ -225,9 +295,15 @@ export default function NhapDiem() {
     return () => window.clearTimeout(timer);
   }, [saveMessage]);
 
+  // When available classes for the selected grade change, default to the first class
   useEffect(() => {
-    setSelectedClass("all");
-  }, [selectedGrade]);
+    const byGrade = selectedGrade === "all" ? classes : classes.filter((item) => String(item?.khoi || "") === selectedGrade);
+    if (byGrade.length > 0) {
+      setSelectedClass(String(byGrade[0].id));
+    } else {
+      setSelectedClass("");
+    }
+  }, [selectedGrade, classes]);
 
   const availableGrades = useMemo(() => {
     const gradeSet = new Set(
@@ -244,22 +320,54 @@ export default function NhapDiem() {
     return classes.filter((item) => String(item?.khoi || "") === selectedGrade);
   }, [classes, selectedGrade]);
 
+  const [apiTeacher, setApiTeacher] = useState(null);
+
   const currentTeacher = useMemo(() => {
-    return (
-      teachers.find(
-        (item) => String(item?.email || "").trim().toLowerCase() === currentUsername
-      ) || null
-    );
-  }, [teachers, currentUsername]);
+    if (apiTeacher) return apiTeacher;
+    return findTeacherByUsername(teachers, currentUsername);
+  }, [apiTeacher, teachers, currentUsername]);
+
+  // Reload scores when selectedNamHoc changes
+  useEffect(() => {
+    if (!selectedNamHoc || !currentTeacher?.id) return;
+    let active = true;
+
+    const reloadScores = async () => {
+      try {
+        const [hk1Res, hk2Res] = await Promise.all([
+          getDiem({ giaoVienId: currentTeacher.id, hocKy: 1, namHoc: selectedNamHoc }),
+          getDiem({ giaoVienId: currentTeacher.id, hocKy: 2, namHoc: selectedNamHoc })
+        ]);
+        if (!active) return;
+
+        const allDiem = [
+          ...(hk1Res?.data?.data || []),
+          ...(hk2Res?.data?.data || [])
+        ];
+        const { records, ids } = convertDiemRowsToDraft(allDiem);
+        setSavedRecordIds(ids);
+        setDraftRecords(records);
+      } catch {
+        // ignore
+      }
+    };
+
+    reloadScores();
+    return () => { active = false; };
+  }, [selectedNamHoc, currentTeacher?.id]);
 
   const allowedSubjects = useMemo(() => {
-    const boMon = normalizeText(currentTeacher?.boMon || "");
-    if (!boMon) return [];
+    if (!currentTeacher) return subjects;
 
-    return subjects.filter((subject) => {
-      const subjectName = normalizeText(subject?.tenMon || "");
+    const boMon = normalizeSubjectText(currentTeacher?.boMon || "");
+    if (!boMon) return subjects;
+
+    const matched = subjects.filter((subject) => {
+      const subjectName = normalizeSubjectText(subject?.tenMon || "");
       return subjectName.includes(boMon) || boMon.includes(subjectName);
     });
+
+    return matched.length > 0 ? matched : subjects;
   }, [subjects, currentTeacher]);
 
   useEffect(() => {
@@ -279,33 +387,89 @@ export default function NhapDiem() {
     [allowedSubjects, selectedSubjectId]
   );
 
+  const selectedClassObj = useMemo(
+    () => classes.find((c) => String(c.id) === selectedClass) || null,
+    [classes, selectedClass]
+  );
+
   const selectedPolicy = useMemo(
     () => getPolicyBySubjectName(selectedSubject?.tenMon || ""),
     [selectedSubject]
   );
 
+  const lockedColumns = useMemo(() => {
+    if (!selectedSubject?.id) return [];
+
+    if (selectedPolicy.mode === "COMMENT") {
+      return isScoreColumnLocked(scoreLocks, selectedSubject.id, selectedSemester, "comment")
+        ? ["Đánh giá"]
+        : [];
+    }
+
+    const columns = [];
+    Array.from({ length: selectedPolicy.txCount }).forEach((_, index) => {
+      if (isScoreColumnLocked(scoreLocks, selectedSubject.id, selectedSemester, `tx-${index}`)) {
+        columns.push(`TX ${index + 1}`);
+      }
+    });
+    if (isScoreColumnLocked(scoreLocks, selectedSubject.id, selectedSemester, "gk")) {
+      columns.push("Giữa kỳ");
+    }
+    if (isScoreColumnLocked(scoreLocks, selectedSubject.id, selectedSemester, "ck")) {
+      columns.push("Cuối kỳ");
+    }
+    return columns;
+  }, [scoreLocks, selectedSemester, selectedPolicy.mode, selectedPolicy.txCount, selectedSubject?.id]);
+
   const filteredStudents = useMemo(() => {
     let result = students;
 
     if (selectedGrade !== "all") {
-      result = result.filter((student) => String(student?.lopHoc?.khoi || "") === selectedGrade);
+      result = result.filter((student) => String(getStudentClass(student)?.khoi || "") === selectedGrade);
     }
 
-    if (selectedClass !== "all") {
-      result = result.filter((student) => String(student?.lopHoc?.id || "") === selectedClass);
+    if (selectedClass) {
+      result = result.filter((student) => String(getStudentClassId(student) || "") === selectedClass);
     }
+
+    result = sortStudentsByGivenName(result);
 
     return result;
   }, [selectedClass, selectedGrade, students]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClass, selectedGrade, selectedSubjectId, selectedSemester, selectedNamHoc]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredStudents.slice(start, start + PAGE_SIZE);
+  }, [filteredStudents, currentPage]);
 
   const getFullRecord = (studentId, subject) => {
     const policy = getPolicyBySubjectName(subject.tenMon);
     const key = getRecordKey(studentId, subject.id);
     const current = draftRecords[key] || {};
 
+    const mergeSemester = (empty, existing) => {
+      if (!existing) return empty;
+      const mergedTx = [...empty.tx];
+      (existing.tx || []).forEach((val, i) => {
+        if (i < mergedTx.length) mergedTx[i] = val;
+      });
+      return {
+        tx: mergedTx,
+        gk: existing.gk ?? empty.gk,
+        ck: existing.ck ?? empty.ck,
+        nhanXet: existing.nhanXet ?? empty.nhanXet
+      };
+    };
+
     return {
-      HK1: { ...createEmptySemester(policy.txCount), ...(current.HK1 || {}) },
-      HK2: { ...createEmptySemester(policy.txCount), ...(current.HK2 || {}) }
+      HK1: mergeSemester(createEmptySemester(policy.txCount), current.HK1),
+      HK2: mergeSemester(createEmptySemester(policy.txCount), current.HK2)
     };
   };
 
@@ -337,16 +501,200 @@ export default function NhapDiem() {
     setIsDirty(true);
   };
 
-  const handleSave = () => {
+  const isColumnLocked = (column) => {
+    if (!selectedSubject?.id) return false;
+    return isScoreColumnLocked(scoreLocks, selectedSubject.id, selectedSemester, column);
+  };
+
+  const handleSave = async () => {
+    if (!currentTeacher?.id || !selectedNamHoc) {
+      setError("Không xác định được giáo viên hoặc năm học. Không thể lưu.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setSaveMessage("");
+
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draftRecords));
+      const diemRows = [];
+
+      Object.entries(draftRecords).forEach(([key, record]) => {
+        const [studentIdStr, subjectIdStr] = key.split("_");
+        const studentId = Number(studentIdStr);
+        const subjectId = Number(subjectIdStr);
+        if (!studentId || !subjectId) return;
+
+        // Find phanCongDay for this teacher+subject+class
+        const student = students.find((s) => Number(s.id) === studentId);
+        const classId = student ? getStudentClassId(student) : null;
+
+        ["HK1", "HK2"].forEach((semester) => {
+          const semData = record[semester];
+          if (!semData) return;
+
+          const hocKy = semester === "HK1" ? 1 : 2;
+
+          // Find matching phanCongDay
+          const phanCong = phanCongData.find((p) => {
+            const pTeacherId = p?.giaoVienId ?? p?.giaoVien?.id;
+            const pSubjectId = p?.monHocId ?? p?.monHoc?.id;
+            const pClassId = p?.lopId ?? p?.lop?.id;
+            const pHocKy = p?.hocKy;
+            return (
+              Number(pTeacherId) === Number(currentTeacher.id) &&
+              Number(pSubjectId) === subjectId &&
+              Number(pClassId) === Number(classId) &&
+              Number(pHocKy) === hocKy
+            );
+          });
+
+          if (!phanCong) return;
+
+          const phanCongDayId = phanCong.id;
+          const subject = subjects.find((s) => Number(s.id) === subjectId);
+          const policy = getPolicyBySubjectName(subject?.tenMon || "");
+
+          if (policy.mode === "COMMENT") {
+            // Only nhanXet row
+            const idKey = `${key}_COMMENT_0_${semester}`;
+            const existingId = savedRecordIds[idKey];
+            diemRows.push({
+              ...(existingId ? { id: existingId } : {}),
+              hocSinh: { id: studentId },
+              monHoc: { id: subjectId },
+              phanCongDay: { id: phanCongDayId },
+              loaiDiem: "TX",
+              soThuTu: 0,
+              hocKy,
+              namHoc: selectedNamHoc,
+              giaTriDiem: null,
+              nhanXet: semData.nhanXet || "DAT",
+              giaoVienNhap: { id: currentTeacher.id },
+              status: "DRAFT"
+            });
+          } else {
+            // TX scores
+            (semData.tx || []).forEach((val, index) => {
+              if (val === "" || val === null || val === undefined) return;
+              const score = Number(val);
+              if (Number.isNaN(score)) return;
+
+              const idKey = `${key}_TX_${index + 1}_${semester}`;
+              const existingId = savedRecordIds[idKey];
+              diemRows.push({
+                ...(existingId ? { id: existingId } : {}),
+                hocSinh: { id: studentId },
+                monHoc: { id: subjectId },
+                phanCongDay: { id: phanCongDayId },
+                loaiDiem: "TX",
+                soThuTu: index + 1,
+                hocKy,
+                namHoc: selectedNamHoc,
+                giaTriDiem: score,
+                nhanXet: null,
+                giaoVienNhap: { id: currentTeacher.id },
+                status: "DRAFT"
+              });
+            });
+
+            // GK
+            if (semData.gk !== "" && semData.gk !== null && semData.gk !== undefined) {
+              const gkScore = Number(semData.gk);
+              if (!Number.isNaN(gkScore)) {
+                const idKey = `${key}_GK_0_${semester}`;
+                const existingId = savedRecordIds[idKey];
+                diemRows.push({
+                  ...(existingId ? { id: existingId } : {}),
+                  hocSinh: { id: studentId },
+                  monHoc: { id: subjectId },
+                  phanCongDay: { id: phanCongDayId },
+                  loaiDiem: "GK",
+                  soThuTu: 0,
+                  hocKy,
+                  namHoc: selectedNamHoc,
+                  giaTriDiem: gkScore,
+                  nhanXet: null,
+                  giaoVienNhap: { id: currentTeacher.id },
+                  status: "DRAFT"
+                });
+              }
+            }
+
+            // CK
+            if (semData.ck !== "" && semData.ck !== null && semData.ck !== undefined) {
+              const ckScore = Number(semData.ck);
+              if (!Number.isNaN(ckScore)) {
+                const idKey = `${key}_CK_0_${semester}`;
+                const existingId = savedRecordIds[idKey];
+                diemRows.push({
+                  ...(existingId ? { id: existingId } : {}),
+                  hocSinh: { id: studentId },
+                  monHoc: { id: subjectId },
+                  phanCongDay: { id: phanCongDayId },
+                  loaiDiem: "CK",
+                  soThuTu: 0,
+                  hocKy,
+                  namHoc: selectedNamHoc,
+                  giaTriDiem: ckScore,
+                  nhanXet: null,
+                  giaoVienNhap: { id: currentTeacher.id },
+                  status: "DRAFT"
+                });
+              }
+            }
+          }
+        });
+      });
+
+      if (diemRows.length === 0) {
+        setSaveMessage("Không có điểm nào để lưu.");
+        setSaving(false);
+        return;
+      }
+
+      const res = await saveAllDiem(diemRows);
+      const saved = res?.data?.data || [];
+
+      // Update savedRecordIds with returned IDs
+      const newIds = { ...savedRecordIds };
+      saved.forEach((row) => {
+        const studentId = row?.hocSinh?.id ?? row?.hocSinhId;
+        const subjectId = row?.monHoc?.id ?? row?.monHocId;
+        if (!studentId || !subjectId) return;
+        const key = getRecordKey(studentId, subjectId);
+        const semester = row.hocKy === 1 ? "HK1" : "HK2";
+        const idKey = `${key}_${row.loaiDiem}_${row.soThuTu || 0}_${semester}`;
+        if (row.id) {
+          newIds[idKey] = row.id;
+        }
+      });
+      setSavedRecordIds(newIds);
+
+      // Save to localStorage as cache
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draftRecords));
+      } catch {
+        // ignore
+      }
+
       setIsDirty(false);
       setLastSavedAt(new Date().toLocaleString("vi-VN"));
       setError("");
-      setSaveMessage("Cập nhật thành công.");
-    } catch {
-      setError("Không thể lưu bảng điểm. Vui lòng thử lại.");
+      notifySuccess(`Đã lưu ${saved.length} điểm thành công.`);
+      setSaveMessage(`Đã lưu ${saved.length} điểm thành công.`);
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Không thể lưu điểm. Vui lòng thử lại.";
+      setError(msg);
       setSaveMessage("");
+      // Fallback: save to localStorage
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draftRecords));
+      } catch {
+        // ignore
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -416,16 +764,15 @@ export default function NhapDiem() {
 
   const scoreGridColumns = useMemo(() => {
     if (selectedPolicy.mode === "COMMENT") {
-      return "240px minmax(170px, 1fr) 140px 140px";
+      return "minmax(160px, 1fr) minmax(120px, 1fr) 100px 100px";
     }
 
-    return `240px repeat(${selectedPolicy.txCount}, minmax(90px, 1fr)) 120px 120px 120px 120px 140px`;
+    // Make the first column flexible and make score columns narrow but flexible
+    return `minmax(160px, 1fr) repeat(${selectedPolicy.txCount}, minmax(64px, 1fr)) 96px 96px 96px 96px 120px`;
   }, [selectedPolicy.mode, selectedPolicy.txCount]);
 
   return (
-    <div className="page users-page">
-      <Header title="Nhập điểm theo môn học" />
-
+    <div className="page users-page teacher-page">
       <div className="card users-toolbar">
         <div>
           <div className="users-title">Bảng nhập điểm theo môn</div>
@@ -434,68 +781,85 @@ export default function NhapDiem() {
             {lastSavedAt ? ` · Cập nhật lúc ${lastSavedAt}` : ""}
           </div>
         </div>
-        <div className="users-actions">
-          <label className="form-field">
-            <span>Học kỳ</span>
-            <select value={selectedSemester} onChange={(event) => setSelectedSemester(event.target.value)}>
-              <option value="HK1">Học kỳ I</option>
-              <option value="HK2">Học kỳ II</option>
-            </select>
-          </label>
+        <div className="users-actions" style={{ flexWrap: "nowrap" }}>
+          <div className="filter-dropdown-wrap" ref={filterRef}>
+            <button
+              type="button"
+              className={`btn-outline filter-toggle${selectedNamHoc || selectedSemester !== "HK1" || selectedGrade !== "all" || selectedClass ? " filter-active" : ""}`}
+              onClick={() => setFilterOpen((v) => !v)}
+              title="Lọc"
+            >
+              <span className="material-symbols-outlined">filter_list</span>
+              {(selectedSemester !== "HK1" || selectedGrade !== "all" || selectedClass) && <span className="filter-dot" />}
+            </button>
 
-          <label className="form-field">
-            <span>Khối</span>
-            <select value={selectedGrade} onChange={(event) => setSelectedGrade(event.target.value)}>
-              <option value="all">Tất cả khối</option>
-              {availableGrades.map((grade) => (
-                <option key={String(grade)} value={String(grade)}>
-                  Khối {grade}
-                </option>
-              ))}
-            </select>
-          </label>
+            {filterOpen && (
+              <div className="filter-dropdown" style={{ zIndex: 9999, bottom: "calc(100% + 8px)", top: "auto" }}>
+                <div className="filter-dropdown-title">Lọc danh sách</div>
+                <label className="filter-dropdown-label">
+                  <span>Năm học</span>
+                  <select value={selectedNamHoc} onChange={(event) => setSelectedNamHoc(event.target.value)}>
+                    {namHocList.length > 0 ? (
+                      namHocList.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))
+                    ) : (
+                      <option value="">Đang tải...</option>
+                    )}
+                  </select>
+                </label>
+                <label className="filter-dropdown-label">
+                  <span>Học kỳ</span>
+                  <select value={selectedSemester} onChange={(event) => setSelectedSemester(event.target.value)}>
+                    <option value="HK1">Học kỳ I</option>
+                    <option value="HK2">Học kỳ II</option>
+                  </select>
+                </label>
+                <label className="filter-dropdown-label">
+                  <span>Khối</span>
+                  <select value={selectedGrade} onChange={(event) => setSelectedGrade(event.target.value)}>
+                    <option value="all">Tất cả khối</option>
+                    {availableGrades.map((grade) => (
+                      <option key={String(grade)} value={String(grade)}>
+                        Khối {grade}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="filter-dropdown-label">
+                  <span>Lớp</span>
+                  <select value={selectedClass} onChange={(event) => setSelectedClass(event.target.value)}>
+                    {filteredClasses.length === 0 ? (
+                      <option value="">Không có lớp</option>
+                    ) : (
+                      filteredClasses.map((lop) => (
+                        <option key={lop.id} value={String(lop.id)}>
+                          {lop.tenLop}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                {(selectedGrade !== "all" || selectedClass || selectedSemester !== "HK1") && (
+                  <button
+                    type="button"
+                    className="filter-clear"
+                    onClick={() => {
+                      setSelectedGrade("all");
+                      setSelectedClass("");
+                      setSelectedSemester("HK1");
+                    }}
+                  >
+                    Xóa bộ lọc
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
-          <label className="form-field">
-            <span>Lớp</span>
-            <select value={selectedClass} onChange={(event) => setSelectedClass(event.target.value)}>
-              <option value="all">Tất cả lớp</option>
-              {filteredClasses.map((lop) => (
-                <option key={lop.id} value={String(lop.id)}>
-                  {lop.tenLop}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={!isDirty}>
-            Cập nhật
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={!isDirty || saving}>
+            {saving ? "Đang lưu..." : "Cập nhật"}
           </button>
-        </div>
-      </div>
-
-      <div className="card subject-tabs-wrap">
-        <div className="subject-tabs">
-          {allowedSubjects.map((subject) => {
-            const active = String(subject.id) === selectedSubjectId;
-            return (
-              <button
-                key={subject.id}
-                type="button"
-                className={`subject-tab ${active ? "active" : ""}`}
-                onClick={() => setSelectedSubjectId(String(subject.id))}
-              >
-                {subject.tenMon}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="table-meta">
-          {!currentTeacher
-            ? "Không xác định được tài khoản giáo viên hiện tại."
-            : !allowedSubjects.length
-              ? `Chưa tìm thấy môn phù hợp với bộ môn: ${currentTeacher.boMon || "--"}`
-              : `Môn phụ trách: ${currentTeacher.boMon || "--"} · Quy định: ${selectedPolicy.label} · Công thức TBHK = (TĐĐGtx + 2 × GK + 3 × CK)/(số TX + 5), TBNH = (HK1 + 2 × HK2)/3`}
         </div>
       </div>
 
@@ -516,13 +880,15 @@ export default function NhapDiem() {
         </div>
       </div>
 
+
+
       <div className="card users-table">
         <div className="table-header">
-          <div>
-            <div className="panel-title">Bảng nhập điểm</div>
-            <div className="panel-subtitle">Xếp loại học tập tự động theo quy định Tốt/Khá/Đạt/Chưa đạt</div>
+          <div className="panel-title">Bảng nhập điểm</div>
+          <div className="panel-pill">
+            {selectedClassObj ? `Lớp ${selectedClassObj.tenLop} · ` : ""}
+            {filteredStudents.length} học sinh
           </div>
-          <div className="panel-pill">{filteredStudents.length} học sinh</div>
         </div>
 
         {error && <div className="table-empty">{error}</div>}
@@ -570,7 +936,7 @@ export default function NhapDiem() {
                     <div className="skeleton" />
                   </div>
                 ))
-              : filteredStudents.map((student) => {
+              : paginatedStudents.map((student) => {
                   const fullRecord = getFullRecord(student.id, selectedSubject);
                   const semData = fullRecord[selectedSemester];
                   const hk1Avg = calcSemesterAverage(fullRecord.HK1);
@@ -591,13 +957,14 @@ export default function NhapDiem() {
                       >
                         <div className="table-main">
                           <div className="table-title">{student.hoTen}</div>
-                          <div className="table-meta">{student?.lopHoc?.tenLop || "--"}</div>
+                          <div className="table-meta">{getStudentClass(student)?.tenLop || "--"}</div>
                         </div>
 
                         <div>
                           <select
                             className="score-input"
                             value={semData.nhanXet}
+                            disabled={isColumnLocked("comment")}
                             onChange={(event) =>
                               updateRecord(student.id, selectedSubject.id, selectedSemester, {
                                 nhanXet: event.target.value
@@ -628,7 +995,7 @@ export default function NhapDiem() {
                     >
                       <div className="table-main">
                         <div className="table-title">{student.hoTen}</div>
-                        <div className="table-meta">{student?.lopHoc?.tenLop || "--"}</div>
+                        <div className="table-meta">{getStudentClass(student)?.tenLop || "--"}</div>
                       </div>
 
                       {Array.from({ length: selectedPolicy.txCount }).map((_, index) => (
@@ -640,9 +1007,26 @@ export default function NhapDiem() {
                             max="10"
                             step="0.1"
                             value={semData.tx[index] ?? ""}
+                            disabled={isColumnLocked(`tx-${index}`)}
                             onChange={(event) => {
+                              const raw = event.target.value;
+                              if (raw === "") {
+                                const nextTx = [...(semData.tx || [])];
+                                nextTx[index] = "";
+                                updateRecord(student.id, selectedSubject.id, selectedSemester, {
+                                  tx: nextTx
+                                });
+                                return;
+                              }
+
+                              const n = Number(raw);
+                              if (Number.isNaN(n) || n < 0 || n > 10) {
+                                notifyError("Điểm phải là số trong khoảng 0 - 10");
+                                return;
+                              }
+
                               const nextTx = [...(semData.tx || [])];
-                              nextTx[index] = event.target.value;
+                              nextTx[index] = raw;
                               updateRecord(student.id, selectedSubject.id, selectedSemester, {
                                 tx: nextTx
                               });
@@ -659,11 +1043,21 @@ export default function NhapDiem() {
                           max="10"
                           step="0.1"
                           value={semData.gk}
-                          onChange={(event) =>
-                            updateRecord(student.id, selectedSubject.id, selectedSemester, {
-                              gk: event.target.value
-                            })
-                          }
+                          disabled={isColumnLocked("gk")}
+                          onChange={(event) => {
+                              const raw = event.target.value;
+                              if (raw === "") {
+                                updateRecord(student.id, selectedSubject.id, selectedSemester, { gk: "" });
+                                return;
+                              }
+                              const n = Number(raw);
+                              if (Number.isNaN(n) || n < 0 || n > 10) {
+                                notifyError("Điểm phải là số trong khoảng 0 - 10");
+                                return;
+                              }
+
+                              updateRecord(student.id, selectedSubject.id, selectedSemester, { gk: raw });
+                            } }
                         />
                       </div>
 
@@ -675,11 +1069,21 @@ export default function NhapDiem() {
                           max="10"
                           step="0.1"
                           value={semData.ck}
-                          onChange={(event) =>
-                            updateRecord(student.id, selectedSubject.id, selectedSemester, {
-                              ck: event.target.value
-                            })
-                          }
+                          disabled={isColumnLocked("ck")}
+                          onChange={(event) => {
+                              const raw = event.target.value;
+                              if (raw === "") {
+                                updateRecord(student.id, selectedSubject.id, selectedSemester, { ck: "" });
+                                return;
+                              }
+                              const n = Number(raw);
+                              if (Number.isNaN(n) || n < 0 || n > 10) {
+                                notifyError("Điểm phải là số trong khoảng 0 - 10");
+                                return;
+                              }
+
+                              updateRecord(student.id, selectedSubject.id, selectedSemester, { ck: raw });
+                            } }
                         />
                       </div>
 
@@ -694,6 +1098,77 @@ export default function NhapDiem() {
                     </div>
                   );
                 })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && filteredStudents.length > PAGE_SIZE && (
+          <div className="pagination">
+            <div className="pagination-info">
+              Hiển thị {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredStudents.length)} / {filteredStudents.length} học sinh
+            </div>
+            <div className="pagination-controls">
+              <button
+                type="button"
+                className="pagination-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(1)}
+              >
+                «
+              </button>
+              <button
+                type="button"
+                className="pagination-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                ‹
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((page) => {
+                  if (totalPages <= 7) return true;
+                  if (page === 1 || page === totalPages) return true;
+                  if (Math.abs(page - currentPage) <= 1) return true;
+                  return false;
+                })
+                .reduce((acc, page, idx, arr) => {
+                  if (idx > 0 && page - arr[idx - 1] > 1) {
+                    acc.push("...");
+                  }
+                  acc.push(page);
+                  return acc;
+                }, [])
+                .map((page, idx) =>
+                  page === "..." ? (
+                    <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>
+                  ) : (
+                    <button
+                      key={page}
+                      type="button"
+                      className={`pagination-btn${page === currentPage ? " pagination-active" : ""}`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+              <button
+                type="button"
+                className="pagination-btn"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                ›
+              </button>
+              <button
+                type="button"
+                className="pagination-btn"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+              >
+                »
+              </button>
+            </div>
           </div>
         )}
       </div>

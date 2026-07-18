@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
+import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
   createMonHoc,
@@ -7,6 +8,7 @@ import {
   getMonHoc,
   updateMonHoc
 } from "../../../api/monhocApi.js";
+import { normalizeStrict } from "../../../utils/normalizeText.js";
 
 const REMARK_ONLY_SUBJECTS = [
   { tenMon: "Giáo dục thể chất (GDTC)", heSo: 0 },
@@ -32,20 +34,10 @@ const SCORE_AND_REMARK_SUBJECTS = [
 
 const STANDARD_SUBJECTS = [...REMARK_ONLY_SUBJECTS, ...SCORE_AND_REMARK_SUBJECTS];
 
-const normalizeSubjectName = (value) =>
-  (value || "")
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-
-const REMARK_ONLY_KEYWORDS = new Set(REMARK_ONLY_SUBJECTS.map((item) => normalizeSubjectName(item.tenMon)));
+const REMARK_ONLY_KEYWORDS = new Set(REMARK_ONLY_SUBJECTS.map((item) => normalizeStrict(item.tenMon)));
 
 const getEvaluationLabel = (subject) => {
-  const key = normalizeSubjectName(subject?.tenMon);
+  const key = normalizeStrict(subject?.tenMon);
   if (REMARK_ONLY_KEYWORDS.has(key) || Number(subject?.heSo) === 0) {
     return "Nhận xét (Đạt/Chưa đạt)";
   }
@@ -63,7 +55,14 @@ export default function MonHocList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
   const [formError, setFormError] = useState("");
-  const [form, setForm] = useState({ tenMon: "" });
+  const [deleteModal, setDeleteModal] = useState({ open: false, subject: null });
+  const [form, setForm] = useState({
+    tenMon: "",
+    nhomDanhGia: "DIEM_SO",
+    soDtxHocKy: 3,
+    khoiApDung: ["10", "11", "12"],
+    moTa: ""
+  });
 
   const fetchSubjects = async () => {
     try {
@@ -142,7 +141,13 @@ export default function MonHocList() {
 
   const openCreate = () => {
     setEditingSubject(null);
-    setForm({ tenMon: "" });
+    setForm({
+      tenMon: "",
+      nhomDanhGia: "DIEM_SO",
+      soDtxHocKy: 3,
+      khoiApDung: ["10", "11", "12"],
+      moTa: ""
+    });
     setFormError("");
     setSuccessMessage("");
     setModalOpen(true);
@@ -150,7 +155,13 @@ export default function MonHocList() {
 
   const openEdit = (item) => {
     setEditingSubject(item);
-    setForm({ tenMon: item.tenMon || "" });
+    setForm({
+      tenMon: item.tenMon || "",
+      nhomDanhGia: item.nhomDanhGia || "DIEM_SO",
+      soDtxHocKy: item.soDtxHocKy ?? 3,
+      khoiApDung: item.khoiApDung ? item.khoiApDung.split(",") : ["10", "11", "12"],
+      moTa: item.moTa || ""
+    });
     setFormError("");
     setSuccessMessage("");
     setModalOpen(true);
@@ -162,11 +173,11 @@ export default function MonHocList() {
       setSuccessMessage("");
 
       const existingMap = new Map(
-        subjects.map((item) => [normalizeSubjectName(item.tenMon), item])
+        subjects.map((item) => [normalizeStrict(item.tenMon), item])
       );
 
       const missing = STANDARD_SUBJECTS.filter(
-        (item) => !existingMap.has(normalizeSubjectName(item.tenMon))
+        (item) => !existingMap.has(normalizeStrict(item.tenMon))
       );
 
       if (!missing.length) {
@@ -192,8 +203,13 @@ export default function MonHocList() {
     }
   };
 
-  const handleDelete = async (item) => {
-    if (!window.confirm(`Xóa môn học ${item.tenMon}?`)) return;
+  const handleDeleteClick = (item) => {
+    setDeleteModal({ open: true, subject: item });
+  };
+
+  const handleDeleteConfirm = async () => {
+    const item = deleteModal.subject;
+    if (!item) return;
     try {
       await deleteMonHoc(item.id);
       setSubjects((prev) => prev.filter((row) => row.id !== item.id));
@@ -202,24 +218,104 @@ export default function MonHocList() {
     } catch (err) {
       setError("Không thể xóa môn học.");
       setSuccessMessage("");
+    } finally {
+      setDeleteModal({ open: false, subject: null });
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError("");
-    if (!form.tenMon.trim()) {
+
+    // Validate tên môn
+    const tenMon = form.tenMon.trim();
+    if (!tenMon) {
       setFormError("Vui lòng nhập tên môn.");
       return;
     }
 
-    const normalizedName = normalizeSubjectName(form.tenMon);
-    const isRemarkOnly = REMARK_ONLY_KEYWORDS.has(normalizedName);
-    const inferredHeSo = editingSubject?.heSo ?? (isRemarkOnly ? 0 : 1);
+    // Kiểm tra tên môn không chứa ký tự lạ
+    const validNamePattern = /^[A-ZÀ-Ỹa-zà-ỹ0-9\s&().,]+$/;
+    if (!validNamePattern.test(tenMon)) {
+      setFormError("Tên môn chỉ được chứa chữ cái, số và ký tự &().,");
+      return;
+    }
+
+    // Kiểm tra tên môn có nghĩa
+    const words = tenMon.split(/\s+/).filter(Boolean);
+    if (words.length < 1) {
+      setFormError("Vui lòng nhập tên môn.");
+      return;
+    }
+
+    // Kiểm tra có dấu tiếng Việt (thanh dấu hoặc ký tự đặc biệt VN)
+    // Tiếng Việt có dấu: àáảãạăắằẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ
+    const vietnameseDiacritics = /[àáảãạăắằẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
+    if (!vietnameseDiacritics.test(tenMon)) {
+      setFormError("Tên môn phải có dấu tiếng Việt (vd: Toán, Ngữ văn, Địa lí).");
+      return;
+    }
+
+    // Với tên 1 từ: phải có ít nhất 4 chữ cái (vd: Toán, Sinh, Sử)
+    // Với tên nhiều từ: mỗi từ phải có ít nhất 2 chữ cái và bắt đầu bằng chữ hoa
+    if (words.length === 1) {
+      if (words[0].length < 4) {
+        setFormError("Tên môn phải có ít nhất 4 chữ cái (vd: Toán, Sinh).");
+        return;
+      }
+      if (!/^[A-ZÀ-Ỹ]/.test(words[0])) {
+        setFormError("Tên môn phải bắt đầu bằng chữ hoa (vd: Toán).");
+        return;
+      }
+    } else {
+      // Nhiều từ: mỗi từ phải bắt đầu bằng chữ hoa và có ít nhất 2 chữ cái
+      for (const w of words) {
+        if (w.length < 2) {
+          setFormError("Mỗi từ phải có ít nhất 2 chữ cái.");
+          return;
+        }
+        if (!/^[A-ZÀ-Ỹ]/.test(w)) {
+          setFormError("Mỗi từ phải bắt đầu bằng chữ hoa (vd: Ngữ văn, Tiếng Anh).");
+          return;
+        }
+      }
+    }
+
+    // Kiểm tra trùng tên môn
+    const normalizedName = normalizeStrict(tenMon);
+    const isDuplicate = subjects.some(
+      (s) => normalizeStrict(s.tenMon) === normalizedName && s.id !== editingSubject?.id
+    );
+    if (isDuplicate) {
+      setFormError(`Môn học "${tenMon}" đã tồn tại.`);
+      return;
+    }
+
+    // Validate nhóm đánh giá
+    if (!form.nhomDanhGia) {
+      setFormError("Vui lòng chọn nhóm đánh giá.");
+      return;
+    }
+
+    // Validate số ĐTX
+    const soDtx = Number(form.soDtxHocKy);
+    if (form.nhomDanhGia === "DIEM_SO" && (isNaN(soDtx) || soDtx < 1 || soDtx > 10)) {
+      setFormError("Số ĐTX phải từ 1 đến 10.");
+      return;
+    }
+
+    // Validate khối áp dụng
+    if (!form.khoiApDung.length) {
+      setFormError("Vui lòng chọn ít nhất 1 khối áp dụng.");
+      return;
+    }
 
     const payload = {
-      tenMon: form.tenMon.trim(),
-      heSo: inferredHeSo
+      tenMon: tenMon,
+      nhomDanhGia: form.nhomDanhGia,
+      soDtxHocKy: form.nhomDanhGia === "NHAN_XET" ? 0 : soDtx,
+      khoiApDung: form.khoiApDung.join(","),
+      moTa: form.moTa.trim() || null
     };
 
     try {
@@ -262,9 +358,6 @@ export default function MonHocList() {
             <button className="btn-primary" onClick={openCreate}>
               Thêm môn học
             </button>
-            <button className="btn-outline" onClick={handleAddStandardSubjects}>
-              Bổ sung đủ môn theo quy định
-            </button>
           </div>
         }
       />
@@ -288,7 +381,6 @@ export default function MonHocList() {
         <div className="table-header">
           <div>
             <div className="panel-title">Danh sách môn học</div>
-            <div className="panel-subtitle">Dữ liệu lấy từ cơ sở dữ liệu</div>
           </div>
           <div className="panel-pill">{filteredSubjects.length} môn</div>
         </div>
@@ -298,15 +390,15 @@ export default function MonHocList() {
           <div className="table-empty">Không tìm thấy môn học phù hợp.</div>
         )}
         <div className="table-grid">
-          <div className="table-row table-head">
+          <div className="table-row table-head" style={{ gridTemplateColumns: "60px 1fr 200px 140px" }}>
             <div>STT</div>
             <div>Tên môn</div>
-            <div>Đánh giá</div>
-            <div>Thao tác</div>
+            <div style={{ textAlign: "center" }}>Đánh giá</div>
+            <div style={{ textAlign: "right" }}>Thao tác</div>
           </div>
           {loading
             ? Array.from({ length: 5 }).map((_, index) => (
-                <div className="table-row" key={`skeleton-${index}`}>
+                <div className="table-row" key={`skeleton-${index}`} style={{ gridTemplateColumns: "60px 1fr 200px 140px" }}>
                   <div className="skeleton" />
                   <div className="skeleton" />
                   <div className="skeleton" />
@@ -314,13 +406,13 @@ export default function MonHocList() {
                 </div>
               ))
             : pagedSubjects.map((item, index) => (
-                <div className="table-row" key={item.id}>
+                <div className="table-row" key={item.id} style={{ gridTemplateColumns: "60px 1fr 200px 140px" }}>
                   <div className="table-id">{(page - 1) * pageSize + index + 1}</div>
                   <div className="table-main">
                     <div className="table-title">{item.tenMon}</div>
                     <div className="table-meta">ID: {item.id}</div>
                   </div>
-                  <div>
+                  <div style={{ textAlign: "center" }}>
                     <span className="role-pill">{getEvaluationLabel(item)}</span>
                   </div>
                   <div className="table-actions">
@@ -331,10 +423,11 @@ export default function MonHocList() {
                       Sửa
                     </button>
                     <button
-                      className="btn-danger btn-sm"
-                      onClick={() => handleDelete(item)}
+                      className="rounded-lg p-sm text-outline hover:bg-red-50 hover:text-red-600"
+                      onClick={() => handleDeleteClick(item)}
+                      title="Xóa"
                     >
-                      Xóa
+                      <MaterialIcon name="delete" className="text-[20px]" />
                     </button>
                   </div>
                 </div>
@@ -368,15 +461,83 @@ export default function MonHocList() {
       >
         <form className="form-grid" onSubmit={handleSubmit}>
           <label className="form-field">
-            <span>Tên môn</span>
+            <span>Tên môn *</span>
             <input
               value={form.tenMon}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, tenMon: event.target.value }))
               }
-              placeholder="vd: Toán"
+              placeholder="vd: Toán, Ngữ văn, Tiếng Anh..."
             />
           </label>
+
+          <label className="form-field">
+            <span>Nhóm đánh giá *</span>
+            <select
+              value={form.nhomDanhGia}
+              onChange={(event) => {
+                const val = event.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  nhomDanhGia: val,
+                  soDtxHocKy: val === "NHAN_XET" ? 0 : 3
+                }));
+              }}
+            >
+              <option value="DIEM_SO">Nhận xét + Điểm số</option>
+              <option value="NHAN_XET">Nhận xét (Đạt/Chưa đạt)</option>
+            </select>
+          </label>
+
+          {form.nhomDanhGia === "DIEM_SO" && (
+            <label className="form-field">
+              <span>Số ĐTX mỗi học kỳ *</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={form.soDtxHocKy}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, soDtxHocKy: Number(event.target.value) }))
+                }
+              />
+            </label>
+          )}
+
+          <div className="form-field">
+            <span>Khối áp dụng *</span>
+            <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+              {["10", "11", "12"].map((khoi) => (
+                <label key={khoi} style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.khoiApDung.includes(khoi)}
+                    onChange={(event) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        khoiApDung: event.target.checked
+                          ? [...prev.khoiApDung, khoi]
+                          : prev.khoiApDung.filter((k) => k !== khoi)
+                      }));
+                    }}
+                  />
+                  <span>Khối {khoi}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <label className="form-field">
+            <span>Mô tả</span>
+            <input
+              value={form.moTa}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, moTa: event.target.value }))
+              }
+              placeholder="Mô tả môn học (tùy chọn)"
+            />
+          </label>
+
           {formError && <div className="form-error">{formError}</div>}
           <div className="form-actions">
             <button
@@ -392,6 +553,40 @@ export default function MonHocList() {
           </div>
         </form>
       </SimpleModal>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.open && (
+        <div className="modal-overlay" onClick={() => setDeleteModal({ open: false, subject: null })}>
+          <div className="modal-box delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-icon">
+              <span className="material-symbols-outlined">warning</span>
+            </div>
+            <h3 className="delete-modal-title">Xác nhận xóa môn học</h3>
+            <p className="delete-modal-desc">
+              Bạn có chắc chắn muốn xóa môn học <strong>{deleteModal.subject?.tenMon}</strong>?
+            </p>
+            <p className="delete-modal-warning">
+              Hành động này không thể hoàn tác.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => setDeleteModal({ open: false, subject: null })}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={handleDeleteConfirm}
+              >
+                Xóa môn học
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

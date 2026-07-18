@@ -11,4 +11,20 @@ public interface ThoiKhoaBieuRepository extends JpaRepository<ThoiKhoaBieu, Inte
     List<ThoiKhoaBieu> findByLopIdAndHocKyAndNamHoc(Integer lopId, Integer hocKy, String namHoc);
     List<ThoiKhoaBieu> findByGiaoVienIdAndHocKyAndNamHoc(Integer giaoVienId, Integer hocKy, String namHoc);
     List<ThoiKhoaBieu> findByLopId(Integer lopId);
+    List<ThoiKhoaBieu> findByNamHocAndHocKy(String namHoc, Integer hocKy);
+    List<ThoiKhoaBieu> findByGiaoVienId(Integer giaoVienId);
+
+    // Queries with week number
+    List<ThoiKhoaBieu> findByLopIdAndHocKyAndNamHocAndTuan(Integer lopId, Integer hocKy, String namHoc, Integer tuan);
+    List<ThoiKhoaBieu> findByLopIdAndNamHocAndTuan(Integer lopId, String namHoc, Integer tuan);
+    List<ThoiKhoaBieu> findByLopIdAndTuan(Integer lopId, Integer tuan);
+    List<ThoiKhoaBieu> findByNamHocAndHocKyAndTuan(String namHoc, Integer hocKy, Integer tuan);
+    List<ThoiKhoaBieu> findByGiaoVienIdAndHocKyAndNamHocAndTuan(Integer giaoVienId, Integer hocKy, String namHoc, Integer tuan);
+
+    // Find by class and time slot
+    List<ThoiKhoaBieu> findByLopIdAndThuAndTietBatDau(Integer lopId, Integer thu, Integer tietBatDau);
+
+    // Delete by filter
+    void deleteByNamHocAndHocKy(String namHoc, Integer hocKy);
+    void deleteByNamHocAndHocKyAndTuan(String namHoc, Integer hocKy, Integer tuan);
 }

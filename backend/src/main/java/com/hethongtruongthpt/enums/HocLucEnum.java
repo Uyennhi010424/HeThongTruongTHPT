@@ -1,8 +1,8 @@
 package com.hethongtruongthpt.enums;
 
 public enum HocLucEnum {
-    GIOI,
+    TOT,
     KHA,
-    TRUNG_BINH,
-    YEU
+    DAT,
+    CHUA_DAT
 }

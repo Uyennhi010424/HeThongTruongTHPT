@@ -39,6 +39,14 @@ public class LichThi {
     @Column(name = "ghi_chu")
     private String ghiChu;
 
+    @ManyToOne
+    @JoinColumn(name = "giam_thi_1_id")
+    private GiaoVien giamThi1;
+
+    @ManyToOne
+    @JoinColumn(name = "giam_thi_2_id")
+    private GiaoVien giamThi2;
+
     @Column(name = "hoc_ky", nullable = false)
     private Integer hocKy;
 
@@ -115,6 +123,22 @@ public class LichThi {
 
     public void setGhiChu(String ghiChu) {
         this.ghiChu = ghiChu;
+    }
+
+    public GiaoVien getGiamThi1() {
+        return giamThi1;
+    }
+
+    public void setGiamThi1(GiaoVien giamThi1) {
+        this.giamThi1 = giamThi1;
+    }
+
+    public GiaoVien getGiamThi2() {
+        return giamThi2;
+    }
+
+    public void setGiamThi2(GiaoVien giamThi2) {
+        this.giamThi2 = giamThi2;
     }
 
     public Integer getHocKy() {

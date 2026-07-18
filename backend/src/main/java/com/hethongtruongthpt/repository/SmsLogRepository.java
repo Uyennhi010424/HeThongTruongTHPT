@@ -8,7 +8,7 @@ import java.util.List;
 
 @Repository
 public interface SmsLogRepository extends JpaRepository<SmsLog, Integer> {
-    List<SmsLog> findByTrangThai(String trangThai);
-    List<SmsLog> findByThangNam(String thangNam);
     List<SmsLog> findByHocSinhId(Integer hocSinhId);
+    List<SmsLog> findByTrangThai(String trangThai);
+    long countByHocSinhIdAndThangNam(Integer hocSinhId, String thangNam);
 }

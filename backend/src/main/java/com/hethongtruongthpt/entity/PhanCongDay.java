@@ -1,8 +1,10 @@
 package com.hethongtruongthpt.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Entity
 @Table(name = "phan_cong_day", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"giao_vien_id", "mon_hoc_id", "lop_id", "hoc_ky"})
@@ -14,7 +16,7 @@ public class PhanCongDay {
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "giao_vien_id", nullable = false)
+    @JoinColumn(name = "giao_vien_id", nullable = true)
     private GiaoVien giaoVien;
 
     @ManyToOne

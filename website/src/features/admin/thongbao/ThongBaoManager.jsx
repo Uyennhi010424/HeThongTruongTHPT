@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../../components/common/Header.jsx";
+import PageHeader from "../../../components/edu/PageHeader.jsx";
+import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
   createThongBao,
@@ -94,7 +95,7 @@ export default function ThongBaoManager() {
     if (!keyword.trim()) return notices;
     const lower = keyword.toLowerCase();
     return notices.filter((item) =>
-      [item.tieuDe, item.noiDung, item.doiTuong]
+      [item.tieuDe, item.noiDung, item.doiTuong || item.loai]
         .filter(Boolean)
         .some((field) => field.toLowerCase().includes(lower))
     );
@@ -145,7 +146,7 @@ export default function ThongBaoManager() {
     setForm({
       tieuDe: notice.tieuDe || "",
       noiDung: notice.noiDung || "",
-      doiTuong: notice.doiTuong || "ALL",
+      doiTuong: notice.doiTuong || notice.loai || "ALL",
       trangThai: notice.trangThai ?? 1
     });
     setFormError("");
@@ -177,7 +178,7 @@ export default function ThongBaoManager() {
     const payload = {
       tieuDe: form.tieuDe.trim(),
       noiDung: form.noiDung.trim(),
-      doiTuong: form.doiTuong,
+      loai: form.doiTuong,
       trangThai: Number(form.trangThai),
       ngayDang: editingNotice?.ngayDang || new Date().toISOString()
     };
@@ -202,7 +203,7 @@ export default function ThongBaoManager() {
 
   return (
     <div className="page users-page">
-      <Header title="Thông báo nhà trường" />
+      <PageHeader title="Thông báo nhà trường" />
 
       <div className="card users-toolbar">
         <div>
@@ -245,7 +246,6 @@ export default function ThongBaoManager() {
         <div className="table-header">
           <div>
             <div className="panel-title">Danh sách thông báo</div>
-            <div className="panel-subtitle">Dữ liệu lấy từ cơ sở dữ liệu</div>
           </div>
           <div className="panel-pill">{filteredNotices.length} thông báo</div>
         </div>
@@ -281,7 +281,7 @@ export default function ThongBaoManager() {
                     <div className="table-meta">{notice.noiDung}</div>
                   </div>
                   <div>
-                    <span className="role-pill">{getTargetLabel(notice.doiTuong)}</span>
+                    <span className="role-pill">{getTargetLabel(notice.doiTuong || notice.loai)}</span>
                   </div>
                   <div className="table-date">
                     {formatDateTime(notice.ngayDang) || "--"}
@@ -303,10 +303,11 @@ export default function ThongBaoManager() {
                       Sửa
                     </button>
                     <button
-                      className="btn-danger btn-sm"
+                      className="rounded-lg p-sm text-outline hover:bg-red-50 hover:text-red-600"
                       onClick={() => handleDelete(notice)}
+                      title="Xóa"
                     >
-                      Xóa
+                      <MaterialIcon name="delete" className="text-[20px]" />
                     </button>
                   </div>
                 </div>

@@ -4,7 +4,7 @@ import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.entity.PhuHuynh;
 import com.hethongtruongthpt.entity.PhuHuynhHocSinh;
 import com.hethongtruongthpt.repository.PhuHuynhHocSinhRepository;
-import com.hethongtruongthpt.repository.PhuHuynhRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.http.HttpStatus;
@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/hocsinh")
+@RequestMapping("/api/phuhuynh-hocsinh")
 public class PhuHuynhHocSinhController {
     private final PhuHuynhHocSinhRepository repository;
 
@@ -26,6 +26,7 @@ public class PhuHuynhHocSinhController {
         this.repository = repository;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
     @GetMapping("/{id}/phuhuynh")
     public ResponseEntity<ApiResponse<List<PhuHuynh>>> getParentsForStudent(@PathVariable("id") Integer id) {
         List<PhuHuynhHocSinh> links = repository.findByHocSinhId(id);
@@ -33,6 +34,7 @@ public class PhuHuynhHocSinhController {
         return ResponseEntity.ok(ApiResponse.ok(parents));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/phuhuynh/{phId}")
     @ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<ApiResponse<Object>> linkParentToStudent(@PathVariable("id") Integer id, @PathVariable("phId") Integer phId) {

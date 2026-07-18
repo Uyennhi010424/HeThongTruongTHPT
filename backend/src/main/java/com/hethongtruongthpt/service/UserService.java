@@ -6,6 +6,13 @@ import com.hethongtruongthpt.entity.User;
 import com.hethongtruongthpt.enums.RoleEnum;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.UserRepository;
+import com.hethongtruongthpt.util.DefaultAccountPasswordPolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import com.hethongtruongthpt.exception.ApiException;
@@ -17,33 +24,63 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class UserService {
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final DefaultAccountPasswordPolicy passwordPolicy;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, DefaultAccountPasswordPolicy passwordPolicy) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.passwordPolicy = passwordPolicy;
     }
 
-    private static final String DEFAULT_ACCOUNT_PASSWORD = "Abc1234@";
-
     public void resetPasswordToDefault(Integer id) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
         try {
             User existing = userRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
             String newRaw;
             if (existing.getRole() == RoleEnum.GIAO_VIEN && existing.getUsername() != null) {
-                String username = existing.getUsername();
-                String local = username.contains("@") ? username.substring(0, username.indexOf('@')) : username;
-                newRaw = local + "gv123@";
+                newRaw = passwordPolicy.getTeacherDefaultPassword(existing.getUsername());
+            } else if (existing.getRole() == RoleEnum.PHU_HUYNH) {
+                newRaw = passwordPolicy.getParentDefaultPassword();
             } else {
-                newRaw = DEFAULT_ACCOUNT_PASSWORD;
+                newRaw = passwordPolicy.getStudentDefaultPassword();
             }
             existing.setPassword(passwordEncoder.encode(newRaw));
+            existing.setMustChangePassword(true);
             userRepository.save(existing);
         } catch (Exception ex) {
             throw new ApiException("Không thể đặt lại mật khẩu: " + ex.getMessage());
         }
+    }
+
+    public void changePassword(Integer id, String oldPassword, String newPassword) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
+        if (oldPassword == null || oldPassword.isBlank()) {
+            throw new ApiException("Mật khẩu cũ không được để trống");
+        }
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new ApiException("Mật khẩu mới không được để trống");
+        }
+
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
+
+        String storedPassword = existing.getPassword();
+        boolean isBcrypt = storedPassword != null && storedPassword.matches("^\\$2[aby]\\$\\d{2}\\$.+");
+
+        if (!isBcrypt) {
+            throw new ApiException("Tài khoản chưa được thiết lập mật khẩu an toàn. Vui lòng liên hệ quản trị viên.");
+        }
+
+        if (!passwordEncoder.matches(oldPassword, storedPassword)) {
+            throw new ApiException("Mật khẩu cũ không chính xác");
+        }
+
+        existing.setPassword(passwordEncoder.encode(newPassword.trim()));
+        userRepository.save(existing);
     }
 
     public List<UserDTO> getAll() {
@@ -52,10 +89,23 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    public Page<UserDTO> getAllPaged(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("username").ascending());
+        return userRepository.findAll(pageable).map(this::toDto);
+    }
+
     public UserDTO getById(Integer id) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
         return toDto(user);
+    }
+
+    public UserDTO getByUsername(String username) {
+        if (username == null || username.isBlank()) return null;
+        return userRepository.findByUsername(username.trim())
+                .map(this::toDto)
+                .orElse(null);
     }
 
     public UserDTO create(UserRequest request) {
@@ -71,14 +121,28 @@ public class UserService {
 
         User user = new User();
         user.setUsername(username);
-        user.setPassword(normalizePassword(request.getPassword()));
+
+        // Generate default password server-side when none is provided
+        String rawPassword = request.getPassword();
+        if (rawPassword == null || rawPassword.isBlank()) {
+            RoleEnum role = resolveRole(request.getRole());
+            if (role == RoleEnum.GIAO_VIEN) {
+                rawPassword = passwordPolicy.getTeacherDefaultPassword(username);
+            } else {
+                rawPassword = passwordPolicy.getStudentDefaultPassword();
+            }
+        }
+        user.setPassword(normalizePassword(rawPassword));
+
         user.setRole(resolveRole(request.getRole()));
         user.setIsActive(resolveActive(request.getStatus()));
+        user.setMustChangePassword(true);
         User saved = userRepository.save(user);
         return toDto(saved);
     }
 
     public UserDTO update(Integer id, UserRequest request) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
 
@@ -98,6 +162,7 @@ public class UserService {
     }
 
     public void delete(Integer id) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
         userRepository.deleteById(id);
     }
 
@@ -122,7 +187,8 @@ public class UserService {
         String raw = roleName.trim().toUpperCase();
         try {
             return RoleEnum.valueOf(raw);
-        } catch (IllegalArgumentException ignored) {
+        } catch (IllegalArgumentException ex) {
+            log.debug("Role '{}' không khớp enum trực tiếp, thử parse mở rộng", raw);
         }
 
         // Accept frontend variants like "GIAOVIEN", "HOCSINH", "PHUHUYNH", "VAN_THU", etc.

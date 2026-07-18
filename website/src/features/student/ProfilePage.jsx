@@ -1,48 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
-import Header from "../../components/common/Header.jsx";
-import { getHocSinh, updateHocSinh } from "../../api/hocsinhApi.js";
-import { getToken } from "../../store/authStore.js";
+import { useNavigate } from "react-router-dom";
+import { getCurrentHocSinh, updateHocSinh } from "../../api/hocsinhApi.js";
+import { uploadAvatar } from "../../api/uploadApi.js";
+import { notifyError, notifySuccess } from "../../utils/notify.js";
+import { readCachedAvatar, writeCachedAvatar } from "../../utils/avatarCache.js";
+import { getCurrentUsernameFromToken } from "../../utils/teacherProfile.js";
 
-const formatDateInput = (value) => {
-  if (!value) return "";
-  if (typeof value === "string" && value.length >= 10) return value.slice(0, 10);
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+const formatDisplayDate = (value) => {
+  if (!value) return "--";
+  const str = typeof value === "string" ? value.slice(0, 10) : "";
+  if (!str) return "--";
+  const [y, m, d] = str.split("-");
+  if (!y || !m || !d) return str;
+  return `${d}/${m}/${y}`;
 };
 
-const getCurrentUsername = () => {
-  const token = getToken();
-  if (!token) return "";
-
-  try {
-    const payloadPart = token.split(".")[1] || "";
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(window.atob(normalized));
-    return String(payload?.sub || "").trim().toLowerCase();
-  } catch {
-    return "";
-  }
-};
+const FIELD_DEFS = [
+  { key: "hoTen", label: "Họ tên" },
+  { key: "username", label: "Tài khoản" },
+  { key: "email", label: "Email" },
+  { key: "lop", label: "Lớp" },
+  { key: "ngaySinh", label: "Ngày sinh" },
+  { key: "gioiTinh", label: "Giới tính" },
+  { key: "sdt", label: "Điện thoại" },
+  { key: "diaChi", label: "Địa chỉ" },
+  { key: "namNhapHoc", label: "Năm nhập học" },
+  { key: "maBhyt", label: "Mã BHYT" },
+  { key: "dienChinhSach", label: "Diện chính sách" },
+  { key: "trangThai", label: "Trạng thái" }
+];
 
 export default function ProfilePage() {
-  const currentUsername = useMemo(() => getCurrentUsername(), []);
+  const navigate = useNavigate();
+  const currentUsername = useMemo(() => getCurrentUsernameFromToken(), []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
   const [student, setStudent] = useState(null);
-  const [form, setForm] = useState({
-    hoTen: "",
-    ngaySinh: "",
-    gioiTinh: "true",
-    diaChi: "",
-    sdt: "",
-    email: "",
-    namNhapHoc: "",
-    maBhyt: "",
-    dienChinhSach: "false",
-    trangThai: "1"
-  });
+  const [avatarPreview, setAvatarPreview] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -51,27 +45,16 @@ export default function ProfilePage() {
       try {
         setLoading(true);
         setError("");
-        const response = await getHocSinh();
+        const res = await getCurrentHocSinh();
         if (!active) return;
-        const list = response?.data?.data || [];
-        const matched = list.find(
-          (item) => String(item?.email || "").trim().toLowerCase() === currentUsername
-        );
-        const current = matched || list[0] || null;
+        const current = res?.data?.data || null;
         setStudent(current);
-        setForm({
-          hoTen: current?.hoTen || "",
-          ngaySinh: formatDateInput(current?.ngaySinh),
-          gioiTinh: String(current?.gioiTinh ?? true),
-          diaChi: current?.diaChi || "",
-          sdt: current?.sdt || "",
-          email: current?.email || "",
-          namNhapHoc: current?.namNhapHoc ?? "",
-          maBhyt: current?.maBhyt || "",
-          dienChinhSach: String(current?.dienChinhSach ?? false),
-          trangThai: String(current?.trangThai ?? 1)
-        });
-      } catch (err) {
+        const avatar =
+          current?.anhDaiDien ||
+          readCachedAvatar({ username: currentUsername, role: "student" }) ||
+          "";
+        setAvatarPreview(avatar);
+      } catch {
         if (!active) return;
         setError("Không thể tải hồ sơ học sinh.");
       } finally {
@@ -80,184 +63,157 @@ export default function ProfilePage() {
     };
 
     fetchProfile();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [currentUsername]);
 
-  const info = useMemo(() => {
-    return {
-      lop: student?.lopHoc?.tenLop || "--",
-      createdAt: student?.createdAt ? formatDateInput(student.createdAt) : "--"
+  useEffect(() => {
+    return () => {
+      if (avatarPreview && avatarPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
     };
-  }, [student]);
+  }, [avatarPreview]);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!student?.id) return;
-    setError("");
-    setSaving(true);
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      notifyError("Kích thước ảnh tối đa 2MB.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      notifyError("Chỉ chấp nhận file ảnh.");
+      return;
+    }
+
+    if (avatarPreview && avatarPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+
     try {
-      const payload = {
-        ...student,
-        hoTen: form.hoTen.trim(),
-        ngaySinh: form.ngaySinh || null,
-        gioiTinh: form.gioiTinh === "true",
-        diaChi: form.diaChi.trim(),
-        sdt: form.sdt.trim(),
-        email: form.email.trim(),
-        namNhapHoc: form.namNhapHoc ? Number(form.namNhapHoc) : null,
-        maBhyt: form.maBhyt.trim(),
-        dienChinhSach: form.dienChinhSach === "true",
-        trangThai: Number(form.trangThai)
-      };
-      const response = await updateHocSinh(student.id, payload);
-      setStudent(response?.data?.data || payload);
-    } catch (err) {
-      setError("Không thể cập nhật hồ sơ.");
-    } finally {
-      setSaving(false);
+      const uploadRes = await uploadAvatar(file);
+      const url = uploadRes?.data?.data?.url;
+      if (!url) {
+        notifyError("Tải ảnh lên thất bại. Vui lòng thử lại.");
+        return;
+      }
+
+      const payload = { ...student, anhDaiDien: url };
+      const saveRes = await updateHocSinh(student.id, payload);
+      const saved = saveRes?.data?.data || payload;
+      setStudent(saved);
+
+      writeCachedAvatar({
+        avatar: url,
+        username: student?.user?.username || student?.email || currentUsername,
+        role: "student"
+      });
+      notifySuccess("Cập nhật ảnh đại diện thành công.");
+    } catch {
+      notifyError("Không thể cập nhật ảnh đại diện.");
+    }
+  };
+
+  const getFieldValue = (key) => {
+    switch (key) {
+      case "username": return student?.user?.username || "--";
+      case "email": return student?.email || "--";
+      case "lop": return student?.lop?.tenLop || "Chưa có lớp";
+      case "ngaySinh": return formatDisplayDate(student?.ngaySinh);
+      case "gioiTinh": return student?.gioiTinh === "NU" ? "Nữ" : "Nam";
+      case "sdt": return student?.sdt || "--";
+      case "diaChi": return student?.diaChi || "--";
+      case "namNhapHoc": return student?.namNhapHoc || "--";
+      case "maBhyt": return student?.maBhyt || "--";
+      case "dienChinhSach": return student?.dienChinhSach ? "Có" : "Không";
+      case "trangThai":
+        if (student?.trangThai === 2) return "Đã tốt nghiệp";
+        if (student?.trangThai === 0) return "Tạm khóa";
+        return "Đang học";
+      default: return student?.[key] || "--";
     }
   };
 
   return (
-    <div className="page users-page">
-      <Header title="Thông tin cá nhân" />
+    <div className="student-page">
+      <section className="student-hero card">
+        <div className="student-hero-copy">
+          <div className="student-hero-kicker">EduManager Pro</div>
+          <h2 className="student-hero-title">Hồ sơ học sinh</h2>
+          <p className="student-hero-subtitle">Xem thông tin cá nhân và cập nhật ảnh đại diện.</p>
+        </div>
+      </section>
 
-      <div className="card">
-        <div className="panel-title">Hồ sơ học sinh</div>
-        <div className="panel-subtitle">Cập nhật thông tin cá nhân</div>
+      <div className="card student-card">
+        <div className="table-header">
+          <div>
+            <div className="panel-title">Hồ sơ học sinh</div>
+            <div className="panel-subtitle">Thông tin cá nhân</div>
+          </div>
+          <div className="panel-pill">{student?.lop?.tenLop || "Chưa có lớp"}</div>
+        </div>
 
         {error && <div className="table-empty">{error}</div>}
         {!error && loading && <div className="table-empty">Đang tải dữ liệu...</div>}
 
         {!loading && !error && (
-          <form className="form-grid" onSubmit={handleSubmit}>
-            <label className="form-field">
-              <span>Họ tên</span>
-              <input
-                value={form.hoTen}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, hoTen: event.target.value }))
-                }
-                placeholder="Nhập họ tên"
-              />
-            </label>
-            <label className="form-field">
-              <span>Ngày sinh</span>
-              <input
-                type="date"
-                value={form.ngaySinh}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, ngaySinh: event.target.value }))
-                }
-              />
-            </label>
-            <label className="form-field">
-              <span>Giới tính</span>
-              <select
-                value={form.gioiTinh}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, gioiTinh: event.target.value }))
-                }
-              >
-                <option value="true">Nam</option>
-                <option value="false">Nữ</option>
-              </select>
-            </label>
-            <label className="form-field">
-              <span>Điện thoại</span>
-              <input
-                value={form.sdt}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, sdt: event.target.value }))
-                }
-                placeholder="Số điện thoại"
-              />
-            </label>
-            <label className="form-field">
-              <span>Email</span>
-              <input
-                value={form.email}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, email: event.target.value }))
-                }
-                placeholder="Email"
-              />
-            </label>
-            <label className="form-field">
-              <span>Địa chỉ</span>
-              <input
-                value={form.diaChi}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, diaChi: event.target.value }))
-                }
-                placeholder="Địa chỉ"
-              />
-            </label>
-            <label className="form-field">
-              <span>Năm nhập học</span>
-              <input
-                type="number"
-                value={form.namNhapHoc}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, namNhapHoc: event.target.value }))
-                }
-                placeholder="2024"
-              />
-            </label>
-            <label className="form-field">
-              <span>Mã BHYT</span>
-              <input
-                value={form.maBhyt}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, maBhyt: event.target.value }))
-                }
-                placeholder="BHYT"
-              />
-            </label>
-            <label className="form-field">
-              <span>Diện chính sách</span>
-              <select
-                value={form.dienChinhSach}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, dienChinhSach: event.target.value }))
-                }
-              >
-                <option value="false">Không</option>
-                <option value="true">Có</option>
-              </select>
-            </label>
-            <label className="form-field">
-              <span>Trạng thái</span>
-              <select
-                value={form.trangThai}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, trangThai: event.target.value }))
-                }
-              >
-                <option value="1">Đang học</option>
-                <option value="0">Tạm khóa</option>
-              </select>
-            </label>
-
-            <div className="profile-summary">
-              <div>
-                <div className="table-title">Lớp</div>
-                <div className="table-meta">{info.lop}</div>
-              </div>
-              <div>
-                <div className="table-title">Ngày tạo</div>
-                <div className="table-meta">{info.createdAt}</div>
+          <div className="form-grid">
+            <div className="form-field form-field-wide">
+              <span>Ảnh đại diện</span>
+              <div className="flex items-center gap-4">
+                <div className="profile-avatar-wrapper">
+                  <label className="profile-avatar-label">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="avatar" className="profile-avatar-img" />
+                    ) : (
+                      <div className="profile-avatar-fallback" aria-hidden>
+                        <span className="material-symbols-outlined text-[44px] text-[#9cb6de]">person</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="profile-avatar-input"
+                      onChange={handleAvatarChange}
+                    />
+                    <div className="profile-avatar-overlay">
+                      <span className="material-symbols-outlined">photo_camera</span>
+                    </div>
+                  </label>
+                </div>
+                <div className="table-meta">Bấm vào ảnh để thay đổi ảnh đại diện.</div>
               </div>
             </div>
 
-            <div className="form-actions">
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? "Đang lưu..." : "Lưu thay đổi"}
-              </button>
+            {FIELD_DEFS.map(({ key, label }) => (
+              <label className="form-field" key={key}>
+                <span>{label}</span>
+                <input value={getFieldValue(key)} disabled />
+              </label>
+            ))}
+            <div className="form-field form-field-wide">
+              <span>Quản lý tài khoản</span>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => navigate("/student/profile/edit")}
+                >
+                  Chỉnh sửa hồ sơ
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => navigate("/student/profile/change-password")}
+                >
+                  Đổi mật khẩu
+                </button>
+              </div>
             </div>
-          </form>
+          </div>
         )}
       </div>
     </div>

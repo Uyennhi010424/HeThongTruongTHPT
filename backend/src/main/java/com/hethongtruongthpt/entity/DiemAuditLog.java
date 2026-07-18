@@ -1,6 +1,9 @@
 package com.hethongtruongthpt.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -12,16 +15,22 @@ public class DiemAuditLog {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
-    @JoinColumn(name = "diem_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "diem_id")
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "hocSinh", "monHoc", "giaoVienNhap", "phanCongDay"})
     private Diem diem;
 
-    @ManyToOne
-    @JoinColumn(name = "hoc_sinh_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hoc_sinh_id")
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "user", "lop"})
     private HocSinh hocSinh;
 
-    @ManyToOne
-    @JoinColumn(name = "mon_hoc_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mon_hoc_id")
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private MonHoc monHoc;
 
     @Column(name = "gia_tri_cu", precision = 4, scale = 1)
@@ -33,8 +42,10 @@ public class DiemAuditLog {
     @Column(name = "hanh_dong", nullable = false)
     private String hanhDong; // INSERT, UPDATE, DELETE
 
-    @ManyToOne
-    @JoinColumn(name = "giao_vien_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "giao_vien_id")
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "user"})
     private GiaoVien giaoVien;
 
     @Column(name = "thoi_gian", nullable = false, updatable = false)

@@ -1,5 +1,6 @@
 package com.hethongtruongthpt.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.hethongtruongthpt.enums.RoleEnum;
 import jakarta.persistence.*;
 
@@ -16,6 +17,7 @@ public class User {
     @Column(name = "username", length = 50, nullable = false, unique = true)
     private String username;
 
+    @JsonIgnore
     @Column(name = "password", length = 255, nullable = false)
     private String password;
 
@@ -25,6 +27,9 @@ public class User {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    @Column(name = "must_change_password", nullable = false)
+    private Boolean mustChangePassword = false;
 
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
@@ -87,6 +92,14 @@ public class User {
 
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public Boolean getMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    public void setMustChangePassword(Boolean mustChangePassword) {
+        this.mustChangePassword = mustChangePassword;
     }
 
     public LocalDateTime getLastLogin() {

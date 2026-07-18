@@ -1,5 +1,7 @@
 server:
-  port: 8080
+  # Co the doi port qua bien moi truong: PORT=8081 mvn spring-boot:run
+  port: ${PORT:8080}
+  shutdown: graceful
   servlet:
     encoding:
       charset: UTF-8
@@ -7,10 +9,16 @@ server:
       force: true
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 10s
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
   datasource:
-    url: jdbc:mysql://localhost:3306/hethongthpt?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
-    username: root
-    password: LiChaengisreal1127@
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/hethongthpt?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&characterSetResults=utf8mb4&sessionVariables=character_set_client=utf8mb4,character_set_connection=utf8mb4,character_set_results=utf8mb4&zeroDateTimeBehavior=convertToNull}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:LiChaengisreal1127@}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -23,7 +31,74 @@ spring:
   sql:
     init:
       mode: never
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    baseline-version: 0
+    table: flyway_schema_history
+    validate-on-migrate: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME:c3truongthptabc@gmail.com}
+    password: ${SMTP_PASSWORD:your-gmail-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 jwt:
-  secret: "CHANGE_ME_SECRET_CHANGE_ME_SECRET_32B"
-  expiration: 86400000
+  secret: ${JWT_SECRET:mySuperSecretKeyForJWTToken2026MustBe32CharsLong!!}
+  expiration: ${JWT_EXPIRATION:604800000}
+
+app:
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+  backup:
+    dir: ${BACKUP_DIR:./backups}
+    mysql-path: ${MYSQL_PATH:C:/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe}
+    mysqldump-path: ${MYSQLDUMP_PATH:C:/Program Files/MySQL/MySQL Server 8.0/bin/mysqldump.exe}
+
+# Default passwords for new accounts (must be set in .env)
+student-default-password: ${STUDENT_DEFAULT_PASSWORD:Abc1234@}
+parent-default-password: ${PARENT_DEFAULT_PASSWORD:Abc1234@}
+teacher-default-suffix: ${TEACHER_DEFAULT_SUFFIX:gv123@}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.hethongtruongthpt: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/application.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30

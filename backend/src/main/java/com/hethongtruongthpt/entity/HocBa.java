@@ -6,17 +6,26 @@ import jakarta.persistence.*;
 @Table(name = "HOC_BA")
 public class HocBa {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ID_HOCBA")
     private Integer id;
 
-    @Column(name = "ID_NAMHOC")
-    private Integer namHocId;
+    @ManyToOne
+    @JoinColumn(name = "ID_HOCSINH", nullable = false)
+    private HocSinh hocSinh;
+
+    @ManyToOne
+    @JoinColumn(name = "ID_NAMHOC")
+    private NamHoc namHoc;
 
     @Column(name = "HOC_LUC", length = 20)
     private String hocLuc;
 
     @Column(name = "HANH_KIEM", length = 20)
     private String hanhKiem;
+
+    @Column(name = "DIEM_TB_CA_NAM", precision = 4, scale = 2)
+    private java.math.BigDecimal diemTBCaNam;
 
     @Column(name = "GHI_CHU", length = 255)
     private String ghiChu;
@@ -29,12 +38,20 @@ public class HocBa {
         this.id = id;
     }
 
-    public Integer getNamHocId() {
-        return namHocId;
+    public HocSinh getHocSinh() {
+        return hocSinh;
     }
 
-    public void setNamHocId(Integer namHocId) {
-        this.namHocId = namHocId;
+    public void setHocSinh(HocSinh hocSinh) {
+        this.hocSinh = hocSinh;
+    }
+
+    public NamHoc getNamHoc() {
+        return namHoc;
+    }
+
+    public void setNamHoc(NamHoc namHoc) {
+        this.namHoc = namHoc;
     }
 
     public String getHocLuc() {
@@ -51,6 +68,14 @@ public class HocBa {
 
     public void setHanhKiem(String hanhKiem) {
         this.hanhKiem = hanhKiem;
+    }
+
+    public java.math.BigDecimal getDiemTBCaNam() {
+        return diemTBCaNam;
+    }
+
+    public void setDiemTBCaNam(java.math.BigDecimal diemTBCaNam) {
+        this.diemTBCaNam = diemTBCaNam;
     }
 
     public String getGhiChu() {

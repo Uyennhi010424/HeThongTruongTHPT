@@ -11,4 +11,5 @@ public interface PhuHuynhHocSinhRepository extends JpaRepository<PhuHuynhHocSinh
     List<PhuHuynhHocSinh> findByHocSinhId(Integer hocSinhId);
     List<PhuHuynhHocSinh> findByPhuHuynhId(Integer phuHuynhId);
     List<PhuHuynhHocSinh> findByHocSinhIdAndLaNguoiLienHeChinhTrue(Integer hocSinhId);
+    List<PhuHuynhHocSinh> findByHocSinhIdIn(List<Integer> hocSinhIds);
 }

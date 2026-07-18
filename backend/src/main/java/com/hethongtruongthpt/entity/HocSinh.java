@@ -1,6 +1,8 @@
 package com.hethongtruongthpt.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -16,15 +18,20 @@ public class HocSinh {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Size(max = 20, message = "Mã học sinh tối đa 20 ký tự")
     @Column(name = "ma_hoc_sinh", length = 20, nullable = false, unique = true)
     private String maHocSinh;
 
+    @NotBlank(message = "Họ tên không được để trống")
+    @Size(max = 100, message = "Họ tên tối đa 100 ký tự")
     @Column(name = "ho_ten", length = 100, nullable = false)
     private String hoTen;
 
+    @NotNull(message = "Ngày sinh không được để trống")
     @Column(name = "ngay_sinh", nullable = false)
     private LocalDate ngaySinh;
 
+    @NotBlank(message = "Giới tính không được để trống")
     @Column(name = "gioi_tinh", nullable = false)
     private String gioiTinh; // NAM or NU
 
@@ -38,9 +45,11 @@ public class HocSinh {
     @Column(name = "nam_nhap_hoc", nullable = false)
     private Integer namNhapHoc;
 
+    @Pattern(regexp = "^(0[0-9]{9})?$", message = "Số điện thoại không hợp lệ (phải có 10 chữ số bắt đầu bằng 0)")
     @Column(name = "sdt", length = 20)
     private String sdt;
 
+    @Email(message = "Email không hợp lệ")
     @Column(name = "email", length = 100)
     private String email;
 
@@ -62,14 +71,20 @@ public class HocSinh {
     @Transient
     private Integer phuHuynhId; // populated at service layer when available
 
-    @Column(name = "anh_dai_dien", length = 255)
+    @Column(name = "anh_dai_dien", columnDefinition = "TEXT")
     private String anhDaiDien;
 
+    @JsonIgnore
     @Column(name = "fcm_token", length = 500)
     private String fcmToken;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @PostLoad
+    private void normalizeText() {
+        if (hoTen != null) hoTen = java.text.Normalizer.normalize(hoTen.strip(), java.text.Normalizer.Form.NFC);
+    }
 
     @PrePersist
     public void prePersist() {

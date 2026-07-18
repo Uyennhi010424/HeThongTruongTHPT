@@ -1,12 +1,57 @@
+# Environment
+.env
+.env.local
+.env.*.local
+website/.env
+
 # Build outputs
 backend/target/
-mobile/app/build/
+website/dist/
 website/node_modules/
+mobile/app/build/
+*.class
+*.jar
+*.war
 
 # IDE
 .vscode/
 .idea/
+*.iml
+.classpath
+.project
+.settings/
+.factorypath
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Logs
+backend/logs/
+*.log
+*.log.gz
+
+# Temporary / scratch files
+tmp_*.json
+*.tmp
+*.bak
+*.swp
+
+# SQL dumps
+Dump*/
+
+# Data import scripts (not part of app)
+website/all-hocsinh.json
+website/import-*.json
+website/import-*.ps1
+website/backfill-*.ps1
+
+# Root scratch files
+TKB_FULL.md
+
+# Tool artifacts
+.remember/
+backend/.github/
+
+backend/backups/*.sql

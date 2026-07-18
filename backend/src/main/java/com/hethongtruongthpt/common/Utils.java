@@ -24,17 +24,48 @@ public class Utils {
 				.doubleValue();
 	}
 
-	public static HocLucEnum xepLoaiHocLuc(double diemTrungBinh) {
-		if (diemTrungBinh >= 8.0) {
-			return HocLucEnum.GIOI;
+	/**
+	 * Xếp loại học lực theo Thông tư 22/2021/TT-BGDĐT.
+	 *
+	 * @param diemTBCaNam  Điểm trung bình tất cả các môn cả năm
+	 * @param diemTBMons   Danh sách ĐTB cả năm của từng môn học
+	 * @return Xếp loại học lực
+	 */
+	public static HocLucEnum xepLoaiHocLuc(List<String> commentResults, List<Double> diemTBMons) {
+		if (diemTBMons == null || diemTBMons.isEmpty()) {
+			return HocLucEnum.CHUA_DAT;
 		}
-		if (diemTrungBinh >= 6.5) {
+
+		long commentNotReached = commentResults == null ? 0 : commentResults.stream().filter(r -> !"DAT".equals(r)).count();
+		long totalCommentSubjects = commentResults == null ? 0 : commentResults.size();
+
+		boolean allCommentReached = commentNotReached == 0;
+		boolean allAbove65 = diemTBMons.stream().allMatch(d -> d != null && d >= 6.5);
+		boolean allAbove50 = diemTBMons.stream().allMatch(d -> d != null && d >= 5.0);
+		boolean allAbove35 = diemTBMons.stream().allMatch(d -> d != null && d >= 3.5);
+
+		long countAbove80 = diemTBMons.stream().filter(d -> d != null && d >= 8.0).count();
+		long countAbove65 = diemTBMons.stream().filter(d -> d != null && d >= 6.5).count();
+		long countAbove50 = diemTBMons.stream().filter(d -> d != null && d >= 5.0).count();
+
+		// 1. Tốt: Đạt tất cả nhận xét + Tất cả môn điểm số >= 6.5 + Ít nhất 6 môn >= 8.0
+		if (allCommentReached && allAbove65 && countAbove80 >= 6) {
+			return HocLucEnum.TOT;
+		}
+
+		// 2. Khá: Đạt tất cả nhận xét + Tất cả môn điểm số >= 5.0 + Ít nhất 6 môn >= 6.5
+		if (allCommentReached && allAbove50 && countAbove65 >= 6) {
 			return HocLucEnum.KHA;
 		}
-		if (diemTrungBinh >= 5.0) {
-			return HocLucEnum.TRUNG_BINH;
+
+		// 3. Đạt: Tối đa 1 nhận xét Chưa đạt + Tất cả môn điểm số >= 3.5 + Ít nhất 6 môn >= 5.0
+		boolean maxOneCommentFailed = totalCommentSubjects > 0 ? commentNotReached <= 1 : true;
+		if (maxOneCommentFailed && allAbove35 && countAbove50 >= 6) {
+			return HocLucEnum.DAT;
 		}
-		return HocLucEnum.YEU;
+
+		// 4. Chưa đạt: Các trường hợp còn lại
+		return HocLucEnum.CHUA_DAT;
 	}
 
 	private Utils() {

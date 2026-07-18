@@ -19,7 +19,7 @@ public class ThoiKhoaBieu {
     private MonHoc monHoc;
 
     @ManyToOne
-    @JoinColumn(name = "giao_vien_id", nullable = false)
+    @JoinColumn(name = "giao_vien_id", nullable = true)
     private GiaoVien giaoVien;
 
     @Column(name = "thu", nullable = false)
@@ -39,6 +39,16 @@ public class ThoiKhoaBieu {
 
     @Column(name = "nam_hoc", length = 9, nullable = false)
     private String namHoc;
+
+    @Column(name = "tuan", nullable = false)
+    private Integer tuan = 1; // Số tuần trong học kỳ
+
+    @Column(name = "is_locked")
+    private Boolean isLocked = false;
+
+    @Column(name = "ghi_chu", length = 255)
+    private String ghiChu;
+
 
     public Integer getId() {
         return id;
@@ -118,5 +128,29 @@ public class ThoiKhoaBieu {
 
     public void setNamHoc(String namHoc) {
         this.namHoc = namHoc;
+    }
+
+    public Integer getTuan() {
+        return tuan;
+    }
+
+    public void setTuan(Integer tuan) {
+        this.tuan = tuan;
+    }
+
+    public Boolean getIsLocked() {
+        return isLocked;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked;
+    }
+
+    public String getGhiChu() {
+        return ghiChu;
+    }
+
+    public void setGhiChu(String ghiChu) {
+        this.ghiChu = ghiChu;
     }
 }

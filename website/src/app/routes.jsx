@@ -1,42 +1,119 @@
+import { lazy, Suspense, Component } from "react";
 import { Navigate } from "react-router-dom";
 import LoginPage from "../features/auth/LoginPage.jsx";
-import AdminLayout from "../layouts/AdminLayout.jsx";
-import TeacherLayout from "../layouts/TeacherLayout.jsx";
-import StudentLayout from "../layouts/StudentLayout.jsx";
-import ParentLayout from "../layouts/ParentLayout.jsx";
+import ResetPasswordPage from "../features/auth/ResetPasswordPage.jsx";
 import PrivateRoute from "../components/common/PrivateRoute.jsx";
 
-import AdminDashboard from "../features/admin/dashboard/AdminDashboard.jsx";
-import UserList from "../features/admin/users/UserList.jsx";
-import HocSinhList from "../features/admin/hocsinh/HocSinhList.jsx";
-import GiaoVienList from "../features/admin/giaovien/GiaoVienList.jsx";
-import LopList from "../features/admin/lop/LopList.jsx";
-import MonHocList from "../features/admin/monhoc/MonHocList.jsx";
-import NamHocHocKyPage from "../features/admin/namhoc-hocky/NamHocHocKyPage.jsx";
-import ThongBaoManager from "../features/admin/thongbao/ThongBaoManager.jsx";
-import ReportPage from "../features/admin/report/ReportPage.jsx";
-import AdminConfigPage from "../features/admin/config/AdminConfigPage.jsx";
-import PhanCongPage from "../features/admin/phancong/PhanCongPage.jsx";
-import LichThiAdminPage from "../features/admin/lichthi/LichThiAdminPage.jsx";
-import AuditLogPage from "../features/admin/audit/AuditLogPage.jsx";
-import AdminThoiKhoaBieuPage from "../features/admin/thoikhoabieu/AdminThoiKhoaBieuPage.jsx";
-import AdminNhapDiemPage from "../features/admin/diem/AdminNhapDiemPage.jsx";
+// Lazy-load layouts to reduce initial bundle size
+const AdminLayout = lazy(() => import("../layouts/AdminLayout.jsx"));
+const TeacherLayout = lazy(() => import("../layouts/TeacherLayout.jsx"));
+const StudentLayout = lazy(() => import("../layouts/StudentLayout.jsx"));
+const ParentLayout = lazy(() => import("../layouts/ParentLayout.jsx"));
 
-import TeacherDashboard from "../features/teacher/dashboard/TeacherDashboard.jsx";
-import NhapDiem from "../features/teacher/diem/NhapDiem.jsx";
-import DiemDanhPage from "../features/teacher/diemdanh/DiemDanhPage.jsx";
-import HanhKiemPage from "../features/teacher/hanhkiem/HanhKiemPage.jsx";
-import LopChuNhiem from "../features/teacher/lopchunhiem/LopChuNhiem.jsx";
+// ─── Lazy-loaded page components (code splitting) ───
 
-import StudentHome from "../features/student/HomePage.jsx";
-import TimetablePage from "../features/student/TimetablePage.jsx";
-import ScorePage from "../features/student/ScorePage.jsx";
-import ConductPage from "../features/student/ConductPage.jsx";
-import ProfilePage from "../features/student/ProfilePage.jsx";
+// Admin pages
+const AdminDashboard = lazy(() => import("../features/admin/dashboard/AdminDashboard.jsx"));
+const UserList = lazy(() => import("../features/admin/users/UserList.jsx"));
+const HocSinhList = lazy(() => import("../features/admin/hocsinh/HocSinhList.jsx"));
+const GiaoVienList = lazy(() => import("../features/admin/giaovien/GiaoVienList.jsx"));
+const LopList = lazy(() => import("../features/admin/lop/LopList.jsx"));
+const MonHocList = lazy(() => import("../features/admin/monhoc/MonHocList.jsx"));
+const NamHocHocKyPage = lazy(() => import("../features/admin/namhoc-hocky/NamHocHocKyPage.jsx"));
+const ThongBaoManager = lazy(() => import("../features/admin/thongbao/ThongBaoManager.jsx"));
+const ReportPage = lazy(() => import("../features/admin/report/ReportPage.jsx"));
+const AdminConfigPage = lazy(() => import("../features/admin/config/AdminConfigPage.jsx"));
+const PhanCongPage = lazy(() => import("../features/admin/phancong/PhanCongPage.jsx"));
+const LichThiAdminPage = lazy(() => import("../features/admin/lichthi/LichThiAdminPage.jsx"));
+const AuditLogPage = lazy(() => import("../features/admin/audit/AuditLogPage.jsx"));
+const AdminThoiKhoaBieuPage = lazy(() => import("../features/admin/thoikhoabieu/AdminThoiKhoaBieuPage.jsx"));
+const AdminNhapDiemPage = lazy(() => import("../features/admin/diem/AdminNhapDiemPage.jsx"));
+const AdminProfile = lazy(() => import("../features/admin/profile/AdminProfile.jsx"));
+const BackupPage = lazy(() => import("../features/admin/backup/BackupPage.jsx"));
+const PhuHuynhList = lazy(() => import("../features/admin/phuhuynh/PhuHuynhList.jsx"));
+const ToHopMonList = lazy(() => import("../features/admin/tohopmon/ToHopMonList.jsx"));
+const AdminHanhKiemPage = lazy(() => import("../features/admin/hanhkiem/AdminHanhKiemPage.jsx"));
 
-import ParentHome from "../features/parent/HomePage.jsx";
-import ScoreFollow from "../features/parent/ScoreFollow.jsx";
-import TimetableFollow from "../features/parent/TimetableFollow.jsx";
+// Shared account pages
+const EditProfile = lazy(() => import("../features/account/EditProfile.jsx"));
+const ChangePassword = lazy(() => import("../features/account/ChangePassword.jsx"));
+const SettingsPage = lazy(() => import("../features/account/SettingsPage.jsx"));
+
+// Teacher pages
+const TeacherProfile = lazy(() => import("../features/teacher/TeacherProfile.jsx"));
+const TeacherDashboard = lazy(() => import("../features/teacher/dashboard/TeacherDashboard.jsx"));
+const NhapDiem = lazy(() => import("../features/teacher/diem/NhapDiem.jsx"));
+const TeacherBangDiem = lazy(() => import("../features/teacher/diem/TeacherBangDiem.jsx"));
+const TeacherThongBao = lazy(() => import("../features/teacher/thongbao/TeacherThongBao.jsx"));
+const TeacherLichThi = lazy(() => import("../features/teacher/lichthi/TeacherLichThi.jsx"));
+const DiemDanhPage = lazy(() => import("../features/teacher/diemdanh/DiemDanhPage.jsx"));
+const HanhKiemPage = lazy(() => import("../features/teacher/hanhkiem/HanhKiemPage.jsx"));
+const LopChuNhiem = lazy(() => import("../features/teacher/lopchunhiem/LopChuNhiem.jsx"));
+const TeacherReport = lazy(() => import("../features/teacher/TeacherReport.jsx"));
+const TeacherRegisterPhanCong = lazy(() => import("../features/teacher/thoikhoabieu/TeacherRegisterPhanCong.jsx"));
+const TeacherLeaveRequestPage = lazy(() => import("../features/teacher/TeacherLeaveRequestPage.jsx"));
+
+// Student pages
+const StudentHome = lazy(() => import("../features/student/HomePage.jsx"));
+const TimetablePage = lazy(() => import("../features/student/TimetablePage.jsx"));
+const ScorePage = lazy(() => import("../features/student/ScorePage.jsx"));
+const ConductPage = lazy(() => import("../features/student/ConductPage.jsx"));
+const ProfilePage = lazy(() => import("../features/student/ProfilePage.jsx"));
+const HocBaPage = lazy(() => import("../features/student/HocBaPage.jsx"));
+const StudentDiemDanhPage = lazy(() => import("../features/student/DiemDanhPage.jsx"));
+const KhenThuongPage = lazy(() => import("../features/student/KhenThuongPage.jsx"));
+const StudentThongBao = lazy(() => import("../features/student/StudentThongBao.jsx"));
+const StudentLichThi = lazy(() => import("../features/student/StudentLichThi.jsx"));
+
+// Parent pages
+const ParentHome = lazy(() => import("../features/parent/HomePage.jsx"));
+const ScoreFollow = lazy(() => import("../features/parent/ScoreFollow.jsx"));
+const TimetableFollow = lazy(() => import("../features/parent/TimetableFollow.jsx"));
+const ParentProfile = lazy(() => import("../features/parent/ParentProfile.jsx"));
+const ParentDiemDanh = lazy(() => import("../features/parent/ParentDiemDanh.jsx"));
+const ParentThongBao = lazy(() => import("../features/parent/ParentThongBao.jsx"));
+
+// ─── Loading fallback ───
+const PageLoader = () => (
+  <div className="flex h-64 items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+  </div>
+);
+
+// ─── Error boundary for chunk loading failures ───
+class ChunkErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-64 flex-col items-center justify-center gap-4">
+          <p className="text-body-lg text-error">Không thể tải trang. Vui lòng thử lại.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-primary px-4 py-2 text-on-primary"
+          >
+            Tải lại
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const withSuspense = (Component) => (
+  <ChunkErrorBoundary>
+    <Suspense fallback={<PageLoader />}>
+      <Component />
+    </Suspense>
+  </ChunkErrorBoundary>
+);
 
 const NotFound = () => (
   <div className="p-6">
@@ -45,92 +122,123 @@ const NotFound = () => (
 );
 
 const routes = [
-  { path: "/", element: <LoginPage title="Đăng nhập quản trị" expectedRole="ADMIN" /> },
-  { path: "/login", element: <LoginPage title="Đăng nhập quản trị" expectedRole="ADMIN" /> },
-  {
-    path: "/login/admin",
-    element: <LoginPage title="Đăng nhập quản trị" expectedRole="ADMIN" />
-  },
-  {
-    path: "/login/teacher",
-    element: <LoginPage title="Đăng nhập giáo viên" expectedRole="GIAO_VIEN" />
-  },
-  {
-    path: "/login/student",
-    element: <LoginPage title="Đăng nhập học sinh" expectedRole="HOC_SINH" />
-  },
-  {
-    path: "/login/parent",
-    element: <LoginPage title="Đăng nhập phụ huynh" expectedRole="PHU_HUYNH" />
-  },
+  { path: "/", element: <LoginPage /> },
+  { path: "/login", element: <LoginPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
   {
     path: "/admin",
     element: (
       <PrivateRoute roles={["ADMIN"]}>
-        <AdminLayout />
+        <ChunkErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminLayout />
+          </Suspense>
+        </ChunkErrorBoundary>
       </PrivateRoute>
     ),
     children: [
-      { path: "dashboard", element: <AdminDashboard /> },
-      { path: "namhoc-hocky", element: <NamHocHocKyPage /> },
+      { path: "dashboard", element: withSuspense(AdminDashboard) },
+      { path: "profile", element: withSuspense(AdminProfile) },
+      { path: "profile/edit", element: withSuspense(EditProfile) },
+      { path: "profile/change-password", element: withSuspense(ChangePassword) },
+      { path: "profile/settings", element: withSuspense(SettingsPage) },
+      { path: "namhoc-hocky", element: withSuspense(NamHocHocKyPage) },
       { path: "namhoc", element: <Navigate to="/admin/namhoc-hocky" replace /> },
       { path: "hocky", element: <Navigate to="/admin/namhoc-hocky" replace /> },
-      { path: "lop", element: <LopList /> },
-      { path: "hocsinh", element: <HocSinhList /> },
-      { path: "giaovien", element: <GiaoVienList /> },
-      { path: "monhoc", element: <MonHocList /> },
-      { path: "phancong", element: <PhanCongPage /> },
-      { path: "diem", element: <AdminNhapDiemPage /> },
-      { path: "thoikhoabieu", element: <AdminThoiKhoaBieuPage /> },
-      { path: "lichthi", element: <LichThiAdminPage /> },
-      { path: "users", element: <UserList /> },
-      { path: "config", element: <AdminConfigPage /> },
-      { path: "report", element: <ReportPage /> },
-      { path: "audit", element: <AuditLogPage /> },
-      { path: "thongbao", element: <ThongBaoManager /> }
+      { path: "lop", element: withSuspense(LopList) },
+      { path: "hocsinh", element: withSuspense(HocSinhList) },
+      { path: "phuhuynh", element: withSuspense(PhuHuynhList) },
+      { path: "giaovien", element: withSuspense(GiaoVienList) },
+      { path: "monhoc", element: withSuspense(MonHocList) },
+      { path: "tohopmon", element: withSuspense(ToHopMonList) },
+      { path: "phancong", element: withSuspense(PhanCongPage) },
+      { path: "diem", element: withSuspense(AdminNhapDiemPage) },
+      { path: "hanhkiem", element: withSuspense(AdminHanhKiemPage) },
+      { path: "thoikhoabieu", element: withSuspense(AdminThoiKhoaBieuPage) },
+      { path: "lichthi", element: withSuspense(LichThiAdminPage) },
+      { path: "users", element: withSuspense(UserList) },
+      { path: "config", element: withSuspense(AdminConfigPage) },
+      { path: "report", element: withSuspense(ReportPage) },
+      { path: "audit", element: withSuspense(AuditLogPage) },
+      { path: "thongbao", element: withSuspense(ThongBaoManager) },
+      { path: "backup", element: withSuspense(BackupPage) }
     ]
   },
   {
     path: "/teacher",
     element: (
       <PrivateRoute roles={["GIAOVIEN"]}>
-        <TeacherLayout />
+        <ChunkErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <TeacherLayout />
+          </Suspense>
+        </ChunkErrorBoundary>
       </PrivateRoute>
     ),
     children: [
-      { path: "dashboard", element: <TeacherDashboard /> },
-      { path: "diem/nhap", element: <NhapDiem /> },
-      { path: "diemdanh", element: <DiemDanhPage /> },
-      { path: "hanhkiem", element: <HanhKiemPage /> },
-      { path: "lopchunhiem", element: <LopChuNhiem /> }
+      { path: "dashboard", element: withSuspense(TeacherDashboard) },
+      { path: "profile", element: withSuspense(TeacherProfile) },
+      { path: "profile/edit", element: withSuspense(EditProfile) },
+      { path: "profile/change-password", element: withSuspense(ChangePassword) },
+      { path: "profile/settings", element: withSuspense(SettingsPage) },
+      { path: "diem/nhap", element: withSuspense(NhapDiem) },
+      { path: "diem/bangdiem", element: withSuspense(TeacherBangDiem) },
+      { path: "thongbao", element: withSuspense(TeacherThongBao) },
+      { path: "lichthi", element: withSuspense(TeacherLichThi) },
+      { path: "diemdanh", element: withSuspense(DiemDanhPage) },
+      { path: "hanhkiem", element: withSuspense(HanhKiemPage) },
+      { path: "lopchunhiem", element: withSuspense(LopChuNhiem) },
+      { path: "report", element: withSuspense(TeacherReport) },
+      { path: "dangky-lop", element: withSuspense(TeacherRegisterPhanCong) },
+      { path: "xin-nghi", element: withSuspense(TeacherLeaveRequestPage) }
     ]
   },
   {
     path: "/student",
     element: (
       <PrivateRoute roles={["HOCSINH"]}>
-        <StudentLayout />
+        <ChunkErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <StudentLayout />
+          </Suspense>
+        </ChunkErrorBoundary>
       </PrivateRoute>
     ),
     children: [
-      { path: "home", element: <StudentHome /> },
-      { path: "timetable", element: <TimetablePage /> },
-      { path: "score", element: <ScorePage /> },
-      { path: "conduct", element: <ConductPage /> },
-      { path: "profile", element: <ProfilePage /> }
+      { path: "home", element: withSuspense(StudentHome) },
+      { path: "timetable", element: withSuspense(TimetablePage) },
+      { path: "score", element: withSuspense(ScorePage) },
+      { path: "hocba", element: withSuspense(HocBaPage) },
+      { path: "diemdanh", element: withSuspense(StudentDiemDanhPage) },
+      { path: "khen-thuong", element: withSuspense(KhenThuongPage) },
+      { path: "conduct", element: withSuspense(ConductPage) },
+      { path: "thongbao", element: withSuspense(StudentThongBao) },
+      { path: "lichthi", element: withSuspense(StudentLichThi) },
+      { path: "profile", element: withSuspense(ProfilePage) },
+      { path: "profile/edit", element: withSuspense(EditProfile) },
+      { path: "profile/change-password", element: withSuspense(ChangePassword) }
     ]
   },
   {
     path: "/parent",
     element: (
       <PrivateRoute roles={["PHUHUYNH"]}>
-        <ParentLayout />
+        <ChunkErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <ParentLayout />
+          </Suspense>
+        </ChunkErrorBoundary>
       </PrivateRoute>
     ),
     children: [
-      { path: "home", element: <ParentHome /> },
-      { path: "score", element: <ScoreFollow /> },
-      { path: "timetable", element: <TimetableFollow /> }
+      { path: "home", element: withSuspense(ParentHome) },
+      { path: "score", element: withSuspense(ScoreFollow) },
+      { path: "timetable", element: withSuspense(TimetableFollow) },
+      { path: "profile", element: withSuspense(ParentProfile) },
+      { path: "diemdanh", element: withSuspense(ParentDiemDanh) },
+      { path: "thongbao", element: withSuspense(ParentThongBao) },
+      { path: "profile/edit", element: withSuspense(EditProfile) },
+      { path: "profile/change-password", element: withSuspense(ChangePassword) }
     ]
   },
   { path: "*", element: <NotFound /> }

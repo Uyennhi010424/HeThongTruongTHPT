@@ -9,6 +9,9 @@ import com.hethongtruongthpt.repository.GiaoVienRepository;
 import com.hethongtruongthpt.repository.LopHocRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,11 @@ public class ChuNhiemService {
         }
     }
 
+    public Page<ChuNhiemDTO> getAllPaged(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return chuNhiemRepository.findAll(pageable).map(this::toDto);
+    }
+
     public ChuNhiemDTO getByGiaoVienId(Integer giaoVienId) {
         try {
             return chuNhiemRepository.findById_GiaoVienId(giaoVienId).stream()
@@ -54,6 +62,9 @@ public class ChuNhiemService {
 
     @Transactional
     public ChuNhiemDTO assignByGiaoVienId(Integer giaoVienId, Integer lopId) {
+        if (giaoVienId == null) {
+            throw new ResourceNotFoundException("Thiếu mã giáo viên");
+        }
         if (lopId == null) {
             clearByGiaoVienId(giaoVienId);
             return null;
@@ -77,11 +88,32 @@ public class ChuNhiemService {
         assignment.setId(id);
 
         ChuNhiem saved = chuNhiemRepository.save(assignment);
+
+        // Sync LopHoc.gvcn so auto-assign can find homeroom teacher
+        giaoVienRepository.findById(giaoVienId).ifPresent(gv -> {
+            lopHocRepository.findById(lopId).ifPresent(lop -> {
+                lop.setGvcn(gv);
+                lopHocRepository.save(lop);
+            });
+        });
+
         return toDto(saved);
     }
 
     @Transactional
     public void clearByGiaoVienId(Integer giaoVienId) {
+        if (giaoVienId == null) return;
+        // Clear LopHoc.gvcn for classes where this teacher was GVCN
+        chuNhiemRepository.findById_GiaoVienId(giaoVienId).forEach(cn -> {
+            Integer lopId = cn.getId().getLopId();
+            if (lopId == null) return;
+            lopHocRepository.findById(lopId).ifPresent(lop -> {
+                if (lop.getGvcn() != null && lop.getGvcn().getId() != null && lop.getGvcn().getId().equals(giaoVienId)) {
+                    lop.setGvcn(null);
+                    lopHocRepository.save(lop);
+                }
+            });
+        });
         chuNhiemRepository.deleteById_GiaoVienId(giaoVienId);
     }
 

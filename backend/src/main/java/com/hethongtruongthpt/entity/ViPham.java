@@ -9,9 +9,13 @@ import java.time.LocalDate;
 @Table(name = "VI_PHAM")
 public class ViPham {
     @Id
-    @Column(name = "ID_VIPHAM")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "ID_VIPHAM")
     private Integer id;
+
+    @ManyToOne
+    @JoinColumn(name = "ID_HOCSINH", nullable = false)
+    private HocSinh hocSinh;
 
     @Column(name = "NOI_DUNG", length = 255)
     private String noiDung;
@@ -29,6 +33,14 @@ public class ViPham {
 
     public void setId(Integer id) {
         this.id = id;
+    }
+
+    public HocSinh getHocSinh() {
+        return hocSinh;
+    }
+
+    public void setHocSinh(HocSinh hocSinh) {
+        this.hocSinh = hocSinh;
     }
 
     public String getNoiDung() {

@@ -1,5 +1,6 @@
 package com.hethongtruongthpt.entity;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -18,12 +19,16 @@ public class GiaoVien {
     @Column(name = "ma_giao_vien", length = 20, nullable = false, unique = true)
     private String maGiaoVien;
 
+    @NotBlank(message = "Họ tên không được để trống")
+    @Size(max = 100, message = "Họ tên tối đa 100 ký tự")
     @Column(name = "ho_ten", length = 100, nullable = false)
     private String hoTen;
 
+    @Email(message = "Email không hợp lệ")
     @Column(name = "email", length = 100, unique = true)
     private String email;
 
+    @Pattern(regexp = "^(0[0-9]{9})?$", message = "Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0")
     @Column(name = "so_dien_thoai", length = 15)
     private String soDienThoai;
 
@@ -44,6 +49,12 @@ public class GiaoVien {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @PostLoad
+    private void normalizeText() {
+        if (hoTen != null) hoTen = java.text.Normalizer.normalize(hoTen.strip(), java.text.Normalizer.Form.NFC);
+        if (boMon != null) boMon = java.text.Normalizer.normalize(boMon.strip(), java.text.Normalizer.Form.NFC);
+    }
 
     @PrePersist
     public void prePersist() {
