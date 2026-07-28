@@ -3,6 +3,7 @@ import PageHeader from "../../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 
 const DAYS = [
   { value: 2, label: "Thứ Hai" },
@@ -20,6 +21,7 @@ const PERIODS = Array.from({ length: 10 }, (_, i) => ({
 }));
 
 export default function TeacherBusySchedule() {
+  const { confirm } = useConfirm();
   const [busySlots, setBusySlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,8 +70,8 @@ export default function TeacherBusySchedule() {
     }
   };
 
-  const handleClearAll = () => {
-    if (window.confirm("Bạn muốn xóa toàn bộ lịch bận đã chọn?")) {
+  const handleClearAll = async () => {
+    if (await confirm("Bạn muốn xóa toàn bộ lịch bận đã chọn?")) {
       setBusySlots([]);
     }
   };

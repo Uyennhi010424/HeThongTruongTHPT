@@ -10,6 +10,8 @@ public interface HanhKiemRepository extends JpaRepository<HanhKiem, Integer> {
 
     List<HanhKiem> findByHocSinhId(Integer hocSinhId);
 
+    List<HanhKiem> findByHocSinhIdIn(List<Integer> hocSinhIds);
+
     List<HanhKiem> findByGiaoVienId(Integer giaoVienId);
 
     List<HanhKiem> findByHocSinhIdAndNamHocId(Integer hocSinhId, Integer namHocId);

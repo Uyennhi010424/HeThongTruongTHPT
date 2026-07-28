@@ -2,11 +2,15 @@ package com.hethongtruongthpt.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "lop", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"ten_lop", "nam_hoc"})
 })
+@SQLDelete(sql = "UPDATE lop SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class LopHoc {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,7 +33,7 @@ public class LopHoc {
     @Column(name = "nam_hoc", length = 9, nullable = false)
     private String namHoc;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "gvcn_id")
     private GiaoVien gvcn; // Giáo viên chủ nhiệm
 
@@ -47,6 +51,9 @@ public class LopHoc {
 
     @Column(name = "phong_hoc", length = 10)
     private String phongHoc;
+
+    @Column(name = "is_deleted", columnDefinition = "boolean default false")
+    private Boolean isDeleted = false;
 
     public Integer getId() {
         return id;
@@ -110,5 +117,13 @@ public class LopHoc {
 
     public void setToHopId(Integer toHopId) {
         this.toHopId = toHopId;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
 }

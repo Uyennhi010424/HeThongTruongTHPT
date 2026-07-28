@@ -60,19 +60,29 @@ export default function EduSidebar({
       <Link
         key={item.path}
         to={item.path}
-        onClick={onClose}
-        className={`flex min-h-10 items-center gap-3 rounded-lg px-4 py-2 font-label-md text-label-md transition-colors duration-150 ${
+        onClick={() => {
+          if (window.innerWidth < 1024) onClose();
+        }}
+        className={`group relative flex min-h-10 items-center rounded-lg py-1.5 my-0.5 transition-all duration-300 ease-out overflow-hidden ${
+          isOpen ? "gap-2.5 px-3 font-label-md text-label-md mx-2" : "justify-center px-0 lg:mx-2 lg:mb-1"
+        } ${
           isActive
-            ? "border-l-4 border-white bg-white/20 font-bold text-white"
-            : "text-white/80 hover:bg-white/10 hover:text-white"
+            ? "bg-white/10 font-bold text-white shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm border border-white/10"
+            : "text-white/70 hover:bg-white/5 hover:text-white"
         }`}
+        title={!isOpen ? item.label : undefined}
       >
+        {/* Active Indicator Line */}
+        {isActive && isOpen && (
+          <div className="absolute left-0 top-1/2 h-1/2 w-1 -translate-y-1/2 rounded-r-full bg-white opacity-90 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+        )}
+        
         {item.icon && (
-          <span className="material-symbols-outlined text-[20px] opacity-80">
+          <span className={`material-symbols-outlined transition-all duration-300 ${isOpen ? "text-[18px]" : "text-[22px]"} ${isActive ? "opacity-100 scale-110" : "opacity-80 group-hover:scale-110 group-hover:opacity-100"}`}>
             {item.icon}
           </span>
         )}
-        <span>{item.label}</span>
+        <span className={`transition-opacity duration-300 whitespace-nowrap ${isOpen ? "opacity-100" : "opacity-0 hidden"}`}>{item.label}</span>
       </Link>
     );
   };
@@ -86,37 +96,69 @@ export default function EduSidebar({
         );
 
         return (
-          <div key={group.group}>
-            <button
-              type="button"
-              onClick={() => toggleGroup(group.group)}
-              className={`flex w-full min-h-10 items-center justify-between rounded-lg px-4 py-2 text-left font-label-md text-label-md transition-colors duration-150 ${
-                hasActiveChild
-                  ? "text-white font-semibold"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <span className="uppercase tracking-wider text-[11px] font-bold opacity-90">
-                {group.group}
-              </span>
-              <span
-                className="material-symbols-outlined text-[18px] transition-transform duration-200"
-                style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
-              >
-                expand_more
-              </span>
-            </button>
-            <div
-              className="overflow-hidden transition-all duration-200"
-              style={{
-                maxHeight: expanded ? `${(group.children?.length || 0) * 48}px` : "0px",
-                opacity: expanded ? 1 : 0
-              }}
-            >
-              <div className="ml-2 flex flex-col gap-0.5 border-l border-white/20 pl-2">
-                {group.children?.map(renderLink)}
-              </div>
-            </div>
+          <div key={group.group} className={!isOpen ? "mt-2 border-t border-white/10 pt-2 relative group/popout" : ""}>
+            {isOpen ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.group)}
+                  className={`group flex w-full min-h-10 items-center justify-between rounded-lg px-3 py-1.5 mx-2 text-left font-label-md text-label-md transition-all duration-300 ease-out ${
+                    hasActiveChild
+                      ? "text-white font-semibold bg-white/5"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <span className="uppercase tracking-wider text-[11px] font-bold opacity-90 transition-opacity group-hover:opacity-100">
+                    {group.group}
+                  </span>
+                  <span
+                    className="material-symbols-outlined text-[18px] transition-transform duration-300 ease-in-out group-hover:scale-110"
+                    style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
+                  >
+                    expand_more
+                  </span>
+                </button>
+                <div
+                  className="overflow-hidden transition-all duration-200"
+                  style={{
+                    maxHeight: expanded ? `${(group.children?.length || 0) * 48}px` : "0px",
+                    opacity: expanded ? 1 : 0
+                  }}
+                >
+                  <div className="flex flex-col gap-0.5 ml-2 border-l border-white/20 pl-2">
+                    {group.children?.map(renderLink)}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Minimized Group Icon */}
+                <div className={`flex min-h-10 items-center justify-center rounded-lg lg:mx-2 lg:mb-1 cursor-pointer transition-all duration-300 ${hasActiveChild ? "bg-white/10 text-white shadow-[0_2px_8px_rgba(0,0,0,0.1)] border border-white/10" : "text-white/70 hover:bg-white/5 hover:text-white"}`}>
+                  <span className="material-symbols-outlined text-[22px]">{group.icon || "folder"}</span>
+                </div>
+                {/* Popout Menu */}
+                <div className="absolute left-full top-0 ml-2 hidden w-48 flex-col rounded-xl bg-[#0f4a8a] border border-white/10 p-2 shadow-xl opacity-0 group-hover/popout:flex group-hover/popout:opacity-100 transition-all duration-300 z-50">
+                   <div className="px-3 py-2 text-[10px] font-bold text-white/50 uppercase tracking-wider">{group.group}</div>
+                   {group.children?.map((item) => {
+                     const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
+                     return (
+                       <Link
+                         key={item.path}
+                         to={item.path}
+                         className={`flex items-center gap-3 rounded-lg px-3 py-2 my-0.5 text-sm transition-all duration-200 ${
+                           isActive
+                             ? "bg-white/20 font-bold text-white"
+                             : "text-white/70 hover:bg-white/10 hover:text-white hover:translate-x-1"
+                         }`}
+                       >
+                         {item.icon && <span className="material-symbols-outlined text-[18px]">{item.icon}</span>}
+                         <span>{item.label}</span>
+                       </Link>
+                     );
+                   })}
+                </div>
+              </>
+            )}
           </div>
         );
       })}
@@ -126,7 +168,7 @@ export default function EduSidebar({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-200 ${
+        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-200 lg:hidden ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         aria-hidden="true"
@@ -134,18 +176,17 @@ export default function EduSidebar({
       />
       <aside
         id="admin-sidebar"
-        className={`fixed left-0 top-0 z-50 flex h-screen w-[280px] -translate-x-full flex-col bg-primary py-md transition-transform duration-200 ${
-          isOpen ? "translate-x-0 shadow-lg" : ""
+        className={`fixed left-0 top-0 z-50 flex h-screen flex-col bg-gradient-to-b from-primary to-[#0f4a8a] py-md transition-all duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
+          isOpen
+            ? "w-[250px] translate-x-0 shadow-[4px_0_24px_rgba(0,0,0,0.15)]"
+            : "w-[250px] -translate-x-full lg:w-[80px] lg:translate-x-0 shadow-none lg:shadow-[2px_0_12px_rgba(0,0,0,0.05)]"
         }`}
         aria-label="Điều hướng quản trị"
         role="dialog"
         aria-modal="true"
       >
-        <div className="mb-xl flex items-start justify-between gap-md px-lg">
-          <div>
-            <h1 className="text-headline-md font-bold text-white">{title}</h1>
-            <p className="text-label-sm text-white/70">{subtitle}</p>
-          </div>
+        <div className={`flex items-start justify-end gap-md ${isOpen ? "px-lg mb-6" : "px-0 lg:justify-center mb-6"}`}>
+
           <button
             type="button"
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20 lg:hidden"

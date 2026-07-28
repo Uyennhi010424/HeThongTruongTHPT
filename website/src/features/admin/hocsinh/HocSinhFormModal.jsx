@@ -1,25 +1,36 @@
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
-import {
-  buildStudentEmailPreview,
-  formatPhoneDisplay
-} from "./hocSinhUtils.js";
+import { formatPhoneDisplay, buildStudentEmailPreview, validateStudentAgeAndYear } from "./hocSinhUtils.js";
 
-export default function HocSinhFormModal({
-  modalOpen,
-  editingStudent,
-  form,
-  setForm,
-  formError,
-  classesByGrade,
-  parents,
-  handleSubmit,
-  onClose
-}) {
+export default function HocSinhFormModal({ hooks }) {
+  const {
+    modalOpen, setModalOpen,
+    editingStudent,
+    form, setForm,
+    formError, classesByGrade, parents,
+    handleSubmit
+  } = hooks;
+
+  let selectedKhoi = null;
+  for (const group of classesByGrade) {
+    if (group.items.some(lop => String(lop.id) === String(form.lopHocId))) {
+      selectedKhoi = group.grade;
+      break;
+    }
+  }
+
+  const ageError = validateStudentAgeAndYear(form.ngaySinh, form.namNhapHoc, selectedKhoi);
+  
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let y = 2000; y <= currentYear + 1; y++) {
+    yearOptions.push(y);
+  }
+
   return (
     <SimpleModal
       open={modalOpen}
       title={editingStudent ? "Cập nhật học sinh" : "Thêm học sinh"}
-      onClose={onClose}
+      onClose={() => setModalOpen(false)}
       width={720}
     >
       <form className="form-grid form-grid-student" onSubmit={handleSubmit}>
@@ -42,6 +53,7 @@ export default function HocSinhFormModal({
               setForm((prev) => ({ ...prev, ngaySinh: event.target.value }))
             }
           />
+          {ageError && <div className="field-error-text" style={{color: 'red', fontSize: '0.85rem', marginTop: '4px'}}>{ageError}</div>}
         </label>
         <label className="form-field">
           <span>Giới tính</span>
@@ -51,16 +63,16 @@ export default function HocSinhFormModal({
               setForm((prev) => ({ ...prev, gioiTinh: event.target.value }))
             }
           >
-            <option value="true">Nam</option>
-            <option value="false">Nữ</option>
+            <option value="NAM">Nam</option>
+            <option value="NU">Nữ</option>
           </select>
         </label>
         <label className="form-field">
           <span>Lớp học</span>
           <select
-            value={form.lopId}
+            value={form.lopHocId}
             onChange={(event) =>
-              setForm((prev) => ({ ...prev, lopId: event.target.value }))
+              setForm((prev) => ({ ...prev, lopHocId: event.target.value }))
             }
           >
             <option value="">Chọn lớp</option>
@@ -127,14 +139,17 @@ export default function HocSinhFormModal({
         </label>
         <label className="form-field">
           <span>Năm nhập học</span>
-          <input
-            type="number"
-            value={form.namNhapHoc}
+          <select
+            value={form.namNhapHoc || ""}
             onChange={(event) =>
-              setForm((prev) => ({ ...prev, namNhapHoc: event.target.value }))
+              setForm((prev) => ({ ...prev, namNhapHoc: event.target.value ? Number(event.target.value) : "" }))
             }
-            placeholder="vd: 2023"
-          />
+          >
+            <option value="">Chọn năm nhập học</option>
+            {yearOptions.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
         </label>
         <label className="form-field">
           <span>Mã BHYT</span>
@@ -173,6 +188,7 @@ export default function HocSinhFormModal({
             <option value={0}>Ngừng học</option>
           </select>
         </label>
+        
         <div className="form-section-title">Thông tin phụ huynh</div>
         <label className="form-field">
           <span>Phụ huynh (đã có)</span>
@@ -234,16 +250,18 @@ export default function HocSinhFormModal({
             placeholder="vd: Kinh doanh"
           />
         </label>
-        {formError && <div className="form-error">{formError}</div>}
-        <div className="form-actions">
+        
+        {formError && <div className="form-error col-span-2">{formError}</div>}
+        
+        <div className="form-actions col-span-2">
           <button
             type="button"
             className="btn-outline"
-            onClick={onClose}
+            onClick={() => setModalOpen(false)}
           >
             Hủy
           </button>
-          <button type="submit" className="btn-primary">
+          <button type="submit" className="btn-primary" disabled={!!ageError}>
             {editingStudent ? "Cập nhật" : "Thêm học sinh"}
           </button>
         </div>

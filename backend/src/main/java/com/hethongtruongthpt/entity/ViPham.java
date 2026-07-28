@@ -13,7 +13,7 @@ public class ViPham {
     @Column(name = "ID_VIPHAM")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "ID_HOCSINH", nullable = false)
     private HocSinh hocSinh;
 

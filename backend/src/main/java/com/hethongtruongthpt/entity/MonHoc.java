@@ -2,9 +2,13 @@ package com.hethongtruongthpt.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "mon_hoc")
+@SQLDelete(sql = "UPDATE mon_hoc SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class MonHoc {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,6 +44,9 @@ public class MonHoc {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "is_deleted", columnDefinition = "boolean default false")
+    private Boolean isDeleted = false;
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
     public String getTenMon() { return tenMon; }
@@ -56,4 +63,6 @@ public class MonHoc {
     public void setMoTa(String moTa) { this.moTa = moTa; }
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
 }

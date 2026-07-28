@@ -44,10 +44,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/admin-config", "/api/admin-config/**").permitAll()
                 // Swagger UI
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                // Static uploads & upload API require authentication
-                .requestMatchers("/uploads/**", "/api/upload/**").authenticated()
+                // Static uploads
+                .requestMatchers("/uploads/**").permitAll()
+                // Upload API require authentication
+                .requestMatchers("/api/upload/**").authenticated()
                 // Actuator - only ADMIN
                 .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
                 // All other endpoints require authentication

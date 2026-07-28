@@ -1,14 +1,28 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import PageHeader from "../../../components/edu/PageHeader.jsx";
-import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
-import SimpleModal from "../../../components/modal/SimpleModal.jsx";
-import { createLop, createLopBulk, deleteLop, getLop, promoteStudents, syncSiSo, updateLop } from "../../../api/lopApi.js";
+import { Plus, X, MoreVertical, Edit, Trash2, Eye, Shield, RefreshCw, GraduationCap, Users } from "lucide-react";
+import { createLop, createLopBulk, deleteLop, getLop, syncSiSo, updateLop, assignGvcn } from "../../../api/lopApi.js";
+import { getGiaoVien } from "../../../api/giaovienApi.js";
+import { getHocSinh } from "../../../api/hocsinhApi.js";
+import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { getToHopMon } from "../../../api/toHopMonApi.js";
+import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import Pagination from "../../../components/common/Pagination.jsx";
 
 const getApiErrorMessage = (err, fallback) => {
   const message = err?.response?.data?.message || err?.response?.data?.error;
   return message || fallback;
+};
+
+const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
 };
 
 const extractGradeFromClassName = (tenLop) => {
@@ -22,7 +36,6 @@ const getCurrentAcademicYear = () => {
   return `${year}-${year + 1}`;
 };
 
-// Dạo ra năm học tiếp theo từ năm học hiện tại (VD: 2025-2026 -> 2026-2027)
 const getNextAcademicYear = (currentYear) => {
   const parts = String(currentYear || "").split("-");
   if (parts.length === 2) {
@@ -30,215 +43,456 @@ const getNextAcademicYear = (currentYear) => {
     const y2 = parseInt(parts[1], 10);
     if (!isNaN(y1) && !isNaN(y2)) return `${y1 + 1}-${y2 + 1}`;
   }
-  // fallback
   const now = new Date();
   return `${now.getFullYear() + 1}-${now.getFullYear() + 2}`;
 };
 
-function LopFilterDropdown({ gradeFilter, setGradeFilter, namHocFilter, setNamHocFilter, availableNamHoc }) {
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterRef = useRef(null);
-  const hasFilter = gradeFilter !== "all" || namHocFilter !== "";
+// --- Dropdown Thao tác ---
+// --- Dropdown Thao tác ---
+const ActionDropdown = ({ item, onEdit, onDelete, onAssignTeacher }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target)) setIsOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
-    <div className="filter-dropdown-wrap" ref={filterRef}>
-      <button
-        type="button"
-        className={`btn-outline filter-toggle ${hasFilter ? "filter-active" : ""}`}
-        onClick={() => setFilterOpen((v) => !v)}
-        title="Lọc"
+    <div className="relative" ref={menuRef}>
+      <button 
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} 
+        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
       >
-        <span className="material-symbols-outlined">filter_list</span>
-        {hasFilter && <span className="filter-dot" />}
+        <MoreVertical className="w-5 h-5" />
       </button>
-      {filterOpen && (
-        <div className="filter-dropdown">
-          <div className="filter-dropdown-title">Lọc danh sách</div>
-          <label className="filter-dropdown-label">
-            <span>Khối</span>
-            <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
-              <option value="all">Tất cả khối</option>
-              <option value="10">Khối 10</option>
-              <option value="11">Khối 11</option>
-              <option value="12">Khối 12</option>
-            </select>
-          </label>
-          <label className="filter-dropdown-label">
-            <span>Năm học</span>
-            <select value={namHocFilter} onChange={(e) => setNamHocFilter(e.target.value)}>
-              <option value="">Tất cả năm</option>
-              {availableNamHoc.map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </label>
-          {hasFilter && (
-            <button type="button" className="filter-clear" onClick={() => { setGradeFilter("all"); setNamHocFilter(""); }}>
-              Xóa bộ lọc
-            </button>
-          )}
+
+      {isOpen && (
+        <div 
+          className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button 
+            onClick={() => { setIsOpen(false); onEdit(item); }} 
+            className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+          >
+            <Edit className="w-4 h-4 text-slate-400" /> Chỉnh sửa
+          </button>
+          <button 
+            onClick={() => { setIsOpen(false); onAssignTeacher(item); }} 
+            className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+          >
+            <Shield className="w-4 h-4 text-slate-400" /> Phân công GVCN
+          </button>
+          <div className="h-px bg-slate-100 my-1"></div>
+          <button 
+            onClick={() => { setIsOpen(false); onDelete(item); }} 
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4 text-red-500" /> Xóa
+          </button>
         </div>
       )}
     </div>
   );
-}
+};
+
+// --- Modal Chi tiết (Centered Enterprise Style) ---
+const ClassDetailModal = ({ item, toHopList, onClose, onViewStudents }) => {
+  const toHop = toHopList.find(th => th.id === item.toHopId);
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200" onClick={onClose}>
+        <div 
+          className="w-full max-w-lg bg-white rounded-xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200" 
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50 shrink-0">
+            <h2 className="text-lg font-bold text-slate-900">Chi tiết lớp học</h2>
+            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {/* Thông tin chung */}
+            <div className="space-y-3">
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Tên lớp</span>
+                <span className="text-sm font-semibold text-slate-900">{item.tenLop}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Năm học</span>
+                <span className="text-sm font-semibold text-slate-900">{item.namHoc}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Khối</span>
+                <span className="text-sm font-medium text-slate-900">{item.khoi}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Tổ hợp môn</span>
+                <span className="text-sm font-medium text-slate-900">{toHop ? `${toHop.maToHop} - ${toHop.tenToHop}` : "Chưa gán"}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">GV chủ nhiệm</span>
+                <span className="text-sm font-medium text-slate-900">{item.gvcn?.hoTen || item.gvcnTen || "Chưa phân công"}</span>
+              </div>
+            </div>
+
+            <hr className="my-5 border-slate-200" />
+
+            {/* Thông tin sĩ số */}
+            <div className="space-y-3">
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Sĩ số hiện tại</span>
+                <span className="text-sm font-semibold text-slate-900">{item.siSo || 0} học sinh</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Danh sách</span>
+                <button
+                  onClick={onViewStudents}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                >
+                  Xem danh sách chi tiết
+                </button>
+              </div>
+            </div>
+            
+            {item.ghiChu && (
+              <>
+                <hr className="my-5 border-slate-200" />
+                <div className="flex items-start">
+                  <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Ghi chú</span>
+                  <span className="text-sm text-slate-700">{item.ghiChu}</span>
+                </div>
+              </>
+            )}
+          </div>
+          
+          {/* Footer actions */}
+          <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+              Đóng
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// --- Modal Phân công GVCN ---
+const AssignTeacherModal = ({ item, onClose, onAssignSuccess }) => {
+  const [teachers, setTeachers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      try {
+        setLoading(true);
+        const res = await getGiaoVien();
+        const data = res?.data?.data || [];
+        setTeachers(data);
+        const currentName = item?.gvcn?.hoTen || item?.gvcnTen;
+        if (currentName) {
+          const current = data.find((t) => t.hoTen === currentName);
+          if (current) setSelectedTeacherId(String(current.id));
+        }
+      } catch (err) {
+        notifyError("Không thể tải danh sách giáo viên.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTeachers();
+  }, [item]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      await assignGvcn(item.id, { gvcnId: selectedTeacherId ? Number(selectedTeacherId) : null });
+      notifySuccess("Phân công GVCN thành công!");
+      onAssignSuccess();
+    } catch (err) {
+      notifyError(getApiErrorMessage(err, "Không thể phân công GVCN."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200" onClick={onClose}>
+        <div 
+          className="w-full max-w-md bg-white rounded-xl shadow-xl flex flex-col overflow-hidden border border-slate-200" 
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
+            <h2 className="text-lg font-bold text-slate-900">Phân công GVCN</h2>
+            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            <div className="text-sm text-slate-600">
+              Lớp: <span className="font-semibold text-slate-900">{item?.tenLop}</span>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Giáo viên chủ nhiệm</label>
+              {loading ? (
+                <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                <select 
+                  className="w-full h-10 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-shadow outline-none"
+                  value={selectedTeacherId}
+                  onChange={(e) => setSelectedTeacherId(e.target.value)}
+                >
+                  <option value="">-- Chọn giáo viên (hoặc Bỏ phân công) --</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={String(t.id)}>{t.hoTen} - {t.boMon || 'Chưa cập nhật'}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 mt-2 border-t border-slate-100 flex justify-end gap-2">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Hủy
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading || saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {saving ? "Đang lưu..." : "Lưu thay đổi"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// --- Modal Xem danh sách học sinh ---
+const StudentListModal = ({ item, onClose }) => {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        const res = await getHocSinh({ lopId: item.id });
+        // `getHocSinh` returns a list directly or a paginated object
+        // Depending on backend, handle both
+        let data = res?.data?.data;
+        if (data && data.content) {
+          data = data.content; // If paginated
+        }
+        
+        const studentList = data || [];
+        
+        // Sort alphabetically by last name (Tên) then full name (Họ Đệm)
+        studentList.sort((a, b) => {
+          const getNameTokens = (name) => {
+            if (!name) return "";
+            return name.trim().split(" ");
+          };
+          
+          const tokensA = getNameTokens(a.hoTen);
+          const tokensB = getNameTokens(b.hoTen);
+          
+          const tenA = tokensA.length > 0 ? tokensA[tokensA.length - 1] : "";
+          const tenB = tokensB.length > 0 ? tokensB[tokensB.length - 1] : "";
+          
+          const compareTen = tenA.localeCompare(tenB, 'vi');
+          if (compareTen !== 0) return compareTen;
+          
+          return (a.hoTen || "").localeCompare(b.hoTen || "", 'vi');
+        });
+        
+        setStudents(studentList);
+      } catch (err) {
+        notifyError("Không thể tải danh sách học sinh.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (item?.id) fetchStudents();
+  }, [item]);
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200" onClick={onClose}>
+        <div 
+          className="w-full max-w-2xl bg-white rounded-xl shadow-xl flex flex-col overflow-hidden border border-slate-200 max-h-[85vh]" 
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Danh sách học sinh</h2>
+              <p className="text-sm text-slate-500 mt-0.5">Lớp: {item?.tenLop} - Sĩ số: {item?.siSo || 0}</p>
+            </div>
+            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-5 overflow-y-auto">
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-600 rounded-full animate-spin"></div>
+              </div>
+            ) : students.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                Lớp này chưa có học sinh nào.
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                      <th className="px-4 py-3 font-semibold">STT</th>
+                      <th className="px-4 py-3 font-semibold">Mã HS</th>
+                      <th className="px-4 py-3 font-semibold">Họ tên</th>
+                      <th className="px-4 py-3 font-semibold">Ngày sinh</th>
+                      <th className="px-4 py-3 font-semibold">Giới tính</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {students.map((hs, index) => (
+                      <tr key={hs.id} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3 text-sm text-slate-500">{index + 1}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-slate-900">{hs.maHocSinh}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-slate-900">{hs.hoTen}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500">{formatDate(hs.ngaySinh)}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500">{hs.gioiTinh ? "Nam" : "Nữ"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-6 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
 
 export default function LopList() {
   const notifyClassesUpdated = () => {
     try {
       window.dispatchEvent(new Event("classes-updated"));
       window.localStorage.setItem("classesUpdatedAt", String(Date.now()));
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   };
+  
   const [classes, setClasses] = useState([]);
   const [toHopList, setToHopList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("all");
-  const [namHocFilter, setNamHocFilter] = useState(getCurrentAcademicYear());
+  
+  const { searchQuery, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
+  const keyword = searchQuery;
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
   const [modalOpen, setModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
-  const [formError, setFormError] = useState("");
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [assignTeacherModalOpen, setAssignTeacherModalOpen] = useState(false);
+  const [studentListModalOpen, setStudentListModalOpen] = useState(false);
+  const [selectedClass, setSelectedClass] = useState(null);
+  
   const [form, setForm] = useState({
     tenLop: "",
     khoi: "10",
     namHoc: getCurrentAcademicYear(),
     toHopId: ""
   });
-  const [bulkModalOpen, setBulkModalOpen] = useState(false);
-  const [bulkForm, setBulkForm] = useState({
-    namHoc: getCurrentAcademicYear(),
-    soLop10: 5,
-    soLop11: 5,
-    soLop12: 5
-  });
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [promoteModalOpen, setPromoteModalOpen] = useState(false);
-  const [promoteForm, setPromoteForm] = useState({
-    currentNamHoc: getCurrentAcademicYear(),
-    nextNamHoc: getNextAcademicYear(getCurrentAcademicYear())
-  });
-  const [promoteLoading, setPromoteLoading] = useState(false);
-  const [promoteResult, setPromoteResult] = useState(null);
+  
+  useEffect(() => {
+    setSearchPlaceholder("Tìm kiếm lớp học...");
+    setIsSearchVisible(true);
+    return () => setIsSearchVisible(false);
+  }, [setSearchPlaceholder, setIsSearchVisible]);
 
-  const [syncingAll, setSyncingAll] = useState(false);
-
-  const handleSyncAllSiSo = async () => {
+  const loadData = async () => {
     try {
-      setSyncingAll(true);
-      await syncSiSo();
-      // Reload after sync
-      const refreshed = await getLop();
-      setClasses(refreshed?.data?.data || []);
-      notifySuccess("Đồng bộ sĩ số thành công.");
-      notifyClassesUpdated();
+      setLoading(true);
+      setError("");
+      const [lopRes, toHopRes] = await Promise.all([
+        getLop(),
+        getToHopMon()
+      ]);
+      setClasses(lopRes?.data?.data || []);
+      setToHopList(toHopRes?.data?.data || []);
     } catch (err) {
-      notifyError("Không thể đồng bộ sĩ số.");
+      setError("Không thể tải dữ liệu.");
     } finally {
-      setSyncingAll(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    let active = true;
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const [lopRes, toHopRes] = await Promise.all([
-          getLop(),
-          getToHopMon()
-        ]);
-        if (!active) return;
-        setClasses(lopRes?.data?.data || []);
-        setToHopList(toHopRes?.data?.data || []);
-      } catch (err) {
-        if (!active) return;
-        setError("Không thể tải dữ liệu.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      active = false;
-    };
+    loadData();
   }, []);
-
-  const normalize = (v) => String(v ?? "").trim();
-
-  const availableNamHoc = useMemo(() => {
-    const years = [...new Set(classes.map((item) => item.namHoc).filter(Boolean))];
-    return years.sort().reverse();
-  }, [classes]);
 
   const filteredClasses = useMemo(() => {
     const lower = keyword.toLowerCase();
     return classes.filter((item) => {
-      const matchKeyword = !keyword.trim()
-        ? true
-        : [item.tenLop, item.khoi]
-            .filter((field) => field !== null && field !== undefined)
-            .some((field) => String(field).toLowerCase().includes(lower));
-
-      const matchGrade = gradeFilter === "all" ? true : String(item.khoi || "") === gradeFilter;
-      const matchNamHoc = !namHocFilter || item.namHoc === namHocFilter;
-
-      return matchKeyword && matchGrade && matchNamHoc;
+      if (!keyword.trim()) return true;
+      return [item.tenLop, item.khoi]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(lower));
     });
-  }, [keyword, classes, gradeFilter, namHocFilter]);
+  }, [keyword, classes]);
 
-  const stats = useMemo(() => {
-    const total = filteredClasses.length;
-    const grade10 = filteredClasses.filter((item) => normalize(item.khoi) === "10").length;
-    const grade11 = filteredClasses.filter((item) => normalize(item.khoi) === "11").length;
-    const grade12 = filteredClasses.filter((item) => normalize(item.khoi) === "12").length;
-    return { total, grade10, grade11, grade12 };
-  }, [filteredClasses]);
-
-  const groupedClasses = useMemo(() => {
-    const map = new Map();
-
-    filteredClasses.forEach((item) => {
-      const grade = item?.khoi ? String(item.khoi) : "Khác";
-      if (!map.has(grade)) map.set(grade, []);
-      map.get(grade).push(item);
-    });
-
-    return Array.from(map.entries())
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([grade, items]) => ({
-        grade,
-        items: items.sort((x, y) => String(x.tenLop || "").localeCompare(String(y.tenLop || "")))
-      }));
-  }, [filteredClasses]);
-
-  useEffect(() => {
-    if (!successMessage) return undefined;
-    const timer = window.setTimeout(() => setSuccessMessage(""), 2500);
-    return () => window.clearTimeout(timer);
-  }, [successMessage]);
+  const totalPages = Math.ceil(filteredClasses.length / itemsPerPage);
+  const paginatedClasses = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredClasses.slice(start, start + itemsPerPage);
+  }, [filteredClasses, currentPage]);
 
   const openCreate = () => {
     setEditingClass(null);
     setForm({ tenLop: "", khoi: "10", namHoc: getCurrentAcademicYear(), toHopId: "" });
-    setFormError("");
-    setSuccessMessage("");
     setModalOpen(true);
   };
 
@@ -250,48 +504,32 @@ export default function LopList() {
       namHoc: item.namHoc || getCurrentAcademicYear(),
       toHopId: item.toHopId ? String(item.toHopId) : ""
     });
-    setFormError("");
-    setSuccessMessage("");
     setModalOpen(true);
   };
 
+  const { confirm } = useConfirm();
+
   const handleDelete = async (item) => {
-    if (!window.confirm(`Xóa lớp ${item.tenLop}?`)) return;
+    if (!(await confirm(`Xóa lớp ${item.tenLop}?`))) return;
     try {
       await deleteLop(item.id);
       setClasses((prev) => prev.filter((row) => row.id !== item.id));
-      setError("");
-      setSuccessMessage("Xóa lớp học thành công.");
+      notifySuccess("Xóa lớp học thành công.");
       notifyClassesUpdated();
     } catch (err) {
-      setError("Không thể xóa lớp học.");
-      setSuccessMessage("");
+      notifyError("Không thể xóa lớp học.");
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setFormError("");
-    if (!form.tenLop.trim()) {
-      setFormError("Vui lòng nhập tên lớp.");
-      return;
-    }
-    if (!form.khoi) {
-      setFormError("Vui lòng chọn khối.");
-      return;
-    }
-    if (!form.namHoc.trim()) {
-      setFormError("Vui lòng nhập năm học.");
-      return;
-    }
+    if (!form.tenLop.trim()) { notifyError("Vui lòng nhập tên lớp."); return; }
+    if (!form.khoi) { notifyError("Vui lòng chọn khối."); return; }
+    if (!form.namHoc.trim()) { notifyError("Vui lòng nhập năm học."); return; }
 
     const gradeInName = extractGradeFromClassName(form.tenLop);
-    if (!gradeInName) {
-      setFormError("Tên lớp phải bắt đầu bằng 10, 11 hoặc 12. Ví dụ: 10A1.");
-      return;
-    }
-    if (gradeInName !== String(form.khoi)) {
-      setFormError(`Tên lớp ${form.tenLop.trim()} không thuộc khối ${form.khoi}.`);
+    if (!gradeInName || gradeInName !== String(form.khoi)) {
+      notifyError(`Tên lớp phải bắt đầu bằng khối ${form.khoi}. VD: ${form.khoi}A1.`);
       return;
     }
 
@@ -306,442 +544,264 @@ export default function LopList() {
       if (editingClass) {
         const response = await updateLop(editingClass.id, payload);
         const updated = response?.data?.data;
-        setClasses((prev) =>
-          prev.map((row) => (row.id === editingClass.id ? updated : row))
-        );
-        notifyClassesUpdated();
+        setClasses((prev) => prev.map((row) => (row.id === editingClass.id ? updated : row)));
+        notifySuccess("Cập nhật lớp học thành công.");
       } else {
         const response = await createLop(payload);
         const created = response?.data?.data;
         setClasses((prev) => [created, ...prev]);
-        notifyClassesUpdated();
+        notifySuccess("Thêm lớp học thành công.");
       }
-      setError("");
-      setSuccessMessage(
-        editingClass ? "Cập nhật lớp học thành công." : "Thêm lớp học thành công."
-      );
+      notifyClassesUpdated();
       setModalOpen(false);
     } catch (err) {
-      setFormError(getApiErrorMessage(err, "Không thể lưu lớp học. Vui lòng thử lại."));
-      setSuccessMessage("");
+      notifyError(getApiErrorMessage(err, "Không thể lưu lớp học."));
     }
   };
 
-  const handleBulkCreate = async () => {
-    if (!bulkForm.namHoc.trim()) {
-      notifyError("Vui lòng nhập năm học.");
-      return;
-    }
-    const total = bulkForm.soLop10 + bulkForm.soLop11 + bulkForm.soLop12;
-    if (total === 0) {
-      notifyError("Phải có ít nhất 1 lớp.");
-      return;
-    }
-
-    try {
-      setBulkLoading(true);
-      const response = await createLopBulk(bulkForm);
-      const created = response?.data?.data || [];
-      setClasses((prev) => [...created, ...prev]);
-      setBulkModalOpen(false);
-      notifySuccess(`Đã tạo ${created.length} lớp cho năm học ${bulkForm.namHoc}.`);
-      notifyClassesUpdated();
-    } catch (err) {
-      notifyError(getApiErrorMessage(err, "Không thể tạo lớp hàng loạt."));
-    } finally {
-      setBulkLoading(false);
-    }
+  const getToHopStyle = (toHop) => {
+    if (!toHop) return { label: "Chưa gán", bg: "bg-slate-100", text: "text-slate-600" };
+    if (toHop.ban === "Tự nhiên") return { label: `${toHop.tenToHop}`, bg: "bg-blue-50", text: "text-blue-700", full: toHop.tenToHop };
+    if (toHop.ban === "Xã hội") return { label: `${toHop.tenToHop}`, bg: "bg-purple-50", text: "text-purple-700", full: toHop.tenToHop };
+    return { label: `${toHop.tenToHop}`, bg: "bg-indigo-50", text: "text-indigo-700", full: toHop.tenToHop };
   };
 
-  const handlePromote = async () => {
-    if (!promoteForm.currentNamHoc.trim()) {
-      notifyError("Vui lòng nhập năm học hiện tại.");
-      return;
-    }
-    if (!promoteForm.nextNamHoc.trim()) {
-      notifyError("Vui lòng nhập năm học mới.");
-      return;
-    }
-    if (promoteForm.currentNamHoc === promoteForm.nextNamHoc) {
-      notifyError("Năm học mới phải khác năm học hiện tại.");
-      return;
-    }
-
-    try {
-      setPromoteLoading(true);
-      setPromoteResult(null);
-      const response = await promoteStudents(promoteForm);
-      const result = response?.data?.data || {};
-      setPromoteResult(result);
-      const teacherMsg = result.teacherMoved > 0 ? `, ${result.teacherMoved} GV chủ nhiệm theo lớp` : "";
-      notifySuccess(`Lên lớp thành công! ${result.promoted || 0} học sinh lên lớp, ${result.graduated || 0} tốt nghiệp${teacherMsg}.`);
-      // Reload classes
-      const refreshed = await getLop();
-      setClasses(refreshed?.data?.data || []);
-      notifyClassesUpdated();
-    } catch (err) {
-      notifyError(getApiErrorMessage(err, "Không thể lên lớp."));
-    } finally {
-      setPromoteLoading(false);
-    }
-  };
+  const availableNamHoc = useMemo(() => {
+    const years = [...new Set(classes.map((item) => item.namHoc).filter(Boolean))];
+    return years.sort().reverse();
+  }, [classes]);
 
   return (
-    <div className="page users-page">
-      <PageHeader
-        title="Danh mục lớp"
-        description="Theo dõi, cập nhật thông tin lớp và khối."
-        actions={
-          <div className="users-actions" style={{ flexWrap: "nowrap" }}>
-            <div className="dash-search users-search">
-              <span className="dot" />
-              <input
-                placeholder="Tìm theo tên lớp hoặc khối"
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-              />
-            </div>
-
-            <LopFilterDropdown
-              gradeFilter={gradeFilter}
-              setGradeFilter={setGradeFilter}
-              namHocFilter={namHocFilter}
-              setNamHocFilter={setNamHocFilter}
-              availableNamHoc={availableNamHoc}
-            />
-
-            <button className="btn-primary" onClick={openCreate}>
-              Thêm lớp
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Header & Toolbar */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h1 className="text-2xl font-bold text-slate-900">Danh mục lớp học</h1>
+          <p className="text-slate-500 mt-1">Quản lý danh sách lớp học, phân công giáo viên và sĩ số.</p>
+        </div>
+        
+        <div className="px-6 py-4 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button onClick={loadData} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors bg-white border border-slate-200 shadow-sm" title="Làm mới">
+              <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin text-blue-500" : ""}`} />
             </button>
-            <button className="btn-outline" style={{ background: "#10b981", color: "#fff", borderColor: "#10b981" }} onClick={() => {
-              const curYear = getCurrentAcademicYear();
-              setPromoteForm({ currentNamHoc: curYear, nextNamHoc: getNextAcademicYear(curYear) });
-              setPromoteResult(null);
-              setPromoteModalOpen(true);
-            }}>
-              Lên lớp
+            <div className="text-sm font-medium text-slate-500">
+              Tổng số: <span className="text-slate-900 font-bold">{filteredClasses.length}</span> lớp
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md hover:shadow-blue-500/20 font-semibold rounded-xl transition-all">
+              <Plus className="w-5 h-5" /> Thêm lớp
             </button>
           </div>
-        }
-      />
-
-      <div className="users-stats">
-        <div className="stat-card stat-blue">
-          <div className="stat-label">Tổng lớp</div>
-          <div className="stat-value">{loading ? "..." : stats.total}</div>
-        </div>
-        <div className="stat-card stat-sky">
-          <div className="stat-label">Khối 10</div>
-          <div className="stat-value">{loading ? "..." : stats.grade10}</div>
-        </div>
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Khối 11</div>
-          <div className="stat-value">{loading ? "..." : stats.grade11}</div>
-        </div>
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Khối 12</div>
-          <div className="stat-value">{loading ? "..." : stats.grade12}</div>
         </div>
       </div>
 
-      <div className="card users-table">
-        <div className="table-header">
-          <div>
-            <div className="panel-title">Danh sách lớp học</div>
+      {/* Main Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[500px]">
+        {error ? (
+          <div className="p-8 text-center text-red-500">{error}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-100">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tên lớp</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Khối</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tổ hợp môn</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sĩ số</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">GVCN</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20 text-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 8 }).map((_, j) => (
+                        <td key={j} className="px-6 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>
+                      ))}
+                    </tr>
+                  ))
+                ) : paginatedClasses.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
+                      Không tìm thấy dữ liệu lớp học phù hợp.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedClasses.map((item, index) => {
+                    const toHop = toHopList.find((th) => th.id === item.toHopId);
+                    const toHopStyle = getToHopStyle(toHop);
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer" onClick={() => { setSelectedClass(item); setDetailModalOpen(true); }}>
+                        <td className="px-6 py-4 text-sm text-slate-500 font-medium text-center">
+                          {(currentPage - 1) * itemsPerPage + index + 1}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900">{item.tenLop}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{item.namHoc}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">
+                            Khối {item.khoi}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${toHopStyle.bg} ${toHopStyle.text}`} title={toHopStyle.full}>
+                            {toHopStyle.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-slate-700">
+                          {item.siSo || 0}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-medium text-slate-700">{item.gvcn?.hoTen || item.gvcnTen || <span className="text-slate-400 italic">Chưa phân công</span>}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200/60">
+                            Hoạt động
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 border-l border-slate-100 relative bg-slate-50/30">
+                          <div className="transition-opacity flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                            <ActionDropdown 
+                              item={item} 
+                              onEdit={openEdit} 
+                              onDelete={handleDelete}
+                              onAssignTeacher={(it) => { setSelectedClass(it); setAssignTeacherModalOpen(true); }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="panel-pill">{filteredClasses.length} lớp</div>
-        </div>
-        {error && <div className="table-empty">{error}</div>}
-        {!error && successMessage && <div className="table-success">{successMessage}</div>}
-        {!error && !loading && filteredClasses.length === 0 && (
-          <div className="table-empty">Không tìm thấy lớp phù hợp.</div>
         )}
-        <div className="grade-group-wrap">
-          {loading
-            ? Array.from({ length: 5 }).map((_, index) => (
-                <div className="table-row" key={`skeleton-${index}`}>
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                </div>
-              ))
-            : groupedClasses.map((group) => (
-                <div className="grade-group" key={group.grade}>
-                  <div className="grade-group-title">Khối {group.grade}</div>
-                  <div className="table-grid">
-                    {group.items.map((item, idx) => (
-                      <div
-                        className="table-row"
-                        key={item.id}
-                        style={{ gridTemplateColumns: "80px 1fr 130px 180px 160px" }}
-                      >
-                        <div className="table-id">{idx + 1}</div>
-                        <div className="table-main">
-                          <div className="table-title">{item.tenLop}</div>
-                          <div className="table-meta">Sĩ số: {item.siSo || 0}</div>
-                        </div>
-                        <div>
-                          <span className="role-pill">Khối {item.khoi || "--"}</span>
-                        </div>
-                        <div>
-                          {item.toHopId ? (
-                            <span className="role-pill" style={{ background: "#dbeafe", color: "#1e40af" }}>
-                              {toHopList.find((th) => th.id === item.toHopId)?.maToHop || "?"} - {toHopList.find((th) => th.id === item.toHopId)?.tenToHop || "?"}
-                            </span>
-                          ) : (
-                            <span style={{ color: "#999", fontSize: 13 }}>Chưa gán</span>
-                          )}
-                        </div>
-                        <div className="table-actions">
-                          <button
-                            className="btn-outline btn-sm"
-                            onClick={() => openEdit(item)}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            className="rounded-lg p-sm text-outline hover:bg-red-50 hover:text-red-600"
-                            onClick={() => handleDelete(item)}
-                            title="Xóa"
-                          >
-                            <MaterialIcon name="delete" className="text-[20px]" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+
+        {/* Pagination */}
+        <div className="mt-auto">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredClasses.length}
+            pageSize={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(sz) => { setItemsPerPage(sz); setCurrentPage(1); }}
+            pageSizeOptions={[10, 15, 20, 50]}
+          />
         </div>
       </div>
 
-      <SimpleModal
-        open={modalOpen}
-        title={editingClass ? "Cập nhật lớp" : "Thêm lớp"}
-        onClose={() => setModalOpen(false)}
-      >
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <label className="form-field">
-            <span>Tên lớp</span>
-            <input
-              value={form.tenLop}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, tenLop: event.target.value }))
-              }
-              placeholder="vd: 10A1"
-            />
-          </label>
-          <label className="form-field">
-            <span>Khối</span>
-            <select
-              value={form.khoi}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, khoi: event.target.value }))
-              }
-            >
-              <option value="10">Khối 10</option>
-              <option value="11">Khối 11</option>
-              <option value="12">Khối 12</option>
-            </select>
-          </label>
-          <label className="form-field">
-            <span>Năm học</span>
-            <input
-              value={form.namHoc}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, namHoc: event.target.value }))
-              }
-              placeholder="vd: 2025-2026"
-            />
-          </label>
-          <label className="form-field">
-            <span>Tổ hợp môn</span>
-            <select
-              value={form.toHopId}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, toHopId: event.target.value }))
-              }
-            >
-              <option value="">-- Chưa gán --</option>
-              {toHopList.map((th) => (
-                <option key={th.id} value={th.id}>
-                  {th.maToHop} - {th.tenToHop} ({th.ban})
-                </option>
-              ))}
-            </select>
-          </label>
-          {formError && <div className="form-error">{formError}</div>}
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={() => setModalOpen(false)}
-            >
-              Hủy
-            </button>
-            <button type="submit" className="btn-primary">
-              Lưu
-            </button>
-          </div>
-        </form>
-      </SimpleModal>
-
-      {/* Bulk Create Modal */}
-      {bulkModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest p-lg shadow-xl">
-            <h3 className="text-headline-sm font-semibold text-primary mb-md">Tạo lớp hàng loạt</h3>
-            <p className="text-body-sm text-on-surface-variant mb-lg">
-              Tạo nhanh các lớp cho năm học mới. Nhập số lớp mỗi khối.
-            </p>
-
-            <div className="space-y-sm mb-lg">
-              <label className="form-field">
-                <span>Năm học</span>
+      {/* Add/Edit Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h3 className="text-xl font-bold text-slate-900">{editingClass ? "Chỉnh sửa lớp học" : "Thêm lớp học mới"}</h3>
+              <button onClick={() => setModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Tên lớp <span className="text-red-500">*</span></label>
                 <input
-                  value={bulkForm.namHoc}
-                  onChange={(e) => setBulkForm((prev) => ({ ...prev, namHoc: e.target.value }))}
-                  placeholder="vd: 2026-2027"
+                  type="text"
+                  value={form.tenLop}
+                  onChange={e => setForm(p => ({ ...p, tenLop: e.target.value }))}
+                  placeholder="VD: 10A1"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
                 />
-              </label>
-
-              <div className="grid grid-cols-3 gap-sm">
-                <label className="form-field">
-                  <span>Khối 10</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={bulkForm.soLop10}
-                    onChange={(e) => setBulkForm((prev) => ({ ...prev, soLop10: Math.max(0, Math.min(20, Number(e.target.value) || 0)) }))}
-                  />
-                </label>
-                <label className="form-field">
-                  <span>Khối 11</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={bulkForm.soLop11}
-                    onChange={(e) => setBulkForm((prev) => ({ ...prev, soLop11: Math.max(0, Math.min(20, Number(e.target.value) || 0)) }))}
-                  />
-                </label>
-                <label className="form-field">
-                  <span>Khối 12</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={bulkForm.soLop12}
-                    onChange={(e) => setBulkForm((prev) => ({ ...prev, soLop12: Math.max(0, Math.min(20, Number(e.target.value) || 0)) }))}
-                  />
-                </label>
               </div>
-
-              <div className="text-body-sm text-on-surface-variant">
-                Sẽ tạo: {bulkForm.soLop10} lớp khối 10, {bulkForm.soLop11} lớp khối 11, {bulkForm.soLop12} lớp khối 12
-                <br />
-                Tổng: <strong>{bulkForm.soLop10 + bulkForm.soLop11 + bulkForm.soLop12} lớp</strong>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Khối <span className="text-red-500">*</span></label>
+                  <select
+                    value={form.khoi}
+                    onChange={e => setForm(p => ({ ...p, khoi: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                  >
+                    <option value="10">Khối 10</option>
+                    <option value="11">Khối 11</option>
+                    <option value="12">Khối 12</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Năm học <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={form.namHoc}
+                    onChange={e => setForm(p => ({ ...p, namHoc: e.target.value }))}
+                    placeholder="VD: 2026-2027"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="flex justify-end gap-sm">
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => setBulkModalOpen(false)}
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleBulkCreate}
-                disabled={bulkLoading}
-              >
-                {bulkLoading ? "Đang tạo..." : "Tạo lớp"}
-              </button>
-            </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Tổ hợp môn</label>
+                <select
+                  value={form.toHopId}
+                  onChange={e => setForm(p => ({ ...p, toHopId: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                >
+                  <option value="">-- Chưa gán tổ hợp --</option>
+                  {toHopList.map(th => (
+                    <option key={th.id} value={th.id}>{th.maToHop} - {th.tenToHop} ({th.ban})</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">Hủy</button>
+                <button type="submit" className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 transition-all">
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* Promote Modal */}
-      {promoteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest p-lg shadow-xl">
-            <h3 className="text-headline-sm font-semibold text-primary mb-md">Lên lớp</h3>
-            <p className="text-body-sm text-on-surface-variant mb-lg">
-              Chuyển học sinh từ năm học cũ sang năm học mới.<br />
-              Khối 10 → 11, Khối 11 → 12, Khối 12 → Tốt nghiệp.<br />
-              GV chủ nhiệm sẽ theo lớp 3 năm. Khối 12 tốt nghiệp → GV thôi chủ nhiệm.
-            </p>
+      {/* Detail Modal */}
+      {detailModalOpen && selectedClass && (
+        <ClassDetailModal 
+          item={selectedClass} 
+          toHopList={toHopList} 
+          onClose={() => setDetailModalOpen(false)}
+          onViewStudents={() => {
+            setDetailModalOpen(false);
+            setStudentListModalOpen(true);
+          }}
+        />
+      )}
 
-            <div className="space-y-sm mb-lg">
-              <label className="form-field">
-                <span>Năm học hiện tại</span>
-                <select
-                  value={promoteForm.currentNamHoc}
-                  onChange={(e) => {
-                    const selected = e.target.value;
-                    setPromoteForm((prev) => ({
-                      ...prev,
-                      currentNamHoc: selected,
-                      nextNamHoc: getNextAcademicYear(selected)
-                    }));
-                  }}
-                >
-                  {availableNamHoc.map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </label>
+      {/* Assign Teacher Modal */}
+      {assignTeacherModalOpen && selectedClass && (
+        <AssignTeacherModal
+          item={selectedClass}
+          onClose={() => setAssignTeacherModalOpen(false)}
+          onAssignSuccess={() => {
+            setAssignTeacherModalOpen(false);
+            loadData();
+          }}
+        />
+      )}
 
-              <label className="form-field">
-                <span>Năm học mới (tự động tính)</span>
-                <input
-                  value={promoteForm.nextNamHoc}
-                  onChange={(e) => setPromoteForm((prev) => ({ ...prev, nextNamHoc: e.target.value }))}
-                  placeholder="vd: 2026-2027"
-                />
-              </label>
-
-              {promoteResult && (
-                <div className="rounded-lg bg-green-50 p-md text-body-sm">
-                  <div className="font-semibold text-green-700 mb-xs">Kết quả:</div>
-                  <div>Lên lớp: <strong>{promoteResult.promoted}</strong> học sinh</div>
-                  <div>Tốt nghiệp: <strong>{promoteResult.graduated}</strong> học sinh</div>
-                  {promoteResult.teacherMoved > 0 && (
-                    <div>GV chủ nhiệm theo lớp: <strong>{promoteResult.teacherMoved}</strong></div>
-                  )}
-                  {promoteResult.createdClasses?.length > 0 && (
-                    <div>Lớp mới tạo: <strong>{promoteResult.createdClasses.join(", ")}</strong></div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-sm">
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => setPromoteModalOpen(false)}
-              >
-                Đóng
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                style={{ background: "#10b981", borderColor: "#10b981" }}
-                onClick={handlePromote}
-                disabled={promoteLoading}
-              >
-                {promoteLoading ? "Đang xử lý..." : "Xác nhận lên lớp"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Student List Modal */}
+      {studentListModalOpen && selectedClass && (
+        <StudentListModal
+          item={selectedClass}
+          onClose={() => setStudentListModalOpen(false)}
+        />
       )}
     </div>
   );

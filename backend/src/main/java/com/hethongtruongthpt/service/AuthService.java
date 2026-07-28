@@ -32,9 +32,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final TokenBlacklistRepository tokenBlacklistRepository;
     private final TokenBlacklistCache tokenBlacklistCache;
-
-    private static final long REFRESH_TOKEN_EXPIRY_DAYS = 30;
-    private static final int STATUS_GRADUATED = 2; // Đã tốt nghiệp
+    private final UserAuditLogService auditLogService;
 
     public AuthService(
             UserRepository userRepository,
@@ -43,7 +41,8 @@ public class AuthService {
             JwtTokenProvider jwtTokenProvider,
             RefreshTokenRepository refreshTokenRepository,
             TokenBlacklistRepository tokenBlacklistRepository,
-            TokenBlacklistCache tokenBlacklistCache
+            TokenBlacklistCache tokenBlacklistCache,
+            UserAuditLogService auditLogService
     ) {
         this.userRepository = userRepository;
         this.hocSinhRepository = hocSinhRepository;
@@ -52,7 +51,11 @@ public class AuthService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.tokenBlacklistRepository = tokenBlacklistRepository;
         this.tokenBlacklistCache = tokenBlacklistCache;
+        this.auditLogService = auditLogService;
     }
+
+    private static final long REFRESH_TOKEN_EXPIRY_DAYS = 30;
+    private static final int STATUS_GRADUATED = 2; // Đã tốt nghiệp
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -103,8 +106,11 @@ public class AuthService {
         // Clear flag after first login
         if (mustChange) {
             user.setMustChangePassword(false);
-            userRepository.save(user);
         }
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
+
+        auditLogService.logAction(user.getId(), "LOGIN", "Đăng nhập hệ thống", null);
 
         return new LoginResponse(token, refreshToken, role, mustChange);
     }
@@ -156,13 +162,19 @@ public class AuthService {
         entry.setToken(token);
         entry.setExpiryDate(expiry.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime());
         tokenBlacklistRepository.save(entry);
-        tokenBlacklistCache.markBlacklisted(token);
-
-        // Revoke all refresh tokens for the user
-        String username = jwtTokenProvider.getUsernameFromToken(token);
-        User user = userRepository.findByUsername(username).orElse(null);
-        if (user != null) {
-            refreshTokenRepository.deleteByUser(user);
+        if (token != null) {
+            tokenBlacklistCache.markBlacklisted(token);
+        }
+        
+        try {
+            String username = jwtTokenProvider.getUsernameFromToken(token);
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user != null) {
+                auditLogService.logAction(user.getId(), "LOGOUT", "Đăng xuất hệ thống", null);
+                refreshTokenRepository.deleteByUser(user);
+            }
+        } catch (Exception e) {
+            log.debug("Could not log audit for logout: " + e.getMessage());
         }
     }
 

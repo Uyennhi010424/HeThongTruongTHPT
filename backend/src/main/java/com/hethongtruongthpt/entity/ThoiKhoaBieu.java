@@ -1,24 +1,28 @@
 package com.hethongtruongthpt.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "thoi_khoa_bieu")
+@SQLDelete(sql = "UPDATE thoi_khoa_bieu SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class ThoiKhoaBieu {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "lop_id", nullable = false)
     private LopHoc lop;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "mon_hoc_id", nullable = false)
     private MonHoc monHoc;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giao_vien_id", nullable = true)
     private GiaoVien giaoVien;
 
@@ -48,6 +52,9 @@ public class ThoiKhoaBieu {
 
     @Column(name = "ghi_chu", length = 255)
     private String ghiChu;
+
+    @Column(name = "is_deleted", columnDefinition = "boolean default false")
+    private Boolean isDeleted = false;
 
 
     public Integer getId() {
@@ -152,5 +159,13 @@ public class ThoiKhoaBieu {
 
     public void setGhiChu(String ghiChu) {
         this.ghiChu = ghiChu;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
 }

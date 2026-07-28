@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
+import React, { useEffect, useState, useMemo } from "react";
+import { Plus, Save, RotateCcw, CheckCircle, Lock, Trash2 } from "lucide-react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
@@ -43,9 +43,7 @@ const inferConfigFromYearName = (tenNamHoc) => {
   const start = parseStartYear(tenNamHoc);
   if (!start) return { ...emptyConfig };
   const makeDate = (y, m, d) =>
-    new Date(
-      `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
-    );
+    new Date(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
   const fmt = (dt) => dt.toISOString().slice(0, 10);
   const hk1Start = makeDate(start, 9, 5);
   const hk1End = makeDate(start + 1, 1, 15);
@@ -66,14 +64,10 @@ const inferConfigFromYearName = (tenNamHoc) => {
 const toFormFromYear = (year) => ({
   hk1Start: toDateOnly(readField(year, "ngayBatDauHk1", "ngay_bat_dau_hk1")),
   hk1End: toDateOnly(readField(year, "ngayKetThucHk1", "ngay_ket_thuc_hk1")),
-  hk1Deadline: toDateOnly(
-    readField(year, "deadlineNhapDiemHk1", "deadline_nhap_diem_hk1"),
-  ),
+  hk1Deadline: toDateOnly(readField(year, "deadlineNhapDiemHk1", "deadline_nhap_diem_hk1")),
   hk2Start: toDateOnly(readField(year, "ngayBatDauHk2", "ngay_bat_dau_hk2")),
   hk2End: toDateOnly(readField(year, "ngayKetThucHk2", "ngay_ket_thuc_hk2")),
-  hk2Deadline: toDateOnly(
-    readField(year, "deadlineNhapDiemHk2", "deadline_nhap_diem_hk2"),
-  ),
+  hk2Deadline: toDateOnly(readField(year, "deadlineNhapDiemHk2", "deadline_nhap_diem_hk2")),
 });
 
 const buildPayload = ({ tenNamHoc, form, trangThai = "DANG_MO" }) => ({
@@ -100,16 +94,12 @@ const validateConfig = (form) => {
   const missing = required.find(([key]) => !form[key]);
   if (missing) return `Vui lòng nhập ${missing[1].toLowerCase()}.`;
 
-  if (form.hk1Start > form.hk1End)
-    return "Ngày bắt đầu học kỳ I phải trước ngày kết thúc.";
-  if (form.hk2Start > form.hk2End)
-    return "Ngày bắt đầu học kỳ II phải trước ngày kết thúc.";
+  if (form.hk1Start > form.hk1End) return "Ngày bắt đầu học kỳ I phải trước ngày kết thúc.";
+  if (form.hk2Start > form.hk2End) return "Ngày bắt đầu học kỳ II phải trước ngày kết thúc.";
 
   const diffDays = (later, earlier) => {
     if (!later || !earlier) return Infinity;
-    const ms =
-      new Date(later).setHours(0, 0, 0, 0) -
-      new Date(earlier).setHours(0, 0, 0, 0);
+    const ms = new Date(later).setHours(0, 0, 0, 0) - new Date(earlier).setHours(0, 0, 0, 0);
     return Math.floor(ms / (1000 * 60 * 60 * 24));
   };
 
@@ -119,15 +109,6 @@ const validateConfig = (form) => {
     return "Hạn chót nhập điểm học kỳ II phải trước ngày kết thúc ít nhất 5 ngày.";
 
   return "";
-};
-
-const currentSemesterLabel = (form) => {
-  const now = new Date();
-  const hk2Start = form.hk2Start ? new Date(form.hk2Start + "T00:00:00") : null;
-  const hk1Start = form.hk1Start ? new Date(form.hk1Start + "T00:00:00") : null;
-  if (hk2Start && now >= hk2Start) return "Học kỳ II";
-  if (hk1Start && now >= hk1Start) return "Học kỳ I";
-  return "Chưa bắt đầu";
 };
 
 export default function NamHocHocKyPage() {
@@ -150,13 +131,11 @@ export default function NamHocHocKyPage() {
       try {
         const [yRes, hkRes] = await Promise.all([getNamHoc(), getHocKy()]);
         if (!active) return;
-        const yData = yRes?.data?.data || [];
+        const yData = (yRes?.data?.data || []).sort((a,b) => b.tenNamHoc.localeCompare(a.tenNamHoc));
         setYears(yData);
         setHocKyList(hkRes?.data?.data || []);
         if (yData.length) {
-          const activeYear = yData.find(
-            (y) => (y.trangThai || y.trang_thai) === "DANG_MO",
-          );
+          const activeYear = yData.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO");
           setSelectedYear(activeYear || yData[0]);
         }
       } finally {
@@ -200,7 +179,6 @@ export default function NamHocHocKyPage() {
     const trimmedName = createYearName.trim();
     if (!trimmedName) { setCreateError("Vui lòng nhập tên năm học."); return; }
 
-    // Validate format YYYY-YYYY
     const yearPattern = /^(\d{4})-(\d{4})$/;
     const yearMatch = trimmedName.match(yearPattern);
     if (!yearMatch) {
@@ -246,7 +224,7 @@ export default function NamHocHocKyPage() {
       } catch { semesterCreateFailed = true; }
 
       const [freshYears, freshSemesters] = await Promise.all([getNamHoc(), getHocKy()]);
-      const nextYears = freshYears?.data?.data || [];
+      const nextYears = (freshYears?.data?.data || []).sort((a,b) => b.tenNamHoc.localeCompare(a.tenNamHoc));
       setYears(nextYears);
       setHocKyList(freshSemesters?.data?.data || []);
       setSelectedYear(nextYears.find((y) => y.id === createdYear.id) || createdYear);
@@ -294,34 +272,54 @@ export default function NamHocHocKyPage() {
     notifyInfo("Đã khôi phục mốc thời gian mặc định.");
   };
 
-  const handleSetCurrentYear = async (targetYear) => {
+  const handleSetCurrentYear = async () => {
+    if (!selectedYear) return;
     try {
       setSaving(true);
       const openYears = years.filter(
-        (y) => (y.trangThai || y.trang_thai) === "DANG_MO" && y.id !== targetYear.id,
+        (y) => (y.trangThai || y.trang_thai) === "DANG_MO" && y.id !== selectedYear.id,
       );
       for (const y of openYears) {
         await updateNamHoc(y.id, buildPayload({ tenNamHoc: y.tenNamHoc || "", form: toFormFromYear(y), trangThai: "DA_DONG" }));
       }
-      const res = await updateNamHoc(targetYear.id, buildPayload({ tenNamHoc: targetYear.tenNamHoc || "", form: toFormFromYear(targetYear), trangThai: "DANG_MO" }));
+      const res = await updateNamHoc(selectedYear.id, buildPayload({ tenNamHoc: selectedYear.tenNamHoc || "", form: toFormFromYear(selectedYear), trangThai: "DANG_MO" }));
       const updated = res?.data?.data;
       setYears((prev) =>
         prev.map((y) => {
-          if (y.id === targetYear.id) return updated || { ...y, trangThai: "DANG_MO" };
+          if (y.id === selectedYear.id) return updated || { ...y, trangThai: "DANG_MO" };
           if ((y.trangThai || y.trang_thai) === "DANG_MO") return { ...y, trangThai: "DA_DONG" };
           return y;
         }),
       );
       if (updated) setSelectedYear(updated);
-      notifySuccess(`Đã đặt ${targetYear.tenNamHoc} làm năm học hiện tại.`);
+      notifySuccess(`Đã đặt ${selectedYear.tenNamHoc} làm năm học hiện tại.`);
     } catch {
       notifyError("Không thể cập nhật năm học hiện tại.");
     } finally {
       setSaving(false);
     }
   };
+  
+  const handleLockYear = async () => {
+    if (!selectedYear) return;
+    try {
+      setSaving(true);
+      const res = await updateNamHoc(selectedYear.id, buildPayload({ tenNamHoc: selectedYear.tenNamHoc || "", form: toFormFromYear(selectedYear), trangThai: "DA_DONG" }));
+      const updated = res?.data?.data;
+      setYears((prev) =>
+        prev.map((y) => (y.id === selectedYear.id ? updated || { ...y, trangThai: "DA_DONG" } : y))
+      );
+      if (updated) setSelectedYear(updated);
+      notifySuccess(`Đã khóa năm học ${selectedYear.tenNamHoc}.`);
+    } catch {
+      notifyError("Không thể khóa năm học.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const handleDeleteClick = (targetYear) => {
+  const handleDeleteClick = (targetYear, e) => {
+    e.stopPropagation();
     setDeleteModal({ open: true, year: targetYear });
   };
 
@@ -346,284 +344,308 @@ export default function NamHocHocKyPage() {
     }
   };
 
-  const yearLabel = selectedYear?.tenNamHoc || "—";
+  const getBadgeStatus = (y) => {
+    if (y.trangThai === "DANG_MO" || y.trang_thai === "DANG_MO") return { label: "Hiện hành", type: "success" };
+    
+    const startYear = parseInt(y.tenNamHoc.split("-")[0]);
+    const currentYearObj = years.find(yr => yr.trangThai === "DANG_MO" || yr.trang_thai === "DANG_MO");
+    
+    if (!currentYearObj) return { label: "Đã khóa", type: "warning" };
+    
+    const currentStart = parseInt(currentYearObj.tenNamHoc.split("-")[0]);
+    if (startYear <= currentStart - 2) return { label: "Lưu trữ", type: "neutral" };
+    
+    return { label: "Đã khóa", type: "warning" };
+  };
+
+  const selectedBadge = selectedYear ? getBadgeStatus(selectedYear) : null;
+  const isSelectedOngoing = selectedBadge?.label === "Hiện hành";
 
   return (
-    <div className="space-y-lg">
+    <div className="flex flex-col h-full bg-slate-50/50">
       <PageHeader
         title="Năm học & Học kỳ"
-        description="Quản lý mốc thời gian và hạn nhập điểm cho toàn hệ thống."
         actions={
           <button
             type="button"
             onClick={openCreateModal}
-            className="btn-primary flex items-center gap-sm"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
           >
-            <MaterialIcon name="add" />
+            <Plus className="w-4 h-4" />
             Thêm năm học
           </button>
         }
       />
 
-      <div className="grid grid-cols-1 gap-lg lg:grid-cols-[280px_1fr]">
-        {/* ── Cột trái ── */}
-        <aside className="flex flex-col gap-sm">
-          <p className="mb-xs px-xs text-label-sm font-semibold uppercase tracking-widest text-on-surface-variant/60">
-            Danh sách năm học
-          </p>
-
-          {loading ? (
-            <p className="text-body-sm text-outline">Đang tải...</p>
-          ) : (
-            years.map((y) => {
-              const active = selectedYear?.id === y.id;
-              const isOngoing = (y.trangThai || y.trang_thai) === "DANG_MO";
-              return (
-                <div
-                  key={y.id}
-                  className={`group/card relative w-full rounded-2xl border-2 transition-all ${
-                    active
-                      ? "border-primary bg-white shadow-sm"
-                      : "border-transparent bg-surface-container-low hover:border-outline-variant/60 hover:bg-white"
-                  }`}
-                >
-                  {/* Nút xóa — icon nhỏ góc trên phải, hiện khi hover card */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteClick(y)}
-                    disabled={saving}
-                    title="Xóa năm học"
-                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant/30 opacity-0 transition-all group-hover/card:opacity-100 hover:!text-error hover:bg-error/8 disabled:pointer-events-none"
-                  >
-                    <MaterialIcon name="close" className="text-[16px]" />
-                  </button>
-
-                  {/* Phần tên + badge — click để chọn */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedYear(y)}
-                    className="w-full px-md pt-md pb-md text-left"
-                  >
-                    <div className="flex items-center justify-between gap-sm pr-4">
-                      <span
-                        className={`text-body-lg font-bold tracking-tight ${
-                          active ? "text-primary" : "text-on-surface"
-                        }`}
+      <div className="p-6 flex-1 flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 items-start">
+          
+          {/* CỘT TRÁI: DANH SÁCH NĂM HỌC */}
+          <div className="lg:col-span-1 flex flex-col gap-3">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-1">Danh sách năm học</h3>
+            {loading ? (
+              <div className="text-sm text-slate-500">Đang tải...</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {years.map((y) => {
+                  const isActive = selectedYear?.id === y.id;
+                  const badgeInfo = getBadgeStatus(y);
+                  const countHk = hocKyList.filter(hk => hk.namHoc?.id === y.id || hk.nam_hoc_id === y.id).length || 2; // default 2
+                  
+                  return (
+                    <div
+                      key={y.id}
+                      onClick={() => setSelectedYear(y)}
+                      className={`relative group cursor-pointer p-4 rounded-xl border transition-all ${
+                        isActive 
+                          ? "bg-blue-50/50 border-blue-200 shadow-sm" 
+                          : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteClick(y, e)}
+                        className="absolute right-3 top-3 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        title="Xóa năm học"
                       >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      
+                      <div className={`text-base font-bold ${isActive ? "text-blue-700" : "text-slate-800"}`}>
                         {y.tenNamHoc}
-                      </span>
-                      {isOngoing ? (
-                        <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Hiện tại
+                      </div>
+                      
+                      <div className="mt-2 flex items-center gap-2">
+                        {badgeInfo.type === 'success' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Hiện hành
+                          </span>
+                        )}
+                        {badgeInfo.type === 'warning' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            Đã khóa
+                          </span>
+                        )}
+                        {badgeInfo.type === 'neutral' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                            Lưu trữ
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-500">
+                          {countHk} học kỳ
                         </span>
-                      ) : (
-                        <span className="rounded-full bg-surface-container px-2.5 py-1 text-[11px] text-on-surface-variant/60 ring-1 ring-outline-variant/40">
-                          Đã đóng
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* CỘT PHẢI: CHI TIẾT NĂM HỌC */}
+          <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+            {selectedYear ? (
+              <>
+                {/* Header Chi Tiết */}
+                <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50 rounded-t-xl">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                      {selectedYear.tenNamHoc}
+                      {selectedBadge?.type === 'success' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Hiện hành
                         </span>
                       )}
+                      {selectedBadge?.type === 'warning' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                          Đã khóa
+                        </span>
+                      )}
+                      {selectedBadge?.type === 'neutral' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                          Lưu trữ
+                        </span>
+                      )}
+                    </h2>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {!isSelectedOngoing ? (
+                      <button
+                        onClick={handleSetCurrentYear}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-200 text-indigo-700 rounded-lg text-sm font-medium bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Đặt làm hiện hành
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleLockYear}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-amber-200 text-amber-700 rounded-lg text-sm font-medium bg-amber-50 hover:bg-amber-100 transition-colors"
+                      >
+                        <Lock className="w-4 h-4" /> Khóa năm học
+                      </button>
+                    )}
+                    <button
+                      onClick={handleRestoreDefaults}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium bg-white hover:bg-slate-50 transition-colors"
+                      title="Khôi phục ngày mặc định"
+                    >
+                      <RotateCcw className="w-4 h-4" /> Khôi phục
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" /> {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form Học Kỳ */}
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    {/* Học kỳ I */}
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold">I</div>
+                        <h3 className="font-bold text-slate-800">Học kỳ I</h3>
+                      </div>
+                      <div className="p-4 space-y-4">
+                        <LabeledDateField
+                          label="Ngày bắt đầu"
+                          value={form.hk1Start}
+                          onChange={(v) => setForm((f) => ({ ...f, hk1Start: v }))}
+                        />
+                        <LabeledDateField
+                          label="Ngày kết thúc"
+                          value={form.hk1End}
+                          onChange={(v) => setForm((f) => ({ ...f, hk1End: v }))}
+                        />
+                        <div className="pt-2 border-t border-slate-100">
+                          <LabeledDateField
+                            label="Hạn nhập điểm"
+                            value={form.hk1Deadline}
+                            onChange={(v) => setForm((f) => ({ ...f, hk1Deadline: v }))}
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Nút đặt làm hiện tại — chỉ hiện với năm đã đóng */}
-                    {!isOngoing && (
-                      <div
-                        role="button"
-                        tabIndex={-1}
-                        onClick={(e) => { e.stopPropagation(); handleSetCurrentYear(y); }}
-                        className="mt-sm inline-flex items-center gap-xs text-label-sm font-medium text-primary hover:underline"
-                      >
-                        <MaterialIcon name="check_circle" className="text-[13px]" />
-                        Đặt làm năm hiện tại
+                    {/* Học kỳ II */}
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold">II</div>
+                        <h3 className="font-bold text-slate-800">Học kỳ II</h3>
                       </div>
-                    )}
-                  </button>
+                      <div className="p-4 space-y-4">
+                        <LabeledDateField
+                          label="Ngày bắt đầu"
+                          value={form.hk2Start}
+                          onChange={(v) => setForm((f) => ({ ...f, hk2Start: v }))}
+                        />
+                        <LabeledDateField
+                          label="Ngày kết thúc"
+                          value={form.hk2End}
+                          onChange={(v) => setForm((f) => ({ ...f, hk2End: v }))}
+                        />
+                        <div className="pt-2 border-t border-slate-100">
+                          <LabeledDateField
+                            label="Hạn nhập điểm"
+                            value={form.hk2Deadline}
+                            onChange={(v) => setForm((f) => ({ ...f, hk2Deadline: v }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
-              );
-            })
-          )}
-
-          {/* Trạng thái học kỳ hiện tại */}
-          <div className="mt-md rounded-2xl border border-outline-variant/30 bg-surface-container-low px-md py-md">
-            <p className="text-label-sm text-on-surface-variant/60">Đang ở</p>
-            <p className="mt-xs text-body-lg font-bold text-on-surface">
-              {currentSemesterLabel(form)}
-            </p>
-            <p className="mt-xs text-label-sm text-on-surface-variant/60">
-              {hocKyList.length
-                ? `${hocKyList.length} học kỳ đã cấu hình`
-                : "Chưa có học kỳ"}
-            </p>
-          </div>
-        </aside>
-
-        {/* ── Cột phải ── */}
-        <section className="rounded-2xl border border-outline-variant/30 bg-white px-xl py-xl">
-          {/* Header */}
-          <div className="mb-xl flex items-start justify-between">
-            <div>
-              <h2 className="text-headline-md font-bold text-on-surface">
-                Cấu hình năm học
-              </h2>
-              <p className="mt-xs text-body-sm text-on-surface-variant">
-                {yearLabel}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleRestoreDefaults}
-              className="mt-xs text-label-sm text-on-surface-variant underline-offset-2 hover:text-primary hover:underline"
-            >
-              Khôi phục mặc định
-            </button>
-          </div>
-
-          <form className="space-y-xl" onSubmit={handleSave}>
-            {[
-              { n: 1, prefix: "hk1", title: "Học kỳ I" },
-              { n: 2, prefix: "hk2", title: "Học kỳ II" },
-            ].map((hk, idx) => (
-              <div key={hk.prefix}>
-                {/* Divider giữa 2 kỳ */}
-                {idx > 0 && (
-                  <div className="mb-xl border-t border-outline-variant/30" />
-                )}
-
-                <div className="mb-lg flex items-center gap-sm">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[12px] font-bold text-on-primary">
-                    {hk.n}
-                  </span>
-                  <h3 className="text-body-lg font-semibold text-on-surface">
-                    {hk.title}
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 gap-lg md:grid-cols-3">
-                  <LabeledDateField
-                    label="Ngày bắt đầu"
-                    value={form[`${hk.prefix}Start`]}
-                    onChange={(v) =>
-                      setForm((f) => ({ ...f, [`${hk.prefix}Start`]: v }))
-                    }
-                  />
-                  <LabeledDateField
-                    label="Ngày kết thúc"
-                    value={form[`${hk.prefix}End`]}
-                    onChange={(v) =>
-                      setForm((f) => ({ ...f, [`${hk.prefix}End`]: v }))
-                    }
-                  />
-                  <LabeledDateField
-                    label="Hạn nhập điểm"
-                    value={form[`${hk.prefix}Deadline`]}
-                    onChange={(v) =>
-                      setForm((f) => ({ ...f, [`${hk.prefix}Deadline`]: v }))
-                    }
-                    hint="Ít nhất 5 ngày trước khi kết thúc"
-                  />
-                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-slate-500 min-h-[400px]">
+                {!loading && "Chưa có năm học nào. Hãy thêm năm học mới."}
               </div>
-            ))}
-
-            <div className="flex items-center justify-end gap-md border-t border-outline-variant/20 pt-lg">
-              <button
-                type="button"
-                onClick={() => selectedYear && setForm(toFormFromYear(selectedYear))}
-                className="btn-outline"
-              >
-                Hủy thay đổi
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary disabled:opacity-60"
-              >
-                {saving ? "Đang lưu..." : "Lưu cấu hình"}
-              </button>
-            </div>
-          </form>
-        </section>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* ── Modal tạo năm học ── */}
+      {/* Modal Thêm Năm Học */}
       <SimpleModal
         open={createOpen}
         title="Thêm năm học mới"
         onClose={closeCreateModal}
-        width={680}
       >
-        <form className="space-y-lg" onSubmit={handleCreateYear}>
-          <LabeledDateField
-            label="Tên năm học"
-            asText
-            value={createYearName}
-            onChange={handleCreateYearNameChange}
-            placeholder="Ví dụ: 2026-2027"
-          />
+        <form className="space-y-6" onSubmit={handleCreateYear}>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">Tên năm học *</label>
+            <input
+              type="text"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={createYearName}
+              onChange={(e) => handleCreateYearNameChange(e.target.value)}
+              placeholder="Ví dụ: 2026-2027"
+            />
+          </div>
 
-          {[
-            { n: 1, prefix: "hk1", title: "Học kỳ I" },
-            { n: 2, prefix: "hk2", title: "Học kỳ II" },
-          ].map((hk, idx) => (
-            <div key={hk.prefix}>
-              {idx > 0 && <div className="border-t border-outline-variant/30" />}
-              <p className="mb-md mt-lg flex items-center gap-sm text-body-sm font-semibold text-on-surface-variant">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
-                  {hk.n}
-                </span>
-                {hk.title}
-              </p>
-              <div className="grid grid-cols-3 gap-md">
-                <LabeledDateField
-                  label="Bắt đầu"
-                  value={createForm[`${hk.prefix}Start`]}
-                  onChange={(v) =>
-                    setCreateForm((f) => ({ ...f, [`${hk.prefix}Start`]: v }))
-                  }
-                />
-                <LabeledDateField
-                  label="Kết thúc"
-                  value={createForm[`${hk.prefix}End`]}
-                  onChange={(v) =>
-                    setCreateForm((f) => {
-                      const def = v
-                        ? new Date(new Date(v).getTime() - 5 * 86400000)
-                            .toISOString()
-                            .slice(0, 10)
-                        : f[`${hk.prefix}Deadline`];
-                      return {
-                        ...f,
-                        [`${hk.prefix}End`]: v,
-                        [`${hk.prefix}Deadline`]:
-                          !f[`${hk.prefix}Deadline`] ||
-                          new Date(f[`${hk.prefix}Deadline`]) > new Date(def)
-                            ? def
-                            : f[`${hk.prefix}Deadline`],
-                      };
-                    })
-                  }
-                />
-                <LabeledDateField
-                  label="Hạn nhập điểm"
-                  value={createForm[`${hk.prefix}Deadline`]}
-                  onChange={(v) =>
-                    setCreateForm((f) => ({ ...f, [`${hk.prefix}Deadline`]: v }))
-                  }
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Cột HK1 */}
+            <div className="space-y-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h4 className="font-semibold text-slate-800 text-sm">Học kỳ I</h4>
+              <LabeledDateField
+                label="Bắt đầu"
+                value={createForm.hk1Start}
+                onChange={(v) => setCreateForm((f) => ({ ...f, hk1Start: v }))}
+              />
+              <LabeledDateField
+                label="Kết thúc"
+                value={createForm.hk1End}
+                onChange={(v) => setCreateForm((f) => ({ ...f, hk1End: v }))}
+              />
+              <LabeledDateField
+                label="Hạn điểm"
+                value={createForm.hk1Deadline}
+                onChange={(v) => setCreateForm((f) => ({ ...f, hk1Deadline: v }))}
+              />
             </div>
-          ))}
+
+            {/* Cột HK2 */}
+            <div className="space-y-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h4 className="font-semibold text-slate-800 text-sm">Học kỳ II</h4>
+              <LabeledDateField
+                label="Bắt đầu"
+                value={createForm.hk2Start}
+                onChange={(v) => setCreateForm((f) => ({ ...f, hk2Start: v }))}
+              />
+              <LabeledDateField
+                label="Kết thúc"
+                value={createForm.hk2End}
+                onChange={(v) => setCreateForm((f) => ({ ...f, hk2End: v }))}
+              />
+              <LabeledDateField
+                label="Hạn điểm"
+                value={createForm.hk2Deadline}
+                onChange={(v) => setCreateForm((f) => ({ ...f, hk2Deadline: v }))}
+              />
+            </div>
+          </div>
 
           {createError && (
-            <p className="rounded-xl border border-error/20 bg-error/5 px-md py-sm text-body-sm text-error">
+            <p className="text-sm text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
               {createError}
             </p>
           )}
 
-          <div className="flex justify-end gap-md border-t border-outline-variant/20 pt-md">
-            <button type="button" className="btn-outline" onClick={closeCreateModal}>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors" onClick={closeCreateModal}>
               Hủy
             </button>
-            <button type="submit" className="btn-primary" disabled={creating}>
+            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors" disabled={creating}>
               {creating ? "Đang thêm..." : "Thêm năm học"}
             </button>
           </div>
@@ -632,29 +654,27 @@ export default function NamHocHocKyPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteModal.open && (
-        <div className="modal-overlay" onClick={() => setDeleteModal({ open: false, year: null })}>
-          <div className="modal-box delete-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="delete-modal-icon">
-              <span className="material-symbols-outlined">warning</span>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setDeleteModal({ open: false, year: null })} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6 transform transition-all">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4 mx-auto">
+              <Trash2 className="w-6 h-6" />
             </div>
-            <h3 className="delete-modal-title">Xác nhận xóa năm học</h3>
-            <p className="delete-modal-desc">
-              Bạn có chắc chắn muốn xóa năm học <strong>{deleteModal.year?.tenNamHoc}</strong>?
+            <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Xóa năm học</h3>
+            <p className="text-sm text-slate-500 text-center mb-6">
+              Bạn có chắc chắn muốn xóa năm học <strong>{deleteModal.year?.tenNamHoc}</strong>? Hành động này sẽ xóa các học kỳ liên quan và không thể hoàn tác.
             </p>
-            <p className="delete-modal-warning">
-              Hành động này sẽ xóa cả học kỳ liên quan. Không thể hoàn tác.
-            </p>
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="btn-outline"
+            <div className="flex gap-3 w-full">
+              <button 
+                type="button" 
+                className="flex-1 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors" 
                 onClick={() => setDeleteModal({ open: false, year: null })}
               >
                 Hủy
               </button>
-              <button
-                type="button"
-                className="btn-danger"
+              <button 
+                type="button" 
+                className="flex-1 py-2.5 bg-red-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-red-700 transition-colors" 
                 onClick={handleDeleteConfirm}
                 disabled={saving}
               >
@@ -668,34 +688,16 @@ export default function NamHocHocKyPage() {
   );
 }
 
-/**
- * Field dùng chung — date hoặc text input
- */
-function LabeledDateField({ label, value, onChange, hint, asText, placeholder }) {
+function LabeledDateField({ label, value, onChange }) {
   return (
-    <div className="flex flex-col gap-xs">
-      <label className="text-label-sm font-medium text-on-surface-variant">
-        {label}
-      </label>
-      {asText ? (
-        <input
-          type="text"
-          className="rounded-xl border border-outline-variant bg-surface-container-lowest px-md py-sm text-body-md text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-        />
-      ) : (
-        <input
-          type="date"
-          className="rounded-xl border border-outline-variant bg-surface-container-lowest px-md py-sm text-body-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      )}
-      {hint && (
-        <p className="text-label-sm text-on-surface-variant/50">{hint}</p>
-      )}
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-semibold text-slate-700 uppercase tracking-wide text-[11px]">{label}</label>
+      <input
+        type="date"
+        className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   );
 }

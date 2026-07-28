@@ -41,10 +41,39 @@ export const readCachedAvatar = ({ username, role } = {}) => {
 
   for (const key of keys) {
     const value = localStorage.getItem(key);
-    if (value) return value;
+    if (value) {
+      if (value.startsWith("blob:")) {
+        localStorage.removeItem(key);
+      } else {
+        return value;
+      }
+    }
   }
 
-  return localStorage.getItem(roleAdminLegacyKey) || "";
+  // Fallback to checking other common roles if the requested role didn't have an avatar
+  const allRoles = ["admin", "giaovien", "hocsinh", "phuhuynh", "vanthu"];
+  for (const fallbackRole of allRoles) {
+    const fallbackKey = getAvatarStorageKey(resolvedUsername, fallbackRole);
+    const value = localStorage.getItem(fallbackKey);
+    if (value) {
+      if (value.startsWith("blob:")) {
+        localStorage.removeItem(fallbackKey);
+      } else {
+        return value;
+      }
+    }
+  }
+
+  const legacyValue = localStorage.getItem(roleAdminLegacyKey);
+  if (legacyValue) {
+    if (legacyValue.startsWith("blob:")) {
+      localStorage.removeItem(roleAdminLegacyKey);
+    } else {
+      return legacyValue;
+    }
+  }
+
+  return "";
 };
 
 export const writeCachedAvatar = ({ avatar, username, role } = {}) => {

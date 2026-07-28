@@ -57,13 +57,12 @@ export default function StudentLayout() {
         userRole="Học sinh"
         onToggle={() => setMenuOpen((current) => !current)}
         isOpen={menuOpen}
-        hideEdit
         navLinks={links}
       />
       <Toast />
       <main className="mt-16 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar app-main-bg transition-all duration-200">
         <PasswordChangeBanner />
-        <div className="mx-auto max-w-container-max space-y-6 p-lg">
+        <div className="w-full">
           <Outlet />
         </div>
       </main>

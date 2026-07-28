@@ -449,9 +449,18 @@ public class AiService {
 
         // Student data - summarized to reduce prompt length
         sb.append("DỮ LIỆU HỌC SINH:\n");
+        List<Integer> hsIds = hocSinhList.stream().map(HocSinh::getId).collect(Collectors.toList());
+        List<Diem> allDiem = diemRepository.findByHocSinhIdInAndNamHoc(hsIds, namHoc);
+        List<DiemDanh> allDiemDanh = diemDanhRepository.findByHocSinhIdInAndNgayBetween(hsIds, fromDate, toDate);
+        List<HanhKiem> allHanhKiem = hanhKiemRepository.findByHocSinhIdIn(hsIds);
+        
+        Map<Integer, List<Diem>> diemByHs = allDiem.stream().collect(Collectors.groupingBy(d -> d.getHocSinh().getId()));
+        Map<Integer, List<DiemDanh>> diemDanhByHs = allDiemDanh.stream().collect(Collectors.groupingBy(d -> d.getHocSinh().getId()));
+        Map<Integer, List<HanhKiem>> hanhKiemByHs = allHanhKiem.stream().collect(Collectors.groupingBy(d -> d.getHocSinh().getId()));
+
         for (HocSinh hs : hocSinhList) {
-            // Calculate semester average
-            List<Diem> diemList = diemRepository.findByHocSinhIdAndNamHoc(hs.getId(), namHoc);
+            Integer hsId = hs.getId();
+            List<Diem> diemList = diemByHs.getOrDefault(hsId, Collections.emptyList());
             List<Diem> diemHocKy = diemList.stream()
                     .filter(d -> d.getHocKy().equals(hocKy))
                     .collect(Collectors.toList());
@@ -472,12 +481,12 @@ public class AiService {
             }
 
             // Attendance summary
-            List<DiemDanh> ddList = diemDanhRepository.findByHocSinhIdAndNgayBetween(hs.getId(), fromDate, toDate);
+            List<DiemDanh> ddList = diemDanhByHs.getOrDefault(hsId, Collections.emptyList());
             long cp = ddList.stream().filter(d -> "CO_PHEP".equals(d.getLoaiVang())).count();
             long kp = ddList.stream().filter(d -> "KHONG_PHEP".equals(d.getLoaiVang())).count();
 
             // Conduct
-            List<HanhKiem> hkList = hanhKiemRepository.findByHocSinhId(hs.getId());
+            List<HanhKiem> hkList = hanhKiemByHs.getOrDefault(hsId, Collections.emptyList());
             String xepLoai = hkList.stream()
                     .filter(hk -> hk.getNamHoc() != null && namHoc.equals(hk.getNamHoc().getTenNamHoc()) && hk.getHocKy().equals(hocKy))
                     .map(hk -> hk.getXepLoai().name()).findFirst().orElse("--");

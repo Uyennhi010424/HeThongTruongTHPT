@@ -6,11 +6,20 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 @Table(name = "diem", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"hoc_sinh_id", "mon_hoc_id", "loai_diem", "so_thu_tu", "hoc_ky", "nam_hoc"})
 }, indexes = {
-    @Index(name = "idx_diem_nam_hoc", columnList = "nam_hoc")
+    @Index(name = "idx_diem_nam_hoc", columnList = "nam_hoc"),
+    @Index(name = "idx_diem_hoc_sinh", columnList = "hoc_sinh_id"),
+    @Index(name = "idx_diem_gv_nhap", columnList = "giao_vien_nhap_id")
 })
 public class Diem {
     @Id
@@ -18,11 +27,11 @@ public class Diem {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "hoc_sinh_id", nullable = false)
     private HocSinh hocSinh;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "mon_hoc_id", nullable = false)
     private MonHoc monHoc;
 
@@ -61,19 +70,35 @@ public class Diem {
     @Column(name = "status", nullable = false)
     private String status = "DRAFT"; // DRAFT, CONFIRMED, LOCKED
 
+    @CreatedDate
     @Column(name = "ngay_nhap", nullable = false, updatable = false)
     private LocalDateTime ngayNhap;
 
-    @ManyToOne
+    @LastModifiedDate
+    @Column(name = "ngay_sua")
+    private LocalDateTime ngaySua;
+
+    @CreatedBy
+    @Column(name = "nguoi_nhap")
+    private String nguoiNhap;
+
+    @LastModifiedBy
+    @Column(name = "nguoi_sua")
+    private String nguoiSua;
+
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giao_vien_nhap_id", nullable = false)
     private GiaoVien giaoVienNhap;
 
     @Column(name = "ghi_chu")
     private String ghiChu;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @PrePersist
     public void prePersist() {
-        this.ngayNhap = LocalDateTime.now();
         if (this.status == null) {
             this.status = "DRAFT";
         }
@@ -189,5 +214,37 @@ public class Diem {
 
     public void setGhiChu(String ghiChu) {
         this.ghiChu = ghiChu;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+
+    public LocalDateTime getNgaySua() {
+        return ngaySua;
+    }
+
+    public void setNgaySua(LocalDateTime ngaySua) {
+        this.ngaySua = ngaySua;
+    }
+
+    public String getNguoiNhap() {
+        return nguoiNhap;
+    }
+
+    public void setNguoiNhap(String nguoiNhap) {
+        this.nguoiNhap = nguoiNhap;
+    }
+
+    public String getNguoiSua() {
+        return nguoiSua;
+    }
+
+    public void setNguoiSua(String nguoiSua) {
+        this.nguoiSua = nguoiSua;
     }
 }

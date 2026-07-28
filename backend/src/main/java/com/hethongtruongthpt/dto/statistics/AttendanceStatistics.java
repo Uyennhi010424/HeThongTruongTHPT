@@ -6,6 +6,7 @@ import java.util.List;
 public class AttendanceStatistics {
 
     private long tongNgayVang;
+    private long tongLuotDiemDanh;
     private double tyLeVang;
     private List<AbsentStudent> topVangNhat = new ArrayList<>();
     private List<ClassAttendance> theoLop = new ArrayList<>();
@@ -19,6 +20,14 @@ public class AttendanceStatistics {
 
     public void setTongNgayVang(long tongNgayVang) {
         this.tongNgayVang = tongNgayVang;
+    }
+
+    public long getTongLuotDiemDanh() {
+        return tongLuotDiemDanh;
+    }
+
+    public void setTongLuotDiemDanh(long tongLuotDiemDanh) {
+        this.tongLuotDiemDanh = tongLuotDiemDanh;
     }
 
     public double getTyLeVang() {

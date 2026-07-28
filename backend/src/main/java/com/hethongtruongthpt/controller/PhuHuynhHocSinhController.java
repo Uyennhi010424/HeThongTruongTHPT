@@ -26,7 +26,7 @@ public class PhuHuynhHocSinhController {
         this.repository = repository;
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH')")
     @GetMapping("/{id}/phuhuynh")
     public ResponseEntity<ApiResponse<List<PhuHuynh>>> getParentsForStudent(@PathVariable("id") Integer id) {
         List<PhuHuynhHocSinh> links = repository.findByHocSinhId(id);

@@ -28,15 +28,15 @@ public class ThongBao {
     @JsonProperty("doiTuong")
     private String loai; // ALL, HOC_SINH, GIAO_VIEN, PHU_HUYNH
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "lop_id")
     private LopHoc lop;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "hoc_sinh_id")
     private HocSinh hocSinh;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "nguoi_tao_id", nullable = false)
     private User nguoiTao;
 

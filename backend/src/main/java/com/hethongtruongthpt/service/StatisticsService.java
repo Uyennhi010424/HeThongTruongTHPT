@@ -16,6 +16,7 @@ import com.hethongtruongthpt.repository.HocBaRepository;
 import com.hethongtruongthpt.repository.HocSinhRepository;
 import com.hethongtruongthpt.repository.LopHocRepository;
 import com.hethongtruongthpt.repository.NamHocRepository;
+import com.hethongtruongthpt.repository.LichNamHocRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -39,6 +40,7 @@ public class StatisticsService {
     private final DiemDanhRepository diemDanhRepository;
     private final HanhKiemRepository hanhKiemRepository;
     private final NamHocRepository namHocRepository;
+    private final LichNamHocRepository lichNamHocRepository;
 
     public StatisticsService(HocSinhRepository hocSinhRepository,
                              GiaoVienRepository giaoVienRepository,
@@ -46,7 +48,8 @@ public class StatisticsService {
                              HocBaRepository hocBaRepository,
                              DiemDanhRepository diemDanhRepository,
                              HanhKiemRepository hanhKiemRepository,
-                             NamHocRepository namHocRepository) {
+                             NamHocRepository namHocRepository,
+                             LichNamHocRepository lichNamHocRepository) {
         this.hocSinhRepository = hocSinhRepository;
         this.giaoVienRepository = giaoVienRepository;
         this.lopHocRepository = lopHocRepository;
@@ -54,6 +57,7 @@ public class StatisticsService {
         this.diemDanhRepository = diemDanhRepository;
         this.hanhKiemRepository = hanhKiemRepository;
         this.namHocRepository = namHocRepository;
+        this.lichNamHocRepository = lichNamHocRepository;
     }
 
     // ----------------------------------------------------------------
@@ -169,6 +173,11 @@ public class StatisticsService {
     //  ATTENDANCE
     // ----------------------------------------------------------------
 
+    private long countSchoolDays(LocalDate from, LocalDate to) {
+        if (from == null || to == null || from.isAfter(to)) return 0;
+        return lichNamHocRepository.countNgayHocBetween(from, to);
+    }
+
     public AttendanceStatistics getAttendanceStats(String namHoc, LocalDate from, LocalDate to) {
         if (namHoc == null || namHoc.isBlank()) {
             throw new ApiException("Năm học không được để trống");
@@ -198,20 +207,18 @@ public class StatisticsService {
 
             long classCoPhep = 0;
             long classKhongPhep = 0;
-            long classTotalRecords = 0;
+            long classTotalRecords = countSchoolDays(effectiveFrom, effectiveTo) * (lop.getSiSo() != null ? lop.getSiSo() : 0);
+            totalAllRecords += classTotalRecords;
 
             for (Object[] row : absenceRows) {
                 Integer hocSinhId = ((Number) row[0]).intValue();
                 String hoTen = (String) row[1];
                 long coPhep = ((Number) row[2]).longValue();
                 long khongPhep = ((Number) row[3]).longValue();
-                long totalRecords = ((Number) row[4]).longValue();
 
                 totalAbsenceRecords += (coPhep + khongPhep);
-                totalAllRecords += totalRecords;
                 classCoPhep += coPhep;
                 classKhongPhep += khongPhep;
-                classTotalRecords += totalRecords;
 
                 studentMap.merge(hocSinhId,
                         new AttendanceStatistics.AbsentStudent(hocSinhId, hoTen, lop.getTenLop(),
@@ -242,10 +249,13 @@ public class StatisticsService {
         stats.setTongNgayVang(totalAbsenceRecords);
         stats.setTheoLop(classAttendanceList);
 
-        // Absence rate = total absence records / total attendance records * 100
-        if (totalAllRecords > 0) {
-            double rate = (double) totalAbsenceRecords / totalAllRecords * 100.0;
-            stats.setTyLeVang(Math.round(rate * 100.0) / 100.0);
+        // Tỷ lệ vắng tổng = trung bình cộng tỷ lệ vắng của từng lớp có dữ liệu
+        if (!classAttendanceList.isEmpty()) {
+            double tongTyLe = classAttendanceList.stream()
+                    .mapToDouble(AttendanceStatistics.ClassAttendance::getTyLeVang)
+                    .sum();
+            double avgRate = tongTyLe / classAttendanceList.size();
+            stats.setTyLeVang(Math.round(avgRate * 100.0) / 100.0);
         }
 
         // Top 10 students with most absences
@@ -349,6 +359,16 @@ public class StatisticsService {
 
         ConductStatistics stats = new ConductStatistics();
         stats.setPhanBoHanhKiem(phanBo);
+
+        List<ConductStatistics.ClassConduct> classConductList = new ArrayList<>();
+        for (Map.Entry<String, long[]> entry : classConductMap.entrySet()) {
+            String tenLop = entry.getKey();
+            long[] counts = entry.getValue();
+            classConductList.add(new ConductStatistics.ClassConduct(tenLop, counts[0], counts[1], counts[2], counts[3], counts[4]));
+        }
+        // sort by class name
+        classConductList.sort(Comparator.comparing(ConductStatistics.ClassConduct::getTenLop));
+        stats.setTheoLop(classConductList);
 
         // Find best class (highest TOT ratio)
         String bestClass = null;

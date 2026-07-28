@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import PageHeader from "../../../components/edu/PageHeader.jsx";
-import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { Plus, X, MoreVertical, Edit, Trash2, Shield, RefreshCw, Users } from "lucide-react";
+import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
+import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
   getToHopMon,
@@ -33,22 +34,164 @@ const getApiErrorMessage = (err, fallback) => {
   return message || fallback;
 };
 
+// --- Dropdown Menu Component ---
+const ActionDropdown = ({ item, onAction }) => {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (action) => {
+    setOpen(false);
+    onAction(action, item);
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button 
+        onClick={() => setOpen(!open)}
+        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+      >
+        <MoreVertical className="w-5 h-5" />
+      </button>
+      
+      {open && (
+        <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-lg border border-slate-100 z-50 py-1 font-sans">
+          <button onClick={() => handleSelect("DETAILS")} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-slate-400" /> Chi tiết
+          </button>
+          <button onClick={() => handleSelect("EDIT")} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+            <Edit className="w-4 h-4 text-slate-400" /> Chỉnh sửa
+          </button>
+          <div className="h-px bg-slate-100 my-1 mx-2"></div>
+          <button onClick={() => handleSelect("DELETE")} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-red-500" /> Xóa
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Modal Chi tiết (Centered) ---
+const SubjectDetailDrawer = ({ item, onClose }) => {
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200" onClick={onClose}>
+        <div 
+          className="w-full max-w-lg bg-white rounded-xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200" 
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50 shrink-0">
+            <h2 className="text-lg font-bold text-slate-900">Chi tiết tổ hợp môn</h2>
+            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {/* Thông tin chung */}
+            <div className="space-y-3">
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Mã tổ hợp</span>
+                <span className="text-sm font-semibold text-slate-900">{item.maToHop}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Tên tổ hợp</span>
+                <span className="text-sm font-semibold text-slate-900">{item.tenToHop}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Loại tổ hợp</span>
+                <span className="text-sm font-medium text-slate-900">{item.ban}</span>
+              </div>
+              {item.moTa && (
+                <div className="flex items-start">
+                  <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Mô tả</span>
+                  <span className="text-sm text-slate-700">{item.moTa}</span>
+                </div>
+              )}
+            </div>
+
+            <hr className="my-5 border-slate-200" />
+
+            {/* Danh sách môn học */}
+            <div>
+              <div className="text-sm font-medium text-slate-500 mb-3">Danh sách môn tự chọn</div>
+              <div className="flex flex-wrap gap-2">
+                 {(item.tenMonHocs || []).map((ten, index) => (
+                   <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-[13px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                     {ten} {item.soTiets?.[index] ? `(${item.soTiets[index]}t)` : ""}
+                   </span>
+                 ))}
+                 {!(item.tenMonHocs || []).length && (
+                   <span className="text-sm text-slate-400 italic">Chưa có môn học</span>
+                 )}
+              </div>
+            </div>
+            
+            <hr className="my-5 border-slate-200" />
+
+            {/* Sử dụng */}
+            <div className="space-y-3">
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Số lớp sử dụng</span>
+                <span className="text-sm font-semibold text-slate-900">{item.soLopSuDung || 0} lớp</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-32 text-sm font-medium text-slate-500 shrink-0">Danh sách lớp</span>
+                <span className="text-sm font-medium text-slate-900">
+                  {item.danhSachLop && item.danhSachLop.length > 0 
+                    ? item.danhSachLop.join(", ") 
+                    : <span className="text-slate-400 italic">Chưa có lớp</span>}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Footer actions */}
+          <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+              Đóng
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 export default function ToHopMonList() {
   const [toHopList, setToHopList] = useState([]);
   const [allMonHoc, setAllMonHoc] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [keyword, setKeyword] = useState("");
+  const { searchQuery, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
+  const keyword = searchQuery;
+  
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [formError, setFormError] = useState("");
+  
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerItem, setDrawerItem] = useState(null);
+  
   const [form, setForm] = useState({
     maToHop: "",
     tenToHop: "",
     ban: "Tự nhiên",
     moTa: "",
-    monHocIds: []
+    monHocIds: [],
+    soTiets: []
   });
 
   const fetchData = async () => {
@@ -69,6 +212,12 @@ export default function ToHopMonList() {
   };
 
   useEffect(() => {
+    setSearchPlaceholder("Tìm kiếm tổ hợp môn...");
+    setIsSearchVisible(true);
+    return () => setIsSearchVisible(false);
+  }, [setSearchPlaceholder, setIsSearchVisible]);
+
+  useEffect(() => {
     let active = true;
     const load = async () => {
       if (!active) return;
@@ -77,19 +226,6 @@ export default function ToHopMonList() {
     load();
     return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    if (!successMessage) return undefined;
-    const timer = window.setTimeout(() => setSuccessMessage(""), 2500);
-    return () => window.clearTimeout(timer);
-  }, [successMessage]);
-
-  const stats = useMemo(() => {
-    const total = toHopList.length;
-    const active = toHopList.filter((item) => item.isActive).length;
-    const totalLop = toHopList.reduce((sum, item) => sum + (item.soLopSuDung || 0), 0);
-    return { total, active, totalLop };
-  }, [toHopList]);
 
   const filteredList = useMemo(() => {
     if (!keyword.trim()) return toHopList;
@@ -114,8 +250,6 @@ export default function ToHopMonList() {
   const openCreate = () => {
     setEditingItem(null);
     setForm({ maToHop: "", tenToHop: "", ban: "Tự nhiên", moTa: "", monHocIds: [], soTiets: [] });
-    setFormError("");
-    setSuccessMessage("");
     setModalOpen(true);
   };
 
@@ -129,41 +263,46 @@ export default function ToHopMonList() {
       monHocIds: item.monHocIds || [],
       soTiets: item.soTiets || []
     });
-    setFormError("");
-    setSuccessMessage("");
     setModalOpen(true);
   };
 
-  const handleDelete = async (item) => {
-    if (!window.confirm(`Xóa tổ hợp ${item.maToHop} - ${item.tenToHop}?`)) return;
-    try {
-      await deleteToHopMon(item.id);
-      setToHopList((prev) => prev.filter((row) => row.id !== item.id));
-      setError("");
-      setSuccessMessage("Xóa tổ hợp môn thành công.");
-    } catch (err) {
-      setError(getApiErrorMessage(err, "Không thể xóa tổ hợp môn."));
+  const { confirm } = useConfirm();
+
+  const handleAction = async (action, item) => {
+    if (action === "DETAILS") {
+      setDrawerItem(item);
+      setDrawerOpen(true);
+    } else if (action === "EDIT") {
+      openEdit(item);
+    } else if (action === "DELETE") {
+      if (!(await confirm(`Xóa tổ hợp ${item.maToHop} - ${item.tenToHop}? Dữ liệu không thể khôi phục.`))) return;
+      try {
+        await deleteToHopMon(item.id);
+        setToHopList((prev) => prev.filter((row) => row.id !== item.id));
+        notifySuccess("Xóa tổ hợp môn thành công.");
+      } catch (err) {
+        notifyError(getApiErrorMessage(err, "Không thể xóa tổ hợp môn."));
+      }
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setFormError("");
-
+    
     if (!form.maToHop.trim()) {
-      setFormError("Vui lòng nhập mã tổ hợp.");
+      notifyError("Vui lòng nhập mã tổ hợp.");
       return;
     }
     if (!form.tenToHop.trim()) {
-      setFormError("Vui lòng nhập tên tổ hợp.");
+      notifyError("Vui lòng nhập tên tổ hợp.");
       return;
     }
     if (!form.ban) {
-      setFormError("Vui lòng chọn ban.");
+      notifyError("Vui lòng chọn ban.");
       return;
     }
     if (form.monHocIds.length !== 4) {
-      setFormError("Tổ hợp môn phải có đúng 4 môn tự chọn.");
+      notifyError("Tổ hợp môn phải có đúng 4 môn tự chọn.");
       return;
     }
 
@@ -185,16 +324,16 @@ export default function ToHopMonList() {
         setToHopList((prev) =>
           prev.map((row) => (row.id === editingItem.id ? updated : row))
         );
+        notifySuccess("Cập nhật tổ hợp môn thành công.");
       } else {
         const response = await createToHopMon(payload);
         const created = response?.data?.data;
         setToHopList((prev) => [created, ...prev]);
+        notifySuccess("Thêm tổ hợp môn thành công.");
       }
-      setError("");
-      setSuccessMessage(editingItem ? "Cập nhật tổ hợp môn thành công." : "Thêm tổ hợp môn thành công.");
       setModalOpen(false);
     } catch (err) {
-      setFormError(getApiErrorMessage(err, "Không thể lưu tổ hợp môn."));
+      notifyError(getApiErrorMessage(err, "Không thể lưu tổ hợp môn."));
     }
   };
 
@@ -209,10 +348,7 @@ export default function ToHopMonList() {
 
   const handleSeedDefaults = async () => {
     try {
-      setError("");
-      setSuccessMessage("");
       const existingMaSet = new Set(toHopList.map((item) => item.maToHop));
-
       const monHocMap = new Map();
       allMonHoc.forEach((m) => {
         monHocMap.set(m.tenMon, m.id);
@@ -244,11 +380,15 @@ export default function ToHopMonList() {
       if (createdCount > 0) {
         notifySuccess(`Đã tạo ${createdCount} tổ hợp môn theo quy định.`);
       } else {
-        setSuccessMessage("Danh mục tổ hợp đã đủ theo quy định.");
+        notifySuccess("Danh mục tổ hợp đã đủ theo quy định.");
       }
     } catch (err) {
       notifyError(getApiErrorMessage(err, "Không thể tạo tổ hợp môn."));
     }
+  };
+
+  const handleRefresh = () => {
+    fetchData();
   };
 
   // Nhóm môn học theo loại (bắt buộc vs tự chọn) để hiển thị trong form
@@ -268,169 +408,110 @@ export default function ToHopMonList() {
   }, [allMonHoc]);
 
   return (
-    <div className="page users-page">
-      <PageHeader
-        title="Tổ hợp môn tự chọn"
-        actions={
-          <div className="users-actions">
-            <div className="dash-search users-search">
-              <span className="dot" />
-              <input
-                placeholder="Tìm theo mã, tên tổ hợp hoặc môn học"
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-              />
-            </div>
-            <button className="btn-primary" onClick={openCreate}>
-              Thêm tổ hợp
-            </button>
-          </div>
-        }
-      />
+    <div className="min-h-screen bg-[#F8FAFC] pb-12 font-sans text-slate-900 flex flex-col">
+      {/* Header & Toolbar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 shrink-0">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tổ hợp môn tự chọn</h1>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Quản lý cấu hình các tổ hợp môn sử dụng trong nhà trường.
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={handleSeedDefaults} className="inline-flex items-center justify-center bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-colors shadow-sm gap-2">
+             Tạo tổ hợp mẫu
+          </button>
+          
+          <button onClick={handleRefresh} className="inline-flex items-center justify-center w-[42px] h-[42px] bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition-colors duration-200">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
 
-      <div className="users-stats">
-        <div className="stat-card stat-blue">
-          <div className="stat-label">Tổng tổ hợp</div>
-          <div className="stat-value">{loading ? "..." : stats.total}</div>
-        </div>
-        <div className="stat-card stat-sky">
-          <div className="stat-label">Đang hoạt động</div>
-          <div className="stat-value">{loading ? "..." : stats.active}</div>
-        </div>
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Lớp đang sử dụng</div>
-          <div className="stat-value">{loading ? "..." : stats.totalLop}</div>
+          <button onClick={openCreate} className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors duration-200">
+            <Plus className="w-4 h-4" /> Thêm tổ hợp
+          </button>
         </div>
       </div>
 
-      <div className="card users-table">
-        <div className="table-header">
-          <div>
-            <div className="panel-title">Danh sách tổ hợp môn</div>
-            <div className="panel-subtitle">Mỗi tổ hợp gồm 4 môn tự chọn</div>
+      {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-xl text-sm font-semibold shrink-0">{error}</div>}
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto rounded-2xl">
+        {loading ? (
+          <div className="text-center py-12 text-sm text-slate-500">Đang tải dữ liệu...</div>
+        ) : filteredList.length === 0 ? (
+          <div className="text-center py-16">
+            <h3 className="text-sm font-bold text-slate-900">Không tìm thấy tổ hợp</h3>
+            <p className="text-sm text-slate-500 mt-1">Thử thay đổi từ khóa tìm kiếm.</p>
           </div>
-          <div className="panel-pill">{filteredList.length} tổ hợp</div>
-        </div>
-        {error && <div className="table-empty">{error}</div>}
-        {!error && successMessage && <div className="table-success">{successMessage}</div>}
-        {!error && !loading && filteredList.length === 0 && (
-          <div className="table-empty">Không tìm thấy tổ hợp phù hợp.</div>
-        )}
-        <div className="grade-group-wrap">
-          {loading
-            ? Array.from({ length: 3 }).map((_, index) => (
-                <div className="table-row" key={`skeleton-${index}`}>
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
+        ) : (
+          <div className="space-y-6">
+            {groupedByBan.map(([ban, items]) => (
+              <div key={ban}>
+                <div className="flex items-center gap-3 mb-3">
+                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider px-1">{ban}</h2>
+                  <div className="flex-1 h-px bg-slate-200"></div>
                 </div>
-              ))
-            : groupedByBan.map(([ban, items]) => (
-                <div className="grade-group" key={ban}>
-                  <div className="grade-group-title">{ban}</div>
-                  <div className="table-grid">
-                    {items.map((item) => (
-                      <div
-                        className="table-row"
-                        key={item.id}
-                        style={{ gridTemplateColumns: "70px 1fr 1fr 100px 140px" }}
-                      >
-                        <div className="table-id">
-                          <span className="role-pill" style={{ fontWeight: 700 }}>{item.maToHop}</span>
-                        </div>
-                        <div className="table-main">
-                          <div className="table-title">{item.tenToHop}</div>
-                          <div className="table-meta">{item.ban}</div>
-                        </div>
-                        <div>
-                          <div className="text-body-sm" style={{ color: "var(--on-surface-variant, #666)" }}>
-                            {(item.tenMonHocs || []).map((ten, index) => {
-                              const soTiet = item.soTiets?.[index] ?? 2;
-                              return `${ten} (${soTiet}t)`;
-                            }).join(", ") || "Chưa có môn"}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="role-pill">{item.soLopSuDung || 0} lớp</span>
-                        </div>
-                        <div className="table-actions">
-                          <button
-                            className="btn-outline btn-sm"
-                            onClick={() => openEdit(item)}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            className="rounded-lg p-sm text-outline hover:bg-red-50 hover:text-red-600"
-                            onClick={() => handleDelete(item)}
-                            title="Xóa"
-                          >
-                            <MaterialIcon name="delete" className="text-[20px]" />
-                          </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {items.map(item => (
+                    <div key={item.id} className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 flex flex-col group relative">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-bold text-[11px] rounded border border-blue-100">{item.maToHop}</span>
+                        <h3 className="text-sm font-bold text-slate-900 truncate flex-1">{item.tenToHop}</h3>
+                        <ActionDropdown item={item} onAction={handleAction} />
+                      </div>
+                      
+                      <div className="mb-3">
+                        <div className="flex flex-wrap gap-1.5">
+                           {(item.tenMonHocs || []).map((ten, index) => (
+                             <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-50 text-slate-600 border border-slate-200/60">
+                               {ten} {item.soTiets?.[index] ? `(${item.soTiets[index]}t)` : ""}
+                             </span>
+                           ))}
+                           {!(item.tenMonHocs || []).length && (
+                             <span className="text-xs text-slate-400 italic">Chưa có môn học</span>
+                           )}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      
+                      <div className="mt-auto pt-3 border-t border-slate-100 flex items-center">
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Users className="w-3.5 h-3.5" />
+                          <span className="text-[12px] font-semibold">{item.soLopSuDung || 0} lớp sử dụng</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <SimpleModal
-        open={modalOpen}
-        title={editingItem ? "Cập nhật tổ hợp môn" : "Thêm tổ hợp môn"}
-        onClose={() => setModalOpen(false)}
-      >
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <label className="form-field">
-            <span>Mã tổ hợp</span>
-            <input
-              value={form.maToHop}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, maToHop: event.target.value.toUpperCase() }))
-              }
-              placeholder="vd: A1"
-              maxLength={10}
-              disabled={!!editingItem}
-            />
-          </label>
-          <label className="form-field">
-            <span>Tên tổ hợp</span>
-            <input
-              value={form.tenToHop}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, tenToHop: event.target.value }))
-              }
-              placeholder="vd: KHTN 1"
-            />
-          </label>
-          <label className="form-field">
-            <span>Ban</span>
-            <select
-              value={form.ban}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, ban: event.target.value }))
-              }
-            >
-              {BAN_OPTIONS.map((ban) => (
-                <option key={ban} value={ban}>{ban}</option>
-              ))}
+      <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)} title={editingItem ? "Cập nhật tổ hợp môn" : "Thêm tổ hợp môn"} width={500}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Mã tổ hợp <span className="text-red-500">*</span></label>
+              <input type="text" value={form.maToHop} onChange={e => setForm({...form, maToHop: e.target.value.toUpperCase()})} placeholder="vd: A1" maxLength={10} disabled={!!editingItem} className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60" />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Tên tổ hợp <span className="text-red-500">*</span></label>
+              <input type="text" value={form.tenToHop} onChange={e => setForm({...form, tenToHop: e.target.value})} placeholder="vd: KHTN 1" className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Ban <span className="text-red-500">*</span></label>
+            <select value={form.ban} onChange={e => setForm({...form, ban: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+              {BAN_OPTIONS.map((ban) => <option key={ban} value={ban}>{ban}</option>)}
             </select>
-          </label>
-          <label className="form-field">
-            <span>Mô tả</span>
-            <input
-              value={form.moTa}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, moTa: event.target.value }))
-              }
-              placeholder="Mô tả tổ hợp (tùy chọn)"
-            />
-          </label>
-
-          <div className="form-field">
-            <span>Môn tự chọn (chọn đúng 4 môn)</span>
-            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">Môn tự chọn (chọn đúng 4 môn) <span className="text-red-500">*</span></label>
+            <div className="flex flex-wrap gap-2">
               {monHocByType.tuChonList.map((mon) => {
                 const selected = form.monHocIds.includes(mon.id);
                 return (
@@ -438,79 +519,71 @@ export default function ToHopMonList() {
                     key={mon.id}
                     type="button"
                     onClick={() => handleMonHocToggle(mon.id)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: 8,
-                      border: selected ? "2px solid var(--primary, #2563eb)" : "1px solid var(--outline, #ccc)",
-                      background: selected ? "var(--primary-container, #dbeafe)" : "transparent",
-                      color: selected ? "var(--on-primary-container, #1e40af)" : "inherit",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: selected ? 600 : 400
-                    }}
+                    className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${selected ? 'bg-blue-100 text-blue-700 border border-blue-200 font-bold' : 'bg-white text-slate-600 border border-slate-200 font-semibold hover:bg-slate-50'}`}
                   >
                     {mon.tenMon}
                   </button>
                 );
               })}
             </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: "var(--on-surface-variant, #888)" }}>
-              Đã chọn: {form.monHocIds.length}/4 môn
+            <div className="mt-2 text-xs font-semibold text-slate-500">
+              Đã chọn: <span className={form.monHocIds.length === 4 ? "text-blue-600" : "text-red-500"}>{form.monHocIds.length}/4</span> môn
             </div>
-
-            {form.monHocIds.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--on-surface, #333)" }}>Cấu hình số tiết học của các môn tự chọn:</span>
-                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {form.monHocIds.map((id, index) => {
-                    const mon = allMonHoc.find((m) => m.id === id);
-                    if (!mon) return null;
-                    const currentPeriod = form.soTiets?.[index] ?? 2;
-                    return (
-                      <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", border: "1px solid var(--outline-variant, #eee)", borderRadius: 8, background: "#fcfcfc" }}>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{mon.tenMon}</span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 12, color: "#666" }}>Số tiết/tuần:</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={5}
-                            value={currentPeriod}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 2;
-                              setForm((prev) => {
-                                const newSoTiets = [...(prev.soTiets || [])];
-                                while (newSoTiets.length < prev.monHocIds.length) newSoTiets.push(2);
-                                newSoTiets[index] = val;
-                                return { ...prev, soTiets: newSoTiets };
-                              });
-                            }}
-                            style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid #ccc", textAlign: "center", fontSize: 13 }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
-          {formError && <div className="form-error">{formError}</div>}
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={() => setModalOpen(false)}
-            >
-              Hủy
-            </button>
-            <button type="submit" className="btn-primary">
-              Lưu
-            </button>
+          {form.monHocIds.length > 0 && (
+            <div className="pt-2 border-t border-slate-100">
+              <label className="block text-sm font-bold text-slate-700 mb-2">Số tiết học mỗi tuần</label>
+              <div className="space-y-2">
+                {form.monHocIds.map((id, index) => {
+                  const mon = allMonHoc.find((m) => m.id === id);
+                  if (!mon) return null;
+                  const currentPeriod = form.soTiets?.[index] ?? 2;
+                  return (
+                    <div key={id} className="flex items-center justify-between p-2.5 border border-slate-100 rounded-xl bg-slate-50/50">
+                      <span className="text-sm font-semibold text-slate-700">{mon.tenMon}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-500">Tiết/tuần:</span>
+                        <input
+                          type="number" min={1} max={5}
+                          value={currentPeriod}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 2;
+                            setForm((prev) => {
+                              const newSoTiets = [...(prev.soTiets || [])];
+                              while (newSoTiets.length < prev.monHocIds.length) newSoTiets.push(2);
+                              newSoTiets[index] = val;
+                              return { ...prev, soTiets: newSoTiets };
+                            });
+                          }}
+                          className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Mô tả (Ghi chú)</label>
+            <input type="text" value={form.moTa} onChange={e => setForm({...form, moTa: e.target.value})} placeholder="Tùy chọn" className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+          </div>
+          
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
+            <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">Hủy</button>
+            <button type="submit" className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors">Lưu lại</button>
           </div>
         </form>
       </SimpleModal>
+
+      {drawerOpen && drawerItem && (
+        <SubjectDetailDrawer 
+          item={drawerItem} 
+          onClose={() => setDrawerOpen(false)} 
+        />
+      )}
     </div>
   );
 }

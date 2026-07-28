@@ -139,6 +139,35 @@ export const compareClassesByName = (a, b) => {
   return Number(a?.id || 0) - Number(b?.id || 0);
 };
 
+export const validateStudentAgeAndYear = (ngaySinh, namNhapHoc, khoi) => {
+  const currentYear = new Date().getFullYear();
+  let error = null;
+
+  if (namNhapHoc) {
+    if (namNhapHoc > currentYear + 1) {
+      error = `Năm nhập học không được vượt quá ${currentYear + 1}`;
+    } else if (namNhapHoc < 2000) {
+      error = "Năm nhập học phải từ năm 2000 trở đi";
+    }
+  }
+
+  if (!error && ngaySinh && khoi) {
+    const birthYear = new Date(ngaySinh).getFullYear();
+    const age = currentYear - birthYear;
+    
+    let validAge = false;
+    if (khoi == 10 && (age >= 16 && age <= 18)) validAge = true;
+    else if (khoi == 11 && (age >= 17 && age <= 19)) validAge = true;
+    else if (khoi == 12 && (age >= 18 && age <= 20)) validAge = true;
+
+    if (!validAge) {
+      error = `Độ tuổi ${age} không phù hợp với Khối ${khoi} (Năm sinh: ${birthYear}, Năm hiện tại: ${currentYear})`;
+    }
+  }
+
+  return error;
+};
+
 export const parseBoolean = (value, fallback = false) => {
   if (typeof value === "boolean") return value;
   const normalized = normalizeStrict(value);
@@ -303,3 +332,15 @@ export const EXCEL_FIELD_ALIASES = {
 export const REQUIRED_EXCEL_FIELDS = ["hoTen", "lop"];
 
 export const DEFAULT_ACCOUNT_PASSWORD = "123456";
+
+export const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+};
+

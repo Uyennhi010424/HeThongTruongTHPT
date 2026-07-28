@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { getThoiKhoaBieu } from "../../api/thoikhoabieuApi.js";
 import { getLichThiByLop } from "../../api/lichthiApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
@@ -29,7 +30,25 @@ export default function TimetablePage() {
   const [error, setError] = useState("");
   const [selectedTuan, setSelectedTuan] = useState(1);
   const [yearInfo, setYearInfo] = useState({ tenNamHoc: "", hocKy: 1 });
-  const [filterType, setFilterType] = useState("all");
+  const location = useLocation();
+  
+  // Lấy giá trị filter từ query param, nếu không có thì mặc định là "all"
+  const getInitialFilter = () => {
+    const params = new URLSearchParams(location.search);
+    const filterParam = params.get("filter");
+    return ["all", "lessons", "exams"].includes(filterParam) ? filterParam : "all";
+  };
+  
+  const [filterType, setFilterType] = useState(getInitialFilter());
+
+  // Cập nhật filter nếu URL thay đổi (VD: khi đang ở trang TKB mà user bấm link ở sidebar)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const filterParam = params.get("filter");
+    if (filterParam && ["all", "lessons", "exams"].includes(filterParam)) {
+      setFilterType(filterParam);
+    }
+  }, [location.search]);
   const [lopId, setLopId] = useState(null);
   const [namHocList, setNamHocList] = useState([]);
   const [displayedDate, setDisplayedDate] = useState(new Date());
@@ -166,6 +185,17 @@ export default function TimetablePage() {
   /* ── Schedule map (day → period → entries) ── */
   const scheduleMap = useMemo(() => {
     const map = new Map();
+    // Tính selectedWeekStart ngay bên trong để tránh lỗi TDZ
+    let weekStart = new Date();
+    if (yearInfo.tenNamHoc) {
+      const startYear = parseInt(yearInfo.tenNamHoc.split("-")[0]);
+      const schoolStart = new Date(startYear, 8, 5);
+      const dow = schoolStart.getDay();
+      const monday = new Date(schoolStart);
+      monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+      monday.setDate(monday.getDate() + (selectedTuan - 1) * 7);
+      weekStart = monday;
+    }
     timetable.forEach((item) => {
       const day = Number(item?.thu);
       const start = Number(item?.tietBatDau || 1);
@@ -174,8 +204,8 @@ export default function TimetablePage() {
 
       // Skip dates between Sept 1st and Sept 4th
       const dayDiff = day - 2;
-      const targetDate = new Date(selectedWeekStart);
-      targetDate.setDate(selectedWeekStart.getDate() + dayDiff);
+      const targetDate = new Date(weekStart);
+      targetDate.setDate(weekStart.getDate() + dayDiff);
       const m = targetDate.getMonth() + 1;
       const d = targetDate.getDate();
       if (m === 9 && d >= 1 && d <= 4) {
@@ -190,7 +220,7 @@ export default function TimetablePage() {
       }
     });
     return map;
-  }, [timetable, selectedWeekStart]);
+  }, [timetable, selectedTuan, yearInfo.tenNamHoc]);
 
   const getCellEntries = (day, period) => scheduleMap.get(`${day}-${period}`) || [];
 
@@ -533,14 +563,14 @@ export default function TimetablePage() {
               className="tkb-legend-dot"
               style={{ background: "#fff", borderLeft: "3px solid #3b82f6" }}
             />
-            Lịch dạy buổi sáng
+            Lịch học buổi sáng
           </div>
           <div className="tkb-legend-item">
             <div
               className="tkb-legend-dot"
               style={{ background: "#fef9c3", borderLeft: "3px solid #f59e0b" }}
             />
-            Lịch dạy buổi chiều
+            Lịch học buổi chiều
           </div>
           <div className="tkb-legend-item">
             <div

@@ -37,7 +37,12 @@ export default function TeacherReport() {
         const gv = teacherRes?.data?.data;
         setTeacher(gv);
         setClasses(lopRes?.data?.data || []);
-        setSubjects(monHocRes?.data?.data || []);
+        const rawSubjects = monHocRes?.data?.data || [];
+        const filteredSubjects = rawSubjects.filter(s => {
+          const name = (s.tenMon || "").toLowerCase();
+          return !name.includes("shdc") && !name.includes("sinh hoạt lớp");
+        });
+        setSubjects(filteredSubjects);
 
         const allNamHoc = namHocRes?.data?.data || [];
         const years = allNamHoc

@@ -15,15 +15,15 @@ public class PhanCongDay {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giao_vien_id", nullable = true)
     private GiaoVien giaoVien;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "mon_hoc_id", nullable = false)
     private MonHoc monHoc;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "lop_id", nullable = false)
     private LopHoc lop;
 

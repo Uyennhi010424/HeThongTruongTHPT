@@ -1,28 +1,51 @@
+import { 
+  LayoutDashboard, 
+  BookOpen, 
+  Users, 
+  Settings,
+  PenTool,
+  BarChart2,
+  CalendarPlus,
+  ClipboardCheck,
+  CheckCircle,
+  CalendarDays,
+  UserMinus,
+  UsersRound,
+  BellRing,
+  BarChart3
+} from "lucide-react";
+
 export const TEACHER_NAV = [
-  { path: "/teacher/dashboard", label: "Trang chủ", icon: "dashboard" },
+  { id: "dashboard", group: "Trang chủ", icon: LayoutDashboard, path: "/teacher/dashboard" },
   {
+    id: "teaching",
     group: "Giảng dạy",
+    icon: BookOpen,
     children: [
-      { path: "/teacher/diem/nhap", label: "Nhập điểm", icon: "edit_note" },
-      { path: "/teacher/diem/bangdiem", label: "Bảng điểm", icon: "assessment" },
-      { path: "/teacher/dangky-lop", label: "Đăng ký lịch dạy", icon: "edit_calendar" },
-      { path: "/teacher/diemdanh", label: "Điểm danh", icon: "how_to_reg" },
-      { path: "/teacher/hanhkiem", label: "Hạnh kiểm", icon: "verified" },
-      { path: "/teacher/lichthi", label: "Lịch thi", icon: "event" },
-      { path: "/teacher/xin-nghi", label: "Xin nghỉ dạy", icon: "person_off" }
+      { path: "/teacher/diem/nhap", label: "Nhập điểm", icon: PenTool },
+      { path: "/teacher/dangky-lop", label: "Đăng ký lịch dạy", icon: CalendarPlus },
+      { path: "/teacher/diemdanh", label: "Điểm danh", icon: ClipboardCheck },
+      { path: "/teacher/lichthi", label: "Lịch thi", icon: CalendarDays },
+      { path: "/teacher/xin-nghi", label: "Xin nghỉ dạy", icon: UserMinus }
     ]
   },
   {
+    id: "homeroom",
     group: "Chủ nhiệm",
+    icon: Users,
     children: [
-      { path: "/teacher/lopchunhiem", label: "Lớp chủ nhiệm", icon: "groups" }
+      { path: "/teacher/lopchunhiem", label: "Lớp chủ nhiệm", icon: UsersRound },
+      { path: "/teacher/diem/bangdiem", label: "Bảng điểm", icon: BarChart2 },
+      { path: "/teacher/hanhkiem", label: "Hạnh kiểm", icon: CheckCircle }
     ]
   },
   {
+    id: "other",
     group: "Khác",
+    icon: Settings,
     children: [
-      { path: "/teacher/thongbao", label: "Thông báo", icon: "notifications" },
-      { path: "/teacher/report", label: "Thống kê", icon: "analytics" }
+      { path: "/teacher/thongbao", label: "Thông báo", icon: BellRing },
+      { path: "/teacher/report", label: "Thống kê", icon: BarChart3 }
     ]
   }
 ];

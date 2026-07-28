@@ -28,11 +28,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final DefaultAccountPasswordPolicy passwordPolicy;
+    private final UserAuditLogService auditLogService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, DefaultAccountPasswordPolicy passwordPolicy) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, DefaultAccountPasswordPolicy passwordPolicy, UserAuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
+        this.auditLogService = auditLogService;
     }
 
     public void resetPasswordToDefault(Integer id) {
@@ -51,6 +53,7 @@ public class UserService {
             existing.setPassword(passwordEncoder.encode(newRaw));
             existing.setMustChangePassword(true);
             userRepository.save(existing);
+            auditLogService.logAction(existing.getId(), "RESET_PASSWORD", "Đặt lại mật khẩu về mặc định", null);
         } catch (Exception ex) {
             throw new ApiException("Không thể đặt lại mật khẩu: " + ex.getMessage());
         }
@@ -81,6 +84,7 @@ public class UserService {
 
         existing.setPassword(passwordEncoder.encode(newPassword.trim()));
         userRepository.save(existing);
+        auditLogService.logAction(existing.getId(), "CHANGE_PASSWORD", "Người dùng tự đổi mật khẩu", null);
     }
 
     public List<UserDTO> getAll() {
@@ -121,6 +125,9 @@ public class UserService {
 
         User user = new User();
         user.setUsername(username);
+        if (request.getEmail() != null) {
+            user.setEmail(request.getEmail());
+        }
 
         // Generate default password server-side when none is provided
         String rawPassword = request.getPassword();
@@ -147,6 +154,9 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
 
         existing.setUsername(request.getUsername());
+        if (request.getEmail() != null) {
+            existing.setEmail(request.getEmail());
+        }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             existing.setPassword(normalizePassword(request.getPassword()));
         }
@@ -156,9 +166,40 @@ public class UserService {
         if (request.getStatus() != null) {
             existing.setIsActive(resolveActive(request.getStatus()));
         }
+        if (request.getAnhDaiDien() != null) {
+            existing.setAnhDaiDien(request.getAnhDaiDien());
+        }
 
         User saved = userRepository.save(existing);
         return toDto(saved);
+    }
+
+    public void updatePermissions(Integer id, String permissionsStr) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
+        existing.setPermissions(permissionsStr);
+        userRepository.save(existing);
+        auditLogService.logAction(id, "UPDATE_PERMISSIONS", "Cập nhật quyền truy cập hệ thống", null);
+    }
+
+    public void lockAccount(Integer id, java.time.LocalDateTime lockedUntil) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
+        
+        existing.setLockedUntil(lockedUntil);
+        
+        if (lockedUntil != null) {
+            existing.setIsActive(false);
+            String detail = lockedUntil.getYear() >= 2099 ? "Khóa vĩnh viễn" : "Khóa tạm thời đến " + lockedUntil.toString();
+            auditLogService.logAction(id, "LOCK_ACCOUNT", detail, null);
+        } else {
+            existing.setIsActive(true);
+            auditLogService.logAction(id, "UNLOCK_ACCOUNT", "Mở khóa tài khoản", null);
+        }
+        
+        userRepository.save(existing);
     }
 
     public void delete(Integer id) {
@@ -217,12 +258,16 @@ public class UserService {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
-        dto.setEmail(user.getUsername());
+        dto.setEmail(user.getEmail());
         dto.setRole(user.getRole());
         dto.setActive(user.getIsActive());
         dto.setStatus(Boolean.TRUE.equals(user.getIsActive()) ? 1 : 0);
         dto.setCreatedAt(user.getCreatedAt());
         dto.setUpdatedAt(user.getUpdatedAt());
+        dto.setLastLogin(user.getLastLogin());
+        dto.setLockedUntil(user.getLockedUntil());
+        dto.setPermissions(user.getPermissions());
+        dto.setAnhDaiDien(user.getAnhDaiDien());
         return dto;
     }
 }

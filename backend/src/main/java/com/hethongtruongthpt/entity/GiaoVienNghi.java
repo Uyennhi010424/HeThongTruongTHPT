@@ -14,7 +14,7 @@ public class GiaoVienNghi {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giao_vien_id", nullable = false)
     private GiaoVien giaoVien;
 
@@ -36,7 +36,17 @@ public class GiaoVienNghi {
     @Column(name = "ly_do_tu_choi")
     private String lyDoTuChoi;
 
-    @ManyToOne
+    @Column(name = "admin_message", columnDefinition = "TEXT")
+    private String adminMessage;
+
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giao_vien_thay_id")
     private GiaoVien giaoVienThay;
 
@@ -77,4 +87,13 @@ public class GiaoVienNghi {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getAdminMessage() { return adminMessage; }
+    public void setAdminMessage(String adminMessage) { this.adminMessage = adminMessage; }
+
+    public User getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(User approvedBy) { this.approvedBy = approvedBy; }
+
+    public LocalDateTime getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(LocalDateTime approvedAt) { this.approvedAt = approvedAt; }
 }

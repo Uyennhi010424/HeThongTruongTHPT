@@ -2,6 +2,7 @@ package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.entity.GiaoVien;
 import com.hethongtruongthpt.entity.GiaoVienNghi;
+import com.hethongtruongthpt.entity.User;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.GiaoVienNghiRepository;
@@ -12,19 +13,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
 public class GiaoVienNghiService {
 
     private static final Logger logger = LoggerFactory.getLogger(GiaoVienNghiService.class);
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final GiaoVienNghiRepository nghiRepo;
     private final GiaoVienRepository gvRepo;
+    private final LeaveNotificationService notificationService;
 
-    public GiaoVienNghiService(GiaoVienNghiRepository nghiRepo, GiaoVienRepository gvRepo) {
+    public GiaoVienNghiService(GiaoVienNghiRepository nghiRepo,
+                                GiaoVienRepository gvRepo,
+                                LeaveNotificationService notificationService) {
         this.nghiRepo = nghiRepo;
         this.gvRepo = gvRepo;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -64,14 +72,12 @@ public class GiaoVienNghiService {
         GiaoVien gv = gvRepo.findById(giaoVienId)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên"));
 
-        // Allow registering if there is no pending/approved record for this teacher on this day
         java.util.Optional<GiaoVienNghi> existing = nghiRepo.findByGiaoVienIdAndNgay(giaoVienId, ngay);
         if (existing.isPresent()) {
             GiaoVienNghi old = existing.get();
             if ("APPROVED".equals(old.getTrangThai()) || "PENDING".equals(old.getTrangThai())) {
                 throw new ApiException("Yêu cầu nghỉ ngày " + ngay + " đã tồn tại hoặc đã được duyệt.");
             }
-            // If REJECTED, we can reuse or delete old to re-submit
             nghiRepo.delete(old);
             nghiRepo.flush();
         }
@@ -82,17 +88,28 @@ public class GiaoVienNghiService {
         nghi.setNamHoc(namHoc);
         nghi.setLyDo(lyDo);
         nghi.setGhiChu(ghiChu);
-        nghi.setTrangThai("PENDING"); // Default status
+        nghi.setTrangThai("PENDING");
 
         GiaoVienNghi saved = nghiRepo.save(nghi);
         logger.info("Giao vien {} dang ky nghi ngay {} (Trang thai: PENDING)", gv.getHoTen(), ngay);
+
+        // --- Send notification to all admins ---
+        String tenGv = gv.getHoTen() != null ? gv.getHoTen() : "Giáo viên";
+        notificationService.sendToAllAdmins(
+            "Đơn xin nghỉ mới",
+            tenGv + " xin nghỉ ngày " + ngay.format(DATE_FMT),
+            "LEAVE_REQUEST",
+            saved.getId()
+        );
+
         return saved;
     }
 
     @Transactional
-    public GiaoVienNghi duyetNghi(Integer id, String trangThai, String lyDoTuChoi, Integer giaoVienThayId) {
+    public GiaoVienNghi duyetNghi(Integer id, String trangThai, String lyDoTuChoi,
+                                   Integer giaoVienThayId, String adminMessage, User approvedByUser) {
         if (id == null || trangThai == null) throw new ApiException("Thiếu mã đơn nghỉ hoặc trạng thái duyệt");
-        
+
         GiaoVienNghi nghi = nghiRepo.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn xin nghỉ"));
 
@@ -101,25 +118,48 @@ public class GiaoVienNghiService {
         }
 
         nghi.setTrangThai(trangThai);
+        nghi.setAdminMessage(adminMessage);
+        nghi.setApprovedBy(approvedByUser);
+        nghi.setApprovedAt(LocalDateTime.now());
+
         if ("REJECTED".equals(trangThai)) {
             nghi.setLyDoTuChoi(lyDoTuChoi);
             nghi.setGiaoVienThay(null);
-            logger.info("Admin tu choi don nghi cua GV {} ngay {} vi: {}", nghi.getGiaoVien().getHoTen(), nghi.getNgay(), lyDoTuChoi);
+            logger.info("Admin tu choi don nghi cua GV {} ngay {}", nghi.getGiaoVien().getHoTen(), nghi.getNgay());
         } else {
             nghi.setLyDoTuChoi(null);
             if (giaoVienThayId != null) {
                 GiaoVien thay = gvRepo.findById(giaoVienThayId)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên thay thế"));
                 nghi.setGiaoVienThay(thay);
-                logger.info("Admin duyet don nghi cua GV {} va phan cong GV {} day thay ngay {}", 
-                    nghi.getGiaoVien().getHoTen(), thay.getHoTen(), nghi.getNgay());
             } else {
                 nghi.setGiaoVienThay(null);
-                logger.info("Admin duyet don nghi cua GV {} ngay {} (Khong phan cong GV thay)", nghi.getGiaoVien().getHoTen(), nghi.getNgay());
             }
+            logger.info("Admin duyet don nghi cua GV {} ngay {}", nghi.getGiaoVien().getHoTen(), nghi.getNgay());
         }
 
-        return nghiRepo.save(nghi);
+        GiaoVienNghi saved = nghiRepo.save(nghi);
+
+        // --- Send notification back to the teacher ---
+        GiaoVien gv = nghi.getGiaoVien();
+        if (gv != null && gv.getUser() != null) {
+            User teacherUser = gv.getUser();
+            boolean approved = "APPROVED".equals(trangThai);
+            String title = approved ? "Đơn xin nghỉ được duyệt" : "Đơn xin nghỉ bị từ chối";
+            String msg = approved
+                ? "Đơn xin nghỉ ngày " + nghi.getNgay().format(DATE_FMT) + " của bạn đã được chấp thuận."
+                : "Đơn xin nghỉ ngày " + nghi.getNgay().format(DATE_FMT) + " của bạn đã bị từ chối."
+                    + (lyDoTuChoi != null ? " Lý do: " + lyDoTuChoi : "");
+            notificationService.sendToUser(teacherUser, title, msg, "LEAVE_RESULT", saved.getId());
+        }
+
+        return saved;
+    }
+
+    /** Backward-compatible overload (no adminMessage / approvedBy) */
+    @Transactional
+    public GiaoVienNghi duyetNghi(Integer id, String trangThai, String lyDoTuChoi, Integer giaoVienThayId) {
+        return duyetNghi(id, trangThai, lyDoTuChoi, giaoVienThayId, null, null);
     }
 
     @SuppressWarnings("null")

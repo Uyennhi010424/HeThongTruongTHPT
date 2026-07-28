@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Header from "../../../components/common/Header.jsx";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
-import { getLop } from "../../../api/lopApi.js";
-import { getGiaoVien, getCurrentGiaoVien } from "../../../api/giaovienApi.js";
-import { getChuNhiem } from "../../../api/chunhiemApi.js";
 import { getParentsForStudent } from "../../../api/phuhuynhHocSinhApi.js";
 import {
   getStudentClassId,
   getStudentClassName,
   sortStudentsByGivenName
 } from "../../../utils/helpers.js";
-import { getCurrentUsernameFromToken, findTeacherByUsername } from "../../../utils/teacherProfile.js";
+import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
+import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
 
 const getGenderLabel = (value) => {
   if (value === null || value === undefined) return "--";
@@ -29,11 +27,9 @@ const formatBirthDate = (value) => {
 };
 
 export default function LopChuNhiem() {
-  const currentUsername = useMemo(() => getCurrentUsernameFromToken(), []);
+  const filters = useTeacherFilters({ homeroomOnly: true, showSubject: false, showGrade: false });
+  
   const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [homeroomAssignments, setHomeroomAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -43,27 +39,15 @@ export default function LopChuNhiem() {
   const [loadingParents, setLoadingParents] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState("");
 
-  const [apiTeacher, setApiTeacher] = useState(null);
-
   useEffect(() => {
     let active = true;
     const fetchData = async () => {
       try {
         setLoading(true);
         setError("");
-        const [hsRes, lopRes, gvRes, cnRes, meRes] = await Promise.all([
-          getHocSinh(),
-          getLop(),
-          getGiaoVien(),
-          getChuNhiem(),
-          getCurrentGiaoVien().catch(() => null)
-        ]);
+        const hsRes = await getHocSinh();
         if (!active) return;
         setStudents(hsRes?.data?.data || []);
-        setClasses(lopRes?.data?.data || []);
-        setTeachers(gvRes?.data?.data || []);
-        setHomeroomAssignments(cnRes?.data?.data || []);
-        setApiTeacher(meRes?.data?.data || null);
       } catch {
         if (!active) return;
         setError("Không thể tải dữ liệu lớp chủ nhiệm.");
@@ -75,27 +59,13 @@ export default function LopChuNhiem() {
     return () => { active = false; };
   }, []);
 
-  const currentTeacher = useMemo(() => {
-    if (apiTeacher) return apiTeacher;
-    return findTeacherByUsername(teachers, currentUsername);
-  }, [apiTeacher, teachers, currentUsername]);
-
-  const homeroomAssignment = useMemo(() => {
-    if (!currentTeacher?.id) return null;
-    return homeroomAssignments.find((item) => Number(item?.giaoVienId) === Number(currentTeacher.id)) || null;
-  }, [homeroomAssignments, currentTeacher]);
-
-  const homeroomClassId = homeroomAssignment?.lopId ? String(homeroomAssignment.lopId) : "";
-
-  const homeroomClass = useMemo(() => {
-    if (!homeroomClassId) return null;
-    return classes.find((item) => String(item.id) === homeroomClassId) || null;
-  }, [classes, homeroomClassId]);
+  const homeroomClassId = filters.selectedClassId;
+  const homeroomClass = filters.selectedClassObj;
 
   const homeroomStudents = useMemo(() => {
     if (!homeroomClassId) return [];
     return sortStudentsByGivenName(
-      students.filter((item) => String(getStudentClassId(item) || "") === homeroomClassId)
+      students.filter((item) => String(getStudentClassId(item) || "") === String(homeroomClassId))
     );
   }, [students, homeroomClassId]);
 
@@ -135,37 +105,40 @@ export default function LopChuNhiem() {
     return parents.find((p) => String(p.id) === String(selectedParentId)) || null;
   }, [parents, selectedParentId]);
 
-  if (!loading && !homeroomClassId) {
+  if (!loading && !homeroomClassId && !filters.loading) {
     return (
-      <div className="page users-page teacher-page">
-        <div className="card table-empty">Bạn chưa được phân công lớp chủ nhiệm.</div>
+      <div style={{ maxWidth: "100%", padding: "24px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+        <TeacherFilter filters={filters} config={{ homeroomOnly: true, showSubject: false, showGrade: false }} />
+        <div style={{ padding: 40, textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: 8, border: "1px dashed #cbd5e1" }}>
+          Bạn chưa chọn lớp chủ nhiệm hoặc không được phân công chủ nhiệm.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page users-page teacher-page">
-      <Header title="Lớp chủ nhiệm" />
+    <div style={{ maxWidth: "100%", padding: "24px 32px", display: "flex", flexDirection: "column", gap: 32 }}>
+      
+      {/* Teacher Filter */}
+      <TeacherFilter filters={filters} config={{ homeroomOnly: true, showSubject: false, showGrade: false }} />
 
       {/* Thông tin lớp */}
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">
-            {homeroomClass ? `Lớp ${homeroomClass.tenLop}` : "Lớp chủ nhiệm"}
-          </div>
-          <div className="users-subtitle">
-            {homeroomClass?.khoi ? `Khối ${homeroomClass.khoi}` : ""}
-            {homeroomClass ? ` · ${homeroomStudents.length} học sinh` : ""}
-          </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingBottom: 16, borderBottom: "1px solid #e2e8f0" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: "#0f172a" }}>
+          {homeroomClass ? `Lớp ${homeroomClass.tenLop}` : "Lớp chủ nhiệm"}
+        </div>
+        <div style={{ fontSize: 14, color: "#64748b" }}>
+          {homeroomClass?.khoi ? `Khối ${homeroomClass.khoi}` : ""}
+          {homeroomClass ? ` · ${homeroomStudents.length} học sinh` : ""}
         </div>
       </div>
 
       {/* Combobox chọn học sinh và phụ huynh */}
-      <div className="card" style={{ padding: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ padding: 24, background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
           {/* Combobox học sinh */}
-          <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 14, fontWeight: 600, color: "#334155" }}>
               Chọn học sinh
             </label>
             <select
@@ -173,12 +146,12 @@ export default function LopChuNhiem() {
               onChange={(e) => setSelectedStudentId(e.target.value)}
               style={{
                 width: "100%",
-                padding: "10px 12px",
+                padding: "10px 14px",
                 fontSize: 14,
-                border: "1px solid #ccc",
+                border: "1px solid #cbd5e1",
                 borderRadius: 8,
-                background: "#fafafa",
-                color: "#1a1a1a",
+                background: "#f8fafc",
+                color: "#0f172a",
                 outline: "none",
                 boxSizing: "border-box"
               }}
@@ -193,8 +166,8 @@ export default function LopChuNhiem() {
           </div>
 
           {/* Combobox phụ huynh */}
-          <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 14, fontWeight: 600, color: "#334155" }}>
               Phụ huynh
             </label>
             <select
@@ -203,12 +176,12 @@ export default function LopChuNhiem() {
               disabled={!selectedStudentId || loadingParents}
               style={{
                 width: "100%",
-                padding: "10px 12px",
+                padding: "10px 14px",
                 fontSize: 14,
-                border: "1px solid #ccc",
+                border: "1px solid #cbd5e1",
                 borderRadius: 8,
-                background: !selectedStudentId || loadingParents ? "#f0f0f0" : "#fafafa",
-                color: "#1a1a1a",
+                background: !selectedStudentId || loadingParents ? "#f1f5f9" : "#f8fafc",
+                color: "#0f172a",
                 outline: "none",
                 boxSizing: "border-box",
                 cursor: !selectedStudentId ? "not-allowed" : "pointer"
@@ -228,88 +201,110 @@ export default function LopChuNhiem() {
 
         {/* Thông tin học sinh được chọn */}
         {selectedStudent && (
-          <div style={{ marginTop: 16, padding: 16, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8, color: "#1a1a1a" }}>
+          <div style={{ padding: 16, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12, color: "#0f172a" }}>
               Thông tin học sinh
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 24px", fontSize: 14, color: "#444" }}>
-              <div><span style={{ color: "#888" }}>Họ tên:</span> {selectedStudent.hoTen}</div>
-              <div><span style={{ color: "#888" }}>Lớp:</span> {getStudentClassName(selectedStudent) || "--"}</div>
-              <div><span style={{ color: "#888" }}>Ngày sinh:</span> {formatBirthDate(selectedStudent.ngaySinh)}</div>
-              <div><span style={{ color: "#888" }}>Giới tính:</span> {getGenderLabel(selectedStudent.gioiTinh)}</div>
-              <div><span style={{ color: "#888" }}>SĐT:</span> {selectedStudent.sdt || "--"}</div>
-              <div><span style={{ color: "#888" }}>Email:</span> {selectedStudent.email || "--"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px", fontSize: 14, color: "#334155" }}>
+              <div><span style={{ color: "#64748b" }}>Họ tên:</span> {selectedStudent.hoTen}</div>
+              <div><span style={{ color: "#64748b" }}>Lớp:</span> {getStudentClassName(selectedStudent) || "--"}</div>
+              <div><span style={{ color: "#64748b" }}>Ngày sinh:</span> {formatBirthDate(selectedStudent.ngaySinh)}</div>
+              <div><span style={{ color: "#64748b" }}>Giới tính:</span> {getGenderLabel(selectedStudent.gioiTinh)}</div>
+              <div><span style={{ color: "#64748b" }}>SĐT:</span> {selectedStudent.sdt || "--"}</div>
+              <div><span style={{ color: "#64748b" }}>Email:</span> {selectedStudent.email || "--"}</div>
             </div>
           </div>
         )}
 
         {/* Thông tin phụ huynh được chọn */}
         {selectedParent && (
-          <div style={{ marginTop: 12, padding: 16, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8, color: "#1a1a1a" }}>
+          <div style={{ padding: 16, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12, color: "#0f172a" }}>
               Thông tin phụ huynh
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 24px", fontSize: 14, color: "#444" }}>
-              <div><span style={{ color: "#888" }}>Họ tên:</span> {selectedParent.hoTen}</div>
-              <div><span style={{ color: "#888" }}>Quan hệ:</span> {selectedParent.quanHe || "--"}</div>
-              <div><span style={{ color: "#888" }}>SĐT:</span> {selectedParent.sdt || "--"}</div>
-              <div><span style={{ color: "#888" }}>Email:</span> {selectedParent.email || "--"}</div>
-              <div><span style={{ color: "#888" }}>Địa chỉ:</span> {selectedParent.diaChi || "--"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px", fontSize: 14, color: "#334155" }}>
+              <div><span style={{ color: "#64748b" }}>Họ tên:</span> {selectedParent.hoTen}</div>
+              <div><span style={{ color: "#64748b" }}>Quan hệ:</span> {selectedParent.quanHe || "--"}</div>
+              <div><span style={{ color: "#64748b" }}>SĐT:</span> {selectedParent.sdt || "--"}</div>
+              <div><span style={{ color: "#64748b" }}>Email:</span> {selectedParent.email || "--"}</div>
+              <div><span style={{ color: "#64748b" }}>Địa chỉ:</span> {selectedParent.diaChi || "--"}</div>
             </div>
           </div>
         )}
       </div>
 
       {/* Bảng danh sách học sinh */}
-      <div className="card users-table">
-        <div className="table-header">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div className="panel-title">Danh sách học sinh</div>
-            <div className="panel-subtitle">Lớp chủ nhiệm được phân công</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>Danh sách học sinh</div>
+            <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>Lớp chủ nhiệm được phân công</div>
           </div>
-          <div className="panel-pill">{homeroomStudents.length} học sinh</div>
+          <div style={{ background: "#f1f5f9", color: "#475569", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
+            {homeroomStudents.length} học sinh
+          </div>
         </div>
-        {error && <div className="table-empty">{error}</div>}
+
+        {error && <div style={{ padding: 16, background: "#fee2e2", color: "#dc2626", borderRadius: 8 }}>{error}</div>}
+        
         {!error && !loading && homeroomStudents.length === 0 && (
-          <div className="table-empty">Không có học sinh trong lớp.</div>
-        )}
-        <div className="table-grid">
-          <div className="table-row table-head">
-            <div>STT</div>
-            <div>Học sinh</div>
-            <div>Liên hệ</div>
-            <div>Trạng thái</div>
+          <div style={{ padding: 40, textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: 8, border: "1px dashed #cbd5e1" }}>
+            Không có học sinh trong lớp.
           </div>
-          {loading
-            ? Array.from({ length: 5 }).map((_, i) => (
-                <div className="table-row" key={`skeleton-${i}`}>
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                </div>
-              ))
-            : homeroomStudents.map((student, i) => (
-                <div className="table-row" key={student.id}>
-                  <div className="table-id">{i + 1}</div>
-                  <div className="table-main">
-                    <div className="table-title">{student.hoTen}</div>
-                    <div className="table-meta">
-                      {formatBirthDate(student.ngaySinh)} · {getGenderLabel(student.gioiTinh)}
-                    </div>
-                  </div>
-                  <div className="table-email">
-                    {student.sdt || "--"}
-                    <div className="table-meta">{student.email || ""}</div>
-                  </div>
-                  <div>
-                    <span className={`status-pill ${student.trangThai === 1 ? "status-active" : "status-locked"}`}>
-                      {student.trangThai === 1 ? "Đang học" : "Ngừng học"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-        </div>
+        )}
+
+        {homeroomStudents.length > 0 && (
+          <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 600, fontSize: 14 }}>
+              <thead style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                <tr>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569" }}>STT</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569" }}>Học sinh</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569" }}>Liên hệ</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569" }}>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={`skeleton-${i}`} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                        <td style={{ padding: "12px 16px" }}><div style={{ width: 20, height: 16, background: "#e2e8f0", borderRadius: 4 }}></div></td>
+                        <td style={{ padding: "12px 16px" }}><div style={{ width: 150, height: 16, background: "#e2e8f0", borderRadius: 4 }}></div></td>
+                        <td style={{ padding: "12px 16px" }}><div style={{ width: 100, height: 16, background: "#e2e8f0", borderRadius: 4 }}></div></td>
+                        <td style={{ padding: "12px 16px" }}><div style={{ width: 60, height: 16, background: "#e2e8f0", borderRadius: 4 }}></div></td>
+                      </tr>
+                    ))
+                  : homeroomStudents.map((student, i) => (
+                      <tr key={student.id} style={{ borderBottom: "1px solid #e2e8f0", background: i % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                        <td style={{ padding: "12px 16px", fontWeight: 600, color: "#0f172a" }}>{i + 1}</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
+                          <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>
+                            {formatBirthDate(student.ngaySinh)} · {getGenderLabel(student.gioiTinh)}
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ color: "#334155" }}>{student.sdt || "--"}</div>
+                          <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{student.email || ""}</div>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span style={{
+                            padding: "4px 10px",
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            background: student.trangThai === 1 ? "#dcfce7" : "#fef2f2",
+                            color: student.trangThai === 1 ? "#16a34a" : "#dc2626"
+                          }}>
+                            {student.trangThai === 1 ? "Đang học" : "Ngừng học"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

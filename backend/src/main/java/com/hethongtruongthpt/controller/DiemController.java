@@ -3,8 +3,11 @@ package com.hethongtruongthpt.controller;
 import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.entity.Diem;
 import com.hethongtruongthpt.service.DiemService;
+import com.hethongtruongthpt.service.DiemPdfService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,9 +18,11 @@ import java.util.Map;
 @RequestMapping("/api/diem")
 public class DiemController {
 	private final DiemService diemService;
+	private final DiemPdfService diemPdfService;
 
-	public DiemController(DiemService diemService) {
+	public DiemController(DiemService diemService, DiemPdfService diemPdfService) {
 		this.diemService = diemService;
+		this.diemPdfService = diemPdfService;
 	}
 
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
@@ -26,7 +31,8 @@ public class DiemController {
 			@RequestParam(required = false) Integer hocSinhId,
 			@RequestParam(required = false) Integer hocKy,
 			@RequestParam(required = false) String namHoc,
-			@RequestParam(required = false) Integer giaoVienId) {
+			@RequestParam(required = false) Integer giaoVienId,
+			@RequestParam(required = false) Integer lopId) {
 		if (giaoVienId != null && hocKy != null && namHoc != null) {
 			return ResponseEntity.ok(ApiResponse.ok(diemService.getByGiaoVienNhapIdAndHocKyAndNamHoc(giaoVienId, hocKy, namHoc)));
 		}
@@ -36,6 +42,9 @@ public class DiemController {
 		if (hocSinhId != null) {
 			return ResponseEntity.ok(ApiResponse.ok(diemService.getByHocSinhId(hocSinhId)));
 		}
+		if (lopId != null && hocKy != null && namHoc != null) {
+			return ResponseEntity.ok(ApiResponse.ok(diemService.getByHocSinhLopIdAndHocKyAndNamHoc(lopId, hocKy, namHoc)));
+		}
 		if (hocKy != null && namHoc != null) {
 			return ResponseEntity.ok(ApiResponse.ok(diemService.getByHocKyAndNamHoc(hocKy, namHoc)));
 		}
@@ -43,6 +52,32 @@ public class DiemController {
 			return ResponseEntity.ok(ApiResponse.ok(diemService.getByNamHoc(namHoc)));
 		}
 		return ResponseEntity.ok(ApiResponse.ok(diemService.getAll()));
+	}
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
+    @GetMapping("/class-scoreboard")
+    public ResponseEntity<ApiResponse<com.hethongtruongthpt.dto.ClassScoreboardDTO>> getClassScoreboard(
+            @RequestParam String namHoc,
+            @RequestParam Integer hocKy,
+            @RequestParam Integer lopId) {
+        return ResponseEntity.ok(ApiResponse.ok(diemService.getClassScoreboard(namHoc, hocKy, lopId)));
+    }
+
+	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
+	@GetMapping("/export-student")
+	public ResponseEntity<byte[]> exportStudentScorecard(
+			@RequestParam Integer hocSinhId,
+			@RequestParam Integer hocKy,
+			@RequestParam String namHoc) {
+		try {
+			byte[] pdfBytes = diemPdfService.generateBangDiemHocSinhPdf(hocSinhId, hocKy, namHoc);
+			HttpHeaders headers = new HttpHeaders();
+			headers.setContentType(MediaType.APPLICATION_PDF);
+			headers.setContentDispositionFormData("attachment", "bang_diem_" + hocSinhId + ".pdf");
+			return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
+		} catch (Exception e) {
+			return ResponseEntity.internalServerError().build();
+		}
 	}
 
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
@@ -76,24 +111,37 @@ public class DiemController {
 		return ResponseEntity.ok(ApiResponse.ok("Xóa thành công", null));
 	}
 
-	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
-	@GetMapping("/summary")
-	public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getSummary(
-			@RequestParam(required = false) String namHoc,
-			@RequestParam(required = false) Integer hocKy,
-			@RequestParam(required = false) Integer lopId) {
-		List<Map<String, Object>> result;
-		if (namHoc != null && lopId != null) {
-			result = diemService.getSummaryByNamHocAndLopId(namHoc, lopId);
-		} else if (namHoc != null && hocKy != null) {
-			result = diemService.getSummaryByNamHocAndHocKy(namHoc, hocKy);
-		} else if (namHoc != null) {
-			result = diemService.getSummaryByNamHoc(namHoc);
-		} else {
-			result = diemService.getSummaryAll();
-		}
-		return ResponseEntity.ok(ApiResponse.ok(result));
-	}
+    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
+    @GetMapping("/summary")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getSummary(
+            @RequestParam(required = false) String namHoc,
+            @RequestParam(required = false) Integer hocKy,
+            @RequestParam(required = false) Integer lopId) {
+        if (namHoc != null && lopId != null) {
+            return ResponseEntity.ok(ApiResponse.ok(diemService.getSummaryByNamHocAndLopId(namHoc, lopId)));
+        } else if (namHoc != null && hocKy != null) {
+            return ResponseEntity.ok(ApiResponse.ok(diemService.getSummaryByNamHocAndHocKy(namHoc, hocKy)));
+        } else if (namHoc != null) {
+            return ResponseEntity.ok(ApiResponse.ok(diemService.getSummaryByNamHoc(namHoc)));
+        }
+        return ResponseEntity.ok(ApiResponse.ok(diemService.getSummaryAll()));
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN')")
+    @GetMapping("/progress/summary")
+    public ResponseEntity<ApiResponse<List<com.hethongtruongthpt.dto.DiemProgressDTO>>> getProgressSummary(
+            @RequestParam String namHoc,
+            @RequestParam Integer hocKy) {
+        return ResponseEntity.ok(ApiResponse.ok(diemService.getProgressSummary(namHoc, hocKy)));
+    }
+    @PreAuthorize("hasAnyRole('ADMIN')")
+    @GetMapping("/progress/class-summary")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getClassProgressSummary(
+            @RequestParam String namHoc,
+            @RequestParam Integer hocKy,
+            @RequestParam Integer lopId) {
+        return ResponseEntity.ok(ApiResponse.ok(diemService.getClassProgressSummary(namHoc, hocKy, lopId)));
+    }
 
 	/**
 	 * API nhanh: tính ĐTB theo khối trực tiếp trên server.

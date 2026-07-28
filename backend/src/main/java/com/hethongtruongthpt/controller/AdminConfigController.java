@@ -23,13 +23,11 @@ public class AdminConfigController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
     public ResponseEntity<ApiResponse<List<AdminConfig>>> getAll() {
         return ResponseEntity.ok(ApiResponse.ok(adminConfigService.getAll()));
     }
 
     @GetMapping("/{key}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
     public ResponseEntity<ApiResponse<AdminConfig>> getByKey(@PathVariable String key) {
         return ResponseEntity.ok(ApiResponse.ok(adminConfigService.getByKey(key)));
     }

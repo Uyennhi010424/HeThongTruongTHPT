@@ -5,6 +5,7 @@ import com.hethongtruongthpt.entity.HocSinh;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.repository.DiemDanhRepository;
 import com.hethongtruongthpt.repository.HocSinhRepository;
+import com.hethongtruongthpt.repository.LichNamHocRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,12 +23,14 @@ public class DiemDanhService {
     private static final Logger log = LoggerFactory.getLogger(DiemDanhService.class);
     private final DiemDanhRepository repository;
     private final HocSinhRepository hocSinhRepository;
+    private final LichNamHocRepository lichNamHocRepository;
     private final SmsService smsService;
 
-    public DiemDanhService(DiemDanhRepository repository, HocSinhRepository hocSinhRepository, SmsService smsService) {
+    public DiemDanhService(DiemDanhRepository repository, HocSinhRepository hocSinhRepository, SmsService smsService, LichNamHocRepository lichNamHocRepository) {
         this.repository = repository;
         this.hocSinhRepository = hocSinhRepository;
         this.smsService = smsService;
+        this.lichNamHocRepository = lichNamHocRepository;
     }
 
     public List<DiemDanh> getByNgayAndLopHocId(LocalDate ngay, Integer lopHocId) {
@@ -47,16 +50,11 @@ public class DiemDanhService {
     }
 
     /**
-     * Đếm số ngày học (thứ 2 → thứ 7) trong khoảng thời gian.
-     * Bỏ chủ nhật.
+     * Đếm số ngày học thực tế trong khoảng thời gian thông qua bảng LichNamHoc.
      */
     private long countSchoolDays(LocalDate from, LocalDate to) {
         if (from == null || to == null || from.isAfter(to)) return 0;
-        long count = 0;
-        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
-            if (d.getDayOfWeek() != DayOfWeek.SUNDAY) count++;
-        }
-        return count;
+        return lichNamHocRepository.countNgayHocBetween(from, to);
     }
 
     @Transactional
@@ -75,6 +73,19 @@ public class DiemDanhService {
             existingList = repository.findByNgayAndLopHocIdAndTietHoc(ngay, lopHocId, tietHoc);
         } else {
             existingList = repository.findByNgayAndLopHocId(ngay, lopHocId);
+        }
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isTeacher = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_GIAO_VIEN"));
+
+        if (isTeacher) {
+            if (!ngay.equals(LocalDate.now())) {
+                throw new ApiException("Chỉ được phép điểm danh cho ngày hôm nay.");
+            }
+            if (!existingList.isEmpty()) {
+                throw new ApiException("Điểm danh cho tiết học này đã được lưu và không thể sửa đổi.");
+            }
         }
 
         Map<Integer, DiemDanh> existingMap = existingList.stream()

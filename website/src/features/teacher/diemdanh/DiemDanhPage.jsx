@@ -10,6 +10,9 @@ import { getNamHoc } from "../../../api/namhocApi.js";
 import { getStudentClass, getStudentClassId, formatDate, sortStudentsByGivenName } from "../../../utils/helpers.js";
 import { getCurrentUsernameFromToken, findTeacherByUsername } from "../../../utils/teacherProfile.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
+import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
+import { getHolidays } from "../../../api/lichnamhocApi.js";
 
 const STORAGE_KEY = "teacher_attendance_records_v3";
 const LOCKS_KEY = "teacher_attendance_locks_v2";
@@ -18,8 +21,8 @@ const AUTO_NOTE = "Nghỉ quá 45 ngày - cần xử lý theo quy định.";
 const DAY_LABELS = { 2: "Thứ 2", 3: "Thứ 3", 4: "Thứ 4", 5: "Thứ 5", 6: "Thứ 6", 7: "Thứ 7" };
 const WEEK_DAYS = [2, 3, 4, 5, 6, 7];
 
-const getWeekDates = (offset) => {
-  const now = new Date();
+const getWeekDates = (offset, anchorDate = new Date()) => {
+  const now = new Date(anchorDate.getTime());
   const day = now.getDay();
   const monday = new Date(now);
   monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
@@ -70,99 +73,95 @@ const upsertAutoNote = (note, absenceDays) => {
 };
 
 export default function DiemDanhPage() {
-  const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
+  const filters = useTeacherFilters({ showSubject: false, showGrade: false });
+  const {
+    loading: filterLoading,
+    error: filterError,
+    currentTeacher,
+    selectedNamHoc,
+    selectedSemester,
+    selectedClassId,
+    allStudents: students,
+    filteredClasses: classes,
+    selectedClassObj: selectedClass
+  } = filters;
+
   const [draftRecords, setDraftRecords] = useState({});
   const [locks, setLocks] = useState({});
   const [selectedDate, setSelectedDate] = useState(getToday());
-  const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedTiet, setSelectedTiet] = useState(1);
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const [currentTeacher, setCurrentTeacher] = useState(null);
   const [activeTab, setActiveTab] = useState("attendance"); // attendance | statistics
   const [statsData, setStatsData] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [teacherSchedule, setTeacherSchedule] = useState([]); // TKB cua giao vien
   const [weekOffset, setWeekOffset] = useState(0);
+  const [holidays, setHolidays] = useState([]);
+
+  const anchorDate = useMemo(() => {
+    if (!filters.allNamHoc || !filters.selectedNamHoc) return new Date();
+    const currentYear = filters.allNamHoc.find(y => y.tenNamHoc === filters.selectedNamHoc);
+    if (!currentYear) return new Date();
+
+    const startHk1 = new Date(currentYear.ngayBatDauHk1 + "T00:00:00");
+    const endHk1 = new Date(currentYear.ngayKetThucHk1 + "T00:00:00");
+    const startHk2 = new Date(currentYear.ngayBatDauHk2 + "T00:00:00");
+    const endHk2 = new Date(currentYear.ngayKetThucHk2 + "T00:00:00");
+    
+    let endYear = endHk2;
+    if (isNaN(endYear.getTime())) {
+      endYear = new Date(startHk1);
+      endYear.setFullYear(startHk1.getFullYear() + 1);
+      endYear.setMonth(4); // May
+      endYear.setDate(31);
+    }
+
+    const now = new Date();
+    if (now >= startHk1 && now <= endYear) return now;
+
+    if (filters.selectedSemester === "HK2" && !isNaN(startHk2.getTime())) {
+       return startHk2;
+    }
+    return startHk1;
+  }, [filters.allNamHoc, filters.selectedNamHoc, filters.selectedSemester]);
 
   useEffect(() => {
+    const month = String(anchorDate.getMonth() + 1).padStart(2, "0");
+    const day = String(anchorDate.getDate()).padStart(2, "0");
+    const ymd = `${anchorDate.getFullYear()}-${month}-${day}`;
+    setSelectedDate(ymd);
+    setWeekOffset(0);
+  }, [anchorDate]);
+
+  useEffect(() => {
+    if (!currentTeacher?.id || !selectedNamHoc) return;
     let active = true;
-    const fetchData = async () => {
+    const fetchTkb = async () => {
       try {
-        setLoading(true);
-        setError("");
-        const [studentRes, classRes, phanCongRes, gvRes, currentGvRes, namHocRes] = await Promise.all([
-          getHocSinh(), getLop(), getPhanCongDay(), getGiaoVien(), getCurrentGiaoVien(), getNamHoc()
-        ]);
+        const hocKy = selectedSemester === "HK1" ? 1 : 2;
+        const tkbRes = await getThoiKhoaBieu({ namHoc: selectedNamHoc, hocKy });
         if (!active) return;
-        const allClasses = (classRes?.data?.data || []).slice();
-        const classData = allClasses.sort((a, b) =>
-          String(a?.tenLop || "").localeCompare(String(b?.tenLop || ""), "vi", { sensitivity: "base", numeric: true })
-        );
-        const studentsList = studentRes?.data?.data || [];
-        const phanCong = phanCongRes?.data?.data || [];
-        const currentUsername = getCurrentUsernameFromToken();
-        const teacherData = currentGvRes?.data?.data || findTeacherByUsername(gvRes?.data?.data || [], currentUsername);
-        setCurrentTeacher(teacherData);
-
-        let visibleClasses = classData;
-        if (teacherData) {
-          const assignedClassIds = new Set(
-            phanCong
-              .filter((p) => {
-                const entryTeacherId = p?.giaoVienId ?? p?.giaoVien?.id;
-                return entryTeacherId != null && Number(entryTeacherId) === Number(teacherData.id);
-              })
-              .map((p) => String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? ""))
-              .filter(Boolean)
-          );
-          if (assignedClassIds.size > 0) {
-            visibleClasses = classData.filter((c) => assignedClassIds.has(String(c.id)));
-          }
-        }
-
-        // Lay TKB cua giao vien
-        let scheduleData = [];
-        if (teacherData) {
-          const years = namHocRes?.data?.data || [];
-          const currentYear = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1];
-          const tenNamHoc = currentYear?.tenNamHoc || "";
-          let hocKy = 1;
-          if (currentYear?.ngayBatDauHk2) {
-            const today = new Date().toISOString().slice(0, 10);
-            if (today >= currentYear.ngayBatDauHk2) hocKy = 2;
-          }
-          try {
-            const tkbRes = await getThoiKhoaBieu({ namHoc: tenNamHoc, hocKy });
-            if (!active) return;
-            const allTkb = tkbRes?.data?.data || [];
-            scheduleData = allTkb.filter((item) => {
-              const entryTeacherId = item?.giaoVienId ?? item?.giaoVien?.id;
-              return entryTeacherId != null && Number(entryTeacherId) === Number(teacherData.id);
-            });
-          } catch { /* ignore */ }
-        }
-
-        if (!active) return;
-        setStudents(studentsList);
-        setClasses(visibleClasses);
+        const allTkb = tkbRes?.data?.data || [];
+        const scheduleData = allTkb.filter((item) => {
+          const entryTeacherId = item?.giaoVienId ?? item?.giaoVien?.id;
+          return entryTeacherId != null && Number(entryTeacherId) === Number(currentTeacher.id);
+        });
         setTeacherSchedule(scheduleData);
-        if (visibleClasses.length > 0) setSelectedClassId(String(visibleClasses[0].id));
-      } catch {
-        if (!active) return;
-        setError("Không thể tải dữ liệu điểm danh.");
-      } finally {
-        if (active) setLoading(false);
-      }
+        
+        try {
+          const holRes = await getHolidays();
+          if (active) setHolidays(holRes?.data?.data?.map(h => h.ngay) || []);
+        } catch { /* ignore */ }
+      } catch { /* ignore */ }
     };
-    fetchData();
+    fetchTkb();
     return () => { active = false; };
-  }, []);
+  }, [currentTeacher?.id, selectedNamHoc, selectedSemester]);
 
   // Load locks from localStorage
   useEffect(() => {
@@ -232,19 +231,28 @@ export default function DiemDanhPage() {
     return () => window.clearTimeout(timer);
   }, [saveMessage]);
 
+  useEffect(() => {
+    setIsDirty(false);
+  }, [selectedClassId]);
+
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return [];
-    const classStudents = students.filter((s) => String(getStudentClassId(s) || "") === selectedClassId);
+    const classStudents = students.filter((s) => s.trangThai === 1 && String(getStudentClassId(s) || "") === selectedClassId);
     return sortStudentsByGivenName(classStudents);
   }, [students, selectedClassId]);
 
-  const selectedClass = useMemo(
+  const selectedClassInternal = useMemo(
     () => classes.find((item) => String(item.id) === selectedClassId) || null,
     [classes, selectedClassId]
   );
 
   // Tinh ngay trong tuan hien tai
-  const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
+  const weekDates = useMemo(() => getWeekDates(weekOffset, anchorDate), [weekOffset, anchorDate]);
+
+  const currentYearObj = useMemo(() => {
+    if (!filters.allNamHoc || !filters.selectedNamHoc) return null;
+    return filters.allNamHoc.find(y => y.tenNamHoc === filters.selectedNamHoc);
+  }, [filters.allNamHoc, filters.selectedNamHoc]);
 
   // Cac ngay giao vien co lich day (theo lop dang chon)
   const availableDays = useMemo(() => {
@@ -255,8 +263,23 @@ export default function DiemDanhPage() {
       const thu = Number(item.thu);
       if (thu >= 2 && thu <= 7) days.add(thu);
     });
-    return WEEK_DAYS.filter((d) => days.has(d));
-  }, [teacherSchedule, selectedClassId]);
+    return WEEK_DAYS.filter((d) => {
+      if (!days.has(d)) return false;
+      const dateStr = weekDates[d];
+      if (holidays.includes(dateStr)) return false;
+      
+      if (currentYearObj) {
+        if (selectedSemester === "HK1") {
+          if (currentYearObj.ngayBatDauHk1 && dateStr < currentYearObj.ngayBatDauHk1) return false;
+          if (currentYearObj.ngayKetThucHk1 && dateStr > currentYearObj.ngayKetThucHk1) return false;
+        } else if (selectedSemester === "HK2") {
+          if (currentYearObj.ngayBatDauHk2 && dateStr < currentYearObj.ngayBatDauHk2) return false;
+          if (currentYearObj.ngayKetThucHk2 && dateStr > currentYearObj.ngayKetThucHk2) return false;
+        }
+      }
+      return true;
+    });
+  }, [teacherSchedule, selectedClassId, weekDates, holidays, currentYearObj, selectedSemester]);
 
   // Cac tiet giao vien co lich day ngay dang chon (theo lop dang chon)
   const availablePeriods = useMemo(() => {
@@ -295,10 +318,13 @@ export default function DiemDanhPage() {
     }
   }, [availablePeriods, selectedTiet]);
 
-  const attendanceLocked = useMemo(() => {
+  const isAlreadySaved = useMemo(() => {
     if (!selectedDate || !selectedClassId || !selectedTiet) return false;
     return Boolean(locks[getLockKey(selectedDate, selectedClassId, selectedTiet)]);
   }, [locks, selectedDate, selectedClassId, selectedTiet]);
+
+  const isNotToday = selectedDate !== getToday();
+  const attendanceLocked = isNotToday || isAlreadySaved;
 
   const stats = useMemo(() => {
     let present = 0, absentAllowed = 0, absentUnallowed = 0, over45 = 0;
@@ -399,70 +425,87 @@ export default function DiemDanhPage() {
   }, [activeTab, selectedClassId]);
 
   return (
-    <div className="page users-page teacher-page">
-
-      {/* Tabs */}
-      <div className="card" style={{ padding: 0, marginBottom: 16 }}>
-        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-          <button
-            type="button"
-            style={{
-              flex: 1, padding: "12px 16px", border: "none", background: activeTab === "attendance" ? "#3b82f6" : "transparent",
-              color: activeTab === "attendance" ? "#fff" : "#374151", fontWeight: 600, cursor: "pointer"
-            }}
-            onClick={() => setActiveTab("attendance")}
-          >
-            Điểm danh
-          </button>
-          <button
-            type="button"
-            style={{
-              flex: 1, padding: "12px 16px", border: "none", background: activeTab === "statistics" ? "#3b82f6" : "transparent",
-              color: activeTab === "statistics" ? "#fff" : "#374151", fontWeight: 600, cursor: "pointer"
-            }}
-            onClick={() => setActiveTab("statistics")}
-          >
-            Thống kê chuyên cần
-          </button>
+    <div style={{ maxWidth: 1600, margin: "0 auto", width: "100%", padding: "24px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Header & Tabs */}
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 16, paddingBottom: 16, borderBottom: "1px solid #e5e7eb" }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0f172a", margin: 0 }}>Điểm danh</h1>
+          <p style={{ color: "#64748b", margin: "4px 0 0 0", fontSize: 14 }}>Quản lý điểm danh và thống kê chuyên cần</p>
         </div>
-      </div>
-
-      {/* Class tabs */}
-      <div className="card subject-tabs-wrap">
-        <div className="subject-tabs">
-          {classes.map((item) => (
+        
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, background: "#f1f5f9", padding: 4, borderRadius: 8 }}>
             <button
-              key={item.id}
               type="button"
-              className={`subject-tab ${String(item.id) === selectedClassId ? "active" : ""}`}
-              onClick={() => { setSelectedClassId(String(item.id)); setIsDirty(false); }}
+              style={{
+                padding: "8px 16px", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                background: activeTab === "attendance" ? "#fff" : "transparent",
+                color: activeTab === "attendance" ? "#0f172a" : "#64748b",
+                boxShadow: activeTab === "attendance" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                transition: "all 0.15s"
+              }}
+              onClick={() => setActiveTab("attendance")}
             >
-              {item.tenLop}
+              Điểm danh
             </button>
-          ))}
+            <button
+              type="button"
+              style={{
+                padding: "8px 16px", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                background: activeTab === "statistics" ? "#fff" : "transparent",
+                color: activeTab === "statistics" ? "#0f172a" : "#64748b",
+                boxShadow: activeTab === "statistics" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                transition: "all 0.15s"
+              }}
+              onClick={() => setActiveTab("statistics")}
+            >
+              Thống kê chuyên cần
+            </button>
+          </div>
+          
+          <TeacherFilter filters={filters} showSubject={false} showGrade={false} showClass={false} />
         </div>
       </div>
+
+      {/* Tabs chọn lớp ngang */}
+      {filters.filteredClasses && filters.filteredClasses.length > 0 && (
+        <div className="flex gap-6 overflow-x-auto border-b border-slate-200 hide-scrollbar bg-white px-2 rounded-t-xl mb-4">
+          {filters.filteredClasses.map(c => {
+            const isSelected = String(filters.selectedClassId) === String(c.id);
+            return (
+              <button
+                key={c.id}
+                onClick={() => filters.setSelectedClassId(String(c.id))}
+                className={`flex items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold text-[14px] transition-all border-b-2 ${
+                  isSelected
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                }`}
+              >
+                Lớp {c.tenLop}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+
 
       {activeTab === "attendance" && (
-        <>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Toolbar */}
-          <div className="card users-toolbar" style={{ flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div className="users-title">Điểm danh theo tiết</div>
-                <div className="users-subtitle">
-                  Chọn ngày và tiết từ thời khóa biểu
-                  {lastSavedAt ? ` · Cập nhật lúc ${lastSavedAt}` : ""}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" className="btn-outline btn-sm" onClick={() => setWeekOffset((p) => p - 1)}>← Tuần trước</button>
-                <button type="button" className="btn-outline btn-sm" onClick={() => setWeekOffset(0)}>Hôm nay</button>
-                <button type="button" className="btn-outline btn-sm" onClick={() => setWeekOffset((p) => p + 1)}>Tuần sau →</button>
-              </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid #e5e7eb", width: "100%" }}>
+            
+            {/* Nhóm trái */}
+            <div style={{ flexShrink: 0 }}>
+              <button type="button" onClick={() => setWeekOffset(0)} style={{ padding: "0 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 14, cursor: "pointer", color: "#0f172a", fontWeight: 600, height: 40, display: "flex", alignItems: "center", transition: "background 0.15s", whiteSpace: "nowrap" }}>Hôm nay</button>
             </div>
-            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", gap: 6 }}>
+
+            {/* Nhóm giữa (Co giãn) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, justifyContent: "center" }}>
+              <button type="button" onClick={() => setWeekOffset((p) => p - 1)} style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "1px solid transparent", background: "transparent", cursor: "pointer", color: "#64748b", transition: "all 0.15s", flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_left</span></button>
+              
+              <div style={{ display: "flex", gap: 4, alignItems: "center", overflowX: "auto", minWidth: 0 }}>
                 {availableDays.map((thu) => {
                   const dateStr = weekDates[thu];
                   const isSelected = dateStr === selectedDate;
@@ -472,219 +515,255 @@ export default function DiemDanhPage() {
                       type="button"
                       onClick={() => { setSelectedDate(dateStr); setIsDirty(false); }}
                       style={{
-                        padding: "6px 14px", borderRadius: 8, border: isSelected ? "2px solid #3b82f6" : "1px solid #d1d5db",
-                        background: isSelected ? "#eff6ff" : "#fff", color: isSelected ? "#1d4ed8" : "#374151",
-                        fontWeight: isSelected ? 700 : 500, fontSize: 13, cursor: "pointer"
+                        height: 40, padding: "0 12px", borderRadius: 8, border: isSelected ? "1px solid #bfdbfe" : "1px solid transparent",
+                        background: isSelected ? "#eff6ff" : "transparent", color: isSelected ? "#1d4ed8" : "#475569",
+                        fontWeight: isSelected ? 600 : 500, fontSize: 14, cursor: "pointer", transition: "all 0.15s",
+                        display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0
                       }}
                     >
                       {DAY_LABELS[thu]}
-                      <div style={{ fontSize: 11, fontWeight: 400, color: "#6b7280" }}>
+                      <span style={{ fontSize: 13, fontWeight: 400, color: isSelected ? "#3b82f6" : "#94a3b8" }}>
                         {dateStr ? formatDate(dateStr) : ""}
-                      </div>
+                      </span>
                     </button>
                   );
                 })}
                 {availableDays.length === 0 && !loading && (
-                  <span style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Không có lịch dạy trong tuần này</span>
+                  <span style={{ fontSize: 14, color: "#9ca3af", fontStyle: "italic", whiteSpace: "nowrap" }}>Không có lịch dạy</span>
                 )}
               </div>
-              <span style={{ color: "#d1d5db" }}>|</span>
-              <label className="form-field" style={{ marginBottom: 0 }}>
-                <span>Tiết</span>
-                <select value={selectedTiet} onChange={(e) => { setSelectedTiet(Number(e.target.value)); setIsDirty(false); }}>
+
+              <button type="button" onClick={() => setWeekOffset((p) => p + 1)} style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "1px solid transparent", background: "transparent", cursor: "pointer", color: "#64748b", transition: "all 0.15s", flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span></button>
+            </div>
+
+            {/* Nhóm phải */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, margin: 0, whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>Tiết:</span>
+                <select value={selectedTiet} onChange={(e) => { setSelectedTiet(Number(e.target.value)); setIsDirty(false); }} style={{ height: 40, padding: "0 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14, background: "#fff", outline: "none", cursor: "pointer", color: "#0f172a" }}>
                   {availablePeriods.map((p) => <option key={p} value={p}>Tiết {p}</option>)}
                 </select>
               </label>
+
               <button
                 type="button"
-                className="btn-primary"
                 onClick={handleSave}
                 disabled={!isDirty || !selectedClassId || attendanceLocked || saving || !availablePeriods.length}
+                style={{
+                  height: 40, padding: "0 20px", borderRadius: 8, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
+                  background: (!isDirty || !selectedClassId || attendanceLocked || saving || !availablePeriods.length) ? "#f1f5f9" : "#2563eb",
+                  color: (!isDirty || !selectedClassId || attendanceLocked || saving || !availablePeriods.length) ? "#94a3b8" : "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", whiteSpace: "nowrap"
+                }}
               >
                 {saving ? "Đang lưu..." : attendanceLocked ? "Đã khóa" : "Cập nhật"}
               </button>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="users-stats">
-            <div className="stat-card stat-blue">
-              <div className="stat-label">Có mặt</div>
-              <div className="stat-value">{loading ? "..." : stats.present}</div>
+          {/* Stats Summary */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 32, padding: "8px 0 24px 0" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Có mặt:</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#16a34a" }}>{loading ? "..." : stats.present}</span>
             </div>
-            <div className="stat-card stat-sky">
-              <div className="stat-label">Vắng có phép</div>
-              <div className="stat-value">{loading ? "..." : stats.absentAllowed}</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Vắng có phép:</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#ca8a04" }}>{loading ? "..." : stats.absentAllowed}</span>
             </div>
-            <div className="stat-card stat-ice">
-              <div className="stat-label">Vắng không phép</div>
-              <div className="stat-value">{loading ? "..." : stats.absentUnallowed}</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Vắng không phép:</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#dc2626" }}>{loading ? "..." : stats.absentUnallowed}</span>
             </div>
-            <div className="stat-card stat-navy">
-              <div className="stat-label">Nghỉ quá 45 ngày</div>
-              <div className="stat-value">{loading ? "..." : stats.over45}</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Nghỉ quá 45 ngày:</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#475569" }}>{loading ? "..." : stats.over45}</span>
             </div>
           </div>
 
-          {/* Attendance table */}
-          <div className="card users-table">
-            <div className="table-header">
+          {/* Table */}
+          <div style={{ background: "#F8FAFC", borderTop: "1px solid #e5e7eb", overflow: "hidden" }}>
+            <div style={{ padding: "16px 0", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div className="panel-title">Bảng điểm danh {selectedClass?.tenLop || ""} · {formatDate(selectedDate)} · Tiết {selectedTiet}</div>
-                <div className="panel-subtitle">Chọn trạng thái: Có mặt / Vắng có phép / Vắng không phép</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Bảng điểm danh {selectedClass?.tenLop || ""} · {formatDate(selectedDate)} · Tiết {selectedTiet}</div>
+                <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Chọn trạng thái: Có mặt / Vắng có phép / Vắng không phép</div>
               </div>
-              <div className="panel-pill">{filteredStudents.length} học sinh</div>
+              <div style={{ background: "#e2e8f0", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "#475569" }}>
+                {filteredStudents.length} học sinh
+              </div>
             </div>
-            {error && <div className="table-empty">{error}</div>}
-            {!error && saveMessage && <div className="table-success">{saveMessage}</div>}
+
+            {error && <div style={{ padding: 16, background: "#fee2e2", color: "#dc2626" }}>{error}</div>}
+            {!error && saveMessage && <div style={{ padding: 16, background: "#dcfce7", color: "#16a34a", fontWeight: 500 }}>{saveMessage}</div>}
             {!error && !loading && selectedClassId && filteredStudents.length === 0 && (
-              <div className="table-empty">Lớp này chưa có học sinh.</div>
+              <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Lớp này chưa có học sinh.</div>
             )}
             {selectedClassId && attendanceLocked && (
-              <div className="table-success">
-                Lớp {selectedClass?.tenLop || "--"} đã được điểm danh tiết {selectedTiet} ngày {formatDate(selectedDate)}.
+              <div style={{ padding: "12px 0", color: "#1d4ed8", fontWeight: 500, fontSize: 14 }}>
+                {isAlreadySaved 
+                  ? `Lớp ${selectedClass?.tenLop || "--"} đã được điểm danh tiết ${selectedTiet} ngày ${formatDate(selectedDate)} và không thể sửa lại.`
+                  : "Chỉ được phép điểm danh cho ngày hôm nay."}
               </div>
             )}
 
-            {!!selectedClassId && (
-              <div className="attendance-grid">
-                <div className="attendance-row attendance-head">
-                  <div>Học sinh</div>
-                  <div style={{ textAlign: "center" }}>Trạng thái</div>
-                  <div>Số ngày vắng</div>
-                  <div>Ghi chú</div>
-                </div>
-                {loading
-                  ? Array.from({ length: 5 }).map((_, i) => (
-                      <div className="attendance-row" key={`skeleton-${i}`}>
-                        <div className="skeleton" /><div className="skeleton" /><div className="skeleton" /><div className="skeleton" />
-                      </div>
-                    ))
-                  : filteredStudents.map((student) => {
-                      const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, student.id);
-                      const record = draftRecords[key] || { loaiVang: "CO_MAT", soNgayVang: 0, ghiChu: "" };
-                      return (
-                        <div className="attendance-row" key={student.id}>
-                          <div className="table-main">
-                            <div className="table-title">{student.hoTen}</div>
-                            <div className="table-meta">{getStudentClass(student)?.tenLop || "--"}</div>
-                          </div>
-                          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-                            {LOAI_VANG_OPTIONS.map((opt) => (
-                              <label
-                                key={opt.value}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: 4, padding: "4px 10px",
-                                  borderRadius: 8, cursor: attendanceLocked ? "default" : "pointer",
-                                  background: record.loaiVang === opt.value ? (opt.value === "CO_MAT" ? "#dcfce7" : opt.value === "CO_PHEP" ? "#fef9c3" : "#fee2e2") : "#f3f4f6",
-                                  border: record.loaiVang === opt.value ? `2px solid ${opt.value === "CO_MAT" ? "#22c55e" : opt.value === "CO_PHEP" ? "#eab308" : "#ef4444"}` : "2px solid transparent",
-                                  fontWeight: record.loaiVang === opt.value ? 600 : 400, fontSize: 13
-                                }}
-                              >
+            {!!selectedClassId && filteredStudents.length > 0 && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead style={{ background: "#F8FAFC", position: "sticky", top: 0, zIndex: 10 }}>
+                    <tr>
+                      <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Học sinh</th>
+                      <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Trạng thái</th>
+                      <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb", width: 140 }}>Số ngày vắng</th>
+                      <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading
+                      ? Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={`skel-${i}`}>
+                            <td colSpan={4} style={{ padding: 16 }}>Đang tải...</td>
+                          </tr>
+                        ))
+                      : filteredStudents.map((student, idx) => {
+                          const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, student.id);
+                          const record = draftRecords[key] || { loaiVang: "CO_MAT", soNgayVang: 0, ghiChu: "" };
+                          const isEven = idx % 2 === 0;
+                          return (
+                            <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
+                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                                <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
+                                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
+                              </td>
+                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                                <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                                  {LOAI_VANG_OPTIONS.map((opt) => {
+                                    const isSelected = record.loaiVang === opt.value;
+                                    return (
+                                      <label
+                                        key={opt.value}
+                                        style={{
+                                          display: "flex", alignItems: "center", gap: 6, cursor: attendanceLocked ? "default" : "pointer",
+                                          color: isSelected ? (opt.value === "CO_MAT" ? "#16a34a" : opt.value === "CO_PHEP" ? "#ca8a04" : "#dc2626") : "#64748b",
+                                          fontWeight: isSelected ? 600 : 400, fontSize: 13, transition: "color 0.15s"
+                                        }}
+                                      >
+                                        <input
+                                          type="radio"
+                                          name={`loaiVang_${student.id}`}
+                                          value={opt.value}
+                                          checked={isSelected}
+                                          disabled={attendanceLocked}
+                                          onChange={() => updateRecord(student.id, { loaiVang: opt.value, soNgayVang: opt.value === "CO_MAT" ? 0 : record.soNgayVang || 1 })}
+                                          style={{ cursor: attendanceLocked ? "default" : "pointer", accentColor: opt.value === "CO_MAT" ? "#16a34a" : opt.value === "CO_PHEP" ? "#ca8a04" : "#dc2626", width: 14, height: 14 }}
+                                        />
+                                        {opt.label}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </td>
+                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
                                 <input
-                                  type="radio"
-                                  name={`loaiVang_${student.id}`}
-                                  value={opt.value}
-                                  checked={record.loaiVang === opt.value}
-                                  disabled={attendanceLocked}
-                                  onChange={() => updateRecord(student.id, { loaiVang: opt.value, soNgayVang: opt.value === "CO_MAT" ? 0 : record.soNgayVang || 1 })}
-                                  style={{ display: "none" }}
+                                  type="number"
+                                  min="0"
+                                  value={record.soNgayVang}
+                                  disabled={attendanceLocked || record.loaiVang === "CO_MAT"}
+                                  onChange={(e) => updateRecord(student.id, { soNgayVang: e.target.value })}
+                                  style={{
+                                    width: 60, padding: "6px 8px", borderRadius: 6, border: "1px solid #cbd5e1",
+                                    textAlign: "center", fontSize: 13, background: (attendanceLocked || record.loaiVang === "CO_MAT") ? "#f1f5f9" : "#fff",
+                                    color: (attendanceLocked || record.loaiVang === "CO_MAT") ? "#94a3b8" : "#0f172a"
+                                  }}
                                 />
-                                {opt.label}
-                              </label>
-                            ))}
-                          </div>
-                          <div>
-                            <input
-                              className="attendance-input"
-                              type="number"
-                              min="0"
-                              value={record.soNgayVang}
-                              disabled={attendanceLocked || record.loaiVang === "CO_MAT"}
-                              onChange={(e) => updateRecord(student.id, { soNgayVang: e.target.value })}
-                            />
-                          </div>
-                          <div>
-                            <input
-                              className="attendance-note"
-                              value={record.ghiChu}
-                              disabled={attendanceLocked}
-                              onChange={(e) => updateRecord(student.id, { ghiChu: e.target.value })}
-                              placeholder="Nhận xét"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </td>
+                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                                <input
+                                  value={record.ghiChu}
+                                  disabled={attendanceLocked}
+                                  onChange={(e) => updateRecord(student.id, { ghiChu: e.target.value })}
+                                  placeholder="Nhận xét / Lý do..."
+                                  style={{
+                                    width: "100%", padding: "6px 12px", borderRadius: 6, border: "1px solid #cbd5e1",
+                                    fontSize: 13, background: attendanceLocked ? "#f1f5f9" : "#fff"
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {activeTab === "statistics" && (
-        <div className="card users-table">
-          <div className="table-header">
-            <div>
-              <div className="panel-title">Thống kê chuyên cần {selectedClass?.tenLop || ""}</div>
-              <div className="panel-subtitle">Năm học {getCurrentAcademicYear()}</div>
-            </div>
-          </div>
-          {statsLoading && <div className="table-empty">Đang tải...</div>}
-          {!statsLoading && !statsData && <div className="table-empty">Không có dữ liệu.</div>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {statsLoading && <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Đang tải dữ liệu thống kê...</div>}
+          {!statsLoading && !statsData && <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Không có dữ liệu.</div>}
+          
           {!statsLoading && statsData && (
             <>
-              <div className="users-stats" style={{ marginBottom: 16 }}>
-                <div className="stat-card stat-blue">
-                  <div className="stat-label">Tổng ngày học</div>
-                  <div className="stat-value">{statsData.tongNgayHoc}</div>
-                </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "8px 0" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>Tổng số ngày học:</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#1d4ed8" }}>{statsData.tongNgayHoc}</span>
               </div>
-              <div className="attendance-grid">
-                <div className="attendance-row attendance-head">
-                  <div>Học sinh</div>
-                  <div style={{ textAlign: "center" }}>Có phép</div>
-                  <div style={{ textAlign: "center" }}>Không phép</div>
-                  <div style={{ textAlign: "center" }}>Tổng vắng</div>
-                  <div style={{ textAlign: "center" }}>Tỷ lệ vắng</div>
-                  <div style={{ textAlign: "center" }}>Chuyên cần</div>
+              
+              <div style={{ background: "#F8FAFC", borderTop: "1px solid #e5e7eb", overflow: "hidden" }}>
+                <div style={{ padding: "16px 0", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Thống kê chuyên cần {selectedClass?.tenLop || ""}</div>
+                    <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Năm học {getCurrentAcademicYear()}</div>
+                  </div>
                 </div>
-                {(statsData.hocSinh || []).map((hs) => {
-                  const tongNgay = hs.tongNgayHoc || statsData.tongNgayHoc || 1;
-                  const tyLeVang = tongNgay > 0 ? Math.round((hs.tongVang / tongNgay) * 10000) / 100 : 0;
-                  const tyLeVangCoPhep = tongNgay > 0 ? Math.round((hs.coPhep / tongNgay) * 10000) / 100 : 0;
-                  const tyLeVangKhongPhep = tongNgay > 0 ? Math.round((hs.khongPhep / tongNgay) * 10000) / 100 : 0;
-                  return (
-                    <div className="attendance-row" key={hs.hocSinhId}>
-                      <div className="table-main">
-                        <div className="table-title">{hs.hoTen}</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>{hs.coPhep} <span style={{ fontSize: 11, color: "#9ca3af" }}>({tyLeVangCoPhep}%)</span></div>
-                      <div style={{ textAlign: "center", color: hs.khongPhep > 0 ? "#ef4444" : undefined }}>
-                        {hs.khongPhep} <span style={{ fontSize: 11, color: hs.khongPhep > 0 ? "#f87171" : "#9ca3af" }}>({tyLeVangKhongPhep}%)</span>
-                      </div>
-                      <div style={{ textAlign: "center" }}>{hs.tongVang}</div>
-                      <div style={{ textAlign: "center" }}>
-                        <span style={{
-                          padding: "2px 10px", borderRadius: 12, fontWeight: 600, fontSize: 13,
-                          background: tyLeVang <= 10 ? "#dcfce7" : tyLeVang <= 30 ? "#fef9c3" : "#fee2e2",
-                          color: tyLeVang <= 10 ? "#16a34a" : tyLeVang <= 30 ? "#ca8a04" : "#dc2626"
-                        }}>
-                          {tyLeVang}%
-                        </span>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <span style={{
-                          padding: "2px 10px", borderRadius: 12, fontWeight: 600, fontSize: 13,
-                          background: hs.tyLeChuyenCan >= 80 ? "#dcfce7" : hs.tyLeChuyenCan >= 50 ? "#fef9c3" : "#fee2e2",
-                          color: hs.tyLeChuyenCan >= 80 ? "#16a34a" : hs.tyLeChuyenCan >= 50 ? "#ca8a04" : "#dc2626"
-                        }}>
-                          {hs.tyLeChuyenCan}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead style={{ background: "#F8FAFC", position: "sticky", top: 0, zIndex: 10 }}>
+                      <tr>
+                        <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Học sinh</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Có phép</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Không phép</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Tổng vắng</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Tỷ lệ vắng</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Chuyên cần</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(statsData.hocSinh || []).map((hs, idx) => {
+                        const tongNgay = hs.tongNgayHoc || statsData.tongNgayHoc || 1;
+                        const tyLeVang = tongNgay > 0 ? Math.round((hs.tongVang / tongNgay) * 10000) / 100 : 0;
+                        const tyLeVangCoPhep = tongNgay > 0 ? Math.round((hs.coPhep / tongNgay) * 10000) / 100 : 0;
+                        const tyLeVangKhongPhep = tongNgay > 0 ? Math.round((hs.khongPhep / tongNgay) * 10000) / 100 : 0;
+                        const isEven = idx % 2 === 0;
+                        return (
+                          <tr key={hs.hocSinhId} style={{ background: isEven ? "#fff" : "#f8fafc" }}>
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", fontWeight: 600, color: "#0f172a" }}>{hs.hoTen}</td>
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center", color: "#64748b" }}>
+                              {hs.coPhep} <span style={{ fontSize: 12 }}>({tyLeVangCoPhep}%)</span>
+                            </td>
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center", color: hs.khongPhep > 0 ? "#ef4444" : "#64748b", fontWeight: hs.khongPhep > 0 ? 600 : 400 }}>
+                              {hs.khongPhep} <span style={{ fontSize: 12 }}>({tyLeVangKhongPhep}%)</span>
+                            </td>
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center", fontWeight: 600, color: "#0f172a" }}>{hs.tongVang}</td>
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                              <span style={{ fontWeight: 600, fontSize: 13, color: tyLeVang <= 10 ? "#16a34a" : tyLeVang <= 30 ? "#ca8a04" : "#dc2626" }}>
+                                {tyLeVang}%
+                              </span>
+                            </td>
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                              <span style={{ fontWeight: 600, fontSize: 13, color: tyLeVang <= 10 ? "#16a34a" : tyLeVang <= 30 ? "#ca8a04" : "#dc2626" }}>
+                                {tyLeVang <= 10 ? "Tốt" : tyLeVang <= 30 ? "Đạt" : "Kém"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}

@@ -3,6 +3,7 @@ package com.hethongtruongthpt.controller;
 import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.entity.ThoiKhoaBieu;
 import com.hethongtruongthpt.exception.ApiException;
+import com.hethongtruongthpt.service.ThoiKhoaBieuGeneratorService;
 import com.hethongtruongthpt.service.ThoiKhoaBieuService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +52,7 @@ public class ThoiKhoaBieuController {
 			@RequestParam Integer hocKy,
 			@RequestParam(required = false, defaultValue = "1") Integer tuan) {
 		try {
-			ThoiKhoaBieuService.GenerateResult result = thoiKhoaBieuService.generateScheduleForWeek(namHoc, hocKy, tuan);
+			ThoiKhoaBieuGeneratorService.GenerateResult result = thoiKhoaBieuService.generateScheduleForWeek(namHoc, hocKy, tuan);
 			Map<String, Object> body = new HashMap<>();
 			body.put("data", result.getCreated());
 			body.put("warnings", result.getWarnings());
@@ -71,7 +72,7 @@ public class ThoiKhoaBieuController {
 			@RequestParam Integer hocKy,
 			@RequestParam Integer soTuan) {
 		try {
-			ThoiKhoaBieuService.GenerateResult result = thoiKhoaBieuService.generateSchedule(namHoc, hocKy, soTuan);
+			ThoiKhoaBieuGeneratorService.GenerateResult result = thoiKhoaBieuService.generateSchedule(namHoc, hocKy, soTuan);
 			Map<String, Object> body = new HashMap<>();
 			body.put("data", result.getCreated());
 			body.put("warnings", result.getWarnings());
@@ -91,7 +92,7 @@ public class ThoiKhoaBieuController {
 			@RequestParam Integer hocKy,
 			@RequestParam Integer tuan) {
 		try {
-			ThoiKhoaBieuService.GenerateResult result = thoiKhoaBieuService.shuffleSchedule(namHoc, hocKy, tuan);
+			ThoiKhoaBieuGeneratorService.GenerateResult result = thoiKhoaBieuService.shuffleSchedule(namHoc, hocKy, tuan);
 			Map<String, Object> body = new HashMap<>();
 			body.put("data", result.getCreated());
 			body.put("warnings", result.getWarnings());

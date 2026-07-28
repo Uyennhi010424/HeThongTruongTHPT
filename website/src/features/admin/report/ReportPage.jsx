@@ -1,40 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
-import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
+import { FileText } from "lucide-react";
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
 import { getMonHoc } from "../../../api/monhocApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
-import { getDiem, getDiemSummary, getDiemDistribution } from "../../../api/diemApi.js";
+import { getDiemSummary, getDiemDistribution } from "../../../api/diemApi.js";
 import { getStatisticsOverview, getStatisticsAcademic } from "../../../api/statisticsApi.js";
 import statisticsApi from "../../../api/statisticsApi.js";
-import { notifySuccess, notifyError } from "../../../utils/notify.js";
+import { notifyError } from "../../../utils/notify.js";
+import PdfPreviewModal from "../../../components/common/PdfPreviewModal.jsx";
 
 /* -- Helpers -------------------------------------------------------- */
-
-const classify = (avg) => {
-  if (avg == null) return "--";
-  if (avg >= 8) return "Tốt";
-  if (avg >= 6.5) return "Khá";
-  if (avg >= 5) return "Đạt";
-  return "Chưa đạt";
-};
-
 const classifyColor = (avg) => {
   if (avg == null) return "#9ca3af";
-  if (avg >= 8) return "#16a34a";
-  if (avg >= 6.5) return "#2563eb";
-  if (avg >= 5) return "#ca8a04";
-  return "#dc2626";
-};
-
-// Đồng bộ màu với Dashboard - theo Thông tư 22
-const GRADE_COLORS = {
-  "TỐT": "#16a34a",
-  "KHÁ": "#2563eb",
-  "ĐẠT": "#ca8a04",
-  "CHƯA ĐẠT": "#dc2626",
+  if (avg >= 8) return "#16a34a"; // Tốt
+  if (avg >= 6.5) return "#2563eb"; // Khá
+  if (avg >= 5) return "#ca8a04"; // Đạt
+  return "#dc2626"; // Chưa đạt
 };
 
 const sortByClass = (a, b) => {
@@ -44,11 +29,10 @@ const sortByClass = (a, b) => {
 };
 
 /* -- Component ------------------------------------------------------ */
-
 export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("academic");
   const [years, setYears] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -58,9 +42,7 @@ export default function ReportPage() {
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedHocKy, setSelectedHocKy] = useState("0");
   const [selectedKhoi, setSelectedKhoi] = useState("0");
-  const [compareYears, setCompareYears] = useState([]);
 
-  // Statistics from API
   const [statsOverview, setStatsOverview] = useState(null);
   const [statsAcademic, setStatsAcademic] = useState(null);
   const [statsConduct, setStatsConduct] = useState(null);
@@ -69,18 +51,11 @@ export default function ReportPage() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfHtmlContent, setPdfHtmlContent] = useState("");
-  const renderCardValue = (value, width = "70px") => {
+
+  const renderCardValue = (value) => {
     if (statsLoading) {
       return (
-        <span 
-          className="inline-block animate-pulse rounded"
-          style={{ 
-            width, 
-            height: "28px", 
-            backgroundColor: "rgba(0, 0, 0, 0.08)", 
-            verticalAlign: "middle" 
-          }}
-        />
+        <span className="inline-block animate-pulse rounded bg-slate-200 h-[36px] w-[80px]"></span>
       );
     }
     return value;
@@ -99,7 +74,12 @@ export default function ReportPage() {
         const yData = yRes?.data?.data || [];
         setYears(yData);
         setClasses((cRes?.data?.data || []).sort(sortByClass));
-        setSubjects(sRes?.data?.data || []);
+        const rawSubjects = sRes?.data?.data || [];
+        const filteredSubjects = rawSubjects.filter(s => {
+          const name = (s.tenMon || "").toLowerCase();
+          return !name.includes("shdc") && !name.includes("sinh hoạt lớp");
+        });
+        setSubjects(filteredSubjects);
         setStudents(stRes?.data?.data || []);
         setTeachers(tRes?.data?.data || []);
         const current = yData.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || yData[yData.length - 1];
@@ -115,7 +95,6 @@ export default function ReportPage() {
     return () => { active = false; };
   }, []);
 
-  // Fetch scores when year or semester changes
   useEffect(() => {
     if (!selectedYear) return;
     let active = true;
@@ -135,7 +114,6 @@ export default function ReportPage() {
     return () => { active = false; };
   }, [selectedYear, selectedHocKy]);
 
-  // Fetch statistics from API when year/khoi changes
   useEffect(() => {
     if (!selectedYear) return;
     let active = true;
@@ -151,19 +129,19 @@ export default function ReportPage() {
         await Promise.all([
           getStatisticsOverview({ namHoc: selectedYear }).then(res => {
             if (active) setStatsOverview(res?.data?.data || null);
-          }).catch(err => console.error("Overview stats error:", err)),
+          }).catch(err => console.error("Overview error:", err)),
 
           getStatisticsAcademic({ namHoc: selectedYear, ...(selectedKhoi !== "0" ? { khoi: Number(selectedKhoi) } : {}) }).then(res => {
             if (active) setStatsAcademic(res?.data?.data || null);
-          }).catch(err => console.error("Academic stats error:", err)),
+          }).catch(err => console.error("Academic error:", err)),
 
           statisticsApi.getConduct(selectedYear, selectedHocKy).then(res => {
             if (active) setStatsConduct(res?.data?.data || null);
-          }).catch(err => console.error("Conduct stats error:", err)),
+          }).catch(err => console.error("Conduct error:", err)),
 
           statisticsApi.getAttendance({ namHoc: selectedYear }).then(res => {
             if (active) setStatsAttendance(res?.data?.data || null);
-          }).catch(err => console.error("Attendance stats error:", err)),
+          }).catch(err => console.error("Attendance error:", err)),
 
           getDiemDistribution({
             namHoc: selectedYear,
@@ -171,7 +149,7 @@ export default function ReportPage() {
             ...(selectedKhoi !== "0" ? { khoi: Number(selectedKhoi) } : {})
           }).then(res => {
             if (active) setStatsDistribution(res?.data?.data || null);
-          }).catch(err => console.error("Distribution stats error:", err))
+          }).catch(err => console.error("Distribution error:", err))
         ]);
       } catch (err) {
         console.error("Error fetching stats:", err);
@@ -183,7 +161,6 @@ export default function ReportPage() {
     return () => { active = false; };
   }, [selectedYear, selectedKhoi, selectedHocKy]);
 
-  /* -- Filtered scores (lọc theo Khối) ------------------------------ */
   const filteredScores = useMemo(() => {
     let list = allScores;
     if (selectedKhoi !== "0") {
@@ -193,7 +170,6 @@ export default function ReportPage() {
     return list;
   }, [allScores, selectedKhoi]);
 
-  /* -- Subject stats ------------------------------------------------ */
   const subjectMap = useMemo(() => new Map(subjects.map((m) => [m.id, m])), [subjects]);
 
   const subjectStats = useMemo(() => {
@@ -232,9 +208,8 @@ export default function ReportPage() {
         yeuP: Math.round((yeu / count) * 100)
       };
     }).sort((a, b) => String(a.tenMon).localeCompare(String(b.tenMon), "vi"));
-  }, [filteredScores]);
+  }, [filteredScores, subjectMap]);
 
-  /* -- Overview stats (client-side fallback) ------------------------ */
   const overviewStats = useMemo(() => {
     if (statsOverview) {
       return {
@@ -254,9 +229,6 @@ export default function ReportPage() {
     };
   }, [statsOverview, teachers, students, classes, subjects]);
 
-  /* -- Academic stats ---------------------------------------- */
-  // Tất cả (HK1, HK2, Cả năm) đều dùng statsDistribution từ diem/distribution API
-  // để đảm bảo nguồn dữ liệu đồng nhất, không dùng hoc_ba cho việc hiển thị
   const academicData = useMemo(() => {
     if (statsDistribution) {
       const counts = statsDistribution.counts || {};
@@ -264,7 +236,6 @@ export default function ReportPage() {
       const kha = counts["KHA"] || counts["KHÁ"] || 0;
       const tb = counts["DAT"] || counts["ĐẠT"] || 0;
       const yeu = counts["CHUA_DAT"] || counts["CHƯA ĐẠT"] || 0;
-
       const total = gioi + kha + tb + yeu || 1;
       return {
         overallAvg: statsDistribution.avgScore ?? 0,
@@ -274,13 +245,10 @@ export default function ReportPage() {
         khaP: Math.round((kha / total) * 100),
         tbP: Math.round((tb / total) * 100),
         yeuP: Math.round((yeu / total) * 100),
-        kemP: 0,
-        classStats: statsAcademic?.classStats || [],
-        mode: "DIEM",
+        topStudents: statsAcademic?.topStudents || [],
       };
     }
 
-    // Fallback: statsAcademic (hoc_ba) - chỉ dùng khi không có statsDistribution
     if (statsAcademic && selectedHocKy === "0") {
       const pl = statsAcademic.phanLoaiHocLuc || {};
       const gioi = (pl["TOT"] || 0) + (pl["GIOI"] || 0);
@@ -296,115 +264,33 @@ export default function ReportPage() {
         khaP: Math.round((kha / total) * 100),
         tbP: Math.round((dat / total) * 100),
         yeuP: Math.round((chuaDat / total) * 100),
-        kemP: 0,
-        classStats: statsAcademic.classStats || [],
-        mode: "HOC_BA",
+        topStudents: statsAcademic.topStudents || [],
       };
     }
 
-
-    // Fallback: empty
     return {
-      overallAvg: 0, total: 0, gioi: 0, kha: 0, tb: 0, yeu: 0, kem: 0,
-      gioiP: 0, khaP: 0, tbP: 0, yeuP: 0, kemP: 0, classStats: [], mode: "DIEM",
+      overallAvg: 0, total: 0, gioi: 0, kha: 0, tb: 0, yeu: 0,
+      gioiP: 0, khaP: 0, tbP: 0, yeuP: 0, topStudents: [],
     };
+  }, [statsDistribution, statsAcademic, selectedHocKy]);
 
-  }, [statsDistribution, statsAcademic, filteredScores, students, selectedHocKy]);
+  const topStudentsList = useMemo(() => {
+    if (!academicData?.topStudents) return [];
+    return [...academicData.topStudents].slice(0, 10);
+  }, [academicData.topStudents]);
 
-  /* -- Year comparison ---------------------------------------------- */
-  const toggleCompareYear = (tenNamHoc) => {
-    setCompareYears((prev) =>
-      prev.includes(tenNamHoc) ? prev.filter((y) => y !== tenNamHoc) : [...prev, tenNamHoc]
-    );
-  };
+  const pieData = [
+    { name: "Tốt", value: academicData.gioi, color: "#16a34a" },
+    { name: "Khá", value: academicData.kha, color: "#2563eb" },
+    { name: "Đạt", value: academicData.tb, color: "#ca8a04" },
+    { name: "Chưa đạt", value: academicData.yeu, color: "#dc2626" },
+  ];
 
-  const [compareData, setCompareData] = useState({});
+  const lineData = subjectStats.filter(m => m.nhomDanhGia === "DIEM_SO").map(m => ({
+    name: m.tenMon,
+    avg: m.avg ?? 0
+  }));
 
-  useEffect(() => {
-    if (compareYears.length === 0) return;
-    let active = true;
-    const fetchCompare = async () => {
-      const results = {};
-      await Promise.all(compareYears.map(async (y) => {
-        try {
-          const res = await getDiem({ namHoc: y, skipCache: true });
-          if (!active) return;
-          results[y] = res?.data?.data || [];
-        } catch {
-          results[y] = [];
-        }
-      }));
-      if (active) setCompareData((prev) => ({ ...prev, ...results }));
-    };
-    fetchCompare();
-    return () => { active = false; };
-  }, [compareYears]);
-
-  const comparisonStats = useMemo(() => {
-    return compareYears.map((y) => {
-      const scores = (compareData[y] || []).filter((s) => s.giaTriDiem != null);
-      const count = scores.length;
-      const avg = count > 0 ? scores.reduce((a, s) => a + Number(s.giaTriDiem), 0) / count : 0;
-      const gioi = scores.filter((s) => Number(s.giaTriDiem) >= 8).length;
-      const kha = scores.filter((s) => Number(s.giaTriDiem) >= 6.5 && Number(s.giaTriDiem) < 8).length;
-      const tb = scores.filter((s) => Number(s.giaTriDiem) >= 5 && Number(s.giaTriDiem) < 6.5).length;
-      const yeu = scores.filter((s) => Number(s.giaTriDiem) < 5).length;
-      const total = gioi + kha + tb + yeu || 1;
-      return { year: y, count, avg: Math.round(avg * 100) / 100, gioi, kha, tb, yeu, gioiP: Math.round(gioi / total * 100), khaP: Math.round(kha / total * 100), tbP: Math.round(tb / total * 100), yeuP: Math.round(yeu / total * 100) };
-    });
-  }, [compareYears, compareData]);
-
-  /* -- Print PDF ---------------------------------------------------- */
-  const handlePrint = () => {
-    const now = new Date().toLocaleDateString("vi-VN");
-    const hkLabel = selectedHocKy === "0" ? "Cả năm" : `Học kỳ ${selectedHocKy}`;
-    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Báo cáo tổng hợp</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,sans-serif;padding:15px;font-size:13px}
-h1{text-align:center;font-size:18px;margin-bottom:4px}
-.sub{text-align:center;font-size:12px;color:#555;margin-bottom:12px}
-table{border-collapse:collapse;width:100%;margin-bottom:14px}
-th,td{border:1px solid #999;padding:4px 8px;font-size:12px}
-th{background:#1565c0;color:#fff;text-align:center;font-weight:700}
-td.center{text-align:center}
-.stats-row{display:flex;gap:10px;margin-bottom:12px}
-.stat-box{flex:1;border:1px solid #ccc;border-radius:6px;padding:8px;text-align:center}
-.stat-num{font-size:22px;font-weight:700;color:#1565c0}
-.stat-lbl{font-size:11px;color:#555}
-@media print{@page{size:A4 portrait;margin:10mm}body{padding:0}}
-</style></head><body>
-<h1>BÁO CÁO TỔNG HỢP</h1>
-<div class="sub">${selectedYear} · ${hkLabel} · In ngày ${now}</div>
-
-<div class="stats-row">
-<div class="stat-box"><div class="stat-num">${overviewStats.totalTeachers}</div><div class="stat-lbl">Giáo viên</div></div>
-<div class="stat-box"><div class="stat-num">${overviewStats.activeStudents}</div><div class="stat-lbl">HS đang học</div></div>
-<div class="stat-box"><div class="stat-num">${overviewStats.totalClasses}</div><div class="stat-lbl">Lớp</div></div>
-<div class="stat-box"><div class="stat-num">${academicData.overallAvg}</div><div class="stat-lbl">ĐTB toàn trường</div></div>
-</div>
-
-<table><thead><tr><th>Phân loại</th><th>Sĩ số</th><th>Tỷ lệ</th></tr></thead><tbody>
-<tr><td>Tốt (≥8.0)</td><td class="center">${academicData.gioi}</td><td class="center">${academicData.gioiP}%</td></tr>
-<tr><td>Khá (≥6.5)</td><td class="center">${academicData.kha}</td><td class="center">${academicData.khaP}%</td></tr>
-<tr><td>Đạt (≥5.0)</td><td class="center">${academicData.tb}</td><td class="center">${academicData.tbP}%</td></tr>
-<tr><td>Chưa đạt (&lt;5.0)</td><td class="center">${academicData.yeu}</td><td class="center">${academicData.yeuP}%</td></tr>
-</tbody></table>
-
-<h2 style="font-size:14px;margin:10px 0 6px">Thống kê theo môn</h2>
-<table><thead><tr><th>Môn</th><th>ĐTB</th><th>Cao</th><th>Thấp</th><th>Tốt</th><th>Khá</th><th>Đạt</th><th>Chưa đạt</th></tr></thead><tbody>`;
-
-    subjectStats.forEach((m) => {
-      html += `<tr><td>${m.tenMon}</td><td class="center">${m.avg ?? "--"}</td><td class="center">${m.max ?? "--"}</td><td class="center">${m.min ?? "--"}</td><td class="center">${m.gioiP ?? 0}%</td><td class="center">${m.khaP ?? 0}%</td><td class="center">${m.tbP ?? 0}%</td><td class="center">${m.yeuP ?? 0}%</td></tr>`;
-    });
-    html += `</tbody></table></body></html>`;
-
-    const win = window.open("", "_blank");
-    if (win) { win.document.write(html); win.document.close(); }
-    else notifyError("Trình duyệt chặn popup.");
-  };
-
-  /* -- Preview PDF in modal ----------------------------------------- */
   const handlePreviewPdf = () => {
     const now = new Date().toLocaleDateString("vi-VN");
     const hkLabel = selectedHocKy === "0" ? "Cả năm" : `Học kỳ ${selectedHocKy}`;
@@ -455,565 +341,373 @@ td.center{text-align:center}
     setShowPdfPreview(true);
   };
 
-  const handlePrintFromPreview = () => {
-    const win = window.open("", "_blank");
-    if (win) { win.document.write(pdfHtmlContent); win.document.close(); win.print(); }
-    else notifyError("Trình duyệt chặn popup.");
-  };
+  const conductData = useMemo(() => {
+    if (!statsConduct?.phanBoHanhKiem) return { tot: 0, kha: 0, tb: 0, yeu: 0, total: 0 };
+    const { TOT, KHA, TRUNG_BINH, YEU } = statsConduct.phanBoHanhKiem;
+    const tot = TOT || 0;
+    const kha = KHA || 0;
+    const tb = TRUNG_BINH || 0;
+    const yeu = YEU || 0;
+    const total = tot + kha + tb + yeu || 1;
+    return { tot, kha, tb, yeu, total, lopTot: statsConduct.lopTotNhat, lopYeu: statsConduct.lopYeuNhat };
+  }, [statsConduct]);
+  
+  const conductPieData = useMemo(() => [
+    { name: "Tốt", value: conductData.tot, color: "#16a34a" },
+    { name: "Khá", value: conductData.kha, color: "#2563eb" },
+    { name: "Trung bình", value: conductData.tb, color: "#ca8a04" },
+    { name: "Yếu", value: conductData.yeu, color: "#dc2626" },
+  ].filter(d => d.value > 0), [conductData]);
 
-  /* -- Tabs --------------------------------------------------------- */
   const tabs = [
-    { key: "overview", label: "Tổng quan", icon: "dashboard" },
     { key: "academic", label: "Học lực", icon: "school" },
     { key: "attendance", label: "Chuyên cần", icon: "event_available" },
     { key: "conduct", label: "Hạnh kiểm", icon: "verified_user" },
   ];
 
-  /* -- Render ------------------------------------------------------- */
   return (
-    <div className="page users-page">
+    <div className="flex flex-col h-full bg-slate-50/50">
       <PageHeader title="Báo cáo & Thống kê" />
 
-      {/* Tabs */}
-      <div className="card" style={{ padding: 0, marginBottom: 16 }}>
-        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
+      <div className="p-6 flex-1 max-w-7xl mx-auto w-full">
+
+        {/* TABS */}
+        <div className="flex gap-6 border-b border-slate-200 mb-6 overflow-x-auto hide-scrollbar">
           {tabs.map((t) => (
-            <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
-              style={{ flex: 1, padding: "12px 16px", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                background: activeTab === t.key ? "#1565c0" : "transparent",
-                color: activeTab === t.key ? "#fff" : "#374151", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{t.icon}</span>
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === t.key
+                  ? "border-blue-600 text-blue-700"
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
               {t.label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="card users-toolbar">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <label className="form-field" style={{ marginBottom: 0 }}>
-            <span>Năm học</span>
-            <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
-              {years.map((y) => <option key={y.id} value={y.tenNamHoc}>{y.tenNamHoc}</option>)}
-            </select>
-          </label>
-          <label className="form-field" style={{ marginBottom: 0 }}>
-            <span>Học kỳ</span>
-            <select value={selectedHocKy} onChange={(e) => setSelectedHocKy(e.target.value)}>
-              <option value="0">Cả năm</option>
-              <option value="1">Học kỳ I</option>
-              <option value="2">Học kỳ II</option>
-            </select>
-          </label>
+        {/* BỘ LỌC */}
+        <div className="flex items-center gap-4 mb-8 flex-wrap">
+          <select
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white outline-none focus:border-blue-500 shadow-sm"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+          >
+            {years.map((y) => (
+              <option key={y.id} value={y.tenNamHoc}>{y.tenNamHoc}</option>
+            ))}
+          </select>
+          <select
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white outline-none focus:border-blue-500 shadow-sm"
+            value={selectedHocKy}
+            onChange={(e) => setSelectedHocKy(e.target.value)}
+          >
+            <option value="0">Cả năm</option>
+            <option value="1">Học kỳ I</option>
+            <option value="2">Học kỳ II</option>
+          </select>
           {activeTab === "academic" && (
-            <label className="form-field" style={{ marginBottom: 0 }}>
-              <span>Khối</span>
-              <select value={selectedKhoi} onChange={(e) => setSelectedKhoi(e.target.value)}>
-                <option value="0">Tất cả</option>
-                <option value="10">Khối 10</option>
-                <option value="11">Khối 11</option>
-                <option value="12">Khối 12</option>
-              </select>
-            </label>
+            <select
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white outline-none focus:border-blue-500 shadow-sm"
+              value={selectedKhoi}
+              onChange={(e) => setSelectedKhoi(e.target.value)}
+            >
+              <option value="0">Tất cả Khối</option>
+              <option value="10">Khối 10</option>
+              <option value="11">Khối 11</option>
+              <option value="12">Khối 12</option>
+            </select>
           )}
-          <button type="button" className="btn-primary" style={{ marginLeft: "auto" }} onClick={handlePreviewPdf}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle" }}>picture_as_pdf</span>
-            {" "}Xem trước PDF
+
+          <button
+            type="button"
+            className="ml-auto inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+            onClick={handlePreviewPdf}
+          >
+            <FileText className="w-4 h-4" /> Xuất PDF
           </button>
         </div>
-      </div>
 
-      {error && <div className="card table-empty">{error}</div>}
-      {loading && <div className="card table-empty">Đang tải dữ liệu...</div>}
+        {error && <div className="text-red-600 bg-red-50 p-4 rounded-xl text-sm mb-6 border border-red-100">{error}</div>}
 
-      {/* === TAB: TONG QUAN === */}
-      {!loading && activeTab === "overview" && (
-        <>
-          <div className="users-stats">
-            <div className="stat-card stat-blue"><div className="stat-label">Giáo viên</div><div className="stat-value">{renderCardValue(overviewStats.totalTeachers)}</div></div>
-            <div className="stat-card stat-sky"><div className="stat-label">Học sinh</div><div className="stat-value">{renderCardValue(overviewStats.totalStudents)}</div></div>
-            <div className="stat-card stat-ice"><div className="stat-label">Đang học</div><div className="stat-value">{renderCardValue(overviewStats.activeStudents)}</div></div>
-            <div className="stat-card stat-ice"><div className="stat-label">Lớp</div><div className="stat-value">{renderCardValue(overviewStats.totalClasses)}</div></div>
-            <div className="stat-card stat-blue"><div className="stat-label">Môn học</div><div className="stat-value">{renderCardValue(overviewStats.totalSubjects)}</div></div>
-          </div>
-
-          <div className="users-stats">
-            <div className="stat-card stat-blue"><div className="stat-label">ĐTB toàn trường</div><div className="stat-value">{renderCardValue(academicData.overallAvg)}</div></div>
-            <div className="stat-card" style={{ background: "#dcfce7" }}><div className="stat-label">Tốt</div><div className="stat-value" style={{ color: "#16a34a" }}>{renderCardValue(<>{academicData.gioi} <small>({academicData.gioiP}%)</small></>, "90px")}</div></div>
-            <div className="stat-card" style={{ background: "#dbeafe" }}><div className="stat-label">Khá</div><div className="stat-value" style={{ color: "#2563eb" }}>{renderCardValue(<>{academicData.kha} <small>({academicData.khaP}%)</small></>, "90px")}</div></div>
-            <div className="stat-card" style={{ background: "#fef9c3" }}><div className="stat-label">Đạt</div><div className="stat-value" style={{ color: "#ca8a04" }}>{renderCardValue(<>{academicData.tb} <small>({academicData.tbP}%)</small></>, "90px")}</div></div>
-            <div className="stat-card" style={{ background: "#fee2e2" }}><div className="stat-label">Chưa đạt</div><div className="stat-value" style={{ color: "#dc2626" }}>{renderCardValue(<>{academicData.yeu} <small>({academicData.yeuP}%)</small></>, "90px")}</div></div>
-          </div>
-
-          {/* Pie chart CSS */}
-          <div className="card users-table">
-            <div className="table-header"><div><div className="panel-title">Phân loại học lực</div><div className="panel-subtitle">{selectedYear} · {selectedHocKy === "0" ? "Cả năm" : `HK${selectedHocKy}`}</div></div></div>
-            {statsLoading ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, width: "100%", color: "#666", gap: 12 }}>
-                <div style={{ width: 24, height: 24, borderRadius: "50%", border: "3px solid #2563eb", borderTopColor: "transparent", animation: "spin 1s linear infinite" }} />
-                <span>Đang tính toán số liệu học lực...</span>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        {/* KPI CARDS */}
+        {activeTab === "academic" && (
+          <div className="bg-white rounded-xl border border-slate-100 border-t-[3px] border-t-blue-600 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] mb-8 flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100 overflow-hidden">
+            {[
+              { label: "Tổng số Giáo viên", value: renderCardValue(overviewStats.totalTeachers) },
+              { label: "Tổng số Học sinh", value: renderCardValue(overviewStats.activeStudents) },
+              { label: "Tổng số Lớp học", value: renderCardValue(overviewStats.totalClasses) },
+              { label: "ĐTB toàn trường", value: renderCardValue(academicData.overallAvg) },
+            ].map((k, i) => (
+              <div key={i} className="flex-1 px-6 py-5 flex flex-col justify-center items-start hover:bg-slate-50/50 transition-colors cursor-default">
+                <div className="text-[13px] font-medium text-slate-500 mb-1">{k.label}</div>
+                <div className="text-[36px] font-bold text-slate-800 leading-none">{k.value}</div>
               </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 32, padding: 20, justifyContent: "center", flexWrap: "wrap" }}>
-                <div style={{
-                  width: 160, height: 160, borderRadius: "50%",
-                  background: `conic-gradient(#16a34a 0% ${academicData.gioiP}%, #2563eb ${academicData.gioiP}% ${academicData.gioiP + academicData.khaP}%, #ca8a04 ${academicData.gioiP + academicData.khaP}% ${academicData.gioiP + academicData.khaP + academicData.tbP}%, #dc2626 ${academicData.gioiP + academicData.khaP + academicData.tbP}% 100%)`,
-                  display: "flex", alignItems: "center", justifyContent: "center"
-                }}>
-                  <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: "#1565c0" }}>{academicData.total}</div>
-                    <div style={{ fontSize: 10, color: "#666" }}>học sinh</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {[
-                    { label: "Tốt", color: "#16a34a", count: academicData.gioi, pct: academicData.gioiP },
-                    { label: "Khá", color: "#2563eb", count: academicData.kha, pct: academicData.khaP },
-                    { label: "Đạt", color: "#ca8a04", count: academicData.tb, pct: academicData.tbP },
-                    { label: "Chưa đạt", color: "#dc2626", count: academicData.yeu, pct: academicData.yeuP },
-                  ].map((item) => (
-                    <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 14, height: 14, borderRadius: 3, background: item.color }} />
-                      <span style={{ fontSize: 13, width: 90 }}>{item.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, width: 40 }}>{item.count}</span>
-                      <span style={{ fontSize: 12, color: "#666" }}>({item.pct}%)</span>
+            ))}
+          </div>
+        )}
+
+        {/* CHARTS */}
+        {activeTab === "academic" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+            {/* Doughnut Chart */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col">
+              <h3 className="text-sm font-bold text-slate-800 mb-2 uppercase tracking-wide">Phân loại học lực</h3>
+              <div className="flex-1 min-h-[280px] flex items-center justify-center relative">
+                {statsLoading ? (
+                  <span className="text-slate-400 text-sm">Đang tính toán...</span>
+                ) : (
+                  <>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-20px]">
+                      <span className="text-3xl font-bold text-slate-800">{academicData.total}</span>
+                      <span className="text-xs text-slate-500 font-medium">Học sinh</span>
                     </div>
-                  ))}
-                </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          innerRadius={85}
+                          outerRadius={120}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          formatter={(value, name) => [`${value} HS`, name]}
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </>
+                )}
               </div>
-            )}
-          </div>
-        </>
-      )}
+              <div className="mt-2 flex justify-center gap-6 flex-wrap">
+                {pieData.map(entry => (
+                  <div key={entry.name} className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full shadow-sm" style={{ background: entry.color }}></span>
+                    <span className="text-sm font-medium text-slate-600">{entry.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-      {/* === TAB: HOC LUC === */}
-      {!loading && activeTab === "academic" && (
-        <>
-          <div className="users-stats">
-            <div className="stat-card stat-blue"><div className="stat-label">ĐTB toàn trường</div><div className="stat-value">{renderCardValue(academicData.overallAvg)}</div></div>
-            <div className="stat-card" style={{ background: "#dcfce7" }}><div className="stat-label">Tốt</div><div className="stat-value" style={{ color: "#16a34a" }}>{renderCardValue(academicData.gioi)}</div></div>
-            <div className="stat-card" style={{ background: "#dbeafe" }}><div className="stat-label">Khá</div><div className="stat-value" style={{ color: "#2563eb" }}>{renderCardValue(academicData.kha)}</div></div>
-            <div className="stat-card" style={{ background: "#fef9c3" }}><div className="stat-label">Đạt</div><div className="stat-value" style={{ color: "#ca8a04" }}>{renderCardValue(academicData.tb)}</div></div>
-            <div className="stat-card" style={{ background: "#fee2e2" }}><div className="stat-label">Chưa đạt</div><div className="stat-value" style={{ color: "#dc2626" }}>{renderCardValue(academicData.yeu)}</div></div>
-          </div>
-          <div style={{ padding: "6px 12px", background: "#eff6ff", borderRadius: 8, fontSize: 12, color: "#1565c0", marginBottom: 8 }}>
-            Phân loại học lực theo Thông tư 22/2021/TT-BGDĐT: Tốt / Khá / Đạt / Chưa đạt
-          </div>
+            {/* Line Chart */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col">
+              <h3 className="text-sm font-bold text-slate-800 mb-6 uppercase tracking-wide">ĐTB Theo môn học</h3>
+              <div className="flex-1 min-h-[280px]">
+                {statsLoading ? (
+                  <div className="h-full flex items-center justify-center"><span className="text-slate-400 text-sm">Đang tải biểu đồ...</span></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={lineData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={80} tick={{ fontSize: 11, fill: '#64748b' }} tickMargin={5} />
+                      <YAxis domain={[0, 10]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <RechartsTooltip
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 600 }}
+                        formatter={(value) => [value, 'ĐTB']}
+                      />
+                      <Line type="monotone" dataKey="avg" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
 
-          {/* Subject stats */}
-          <div className="card users-table">
-            <div className="table-header"><div><div className="panel-title">Thống kê điểm theo môn học</div><div className="panel-subtitle">{selectedYear} · {selectedHocKy === "0" ? "Cả năm" : `HK${selectedHocKy}`}</div></div></div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#f3f4f6", fontWeight: 600 }}>
-                    <th style={{ padding: "10px 12px", textAlign: "left", minWidth: 180 }}>Môn học</th>
-                    <th style={{ padding: "10px 8px", textAlign: "center", width: 60 }}>ĐTB</th>
-                    <th style={{ padding: "10px 8px", textAlign: "center", width: 65 }}>Cao nhất</th>
-                    <th style={{ padding: "10px 8px", textAlign: "center", width: 65 }}>Thấp nhất</th>
-                    <th style={{ padding: "10px 8px", textAlign: "left", minWidth: 160 }}>Phân bổ</th>
-                    <th style={{ padding: "10px 8px", textAlign: "center", width: 220 }}>Tỷ lệ</th>
+          </div>
+        )}
+
+        {/* TOP STUDENTS TABLE (Only Academic) */}
+        {activeTab === "academic" && (
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-8">
+            <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Top 10 học sinh xuất sắc nhất</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-white text-slate-500 font-semibold uppercase text-[11px] tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-4 text-center w-16">STT</th>
+                    <th className="px-6 py-4">Học sinh</th>
+                    <th className="px-6 py-4 text-center">Lớp</th>
+                    <th className="px-6 py-4 text-center">ĐTB</th>
+                    <th className="px-6 py-4 w-[35%]">Mức độ hoàn thành</th>
                   </tr>
                 </thead>
-                <tbody>
-              {subjectStats.filter((m) => m.nhomDanhGia === "DIEM_SO").map((m) => (
-                <tr key={m.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                  <td style={{ padding: "8px 12px", fontWeight: 600 }}>{m.tenMon}</td>
-                  <td style={{ padding: "8px", textAlign: "center", fontWeight: 700, color: classifyColor(m.avg) }}>{m.avg ?? "--"}</td>
-                  <td style={{ padding: "8px", textAlign: "center" }}>{m.max ?? "--"}</td>
-                  <td style={{ padding: "8px", textAlign: "center" }}>{m.min ?? "--"}</td>
-                  <td style={{ padding: "8px" }}>
-                    <div style={{ display: "flex", height: 18, borderRadius: 4, overflow: "hidden", background: "#e5e7eb" }}>
-                      {m.gioiP > 0 && <div style={{ width: `${m.gioiP}%`, background: "#16a34a" }} title={`Tốt: ${m.gioiP}%`} />}
-                      {m.khaP > 0 && <div style={{ width: `${m.khaP}%`, background: "#2563eb" }} title={`Khá: ${m.khaP}%`} />}
-                      {m.tbP > 0 && <div style={{ width: `${m.tbP}%`, background: "#ca8a04" }} title={`Đạt: ${m.tbP}%`} />}
-                      {m.yeuP > 0 && <div style={{ width: `${m.yeuP}%`, background: "#dc2626" }} title={`Chưa đạt: ${m.yeuP}%`} />}
-                    </div>
-                  </td>
-                  <td style={{ padding: "8px", textAlign: "center" }}>
-                    <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
-                    {[{ v: m.gioiP, c: "#16a34a" }, { v: m.khaP, c: "#2563eb" }, { v: m.tbP, c: "#ca8a04" }, { v: m.yeuP, c: "#dc2626" }].map((b, i) => (
-                      <span key={i} style={{ fontSize: 11, padding: "1px 5px", borderRadius: 8, background: b.c + "18", color: b.c, fontWeight: 600 }}>{b.v}%</span>
-                    ))}
-                  </div>
-                  </td>
-                </tr>
-              ))}
+                <tbody className="divide-y divide-slate-100">
+                  {topStudentsList.length > 0 ? topStudentsList.map((s, i) => (
+                    <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4 text-center font-medium">{i + 1}</td>
+                      <td className="px-6 py-4 font-bold text-slate-800">{s.hoTen}</td>
+                      <td className="px-6 py-4 text-center text-slate-500">{s.tenLop}</td>
+                      <td className="px-6 py-4 text-center font-bold text-[15px]" style={{ color: classifyColor(s.diemTB) }}>{s.diemTB ?? "--"}</td>
+                      <td className="px-6 py-4">
+                        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${(s.diemTB / 10) * 100}%`, backgroundColor: classifyColor(s.diemTB) }}></div>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-500">Không có dữ liệu đánh giá học sinh</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+        )}
 
-          {/* Class stats from API */}
-          {academicData.classStats && academicData.classStats.length > 0 && (
-            <div className="card users-table">
-              <div className="table-header"><div><div className="panel-title">Điểm trung bình theo lớp</div><div className="panel-subtitle">Xếp hạng lớp theo ĐTB</div></div></div>
-              {[10, 11, 12].map((khoi) => {
-                const khoiClasses = academicData.classStats.filter((c) => c.khoi === khoi);
-                if (khoiClasses.length === 0) return null;
-                return (
-                  <div key={khoi} style={{ padding: "12px 16px" }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "#1565c0" }}>Khối {khoi}</div>
-                    {khoiClasses.map((c) => (
-                      <div key={c.tenLop} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                        <span style={{ width: 50, fontSize: 13, fontWeight: 600 }}>{c.tenLop}</span>
-                        <div style={{ flex: 1, height: 22, background: "#e5e7eb", borderRadius: 4, overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${((c.avg || 0) / 10) * 100}%`, background: classifyColor(c.avg), borderRadius: 4, transition: "width 0.3s" }} />
-                        </div>
-                        <span style={{ width: 40, textAlign: "right", fontSize: 13, fontWeight: 700, color: classifyColor(c.avg) }}>{c.avg ?? "--"}</span>
-                        <span style={{ width: 50, fontSize: 11, color: "#666" }}>{c.total} HS</span>
-                      </div>
-                    ))}
-
-      
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* === TAB: CHUYEN CAN === */}
-      {!loading && activeTab === "attendance" && (
-        <>
-          {statsLoading ? (
-            <div className="users-stats">
-              <div className="stat-card stat-blue">
-                <div className="stat-label">Tổng ngày vắng</div>
-                <div className="stat-value">{renderCardValue(null)}</div>
+        {/* CHUYÊN CẦN */}
+        {activeTab === "attendance" && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-100 border-t-[3px] border-t-blue-600 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100 overflow-hidden">
+              <div className="flex-1 px-6 py-5 flex flex-col justify-center items-start hover:bg-slate-50/50 transition-colors cursor-default">
+                <div className="text-[13px] font-medium text-slate-500 mb-1">Tổng lượt nghỉ</div>
+                <div className="text-[36px] font-bold text-slate-800 leading-none">{statsAttendance?.tongNgayVang ?? "--"}</div>
               </div>
-              <div className="stat-card" style={{ background: "#fee2e2" }}>
-                <div className="stat-label">Tỷ lệ vắng</div>
-                <div className="stat-value">{renderCardValue(null)}</div>
+              <div className="flex-1 px-6 py-5 flex flex-col justify-center items-start hover:bg-slate-50/50 transition-colors cursor-default">
+                <div className="text-[13px] font-medium text-slate-500 mb-1">Tỷ lệ vắng trung bình</div>
+                <div className="text-[36px] font-bold text-slate-800 leading-none">{statsAttendance?.tyLeVang ?? "--"}%</div>
               </div>
             </div>
-          ) : statsAttendance ? (
-            <>
-              <div className="users-stats">
-                <div className="stat-card stat-blue">
-                  <div className="stat-label">Tổng ngày vắng</div>
-                  <div className="stat-value">{statsAttendance.tongNgayVang}</div>
-                </div>
-                <div className="stat-card" style={{ background: "#fee2e2" }}>
-                  <div className="stat-label">Tỷ lệ vắng</div>
-                  <div className="stat-value" style={{ color: "#dc2626" }}>{statsAttendance.tyLeVang}%</div>
-                </div>
-              </div>
 
-              {/* Bảng theo lớp */}
-              {statsAttendance.theoLop && statsAttendance.theoLop.length > 0 && (
-                <div className="card users-table">
-                  <div className="table-header"><div><div className="panel-title">Chuyên cần theo lớp</div><div className="panel-subtitle">{selectedYear} · {statsAttendance.theoLop.length} lớp</div></div></div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                      <thead>
-                        <tr style={{ background: "#f3f4f6", fontWeight: 600 }}>
-                          <th style={{ padding: "10px 12px", textAlign: "left" }}>Lớp</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Sĩ số</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Tổng vắng</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Có phép</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Không phép</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Tỷ lệ vắng</th>
+            {statsAttendance?.theoLop?.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-6">
+                <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Chuyên cần theo lớp</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="bg-white text-slate-500 font-semibold uppercase text-[11px] tracking-wider border-b border-slate-200">
+                      <tr>
+                        <th className="px-6 py-4">Lớp</th>
+                        <th className="px-6 py-4 text-center">Sĩ số</th>
+                        <th className="px-6 py-4 text-center">Tổng vắng</th>
+                        <th className="px-6 py-4 text-center">Có phép</th>
+                        <th className="px-6 py-4 text-center">Không phép</th>
+                        <th className="px-6 py-4 text-center">Tỷ lệ vắng</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {statsAttendance.theoLop.map((lop, i) => (
+                        <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4 font-bold text-slate-800">{lop.tenLop}</td>
+                          <td className="px-6 py-4 text-center">{lop.siSo}</td>
+                          <td className="px-6 py-4 text-center font-bold text-red-600">{lop.tongVang}</td>
+                          <td className="px-6 py-4 text-center text-amber-500 font-medium">{lop.coPhep}</td>
+                          <td className="px-6 py-4 text-center text-red-500 font-medium">{lop.khongPhep}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${lop.tyLeVang > 10 ? "bg-red-100 text-red-700" : lop.tyLeVang > 5 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                              {lop.tyLeVang}%
+                            </span>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {statsAttendance.theoLop.map((lop, i) => (
-                          <tr key={i} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                            <td style={{ padding: "8px 12px", fontWeight: 600 }}>{lop.tenLop}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center" }}>{lop.siSo}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: "#dc2626" }}>{lop.tongVang}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center", color: "#f59e0b" }}>{lop.coPhep}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center", color: "#dc2626" }}>{lop.khongPhep}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                              <span style={{
-                                padding: "2px 8px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                                background: lop.tyLeVang > 10 ? "#fee2e2" : lop.tyLeVang > 5 ? "#fef9c3" : "#dcfce7",
-                                color: lop.tyLeVang > 10 ? "#dc2626" : lop.tyLeVang > 5 ? "#ca8a04" : "#16a34a"
-                              }}>{lop.tyLeVang}%</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+        )}
 
-              {/* Top vắng nhiều nhất */}
-              {statsAttendance.topVangNhat && statsAttendance.topVangNhat.length > 0 && (
-                <div className="card users-table">
-                  <div className="table-header"><div><div className="panel-title">Học sinh vắng nhiều nhất</div><div className="panel-subtitle">Top 10</div></div></div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                      <thead>
-                        <tr style={{ background: "#f3f4f6", fontWeight: 600 }}>
-                          <th style={{ padding: "10px 12px", textAlign: "left" }}>Họ tên</th>
-                          <th style={{ padding: "10px 12px", textAlign: "left" }}>Lớp</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Tổng vắng</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Có phép</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Không phép</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {statsAttendance.topVangNhat.map((s, i) => (
-                          <tr key={s.hocSinhId || i} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                            <td style={{ padding: "8px 12px", fontWeight: 600 }}>{s.hoTen}</td>
-                            <td style={{ padding: "8px 12px" }}>{s.tenLop}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: "#dc2626" }}>{s.soNgayVang}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center", color: "#f59e0b" }}>{s.coPhep}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center", color: "#dc2626" }}>{s.khongPhep}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="card users-table">
-              <div className="table-header"><div><div className="panel-title">Thống kê chuyên cần</div><div className="panel-subtitle">Dữ liệu điểm danh theo lớp</div></div></div>
-              <div style={{ padding: 20, textAlign: "center", color: "#6b7280", fontSize: 13 }}>
-                Không có dữ liệu chuyên cần cho năm học này.
+        {/* HẠNH KIỂM */}
+        {activeTab === "conduct" && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-100 border-t-[3px] border-t-blue-600 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100 overflow-hidden">
+              <div className="flex-1 px-6 py-5 flex flex-col justify-center items-start hover:bg-slate-50/50 transition-colors cursor-default">
+                <div className="text-[13px] font-medium text-slate-500 mb-1">Tổng HS được đánh giá</div>
+                <div className="text-[36px] font-bold text-slate-800 leading-none">{statsConduct ? conductData.total : "--"}</div>
+              </div>
+              <div className="flex-1 px-6 py-5 flex flex-col justify-center items-start hover:bg-slate-50/50 transition-colors cursor-default">
+                <div className="text-[13px] font-medium text-slate-500 mb-1">Tỷ lệ Hạnh kiểm Tốt</div>
+                <div className="text-[36px] font-bold text-slate-800 leading-none">{statsConduct ? Math.round((conductData.tot / conductData.total) * 100) + "%" : "--"}</div>
+              </div>
+              <div className="flex-1 px-6 py-5 flex flex-col justify-center items-start hover:bg-slate-50/50 transition-colors cursor-default">
+                <div className="text-[13px] font-medium text-slate-500 mb-1">Lớp xuất sắc nhất</div>
+                <div className="text-[36px] font-bold text-slate-800 leading-none">{conductData.lopTot || "--"}</div>
+              </div>
+              <div className="flex-1 px-6 py-5 flex flex-col justify-center items-start hover:bg-slate-50/50 transition-colors cursor-default">
+                <div className="text-[13px] font-medium text-slate-500 mb-1">Lớp cần lưu ý</div>
+                <div className="text-[36px] font-bold text-slate-800 leading-none">{conductData.lopYeu || "--"}</div>
               </div>
             </div>
-          )}
-        </>
-      )}
 
-      {/* === TAB: HANH KIEM === */}
-      {!loading && activeTab === "conduct" && (
-        <>
-          {statsLoading ? (
-            <div className="users-stats">
-              {[
-                { label: "Tốt", bg: "#dcfce7" },
-                { label: "Khá", bg: "#dbeafe" },
-                { label: "Trung bình", bg: "#fef9c3" },
-                { label: "Yếu", bg: "#fee2e2" },
-              ].map((item, i) => (
-                <div key={i} className="stat-card" style={{ background: item.bg }}>
-                  <div className="stat-label">{item.label}</div>
-                  <div className="stat-value">{renderCardValue(null)}</div>
-                </div>
-              ))}
-            </div>
-          ) : statsConduct ? (
-            <>
-              <div className="users-stats">
-                {[
-                  { label: "Tốt", key: "TOT", color: "#16a34a", bg: "#dcfce7" },
-                  { label: "Khá", key: "KHA", color: "#2563eb", bg: "#dbeafe" },
-                  { label: "Trung bình", key: "TRUNG_BINH", color: "#ca8a04", bg: "#fef9c3" },
-                  { label: "Yếu", key: "YEU", color: "#dc2626", bg: "#fee2e2" },
-                ].map((item) => (
-                  <div key={item.key} className="stat-card" style={{ background: item.bg }}>
-                    <div className="stat-label">{item.label}</div>
-                    <div className="stat-value" style={{ color: item.color }}>{statsConduct.phanBoHanhKiem?.[item.key] ?? 0}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="card users-table">
-                <div className="table-header"><div><div className="panel-title">Thống kê hạnh kiểm</div><div className="panel-subtitle">{selectedYear}</div></div></div>
-                <div style={{ padding: 20 }}>
-                  {/* Pie chart */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 32, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
-                    <div style={{
-                      width: 160, height: 160, borderRadius: "50%",
-                      background: (() => {
-                        const pb = statsConduct.phanBoHanhKiem || {};
-                        const total = (pb.TOT || 0) + (pb.KHA || 0) + (pb.TRUNG_BINH || 0) + (pb.YEU || 0) || 1;
-                        const p1 = Math.round(((pb.TOT || 0) / total) * 100);
-                        const p2 = Math.round(((pb.KHA || 0) / total) * 100);
-                        const p3 = Math.round(((pb.TRUNG_BINH || 0) / total) * 100);
-                        return `conic-gradient(#16a34a 0% ${p1}%, #2563eb ${p1}% ${p1 + p2}%, #ca8a04 ${p1 + p2}% ${p1 + p2 + p3}%, #dc2626 ${p1 + p2 + p3}% 100%)`;
-                      })(),
-                      display: "flex", alignItems: "center", justifyContent: "center"
-                    }}>
-                      <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-                        <div style={{ fontSize: 22, fontWeight: 700, color: "#1565c0" }}>
-                          {Object.values(statsConduct.phanBoHanhKiem || {}).reduce((a, b) => a + b, 0)}
-                        </div>
-                        <div style={{ fontSize: 10, color: "#666" }}>học sinh</div>
+            <div className="flex justify-center mb-8">
+              <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col">
+                <h3 className="text-sm font-bold text-slate-800 mb-2 uppercase tracking-wide">Phân loại hạnh kiểm</h3>
+                <div className="flex-1 min-h-[280px] flex items-center justify-center relative">
+                  {statsLoading ? (
+                    <span className="text-slate-400 text-sm">Đang tính toán...</span>
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-20px]">
+                        <span className="text-3xl font-bold text-slate-800">{conductData.total}</span>
+                        <span className="text-xs text-slate-500 font-medium">Học sinh</span>
                       </div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={conductPieData}
+                            cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={2} dataKey="value"
+                            stroke="none"
+                          >
+                            {conductPieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip formatter={(value) => [`${value} học sinh`, 'Số lượng']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </>
+                  )}
+                </div>
+                <div className="mt-6 flex flex-wrap justify-center gap-6">
+                  {conductPieData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-sm font-medium text-slate-700">{item.name} ({Math.round(item.value / conductData.total * 100)}%)</span>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {[
-                        { label: "Tốt", key: "TOT", color: "#16a34a" },
-                        { label: "Khá", key: "KHA", color: "#2563eb" },
-                        { label: "Trung bình", key: "TRUNG_BINH", color: "#ca8a04" },
-                        { label: "Yếu", key: "YEU", color: "#dc2626" },
-                      ].map((item) => (
-                        <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 14, height: 14, borderRadius: 3, background: item.color }} />
-                          <span style={{ fontSize: 13, width: 90 }}>{item.label}</span>
-                          <span style={{ fontSize: 13, fontWeight: 600 }}>{statsConduct.phanBoHanhKiem?.[item.key] ?? 0}</span>
+                  ))}
+                </div>
+
+                {/* Danh sách các lớp */}
+                {statsConduct?.theoLop && statsConduct.theoLop.length > 0 && (
+                  <div className="mt-8 border-t border-slate-100 pt-6">
+                    <h4 className="text-[13px] font-bold text-slate-500 mb-4 uppercase tracking-wide">Chi tiết theo lớp</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {statsConduct.theoLop.map((lop, idx) => (
+                        <div key={idx} className="flex items-center p-3 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors bg-slate-50/30">
+                          <span className="font-bold text-slate-800 w-14 text-sm">{lop.tenLop}</span>
+                          <div className="flex-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                            {lop.tot > 0 && <span className="text-green-600 font-semibold"><span className="text-slate-500 font-normal">Tốt:</span> {lop.tot}</span>}
+                            {lop.kha > 0 && <span className="text-blue-600 font-semibold"><span className="text-slate-500 font-normal">Khá:</span> {lop.kha}</span>}
+                            {lop.trungBinh > 0 && <span className="text-yellow-600 font-semibold"><span className="text-slate-500 font-normal">TB:</span> {lop.trungBinh}</span>}
+                            {lop.yeu > 0 && <span className="text-red-600 font-semibold"><span className="text-slate-500 font-normal">Yếu:</span> {lop.yeu}</span>}
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Best/worst class */}
-                  <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
-                    {statsConduct.lopTotNhat && (
-                      <div style={{ padding: "8px 16px", borderRadius: 8, background: "#dcfce7", fontSize: 13 }}>
-                        <span style={{ color: "#16a34a", fontWeight: 600 }}>Lớp tốt nhất: </span>
-                        <span style={{ fontWeight: 700 }}>{statsConduct.lopTotNhat}</span>
-                      </div>
-                    )}
-                    {statsConduct.lopYeuNhat && (
-                      <div style={{ padding: "8px 16px", borderRadius: 8, background: "#fee2e2", fontSize: 13 }}>
-                        <span style={{ color: "#dc2626", fontWeight: 600 }}>Lớp cần cải thiện: </span>
-                        <span style={{ fontWeight: 700 }}>{statsConduct.lopYeuNhat}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
-            </>
-          ) : (
-            <div className="card users-table">
-              <div className="table-header"><div><div className="panel-title">Thống kê hạnh kiểm</div><div className="panel-subtitle">Đánh giá hạnh kiểm học sinh</div></div></div>
-              <div style={{ padding: 20, textAlign: "center" }}>
-                <div style={{ fontSize: 48, color: "#1565c0", marginBottom: 12 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 48 }}>verified_user</span>
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Quản lý hạnh kiểm</div>
-                <div style={{ fontSize: 13, color: "#6b7280", maxWidth: 400, margin: "0 auto" }}>
-                  Dữ liệu hạnh kiểm được quản lý tại trang Hạnh kiểm. Sử dụng menu để truy cập.
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* === TAB: SO SANH NAM (kept for comparison) === */}
-      {!loading && activeTab === "compare" && (
-        <>
-          <div className="card users-toolbar">
-            <div>
-              <div className="users-title">Chọn năm học để so sánh</div>
-              <div className="users-subtitle">Có thể chọn nhiều năm. Dữ liệu sẽ được tải khi chọn.</div>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-              {years.map((y) => (
-                <button key={y.id} type="button" onClick={() => toggleCompareYear(y.tenNamHoc)}
-                  style={{
-                    padding: "6px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600,
-                    border: compareYears.includes(y.tenNamHoc) ? "2px solid #1565c0" : "1px solid #d1d5db",
-                    background: compareYears.includes(y.tenNamHoc) ? "#eff6ff" : "#fff",
-                    color: compareYears.includes(y.tenNamHoc) ? "#1565c0" : "#374151"
-                  }}>
-                  {y.tenNamHoc}
-                </button>
-              ))}
             </div>
           </div>
+        )}
 
-          {comparisonStats.length > 0 && (
-            <div className="card users-table">
-              <div className="table-header"><div><div className="panel-title">So sánh các năm học</div><div className="panel-subtitle">Điểm trung bình và phân loại học lực</div></div></div>
-              <div className="table-grid">
-                <div className="table-row table-head">
-                  <div style={{ width: 100 }}>Năm học</div>
-                  <div style={{ width: 60, textAlign: "center" }}>Số điểm</div>
-                  <div style={{ width: 60, textAlign: "center" }}>ĐTB</div>
-                  <div style={{ flex: 1 }}>Phân bổ tỷ lệ</div>
-                  <div style={{ width: 180, textAlign: "center" }}>Chi tiết</div>
-                </div>
-                {comparisonStats.map((cs) => (
-                  <div key={cs.year} className="table-row" style={{ alignItems: "center" }}>
-                    <div style={{ width: 100, fontWeight: 700, fontSize: 13 }}>{cs.year}</div>
-                    <div style={{ width: 60, textAlign: "center", fontSize: 13 }}>{cs.count}</div>
-                    <div style={{ width: 60, textAlign: "center", fontSize: 15, fontWeight: 700, color: classifyColor(cs.avg) }}>{cs.avg}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", height: 24, borderRadius: 4, overflow: "hidden", background: "#e5e7eb" }}>
-                        {cs.gioiP > 0 && <div style={{ width: `${cs.gioiP}%`, background: "#16a34a" }} />}
-                        {cs.khaP > 0 && <div style={{ width: `${cs.khaP}%`, background: "#2563eb" }} />}
-                        {cs.tbP > 0 && <div style={{ width: `${cs.tbP}%`, background: "#ca8a04" }} />}
-                        {cs.yeuP > 0 && <div style={{ width: `${cs.yeuP}%`, background: "#dc2626" }} />}
-                      </div>
-                    </div>
-                    <div style={{ width: 180, display: "flex", gap: 4, justifyContent: "center" }}>
-                      <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 8, background: "#dcfce7", color: "#16a34a", fontWeight: 600 }}>G:{cs.gioi}</span>
-                      <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 8, background: "#dbeafe", color: "#2563eb", fontWeight: 600 }}>K:{cs.kha}</span>
-                      <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 8, background: "#fef9c3", color: "#ca8a04", fontWeight: 600 }}>TB:{cs.tb}</span>
-                      <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 8, background: "#fee2e2", color: "#dc2626", fontWeight: 600 }}>Y:{cs.yeu}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      </div>
 
-          {comparisonStats.length === 0 && (
-            <div className="card table-empty">Chọn năm học ở trên để so sánh.</div>
-          )}
-        </>
-      )}
-      {showPdfPreview && (
-        <div
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 9999, padding: 24
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowPdfPreview(false); }}
-        >
-          <div style={{
-            background: "#fff", borderRadius: 12, overflow: "hidden",
-            width: "min(900px, 95vw)", height: "85vh",
-            display: "flex", flexDirection: "column",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.4)"
-          }}>
-            {/* Modal header */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "14px 20px", borderBottom: "1px solid #e5e7eb",
-              background: "#1565c0"
-            }}>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>picture_as_pdf</span>
-                Xem trước báo cáo — {selectedYear}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={handlePrintFromPreview}
-                  style={{
-                    padding: "6px 16px", background: "#fff", color: "#1565c0",
-                    border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer", fontSize: 13
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: "middle", marginRight: 4 }}>print</span>
-                  In ngay
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPdfPreview(false)}
-                  style={{
-                    padding: "6px 14px", background: "rgba(255,255,255,0.2)", color: "#fff",
-                    border: "1px solid rgba(255,255,255,0.4)", borderRadius: 6, fontWeight: 600, cursor: "pointer", fontSize: 13
-                  }}
-                >
-                  Đóng
-                </button>
-              </div>
-            </div>
-            {/* iframe preview */}
-            <iframe
-              title="preview-pdf"
-              srcDoc={pdfHtmlContent}
-              style={{ flex: 1, border: "none", width: "100%" }}
-            />
-          </div>
-        </div>
-      )}
+      {/* PDF PREVIEW MODAL */}
+      <PdfPreviewModal
+        isOpen={showPdfPreview}
+        onClose={() => setShowPdfPreview(false)}
+        htmlContent={pdfHtmlContent}
+      />
     </div>
   );
 }

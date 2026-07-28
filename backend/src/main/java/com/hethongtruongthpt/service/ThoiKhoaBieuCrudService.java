@@ -1,0 +1,208 @@
+package com.hethongtruongthpt.service;
+
+import com.hethongtruongthpt.entity.NamHoc;
+import com.hethongtruongthpt.entity.ThoiKhoaBieu;
+import com.hethongtruongthpt.exception.ApiException;
+import com.hethongtruongthpt.exception.ResourceNotFoundException;
+import com.hethongtruongthpt.repository.NamHocRepository;
+import com.hethongtruongthpt.repository.ThoiKhoaBieuRepository;
+import com.hethongtruongthpt.util.SchoolWeekUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class ThoiKhoaBieuCrudService {
+
+    private final ThoiKhoaBieuRepository tkbRepo;
+    private final NamHocRepository namHocRepo;
+
+    public ThoiKhoaBieuCrudService(ThoiKhoaBieuRepository tkbRepo, NamHocRepository namHocRepo) {
+        this.tkbRepo = tkbRepo;
+        this.namHocRepo = namHocRepo;
+    }
+
+    public void validateTuanInHocKy(String namHoc, Integer hocKy, Integer tuan) {
+        if (tuan == null || tuan < 1) throw new ApiException("Thiếu số tuần");
+        NamHoc year = namHocRepo.findByTenNamHoc(namHoc)
+                .orElseThrow(() -> new ApiException("Không tìm thấy năm học"));
+        if (!SchoolWeekUtils.isWeekInSemester(year, hocKy, tuan)) {
+            throw new ApiException("Không thể tạo thời khóa biểu không nằm trong học kì");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<ThoiKhoaBieu> getAll() {
+        return tkbRepo.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ThoiKhoaBieu> getByFilter(Integer lopId, String namHoc, Integer hocKy, Integer tuan) {
+        if (tuan == null) {
+            if (lopId != null && namHoc != null && hocKy != null)
+                return tkbRepo.findByLopIdAndHocKyAndNamHoc(lopId, hocKy, namHoc);
+            else if (namHoc != null && hocKy != null)
+                return tkbRepo.findByNamHocAndHocKy(namHoc, hocKy);
+            else if (lopId != null)
+                return tkbRepo.findByLopId(lopId);
+            else
+                return getAll();
+        }
+
+        Integer mappedTuan = (tuan % 2 != 0) ? 1 : 2;
+
+        List<ThoiKhoaBieu> systemSlots;
+        if (lopId != null && namHoc != null && hocKy != null) {
+            systemSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, tuan);
+            if (systemSlots == null || systemSlots.isEmpty()) {
+                systemSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, mappedTuan);
+            }
+        }
+        else if (lopId != null && namHoc != null) {
+            systemSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, tuan);
+            if (systemSlots == null || systemSlots.isEmpty()) {
+                systemSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, mappedTuan);
+            }
+        }
+        else if (lopId != null) {
+            systemSlots = tkbRepo.findByLopIdAndTuan(lopId, tuan);
+            if (systemSlots == null || systemSlots.isEmpty()) {
+                systemSlots = tkbRepo.findByLopIdAndTuan(lopId, mappedTuan);
+            }
+        }
+        else if (namHoc != null && hocKy != null) {
+            systemSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, tuan);
+            if (systemSlots == null || systemSlots.isEmpty()) {
+                systemSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, mappedTuan);
+            }
+        }
+        else {
+            systemSlots = tkbRepo.findAll();
+        }
+
+        if (systemSlots == null) systemSlots = new java.util.ArrayList<>();
+        systemSlots = systemSlots.stream()
+                .filter(t -> t.getIsLocked() == null || !t.getIsLocked())
+                .collect(java.util.stream.Collectors.toList());
+
+        List<ThoiKhoaBieu> teacherSlots;
+        if (lopId != null && namHoc != null && hocKy != null)
+            teacherSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, tuan);
+        else if (lopId != null && namHoc != null)
+            teacherSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, tuan);
+        else if (lopId != null)
+            teacherSlots = tkbRepo.findByLopIdAndTuan(lopId, tuan);
+        else if (namHoc != null && hocKy != null)
+            teacherSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, tuan);
+        else
+            teacherSlots = new java.util.ArrayList<>();
+
+        if (teacherSlots == null) teacherSlots = new java.util.ArrayList<>();
+        teacherSlots = teacherSlots.stream()
+                .filter(t -> t.getIsLocked() != null && t.getIsLocked())
+                .collect(java.util.stream.Collectors.toList());
+
+        List<ThoiKhoaBieu> all = new java.util.ArrayList<>();
+        all.addAll(systemSlots);
+        all.addAll(teacherSlots);
+
+        for (ThoiKhoaBieu tkb : all) {
+            tkb.setTuan(tuan);
+        }
+        return all;
+    }
+
+    @Transactional(readOnly = true)
+    public ThoiKhoaBieu getById(Integer id) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
+        return tkbRepo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Not found"));
+    }
+
+    public ThoiKhoaBieu create(ThoiKhoaBieu entity) {
+        if (entity == null) throw new IllegalArgumentException("Thời khóa biểu không được để trống");
+        if (entity.getTuan() != null) {
+            entity.setTuan(entity.getTuan() % 2 != 0 ? 1 : 2);
+        }
+        return tkbRepo.save(entity);
+    }
+
+    public ThoiKhoaBieu update(Integer id, ThoiKhoaBieu updatedEntity) {
+        getById(id);
+        updatedEntity.setId(id);
+        if (updatedEntity.getTuan() != null) {
+            updatedEntity.setTuan(updatedEntity.getTuan() % 2 != 0 ? 1 : 2);
+        }
+        return tkbRepo.save(updatedEntity);
+    }
+
+    public void delete(Integer id) {
+        if (id == null) throw new IllegalArgumentException("ID không được để trống");
+        tkbRepo.deleteById(id);
+    }
+
+    public long deleteByNamHocAndHocKy(String namHoc, Integer hocKy) {
+        if (namHoc == null || namHoc.isBlank()) {
+            throw new ApiException("namHoc là bắt buộc để xóa TKB");
+        }
+        List<ThoiKhoaBieu> list;
+        if (hocKy != null && hocKy > 0) {
+            list = tkbRepo.findByNamHocAndHocKy(namHoc, hocKy);
+        } else {
+            list = tkbRepo.findAll().stream()
+                    .filter(t -> namHoc.equals(t.getNamHoc()))
+                    .toList();
+        }
+        long count = list.size();
+        if (count > 0) tkbRepo.deleteAll(list);
+        return count;
+    }
+
+    @Transactional
+    public ThoiKhoaBieu moveEntry(Integer id, Integer thu, Integer tietBatDau) {
+        if (id == null || thu == null || tietBatDau == null)
+            throw new ApiException("Thiếu thông tin: id, thu, tietBatDau");
+        if (thu < 2 || thu > 7) throw new ApiException("Thứ phải từ 2-7");
+        if (tietBatDau < 1 || tietBatDau > 10) throw new ApiException("Tiết phải từ 1-10");
+
+        ThoiKhoaBieu entry = getById(id);
+        Integer lopId = entry.getLop().getId();
+        int soTiet = entry.getSoTiet() != null ? entry.getSoTiet() : 1;
+        for (int i = 0; i < soTiet; i++) {
+            int t = tietBatDau + i;
+            if (t > 10) throw new ApiException("Tiết vượt quá phạm vi (1-10)");
+            List<ThoiKhoaBieu> existing = tkbRepo.findByLopIdAndThuAndTietBatDau(lopId, thu, t);
+            for (ThoiKhoaBieu e : existing) {
+                if (!e.getId().equals(id))
+                    throw new ApiException("Slot Thứ " + thu + " Tiết " + t + " đã bị chiếm bởi " + e.getMonHoc().getTenMon());
+            }
+        }
+        entry.setThu(thu);
+        entry.setTietBatDau(tietBatDau);
+        return tkbRepo.save(entry);
+    }
+
+    @Transactional
+    public Map<String, ThoiKhoaBieu> swapEntries(Integer id1, Integer id2) {
+        if (id1 == null || id2 == null) throw new ApiException("Thiếu ID");
+        if (id1.equals(id2)) throw new ApiException("Không thể hoán đổi cùng mục");
+
+        ThoiKhoaBieu entry1 = getById(id1);
+        ThoiKhoaBieu entry2 = getById(id2);
+
+        Integer thu1 = entry1.getThu(), tiet1 = entry1.getTietBatDau();
+        Integer thu2 = entry2.getThu(), tiet2 = entry2.getTietBatDau();
+
+        entry1.setThu(thu2); entry1.setTietBatDau(tiet2);
+        entry2.setThu(thu1); entry2.setTietBatDau(tiet1);
+
+        tkbRepo.save(entry1); tkbRepo.save(entry2);
+
+        Map<String, ThoiKhoaBieu> result = new HashMap<>();
+        result.put("entry1", entry1);
+        result.put("entry2", entry2);
+        return result;
+    }
+}

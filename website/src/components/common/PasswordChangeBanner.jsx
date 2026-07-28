@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { TriangleAlert, X } from "lucide-react";
 
 const changePasswordPaths = {
   ADMIN: "/admin/profile/change-password",
@@ -25,32 +26,28 @@ export default function PasswordChangeBanner() {
   };
 
   return (
-    <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
-      <div className="flex items-center gap-2 text-amber-800">
-        <span className="material-symbols-outlined text-amber-600" style={{ fontSize: 20 }}>
-          warning
-        </span>
-        <span>
+    <div className="mx-4 mt-4 bg-[#FEF3C7] border-l-4 border-amber-500 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3 text-sm shadow-sm transition-all duration-300">
+      <div className="flex items-center gap-2.5 text-amber-900">
+        <TriangleAlert size={18} className="text-amber-600 shrink-0" />
+        <span className="font-medium">
           Bạn đang sử dụng mật khẩu mặc định.{" "}
           <button
             type="button"
-            className="text-amber-900 font-semibold underline underline-offset-2 hover:text-amber-700"
+            className="text-blue-600 font-bold hover:underline underline-offset-2 hover:text-blue-700 transition-colors"
             onClick={() => navigate(changePath)}
           >
-            Đổi mật khẩu
+            Đổi mật khẩu ngay
           </button>{" "}
-          để bảo mật tài khoản.
+          để tăng cường bảo mật tài khoản.
         </span>
       </div>
       <button
         type="button"
-        className="text-amber-600 hover:text-amber-800 shrink-0"
+        className="text-amber-600 hover:text-amber-900 hover:bg-amber-100 p-1 rounded-md transition-colors shrink-0"
         onClick={handleDismiss}
         aria-label="Đóng"
       >
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-          close
-        </span>
+        <X size={16} />
       </button>
     </div>
   );

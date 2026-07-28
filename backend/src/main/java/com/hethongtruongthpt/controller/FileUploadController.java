@@ -32,4 +32,16 @@ public class FileUploadController {
                 .body(ApiResponse.error(ex.getMessage()));
         }
     }
+
+    @PostMapping("/image")
+    public ResponseEntity<ApiResponse<?>> uploadImage(@RequestParam("file") MultipartFile file) {
+        try {
+            String url = fileStorageService.storeImage(file);
+            return ResponseEntity.ok(ApiResponse.ok(Map.of("url", url)));
+        } catch (Exception ex) {
+            return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+        }
+    }
 }

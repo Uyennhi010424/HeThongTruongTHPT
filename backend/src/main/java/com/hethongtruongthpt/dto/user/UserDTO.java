@@ -12,6 +12,10 @@ public class UserDTO {
     private Integer status;
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime updatedAt;
+    private java.time.LocalDateTime lastLogin;
+    private java.time.LocalDateTime lockedUntil;
+    private String permissions;
+    private String anhDaiDien;
 
     public Integer getId() {
         return id;
@@ -83,5 +87,37 @@ public class UserDTO {
 
     public void setUpdatedAt(java.time.LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public java.time.LocalDateTime getLastLogin() {
+        return lastLogin;
+    }
+
+    public void setLastLogin(java.time.LocalDateTime lastLogin) {
+        this.lastLogin = lastLogin;
+    }
+
+    public java.time.LocalDateTime getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public void setLockedUntil(java.time.LocalDateTime lockedUntil) {
+        this.lockedUntil = lockedUntil;
+    }
+
+    public String getPermissions() {
+        return permissions;
+    }
+
+    public void setPermissions(String permissions) {
+        this.permissions = permissions;
+    }
+
+    public String getAnhDaiDien() {
+        return anhDaiDien;
+    }
+
+    public void setAnhDaiDien(String anhDaiDien) {
+        this.anhDaiDien = anhDaiDien;
     }
 }

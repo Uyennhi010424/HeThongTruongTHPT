@@ -3,11 +3,13 @@ package com.hethongtruongthpt.controller;
 import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.dto.giaovien.GiaoVienNghiRequest;
 import com.hethongtruongthpt.entity.GiaoVienNghi;
+import com.hethongtruongthpt.entity.User;
 import com.hethongtruongthpt.service.GiaoVienNghiService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -65,9 +67,11 @@ public class GiaoVienNghiController {
     @PutMapping("/{id}/duyet")
     public ResponseEntity<ApiResponse<GiaoVienNghi>> duyetNghi(
             @PathVariable Integer id,
-            @Valid @RequestBody com.hethongtruongthpt.dto.giaovien.DuyetNghiRequest body) {
+            @Valid @RequestBody com.hethongtruongthpt.dto.giaovien.DuyetNghiRequest body,
+            @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(ApiResponse.ok(nghiService.duyetNghi(
-                id, body.getTrangThai(), body.getLyDoTuChoi(), body.getGiaoVienThayId())));
+                id, body.getTrangThai(), body.getLyDoTuChoi(),
+                body.getGiaoVienThayId(), body.getAdminMessage(), currentUser)));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")

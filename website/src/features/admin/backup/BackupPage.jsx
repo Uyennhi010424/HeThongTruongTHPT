@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import axiosClient from "../../../api/axiosClient.js";
+import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 
 const formatFileSize = (bytes) => {
   if (bytes === 0) return "0 B";
@@ -22,7 +23,8 @@ const formatDateTime = (value) => {
   });
 };
 
-export default function BackupPage() {
+export default function BackupPage({ isEmbedded = false }) {
+  const { confirm } = useConfirm();
   const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -96,7 +98,7 @@ export default function BackupPage() {
   };
 
   const handleRestore = async (filename) => {
-    const confirmed = window.confirm(
+    const confirmed = await confirm(
       `Bạn có chắc chắn muốn phục hồi cơ sở dữ liệu từ file "${filename}"?\n\n` +
         "Thao tác này sẽ GHI ĐÈ dữ liệu hiện tại. Hãy chắc chắn bạn đã sao lưu trước khi thực hiện."
     );
@@ -118,15 +120,17 @@ export default function BackupPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Sao lưu & Phục hồi
-        </h1>
-        <p className="text-gray-500 mt-1">
-          Quản lý bản sao lưu cơ sở dữ liệu hệ thống
-        </p>
-      </div>
+    <div className={isEmbedded ? "" : "p-6 max-w-6xl mx-auto"}>
+      {!isEmbedded && (
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Sao lưu & Phục hồi
+          </h1>
+          <p className="text-gray-500 mt-1">
+            Quản lý bản sao lưu cơ sở dữ liệu hệ thống
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -138,7 +142,6 @@ export default function BackupPage() {
           {success}
         </div>
       )}
-
       <div className="mb-6 flex items-center gap-4">
         <button
           onClick={handleCreate}

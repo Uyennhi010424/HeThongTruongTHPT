@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Edit, Trash2 } from "lucide-react";
+import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
@@ -8,12 +10,9 @@ import {
   updateGiaoVien
 } from "../../../api/giaovienApi.js";
 import { getLop } from "../../../api/lopApi.js";
-import {
-  clearChuNhiemByGiaoVien,
-  getChuNhiem,
-  updateChuNhiemByGiaoVien
-} from "../../../api/chunhiemApi.js";
 import { createUser, getUsers } from "../../../api/userApi.js";
+import Pagination from "../../../components/common/Pagination.jsx";
+import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
 
 const formatDate = (value) => {
   if (!value) return "";
@@ -88,13 +87,12 @@ const notifyUsersUpdated = () => {
 export default function GiaoVienList() {
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [homeroomAssignments, setHomeroomAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [keyword, setKeyword] = useState("");
+  const { searchQuery: keyword, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(8);
+  const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState(null);
   const [formError, setFormError] = useState("");
@@ -105,9 +103,7 @@ export default function GiaoVienList() {
     boMon: "",
     trinhDo: "",
     sdt: "",
-    email: "",
-    chuNhiem: false,
-    lopChuNhiemId: ""
+    email: ""
   });
 
   const ensureTeacherUserAccount = async (teacher, fallbackFullName = "") => {
@@ -141,34 +137,16 @@ export default function GiaoVienList() {
     }
   };
 
-  const classNameById = useMemo(() => {
-    return classes.reduce((acc, item) => {
-      acc[item.id] = item.tenLop;
-      return acc;
-    }, {});
-  }, [classes]);
+  const isHomeroomTeacher = (teacher) => Boolean(teacher?.isGvcn);
 
-  const homeroomByTeacherId = useMemo(() => {
-    return homeroomAssignments.reduce((acc, item) => {
-      if (!item?.giaoVienId) return acc;
-      acc[item.giaoVienId] = {
-        lopId: item.lopId,
-        tenLop: classNameById[item.lopId] || `Lớp #${item.lopId}`
-      };
-      return acc;
-    }, {});
-  }, [homeroomAssignments, classNameById]);
-
-  const isHomeroomTeacher = (teacher) => Boolean(homeroomByTeacherId[teacher?.id]);
-
-  const loadHomeroomAssignments = async () => {
-    try {
-      const assignmentRes = await getChuNhiem();
-      setHomeroomAssignments(assignmentRes?.data?.data || []);
-    } catch (err) {
-      setHomeroomAssignments([]);
-    }
-  };
+  useEffect(() => {
+    setSearchPlaceholder("Tìm kiếm giáo viên...");
+    setIsSearchVisible(true);
+    return () => {
+      setSearchPlaceholder("Tìm kiếm...");
+      setIsSearchVisible(true);
+    };
+  }, [setSearchPlaceholder, setIsSearchVisible]);
 
   useEffect(() => {
     let active = true;
@@ -177,10 +155,9 @@ export default function GiaoVienList() {
       try {
         setLoading(true);
         setError("");
-        const [teacherResult, classResult, assignmentResult] = await Promise.allSettled([
+        const [teacherResult, classResult] = await Promise.allSettled([
           getGiaoVien(),
-          getLop(),
-          getChuNhiem()
+          getLop()
         ]);
         if (!active) return;
 
@@ -193,11 +170,6 @@ export default function GiaoVienList() {
         setTeachers((teacherResult.value?.data?.data || []).map(normalizeTeacher));
         setClasses(
           classResult.status === "fulfilled" ? classResult.value?.data?.data || [] : []
-        );
-        setHomeroomAssignments(
-          assignmentResult.status === "fulfilled"
-            ? assignmentResult.value?.data?.data || []
-            : []
         );
       } catch (err) {
         if (!active) return;
@@ -260,9 +232,7 @@ export default function GiaoVienList() {
       boMon: "",
       trinhDo: "",
       sdt: "",
-      email: "",
-      chuNhiem: false,
-      lopChuNhiemId: ""
+      email: ""
     });
     setFormError("");
     setSuccessMessage("");
@@ -270,7 +240,6 @@ export default function GiaoVienList() {
   };
 
   const openEdit = (teacher) => {
-    const homeroomInfo = homeroomByTeacherId[teacher.id];
     setEditingTeacher(teacher);
     setForm({
       hoTen: teacher.hoTen || "",
@@ -279,9 +248,7 @@ export default function GiaoVienList() {
       boMon: teacher.boMon || "",
       trinhDo: teacher.trinhDo || "",
       sdt: teacher.sdt || "",
-      email: teacher.email || "",
-      chuNhiem: Boolean(homeroomInfo),
-      lopChuNhiemId: homeroomInfo?.lopId ? String(homeroomInfo.lopId) : ""
+      email: teacher.email || ""
     });
     setFormError("");
     setSuccessMessage("");
@@ -309,11 +276,6 @@ export default function GiaoVienList() {
       return;
     }
 
-    if (form.chuNhiem && !form.lopChuNhiemId) {
-      setFormError("Vui lòng chọn lớp chủ nhiệm.");
-      return;
-    }
-
     const payload = {
       hoTen: form.hoTen.trim(),
       ngaySinh: form.ngaySinh || null,
@@ -331,6 +293,9 @@ export default function GiaoVienList() {
       if (editingTeacher) {
         const response = await updateGiaoVien(editingTeacher.id, payload);
         const updated = normalizeTeacher(response?.data?.data);
+        if (!updated.username && editingTeacher.username) {
+          updated.username = editingTeacher.username;
+        }
         savedTeacher = updated;
         setTeachers((prev) =>
           prev.map((item) => (item.id === editingTeacher.id ? updated : item))
@@ -347,24 +312,6 @@ export default function GiaoVienList() {
         await ensureTeacherUserAccount(normalizedCreated, form.hoTen);
         notifyUsersUpdated();
       }
-
-      if (savedTeacher?.id) {
-        try {
-          if (form.chuNhiem && form.lopChuNhiemId) {
-            await updateChuNhiemByGiaoVien(savedTeacher.id, {
-              lopId: Number(form.lopChuNhiemId)
-            });
-          } else {
-            await clearChuNhiemByGiaoVien(savedTeacher.id);
-          }
-        } catch (assignmentError) {
-          setFormError(
-            "Đã lưu thông tin giáo viên, nhưng chưa cập nhật được chủ nhiệm."
-          );
-        }
-      }
-
-      await loadHomeroomAssignments();
 
       setError("");
       setSuccessMessage(
@@ -383,17 +330,9 @@ export default function GiaoVienList() {
     <div className="page users-page">
       <PageHeader
         title="Danh mục giáo viên"
-        description="Theo dõi, cập nhật thông tin giáo viên và phân công chủ nhiệm."
+        description={loading ? "Đang tải dữ liệu..." : `Tổng cộng: ${stats.total} giáo viên (${stats.maleCount} nam, ${stats.femaleCount} nữ) - ${stats.homeroomCount} GVCN`}
         actions={
-          <div className="users-actions">
-            <div className="dash-search users-search">
-              <span className="dot" />
-              <input
-                placeholder="Tìm theo tên, bộ môn, trình độ, SĐT hoặc email"
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-              />
-            </div>
+          <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0 ml-auto">
             <button className="btn-primary" onClick={openCreate}>
               Thêm giáo viên
             </button>
@@ -401,33 +340,8 @@ export default function GiaoVienList() {
         }
       />
 
-      <div className="users-stats">
-        <div className="stat-card stat-blue">
-          <div className="stat-label">Tổng giáo viên</div>
-          <div className="stat-value">{loading ? "..." : stats.total}</div>
-        </div>
-        <div className="stat-card stat-sky">
-          <div className="stat-label">Nam</div>
-          <div className="stat-value">{loading ? "..." : stats.maleCount}</div>
-        </div>
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Nữ</div>
-          <div className="stat-value">{loading ? "..." : stats.femaleCount}</div>
-        </div>
-        <div className="stat-card stat-navy">
-          <div className="stat-label">GV chủ nhiệm</div>
-          <div className="stat-value">{loading ? "..." : stats.homeroomCount}</div>
-        </div>
-      </div>
 
       <div className="card users-table">
-        <div className="table-header">
-          <div>
-            <div className="panel-title">Danh sách giáo viên</div>
-            <div className="panel-subtitle">Dữ liệu lấy từ cơ sở dữ liệu</div>
-          </div>
-          <div className="panel-pill">{filteredTeachers.length} giáo viên</div>
-        </div>
         {error && <div className="table-empty">{error}</div>}
         {!error && successMessage && <div className="table-success">{successMessage}</div>}
         {!error && !loading && filteredTeachers.length === 0 && (
@@ -466,10 +380,23 @@ export default function GiaoVienList() {
                   style={{ gridTemplateColumns: "80px 1.2fr 1fr 1fr 1.2fr 140px 160px" }}
                 >
                   <div className="table-id">{(page - 1) * pageSize + index + 1}</div>
-                  <div className="table-main">
-                    <div className="table-title">{teacher.hoTen}</div>
-                    <div className="table-meta">
-                      {formatDate(teacher.ngaySinh) || "--"} • {getGenderLabel(teacher.gioiTinh)}
+                  <div className="flex items-center gap-3">
+                    <CachedAvatar
+                      username={teacher.username || teacher.email}
+                      role="teacher"
+                      src={teacher.anhDaiDien}
+                      fallback={(() => {
+                        const parts = (teacher.hoTen || "G").trim().split(" ");
+                        return parts[parts.length - 1].charAt(0).toUpperCase();
+                      })()}
+                      className="w-10 h-10 rounded-full object-cover shrink-0 border border-indigo-100"
+                      fallbackClassName="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0"
+                    />
+                    <div className="table-main" style={{ margin: 0, padding: 0 }}>
+                      <div className="table-title">{teacher.hoTen}</div>
+                      <div className="table-meta">
+                        {formatDate(teacher.ngaySinh) || "--"} • {getGenderLabel(teacher.gioiTinh)}
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -488,45 +415,39 @@ export default function GiaoVienList() {
                     </span>
                     {isHomeroomTeacher(teacher) && (
                       <div className="table-meta">
-                        {homeroomByTeacherId[teacher.id]?.tenLop || "--"}
+                        {teacher.tenLopChuNhiem || "--"}
                       </div>
                     )}
                   </div>
-                  <div className="table-actions">
+                  <div className="flex items-center gap-1">
                     <button
-                      className="btn-outline btn-sm"
                       onClick={() => openEdit(teacher)}
+                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                      title="Chỉnh sửa"
                     >
-                      Sửa
+                      <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      className="btn-danger btn-sm"
                       onClick={() => handleDelete(teacher)}
+                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Xóa"
                     >
-                      Xóa
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               ))}
         </div>
-        <div className="pagination">
-          <button
-            className="btn-outline btn-sm"
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            disabled={page === 1}
-          >
-            Trước
-          </button>
-          <div className="pagination-info">
-            Trang {page} / {totalPages}
-          </div>
-          <button
-            className="btn-outline btn-sm"
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            disabled={page === totalPages}
-          >
-            Sau
-          </button>
+        <div className="mt-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={filteredTeachers.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            pageSizeOptions={[10, 20, 50]}
+          />
         </div>
       </div>
 
@@ -620,41 +541,6 @@ export default function GiaoVienList() {
               placeholder="vd: nvanc3@tdn.edu.vn"
               readOnly={!editingTeacher}
             />
-          </label>
-
-          <div className="form-section-title">Thông tin chủ nhiệm</div>
-          <label className="form-field checkbox-field form-field-wide">
-            <span>
-              <input
-                type="checkbox"
-                checked={Boolean(form.chuNhiem)}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    chuNhiem: event.target.checked,
-                    lopChuNhiemId: event.target.checked ? prev.lopChuNhiemId : ""
-                  }))
-                }
-              />
-              Giáo viên chủ nhiệm
-            </span>
-          </label>
-          <label className="form-field form-field-wide">
-            <span>Chủ nhiệm lớp</span>
-            <select
-              value={form.lopChuNhiemId}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, lopChuNhiemId: event.target.value }))
-              }
-              disabled={!form.chuNhiem}
-            >
-              <option value="">Chọn lớp chủ nhiệm</option>
-              {classes.map((lop) => (
-                <option key={lop.id} value={String(lop.id)}>
-                  {lop.tenLop}
-                </option>
-              ))}
-            </select>
           </label>
           {formError && <div className="form-error">{formError}</div>}
           <div className="form-actions">

@@ -232,4 +232,107 @@ public class DiemPdfService {
         cell.setPadding(6);
         table.addCell(cell);
     }
+
+    public byte[] generateBangDiemHocSinhPdf(Integer hocSinhId, Integer hocKy, String namHoc) throws Exception {
+        HocSinh hocSinh = hocSinhRepository.findById(hocSinhId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh với id: " + hocSinhId));
+        LopHoc lopHoc = hocSinh.getLop();
+        String tenLop = lopHoc != null ? lopHoc.getTenLop() : "Chua xep lop";
+
+        List<Diem> diemList = diemRepository.findByHocSinhIdAndHocKyAndNamHoc(hocSinhId, hocKy, namHoc);
+        Map<MonHoc, List<Diem>> diemByMonHoc = diemList.stream()
+                .filter(d -> d.getMonHoc() != null)
+                .collect(Collectors.groupingBy(Diem::getMonHoc));
+
+        Document document = new Document(PageSize.A4, 36, 36, 54, 36);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PdfWriter.getInstance(document, out);
+        document.open();
+
+        Font schoolFont = new Font(Font.FontFamily.TIMES_ROMAN, 14, Font.BOLD);
+        Paragraph schoolName = new Paragraph("TRUONG THPT ABC", schoolFont);
+        schoolName.setAlignment(Element.ALIGN_CENTER);
+        schoolName.setSpacingAfter(4);
+        document.add(schoolName);
+
+        Font titleFont = new Font(Font.FontFamily.TIMES_ROMAN, 16, Font.BOLD);
+        Paragraph title = new Paragraph("KET QUA HOC TAP", titleFont);
+        title.setAlignment(Element.ALIGN_CENTER);
+        title.setSpacingAfter(8);
+        document.add(title);
+
+        Font infoFont = new Font(Font.FontFamily.TIMES_ROMAN, 12);
+        String hkLabel = hocKy == 1 ? "Hoc ky I" : "Hoc ky II";
+        Paragraph info1 = new Paragraph("Ho ten: " + hocSinh.getHoTen() + "    |    Ma HS: " + hocSinh.getMaHocSinh(), infoFont);
+        info1.setAlignment(Element.ALIGN_CENTER);
+        Paragraph info2 = new Paragraph("Lop: " + tenLop + "    |    " + hkLabel + "    |    Nam hoc: " + namHoc, infoFont);
+        info2.setAlignment(Element.ALIGN_CENTER);
+        info2.setSpacingAfter(16);
+        document.add(info1);
+        document.add(info2);
+
+        PdfPTable table = new PdfPTable(6);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{1f, 3.5f, 1.5f, 1.5f, 1.5f, 1.5f});
+
+        Font headerFont = new Font(Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD, BaseColor.WHITE);
+        BaseColor headerBg = new BaseColor(59, 130, 246);
+        String[] headers = {"STT", "Mon hoc", "TX (avg)", "GK", "CK", "TB"};
+
+        for (String header : headers) {
+            addCell(table, header, headerFont, headerBg, Element.ALIGN_CENTER);
+        }
+
+        Font dataFont = new Font(Font.FontFamily.TIMES_ROMAN, 10);
+        Font dataBoldFont = new Font(Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD);
+        BaseColor evenRowBg = new BaseColor(248, 251, 255);
+
+        int stt = 0;
+        List<MonHoc> monHocs = diemByMonHoc.keySet().stream()
+                .sorted(Comparator.comparing(MonHoc::getTenMon))
+                .collect(Collectors.toList());
+
+        for (MonHoc monHoc : monHocs) {
+            stt++;
+            List<Diem> hsDiem = diemByMonHoc.get(monHoc);
+
+            List<BigDecimal> txScores = hsDiem.stream()
+                    .filter(d -> "TX".equals(d.getLoaiDiem()) || "MIENG".equals(d.getLoaiDiem()) || "MUOI_LAM_PHUT".equals(d.getLoaiDiem()) || "MOT_TIET".equals(d.getLoaiDiem()))
+                    .map(Diem::getGiaTriDiem).filter(Objects::nonNull).collect(Collectors.toList());
+
+            BigDecimal gkScore = hsDiem.stream().filter(d -> "GK".equals(d.getLoaiDiem()) || "GIUA_KY".equals(d.getLoaiDiem())).map(Diem::getGiaTriDiem).filter(Objects::nonNull).findFirst().orElse(null);
+            BigDecimal ckScore = hsDiem.stream().filter(d -> "CK".equals(d.getLoaiDiem()) || "CUOI_KY".equals(d.getLoaiDiem())).map(Diem::getGiaTriDiem).filter(Objects::nonNull).findFirst().orElse(null);
+
+            BigDecimal txAvg = null;
+            if (!txScores.isEmpty()) {
+                BigDecimal txSum = txScores.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+                txAvg = txSum.divide(BigDecimal.valueOf(txScores.size()), 1, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal tb = null;
+            if (!txScores.isEmpty() || gkScore != null || ckScore != null) {
+                BigDecimal txSum = txScores.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal gkVal = gkScore != null ? gkScore : BigDecimal.ZERO;
+                BigDecimal ckVal = ckScore != null ? ckScore : BigDecimal.ZERO;
+                int txCount = txScores.size();
+                BigDecimal numerator = txSum.add(gkVal.multiply(BigDecimal.valueOf(2))).add(ckVal.multiply(BigDecimal.valueOf(3)));
+                BigDecimal denominator = BigDecimal.valueOf(txCount + 5);
+                if (denominator.compareTo(BigDecimal.ZERO) > 0) {
+                    tb = numerator.divide(denominator, 1, RoundingMode.HALF_UP);
+                }
+            }
+
+            BaseColor rowBg = (stt % 2 == 0) ? evenRowBg : BaseColor.WHITE;
+            addCell(table, String.valueOf(stt), dataFont, rowBg, Element.ALIGN_CENTER);
+            addCell(table, monHoc.getTenMon(), dataFont, rowBg, Element.ALIGN_LEFT);
+            addCell(table, txAvg != null ? txAvg.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+            addCell(table, gkScore != null ? gkScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+            addCell(table, ckScore != null ? ckScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+            addCell(table, tb != null ? tb.toPlainString() : "--", dataBoldFont, rowBg, Element.ALIGN_CENTER);
+        }
+
+        document.add(table);
+        document.close();
+        return out.toByteArray();
+    }
 }

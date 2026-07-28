@@ -24,6 +24,8 @@ public interface DiemDanhRepository extends JpaRepository<DiemDanh, Integer> {
 
     List<DiemDanh> findByHocSinhIdAndNgayBetween(Integer hocSinhId, LocalDate from, LocalDate to);
 
+    List<DiemDanh> findByHocSinhIdInAndNgayBetween(List<Integer> hocSinhIds, LocalDate from, LocalDate to);
+
     // Statistics: count absences per student in a class within date range
     @Query("SELECT d.hocSinh.id, d.hocSinh.hoTen, " +
            "SUM(CASE WHEN d.loaiVang = 'CO_PHEP' THEN 1 ELSE 0 END), " +

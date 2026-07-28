@@ -49,6 +49,32 @@ public class FileStorageService {
         return "/uploads/avatars/" + filename;
     }
 
+    public String storeImage(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IOException("File rỗng");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_TYPES.contains(contentType)) {
+            throw new IOException("Chỉ chấp nhận ảnh JPEG, PNG, GIF, WEBP");
+        }
+
+        if (file.getSize() > MAX_SIZE) {
+            throw new IOException("Kích thước ảnh tối đa 2MB");
+        }
+
+        String extension = getExtension(contentType);
+        String filename = UUID.randomUUID() + extension;
+
+        Path imageDir = Paths.get(uploadDir, "images").toAbsolutePath().normalize();
+        Files.createDirectories(imageDir);
+
+        Path target = imageDir.resolve(filename);
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+        return "/uploads/images/" + filename;
+    }
+
     private String getExtension(String contentType) {
         return switch (contentType) {
             case "image/png" -> ".png";

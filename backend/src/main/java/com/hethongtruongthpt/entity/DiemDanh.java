@@ -17,11 +17,11 @@ public class DiemDanh {
     @Column(name = "ngay", nullable = false)
     private LocalDate ngay;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "lop_hoc_id", nullable = false)
     private LopHoc lopHoc;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "hoc_sinh_id", nullable = false)
     private HocSinh hocSinh;
 
@@ -46,7 +46,7 @@ public class DiemDanh {
     @Column(name = "ghi_chu")
     private String ghiChu;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giao_vien_id", nullable = false)
     private GiaoVien giaoVien;
 

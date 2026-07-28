@@ -14,15 +14,15 @@ public class HanhKiem {
     @Column(name = "ID_HANHKIEM")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "ID_HOCSINH", nullable = false)
     private HocSinh hocSinh;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "ID_GIAOVIEN")
     private GiaoVien giaoVien;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "ID_NAMHOC")
     private NamHoc namHoc;
 

@@ -12,11 +12,11 @@ public class PhuHuynhHocSinh {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "phu_huynh_id", nullable = false)
     private PhuHuynh phuHuynh;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "hoc_sinh_id", nullable = false)
     private HocSinh hocSinh;
 

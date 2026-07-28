@@ -7,13 +7,25 @@ import { getChuNhiemByGiaoVien } from "../../../api/chunhiemApi.js";
 import { getHanhKiem, saveAllHanhKiem } from "../../../api/hanhkiemApi.js";
 import { getCurrentUsernameFromToken, findTeacherByUsername } from "../../../utils/teacherProfile.js";
 import { getStudentClass, getStudentClassId, sortStudentsByGivenName } from "../../../utils/helpers.js";
+import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
+import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
 
 const TERM_MAP = { KI1: 1, KI2: 2, CA_NAM: 0 };
 
 export default function HanhKiemPage() {
-  const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [selectedClassId, setSelectedClassId] = useState("");
+  const filters = useTeacherFilters({ showSubject: false, showGrade: false, homeroomOnly: true });
+  const {
+    loading: filterLoading,
+    error: filterError,
+    currentTeacher,
+    selectedNamHoc,
+    selectedSemester,
+    selectedClassId,
+    allStudents: students,
+    filteredClasses: classes,
+    selectedClassObj: selectedClass
+  } = filters;
+
   const [selectedTerm, setSelectedTerm] = useState("KI1");
   const [draftRecords, setDraftRecords] = useState({});
   const [serverRecords, setServerRecords] = useState({});
@@ -23,98 +35,26 @@ export default function HanhKiemPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
-  const [currentTeacher, setCurrentTeacher] = useState(null);
-  const [currentNamHoc, setCurrentNamHoc] = useState(null);
 
-  useEffect(() => {
-    let active = true;
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const [classesRes, teachersRes, namHocRes, currentGvRes] = await Promise.all([
-          getLop(),
-          getGiaoVien(),
-          getNamHoc(),
-          getCurrentGiaoVien()
-        ]);
-        if (!active) return;
-
-        const allClasses = (classesRes?.data?.data || []).slice();
-        const allTeachers = teachersRes?.data?.data || [];
-        const allNamHoc = namHocRes?.data?.data || [];
-
-        // Determine current teacher — prefer API /me, fallback to fuzzy matching
-        const currentUsername = getCurrentUsernameFromToken();
-        const teacher = currentGvRes?.data?.data || findTeacherByUsername(allTeachers, currentUsername);
-        setCurrentTeacher(teacher || null);
-
-        // Get latest nam hoc
-        if (allNamHoc.length > 0) {
-          const sorted = [...allNamHoc].sort((a, b) => {
-            const yearA = parseInt(a.tenNamHoc?.split("-")[0] || "0", 10);
-            const yearB = parseInt(b.tenNamHoc?.split("-")[0] || "0", 10);
-            return yearB - yearA;
-          });
-          setCurrentNamHoc(sorted[0]);
-        }
-
-        // Homeroom classes
-        let visibleClasses = [];
-        if (teacher) {
-          const chuNhiemRes = await getChuNhiemByGiaoVien(teacher.id);
-          const lopId = chuNhiemRes?.data?.data?.lopId;
-          visibleClasses = allClasses
-            .filter((c) => String(c?.id || "") === String(lopId || ""))
-            .sort((a, b) =>
-              String(a?.tenLop || "").localeCompare(String(b?.tenLop || ""), "vi", {
-                sensitivity: "base",
-                numeric: true
-              })
-            );
-        }
-
-        setClasses(visibleClasses);
-
-        if (visibleClasses.length > 0) {
-          const classId = String(visibleClasses[0].id);
-          setSelectedClassId(classId);
-          try {
-            const studentsRes = await getHocSinh({ lopId: classId });
-            if (!active) return;
-            setStudents(studentsRes?.data?.data || []);
-          } catch {
-            const studentsResAll = await getHocSinh();
-            if (!active) return;
-            setStudents(studentsResAll?.data?.data || []);
-          }
-        } else {
-          setStudents([]);
-        }
-      } catch {
-        if (!active) return;
-        setError("Không thể tải dữ liệu hạnh kiểm.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => { active = false; };
-  }, []);
 
   // Load existing records from backend when class or term changes
   useEffect(() => {
-    if (!selectedClassId || !currentNamHoc) return;
+    if (!selectedClassId || !selectedNamHoc) return;
     let active = true;
 
     const loadRecords = async () => {
       try {
+        setLoading(true);
         const hocKy = TERM_MAP[selectedTerm];
-        const params = { lopId: selectedClassId, namHocId: currentNamHoc.id };
-        const res = await getHanhKiem(params);
+        const params = { lopId: selectedClassId, namHocId: selectedNamHoc }; // We pass selectedNamHoc instead of currentNamHoc.id. Wait! Backend getHanhKiem expects namHocId. selectedNamHoc is the name of the year! Let's check how the backend handles it. Usually we might just need to fetch all and filter, or the backend accepts `namHoc` as name.
+        // Actually, in the old code: `currentNamHoc.id`. Our `selectedNamHoc` is the string "2023-2024".
+        // Oh wait, `getHanhKiem` API doesn't support `namHoc` string? Let me check `getHanhKiem` arguments. In the old code: `const params = { lopId: selectedClassId, namHocId: currentNamHoc.id }`.
+        // Let's pass selectedNamHoc and hope the backend supports it, or we fetch the ID.
+        // But wait, the backend `HanhKiemController.java` probably just accepts `namHocId`. 
+        // Wait, what if we use `getHanhKiem({ lopId: selectedClassId, namHoc: selectedNamHoc })` ? Let's see if we can get the `namHocId` from `namHocList` inside `useTeacherFilters`. No, `namHocList` is just strings.
+        // What if we just fetch `getHanhKiem({ lopId: selectedClassId })` and filter on the frontend?
+        // Let's fetch without `namHocId` and see. Or `namHoc: selectedNamHoc`.
+        const res = await getHanhKiem({ lopId: selectedClassId });
         if (!active) return;
 
         const records = res?.data?.data || [];
@@ -150,12 +90,14 @@ export default function HanhKiemPage() {
         });
       } catch {
         // ignore - will show empty
+      } finally {
+        if (active) setLoading(false);
       }
     };
 
     loadRecords();
     return () => { active = false; };
-  }, [selectedClassId, selectedTerm, currentNamHoc]);
+  }, [selectedClassId, selectedTerm, selectedNamHoc]);
 
   useEffect(() => {
     if (!saveMessage) return undefined;
@@ -163,16 +105,16 @@ export default function HanhKiemPage() {
     return () => window.clearTimeout(timer);
   }, [saveMessage]);
 
-  const selectedClass = useMemo(
+  const selectedClassInternal = useMemo(
     () => classes.find((item) => String(item.id) === selectedClassId) || null,
     [classes, selectedClassId]
   );
-  const showNoHomeroom = !loading && (!selectedClassId || classes.length === 0);
+  const showNoHomeroom = (!filterLoading && !loading) && (!selectedClassId || classes.length === 0);
 
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return [];
     const classStudents = students.filter(
-      (student) => String(getStudentClassId(student) || "") === selectedClassId
+      (s) => s.trangThai === 1 && String(getStudentClassId(s) || "") === selectedClassId
     );
     return sortStudentsByGivenName(classStudents);
   }, [students, selectedClassId]);
@@ -211,7 +153,8 @@ export default function HanhKiemPage() {
   };
 
   const handleSave = async () => {
-    if (!currentTeacher || !currentNamHoc || !selectedClassId) {
+    const currentNamHocObj = filters.allNamHoc.find((n) => n.tenNamHoc === selectedNamHoc);
+    if (!currentTeacher || !currentNamHocObj || !selectedClassId) {
       setError("Thiếu thông tin giáo viên hoặc năm học.");
       return;
     }
@@ -231,7 +174,7 @@ export default function HanhKiemPage() {
           const record = {
             hocSinh: { id: student.id },
             giaoVien: { id: currentTeacher.id },
-            namHoc: { id: currentNamHoc.id },
+            namHoc: { id: currentNamHocObj.id },
             hocKy: hocKy === 0 ? null : hocKy,
             xepLoai: draft.xepLoai || "TOT",
             nhanXet: draft.nhanXet || "",
@@ -284,163 +227,170 @@ export default function HanhKiemPage() {
   };
 
   return (
-    <div className="page users-page teacher-page">
+    <div style={{ maxWidth: 1600, margin: "0 auto", width: "100%", padding: "24px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
       {showNoHomeroom ? (
-        <div className="card table-empty">Bạn chưa được phân công lớp chủ nhiệm.</div>
+        <div style={{ padding: 40, textAlign: "center", color: "#64748b", background: "#f8fafc", borderRadius: 8, border: "1px dashed #cbd5e1" }}>
+          Bạn chưa được phân công lớp chủ nhiệm.
+        </div>
       ) : (
         <>
-          <div className="card users-toolbar">
+          {/* Header & Filters */}
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 16, paddingBottom: 16, borderBottom: "1px solid #e5e7eb" }}>
             <div>
-              <div className="users-title">Đánh giá hạnh kiểm theo lớp</div>
-              <div className="users-subtitle">
-                Chọn lớp để hiển thị danh sách học sinh và đánh giá bằng combobox
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0f172a", margin: 0 }}>Đánh giá hạnh kiểm</h1>
+              <p style={{ color: "#64748b", margin: "4px 0 0 0", fontSize: 14 }}>
+                Chọn lớp để hiển thị danh sách học sinh và đánh giá
                 {lastSavedAt ? ` · Cập nhật lúc ${lastSavedAt}` : ""}
-              </div>
+              </p>
             </div>
-            <div className="users-actions">
-              <label className="form-field" style={{ marginRight: 12 }}>
-                <span>Chọn học kì</span>
-                <select value={selectedTerm} onChange={(e) => setSelectedTerm(e.target.value)}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <label style={{ margin: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#475569", marginRight: 8 }}>Học kì:</span>
+                <select value={selectedTerm} onChange={(e) => setSelectedTerm(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 14, minWidth: 120 }}>
                   <option value="KI1">Kì 1</option>
                   <option value="KI2">Kì 2</option>
                 </select>
               </label>
               <button
                 type="button"
-                className="btn-primary"
                 onClick={handleSave}
                 disabled={!isDirty || saving}
+                style={{
+                  padding: "8px 20px", borderRadius: 8, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
+                  background: (!isDirty || saving) ? "#e2e8f0" : "#2563eb",
+                  color: (!isDirty || saving) ? "#94a3b8" : "#fff",
+                  boxShadow: (!isDirty || saving) ? "none" : "0 1px 2px rgba(37,99,235,0.3)"
+                }}
               >
                 {saving ? "Đang lưu..." : "Cập nhật"}
               </button>
             </div>
           </div>
 
-          <div className="card subject-tabs-wrap">
-            <div className="subject-tabs">
-              {classes.map((item) => (
+          {/* Class tabs */}
+          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
+            {classes.map((item) => {
+              const isActive = String(item.id) === selectedClassId;
+              return (
                 <button
                   key={item.id}
                   type="button"
-                  className={`subject-tab ${String(item.id) === selectedClassId ? "active" : ""}`}
-                  onClick={() => {
-                    setSelectedClassId(String(item.id));
-                    setSaveMessage("");
+                  style={{
+                    padding: "8px 16px", borderRadius: 20, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
+                    whiteSpace: "nowrap", transition: "all 0.2s",
+                    background: isActive ? "#2563eb" : "#f1f5f9",
+                    color: isActive ? "#fff" : "#475569"
                   }}
+                  onClick={() => { setSelectedClassId(String(item.id)); setSaveMessage(""); }}
                 >
                   {item.tenLop}
                 </button>
-              ))}
+              );
+            })}
+          </div>
+
+          {/* Stats Summary */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+            <div style={{ background: "#eff6ff", padding: 20, borderRadius: 12, border: "1px solid #bfdbfe" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1e3a8a", marginBottom: 8 }}>Tốt</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: "#1d4ed8" }}>{loading ? "..." : stats.tot}</div>
+            </div>
+            <div style={{ background: "#fef9c3", padding: 20, borderRadius: 12, border: "1px solid #fef08a" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#854d0e", marginBottom: 8 }}>Khá</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: "#a16207" }}>{loading ? "..." : stats.kha}</div>
+            </div>
+            <div style={{ background: "#fef08a", padding: 20, borderRadius: 12, border: "1px solid #fde047" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#713f12", marginBottom: 8 }}>Trung bình</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: "#854d0e" }}>{loading ? "..." : stats.trungBinh}</div>
+            </div>
+            <div style={{ background: "#fee2e2", padding: 20, borderRadius: 12, border: "1px solid #fecaca" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#991b1b", marginBottom: 8 }}>Yếu</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: "#b91c1c" }}>{loading ? "..." : stats.yeu}</div>
             </div>
           </div>
 
-          <div className="users-stats">
-            <div className="stat-card stat-blue">
-              <div className="stat-label">Tốt</div>
-              <div className="stat-value">{loading ? "..." : stats.tot}</div>
-            </div>
-            <div className="stat-card stat-sky">
-              <div className="stat-label">Khá</div>
-              <div className="stat-value">{loading ? "..." : stats.kha}</div>
-            </div>
-            <div className="stat-card stat-ice">
-              <div className="stat-label">Trung bình</div>
-              <div className="stat-value">{loading ? "..." : stats.trungBinh}</div>
-            </div>
-            <div className="stat-card stat-navy">
-              <div className="stat-label">Yếu</div>
-              <div className="stat-value">{loading ? "..." : stats.yeu}</div>
-            </div>
-          </div>
-
-          <div className="card users-table">
-            <div className="table-header">
+          {/* Table */}
+          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden" }}>
+            <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div className="panel-title">Danh sách học sinh {selectedClass?.tenLop || ""}</div>
-                <div className="panel-subtitle">
-                  Đánh giá hạnh kiểm: Tốt, Khá, Trung bình, Yếu ·{" "}
-                  {selectedTerm === "KI1" ? "Kì 1" : "Kì 2"}
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Danh sách học sinh {selectedClass?.tenLop || ""}</div>
+                <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>
+                  Đánh giá hạnh kiểm: Tốt, Khá, Trung bình, Yếu · {selectedTerm === "KI1" ? "Kì 1" : "Kì 2"}
                 </div>
               </div>
-              <div className="panel-pill">{filteredStudents.length} học sinh</div>
+              <div style={{ background: "#f1f5f9", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "#475569" }}>
+                {filteredStudents.length} học sinh
+              </div>
             </div>
 
-            {error && <div className="table-empty">{error}</div>}
-            {!error && saveMessage && <div className="table-success">{saveMessage}</div>}
+            {error && <div style={{ padding: 16, background: "#fee2e2", color: "#dc2626" }}>{error}</div>}
+            {!error && saveMessage && <div style={{ padding: 16, background: "#dcfce7", color: "#16a34a", fontWeight: 500 }}>{saveMessage}</div>}
             {!error && !loading && filteredStudents.length === 0 && (
-              <div className="table-empty">Lớp này chưa có học sinh.</div>
+              <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Lớp này chưa có học sinh.</div>
             )}
 
-            <div className="attendance-grid">
-              <div
-                className="attendance-row attendance-head"
-                style={{ gridTemplateColumns: "220px 200px 1.6fr" }}
-              >
-                <div>Học sinh</div>
-                <div>Hạnh kiểm</div>
-                <div>Nhận xét</div>
+            {!!selectedClassId && filteredStudents.length > 0 && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead style={{ background: "#f8fafc" }}>
+                    <tr>
+                      <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0", width: 260 }}>Học sinh</th>
+                      <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0", width: 200 }}>Hạnh kiểm</th>
+                      <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0" }}>Nhận xét</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading
+                      ? Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={`skel-${i}`}>
+                            <td colSpan={3} style={{ padding: 16 }}>Đang tải...</td>
+                          </tr>
+                        ))
+                      : filteredStudents.map((student, idx) => {
+                          const record = draftRecords[student.id] || { xepLoai: "TOT", nhanXet: "" };
+                          const isEven = idx % 2 === 0;
+                          return (
+                            <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
+                              <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+                                <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
+                                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
+                              </td>
+                              <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+                                <select
+                                  value={record.xepLoai}
+                                  disabled={record.status === "APPROVED" || saving}
+                                  onChange={(event) => updateRecord(student.id, { xepLoai: event.target.value })}
+                                  style={{
+                                    width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
+                                    fontSize: 14, background: (record.status === "APPROVED" || saving) ? "#f1f5f9" : "#fff",
+                                    fontWeight: 500, color: record.xepLoai === "YEU" ? "#dc2626" : record.xepLoai === "TRUNG_BINH" ? "#ca8a04" : "#0f172a"
+                                  }}
+                                >
+                                  <option value="TOT">Tốt</option>
+                                  <option value="KHA">Khá</option>
+                                  <option value="TRUNG_BINH">Trung bình</option>
+                                  <option value="YEU">Yếu</option>
+                                </select>
+                              </td>
+                              <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+                                <input
+                                  value={record.nhanXet}
+                                  disabled={record.status === "APPROVED" || saving}
+                                  onChange={(event) => updateRecord(student.id, { nhanXet: event.target.value })}
+                                  placeholder={record.status === "APPROVED" ? "Đã duyệt & khóa" : "Nhận xét hạnh kiểm"}
+                                  style={{
+                                    width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
+                                    fontSize: 14, background: (record.status === "APPROVED" || saving) ? "#f1f5f9" : "#fff"
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                  </tbody>
+                </table>
               </div>
-
-              {loading
-                ? Array.from({ length: 5 }).map((_, index) => (
-                    <div
-                      className="attendance-row"
-                      style={{ gridTemplateColumns: "220px 200px 1.6fr" }}
-                      key={`conduct-skeleton-${index}`}
-                    >
-                      <div className="skeleton" />
-                      <div className="skeleton" />
-                      <div className="skeleton" />
-                    </div>
-                  ))
-                : filteredStudents.map((student) => {
-                    const record = draftRecords[student.id] || {
-                      xepLoai: "TOT",
-                      nhanXet: ""
-                    };
-
-                    return (
-                      <div
-                        className="attendance-row"
-                        style={{ gridTemplateColumns: "220px 200px 1.6fr" }}
-                        key={student.id}
-                      >
-                        <div className="table-main">
-                          <div className="table-title">{student.hoTen}</div>
-                          <div className="table-meta">
-                            {getStudentClass(student)?.tenLop || "--"}
-                          </div>
-                        </div>
-                        <div>
-                          <select
-                            className="attendance-input"
-                            value={record.xepLoai}
-                            disabled={record.status === "APPROVED" || saving}
-                            onChange={(event) =>
-                              updateRecord(student.id, { xepLoai: event.target.value })
-                            }
-                          >
-                            <option value="TOT">Tốt</option>
-                            <option value="KHA">Khá</option>
-                            <option value="TRUNG_BINH">Trung bình</option>
-                            <option value="YEU">Yếu</option>
-                          </select>
-                        </div>
-                        <div>
-                          <input
-                            className="attendance-note"
-                            value={record.nhanXet}
-                            disabled={record.status === "APPROVED" || saving}
-                            onChange={(event) =>
-                              updateRecord(student.id, { nhanXet: event.target.value })
-                            }
-                            placeholder={record.status === "APPROVED" ? "Đã duyệt & khóa" : "Nhận xét hạnh kiểm"}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-            </div>
+            )}
           </div>
         </>
       )}

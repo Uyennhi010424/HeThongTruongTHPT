@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getMonHoc } from "../../api/monhocApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
-import { getDiem } from "../../api/diemApi.js";
+import { getDiem, exportStudentScorecard } from "../../api/diemApi.js";
+import { Download } from "lucide-react";
 import {
   getPolicyBySubject,
   toScore,
@@ -45,7 +46,11 @@ export default function ScorePage() {
         if (!active) return;
 
         const currentStudent = studentRes?.data?.data || null;
-        const subjectList = subjectsRes?.data?.data || [];
+        const rawSubjects = subjectsRes?.data?.data || [];
+        const subjectList = rawSubjects.filter(s => {
+          const name = (s.tenMon || "").toLowerCase();
+          return !name.includes("shdc") && !name.includes("sinh hoạt lớp");
+        });
 
         setStudent(currentStudent);
         setSubjects(subjectList);
@@ -257,6 +262,31 @@ export default function ScorePage() {
     return { diemTBCaNam, ...classification };
   }, [scoreRecords, student?.id, subjects]);
 
+  const handleExportPdf = async () => {
+    if (!student?.id) return;
+    try {
+      setLoading(true);
+      const res = await exportStudentScorecard({
+        hocSinhId: student.id,
+        hocKy: selectedSemester === "HK1" ? 1 : 2,
+        namHoc: currentNamHoc
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `bang_diem_${student.id}_${selectedSemester}_${currentNamHoc}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Xuất PDF thất bại!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const hasStudent = Boolean(student?.id);
   const hasScoreRecord = Boolean(
     hasStudent &&
@@ -342,7 +372,16 @@ export default function ScorePage() {
             <div className="panel-title">Bảng điểm theo môn</div>
             <div className="panel-subtitle">Chọn môn học để xem điểm chi tiết</div>
           </div>
-          <div className="panel-pill">{student?.hoTen || "--"}</div>
+          <div className="flex items-center gap-3">
+            <div className="panel-pill">{student?.hoTen || "--"}</div>
+            <button
+              onClick={handleExportPdf}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              <Download size={16} />
+              Xuất PDF
+            </button>
+          </div>
         </div>
 
         <div className="student-score-toolbar">

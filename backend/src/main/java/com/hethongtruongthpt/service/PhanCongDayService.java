@@ -442,6 +442,22 @@ public class PhanCongDayService {
                 .collect(Collectors.toList());
     }
 
+    public List<PhanCongDayDTO> getByLopId(Integer lopId) {
+        if (lopId == null) return getAll();
+        return repository.findByLopId(lopId).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<PhanCongDayDTO> getByLopIdAndNamHocAndHocKy(Integer lopId, String namHoc, Integer hocKy) {
+        if (lopId == null) return getByNamHocAndHocKy(namHoc, hocKy);
+        if (namHoc == null || namHoc.isBlank() || hocKy == null) return getByLopId(lopId);
+        return repository.findByNamHocAndHocKy(namHoc, hocKy).stream()
+                .filter(pc -> pc.getLop() != null && lopId.equals(pc.getLop().getId()))
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
     public PhanCongDayDTO create(PhanCongDayDTO dto) {
         if (dto == null) throw new ApiException("Dữ liệu phân công không hợp lệ");
 

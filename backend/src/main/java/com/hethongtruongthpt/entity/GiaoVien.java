@@ -3,16 +3,20 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "giao_vien")
+@SQLDelete(sql = "UPDATE giao_vien SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class GiaoVien {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
@@ -49,6 +53,12 @@ public class GiaoVien {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "anh_dai_dien", columnDefinition = "TEXT")
+    private String anhDaiDien;
+
+    @Column(name = "is_deleted", columnDefinition = "boolean default false")
+    private Boolean isDeleted = false;
 
     @PostLoad
     private void normalizeText() {
@@ -155,5 +165,21 @@ public class GiaoVien {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getAnhDaiDien() {
+        return anhDaiDien;
+    }
+
+    public void setAnhDaiDien(String anhDaiDien) {
+        this.anhDaiDien = anhDaiDien;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
 }

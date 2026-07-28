@@ -10,7 +10,7 @@ public class HocKy {
     @Column(name = "ID_HOCKY")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "ID_NAMHOC")
     private NamHoc namHoc;
 

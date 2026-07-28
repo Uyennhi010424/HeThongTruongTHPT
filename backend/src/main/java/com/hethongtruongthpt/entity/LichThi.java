@@ -13,11 +13,11 @@ public class LichThi {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "lop_id", nullable = false)
     private LopHoc lop;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "mon_hoc_id", nullable = false)
     private MonHoc monHoc;
 
@@ -39,11 +39,11 @@ public class LichThi {
     @Column(name = "ghi_chu")
     private String ghiChu;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giam_thi_1_id")
     private GiaoVien giamThi1;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giam_thi_2_id")
     private GiaoVien giamThi2;
 

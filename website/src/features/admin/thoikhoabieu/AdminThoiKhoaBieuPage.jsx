@@ -13,8 +13,10 @@ import {
   duyetNghi,
   huyNghi,
 } from "../../../api/giaoVienNghiApi.js";
+import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import PdfPreviewModal from "../../../components/common/PdfPreviewModal.jsx";
 
 const getApiMessage = (err, fallback) =>
   err?.response?.data?.message || err?.response?.data?.error || fallback;
@@ -34,6 +36,9 @@ export default function AdminThoiKhoaBieuPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfHtmlContent, setPdfHtmlContent] = useState("");
 
   const selectedYear = useMemo(() => {
     return namHocs.find(y => y.id.toString() === selectedYearId);
@@ -364,8 +369,10 @@ export default function AdminThoiKhoaBieuPage() {
     }
   };
 
+  const { confirm } = useConfirm();
+
   const handleDeleteLeave = async (requestId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa đơn xin nghỉ này không?")) return;
+    if (!(await confirm("Bạn có chắc chắn muốn xóa đơn xin nghỉ này không?"))) return;
     try {
       await huyNghi(requestId);
       notifySuccess("Đã xóa đơn xin nghỉ.");
@@ -441,16 +448,12 @@ export default function AdminThoiKhoaBieuPage() {
         <thead><tr>${headerCols}</tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
-      <script>window.onload=function(){window.print()}</script>
+      </table>
+      <style>@media print { @page { size: landscape; margin: 8mm; } }</style>
       </body></html>`;
 
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-    } else {
-      notifyError("Trình duyệt chặn popup. Vui lòng cho phép popup để in PDF.");
-    }
+    setPdfHtmlContent(html);
+    setShowPdfPreview(true);
   };
 
   const getSubjectColor = (subjectName) => {
@@ -527,14 +530,7 @@ export default function AdminThoiKhoaBieuPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleOpenNghiModal}
-            className="px-4 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer select-none"
-          >
-            <span className="material-symbols-outlined text-[16px]">event_busy</span>
-            Nghỉ dạy
-          </button>
+
           <button
             type="button"
             onClick={handleExportPdf}
@@ -705,7 +701,6 @@ export default function AdminThoiKhoaBieuPage() {
                 {lops.map((lop) => (
                   <th key={lop.id} className="px-5 py-4 w-[220px] border-r border-gray-150 text-center">
                     <div className="font-black text-blue-900 text-sm uppercase tracking-wider">{lop.tenLop}</div>
-                    <div className="text-[10px] text-gray-400 font-semibold mt-1">Khối {lop.khoiLop || 10}</div>
                   </th>
                 ))}
               </tr>
@@ -1057,6 +1052,14 @@ export default function AdminThoiKhoaBieuPage() {
           </div>
         </div>
       )}
+
+      {/* PDF PREVIEW MODAL */}
+      <PdfPreviewModal
+        isOpen={showPdfPreview}
+        onClose={() => setShowPdfPreview(false)}
+        htmlContent={pdfHtmlContent}
+        title="Xem trước TKB Toàn trường"
+      />
     </div>
   );
 }

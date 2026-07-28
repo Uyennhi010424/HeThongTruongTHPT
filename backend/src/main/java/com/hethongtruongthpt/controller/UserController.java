@@ -4,7 +4,9 @@ import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.dto.user.ChangePasswordRequest;
 import com.hethongtruongthpt.dto.user.UserDTO;
 import com.hethongtruongthpt.dto.user.UserRequest;
+import com.hethongtruongthpt.dto.user.UserAuditLogDTO;
 import com.hethongtruongthpt.service.UserService;
+import com.hethongtruongthpt.service.UserAuditLogService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +19,11 @@ import java.util.List;
 @RequestMapping("/api/users")
 public class UserController {
 	private final UserService userService;
+	private final UserAuditLogService auditLogService;
 
-	public UserController(UserService userService) {
+	public UserController(UserService userService, UserAuditLogService auditLogService) {
 		this.userService = userService;
+		this.auditLogService = auditLogService;
 	}
 
 	@GetMapping
@@ -94,5 +98,56 @@ public class UserController {
 
 		userService.changePassword(id, request.getOldPassword(), request.getNewPassword());
 		return ResponseEntity.ok(ApiResponse.ok("Đổi mật khẩu thành công", null));
+	}
+
+	@PostMapping("/me/change-password")
+	@PreAuthorize("isAuthenticated()")
+	public ResponseEntity<ApiResponse<Object>> changePasswordMe(
+			@Valid @RequestBody ChangePasswordRequest request
+	) {
+		org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+		String currentUsername = auth != null ? auth.getName() : null;
+		UserDTO targetUser = userService.getByUsername(currentUsername);
+		if (targetUser == null) {
+			throw new com.hethongtruongthpt.exception.ResourceNotFoundException("Không tìm thấy người dùng");
+		}
+		userService.changePassword(targetUser.getId(), request.getOldPassword(), request.getNewPassword());
+		return ResponseEntity.ok(ApiResponse.ok("Đổi mật khẩu thành công", null));
+	}
+
+	@PutMapping("/{id}/permissions")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<ApiResponse<Object>> updatePermissions(
+			@PathVariable("id") Integer id,
+			@RequestBody java.util.Map<String, Object> payload
+	) {
+		try {
+			String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payload);
+			userService.updatePermissions(id, json);
+			return ResponseEntity.ok(ApiResponse.ok("Cập nhật quyền thành công", null));
+		} catch (Exception e) {
+			throw new com.hethongtruongthpt.exception.ApiException("Không thể xử lý JSON payload");
+		}
+	}
+
+	@PutMapping("/{id}/lock")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<ApiResponse<Object>> lockAccount(
+			@PathVariable("id") Integer id,
+			@RequestBody java.util.Map<String, String> payload
+	) {
+		String lockedUntilStr = payload.get("lockedUntil");
+		java.time.LocalDateTime lockedUntil = null;
+		if (lockedUntilStr != null && !lockedUntilStr.isBlank()) {
+			lockedUntil = java.time.LocalDateTime.parse(lockedUntilStr);
+		}
+		userService.lockAccount(id, lockedUntil);
+		return ResponseEntity.ok(ApiResponse.ok("Cập nhật trạng thái khóa thành công", null));
+	}
+
+	@GetMapping("/{id}/logs")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<ApiResponse<List<UserAuditLogDTO>>> getUserLogs(@PathVariable("id") Integer id) {
+		return ResponseEntity.ok(ApiResponse.ok(auditLogService.getUserLogs(id)));
 	}
 }

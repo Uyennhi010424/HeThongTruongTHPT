@@ -114,9 +114,26 @@ public class PhuHuynhService {
     }
 
     public PhuHuynh update(Integer id, PhuHuynh phuHuynh) {
-        getById(id);
-        phuHuynh.setId(id);
-        return phuHuynhRepository.save(phuHuynh);
+        PhuHuynh existing = getById(id);
+        if (phuHuynh.getHoTen() != null && !phuHuynh.getHoTen().isBlank()) {
+            existing.setHoTen(phuHuynh.getHoTen().trim());
+        }
+        if (phuHuynh.getSoDienThoai() != null && !phuHuynh.getSoDienThoai().isBlank()) {
+            existing.setSoDienThoai(phuHuynh.getSoDienThoai().trim());
+        }
+        if (phuHuynh.getEmail() != null) {
+            existing.setEmail(phuHuynh.getEmail().trim());
+        }
+        if (phuHuynh.getNgheNghiep() != null) {
+            existing.setNgheNghiep(phuHuynh.getNgheNghiep().trim());
+        }
+        if (phuHuynh.getQuanHe() != null) {
+            existing.setQuanHe(phuHuynh.getQuanHe());
+        }
+        if (phuHuynh.getIsSmSActive() != null) {
+            existing.setIsSmSActive(phuHuynh.getIsSmSActive());
+        }
+        return phuHuynhRepository.save(existing);
     }
 
     public void delete(Integer id) {

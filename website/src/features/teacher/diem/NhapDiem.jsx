@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, memo, useCallback } from "react";
 import { getAdminConfig } from "../../../api/adminConfigApi.js";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
@@ -22,6 +22,9 @@ import {
   getLearningLevelLabel
 } from "../../../utils/scorePolicy.js";
 import { normalizeSubjectText } from "../../../utils/normalizeText.js";
+import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
+import Pagination from "../../../components/common/Pagination.jsx";
+import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
 
 const STORAGE_KEY = "teacher_subject_scores_v2";
 
@@ -75,36 +78,210 @@ const convertDiemRowsToDraft = (diemRows) => {
   return { records, ids };
 };
 
-export default function NhapDiem() {
-  const currentUsername = useMemo(() => getCurrentUsernameFromToken(), []);
-  const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [teachers, setTeachers] = useState([]);
+const StudentScoreRow = memo(({ 
+  student, 
+  selectedSubject, 
+  selectedSemester, 
+  selectedPolicy, 
+  rawRecord, 
+  learningLevel, 
+  rowBg, 
+  isColumnLocked, 
+  updateRecord 
+}) => {
+  const policy = selectedPolicy;
+  
+  const mergeSemester = (empty, existing) => {
+    if (!existing) return empty;
+    const mergedTx = [...empty.tx];
+    (existing.tx || []).forEach((val, i) => {
+      if (i < mergedTx.length) mergedTx[i] = val;
+    });
+    return {
+      tx: mergedTx,
+      gk: existing.gk ?? empty.gk,
+      ck: existing.ck ?? empty.ck,
+      nhanXet: existing.nhanXet ?? empty.nhanXet
+    };
+  };
 
-  const [selectedGrade, setSelectedGrade] = useState("all");
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedSemester, setSelectedSemester] = useState("HK1");
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [namHocList, setNamHocList] = useState([]);
-  const [selectedNamHoc, setSelectedNamHoc] = useState("");
+  const current = rawRecord || {};
+  const fullRecord = {
+      HK1: mergeSemester(createEmptySemester(policy.txCount), current.HK1),
+      HK2: mergeSemester(createEmptySemester(policy.txCount), current.HK2)
+  };
+  
+  const semData = fullRecord[selectedSemester];
+  const hk1Avg = calcSemesterAverage(fullRecord.HK1);
+  const hk2Avg = calcSemesterAverage(fullRecord.HK2);
+  const yearAvg = calcYearAverage(hk1Avg, hk2Avg);
+
+  if (selectedPolicy.mode === "COMMENT") {
+    const finalComment = fullRecord.HK1.nhanXet === "DAT" && fullRecord.HK2.nhanXet === "DAT" ? "DAT" : "CHUA_DAT";
+    return (
+      <tr className={`hover:bg-blue-50/50 transition-colors border-b border-slate-100 last:border-0 ${rowBg}`}>
+        <td className={`px-4 py-3 sticky left-0 ${rowBg} border-r border-slate-200 z-10 hover:bg-inherit`}>
+          <div className="font-bold text-[14px] text-slate-800">{student.hoTen}</div>
+          <div className="text-[12px] text-slate-500 font-medium mt-0.5">{getStudentClass(student)?.tenLop || "--"}</div>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <select
+            className="h-10 w-full max-w-[140px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-700 disabled:opacity-50 mx-auto"
+            value={semData.nhanXet}
+            disabled={isColumnLocked("comment")}
+            onChange={(event) => updateRecord(student.id, selectedSubject.id, selectedSemester, { nhanXet: event.target.value }, selectedSubject.tenMon)}
+          >
+            <option value="DAT">Đạt</option>
+            <option value="CHUA_DAT">Chưa đạt</option>
+          </select>
+        </td>
+        <td className="px-4 py-3 text-center text-[14px] font-semibold text-slate-700">
+          {finalComment === "DAT" ? "Đạt" : "Chưa đạt"}
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold">
+            {getLearningLevelLabel(learningLevel)}
+          </span>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className={`hover:bg-blue-50/50 transition-colors border-b border-slate-100 last:border-0 ${rowBg}`}>
+      <td className={`px-4 py-3 sticky left-0 ${rowBg} border-r border-slate-200 z-10`}>
+        <div className="font-bold text-[14px] text-slate-800">{student.hoTen}</div>
+        <div className="text-[12px] text-slate-500 font-medium mt-0.5">{getStudentClass(student)?.tenLop || "--"}</div>
+      </td>
+
+      {Array.from({ length: selectedPolicy.txCount }).map((_, index) => (
+        <td key={`tx-${index}`} className="px-2 py-3 text-center">
+          <input
+            className="h-10 w-full max-w-[64px] rounded-[8px] border border-slate-200 bg-white px-2 text-center text-[14px] font-semibold outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-800 disabled:opacity-50 disabled:bg-slate-50 mx-auto"
+            type="number" min="0" max="10" step="0.1"
+            value={semData.tx[index] ?? ""}
+            disabled={isColumnLocked(`tx-${index}`)}
+            onChange={(event) => {
+              const raw = event.target.value;
+              if (raw === "") {
+                const nextTx = [...(semData.tx || [])];
+                nextTx[index] = "";
+                updateRecord(student.id, selectedSubject.id, selectedSemester, { tx: nextTx }, selectedSubject.tenMon);
+                return;
+              }
+              const n = Number(raw);
+              if (Number.isNaN(n) || n < 0 || n > 10) {
+                notifyError("Điểm phải là số trong khoảng 0 - 10");
+                return;
+              }
+              const nextTx = [...(semData.tx || [])];
+              nextTx[index] = raw;
+              updateRecord(student.id, selectedSubject.id, selectedSemester, { tx: nextTx }, selectedSubject.tenMon);
+            }}
+          />
+        </td>
+      ))}
+
+      <td className="px-2 py-3 text-center border-l border-slate-200">
+        <input
+          className="h-10 w-full max-w-[64px] rounded-[8px] border border-slate-200 bg-white px-2 text-center text-[14px] font-semibold outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-800 disabled:opacity-50 disabled:bg-slate-50 mx-auto"
+          type="number" min="0" max="10" step="0.1"
+          value={semData.gk}
+          disabled={isColumnLocked("gk")}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === "") {
+              updateRecord(student.id, selectedSubject.id, selectedSemester, { gk: "" }, selectedSubject.tenMon);
+              return;
+            }
+            const n = Number(raw);
+            if (Number.isNaN(n) || n < 0 || n > 10) {
+              notifyError("Điểm phải là số trong khoảng 0 - 10");
+              return;
+            }
+            updateRecord(student.id, selectedSubject.id, selectedSemester, { gk: raw }, selectedSubject.tenMon);
+          }}
+        />
+      </td>
+
+      <td className="px-2 py-3 text-center">
+        <input
+          className="h-10 w-full max-w-[64px] rounded-[8px] border border-slate-200 bg-white px-2 text-center text-[14px] font-semibold outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-800 disabled:opacity-50 disabled:bg-slate-50 mx-auto"
+          type="number" min="0" max="10" step="0.1"
+          value={semData.ck}
+          disabled={isColumnLocked("ck")}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === "") {
+              updateRecord(student.id, selectedSubject.id, selectedSemester, { ck: "" }, selectedSubject.tenMon);
+              return;
+            }
+            const n = Number(raw);
+            if (Number.isNaN(n) || n < 0 || n > 10) {
+              notifyError("Điểm phải là số trong khoảng 0 - 10");
+              return;
+            }
+            updateRecord(student.id, selectedSubject.id, selectedSemester, { ck: raw }, selectedSubject.tenMon);
+          }}
+        />
+      </td>
+
+      <td className="px-3 py-3 text-center text-[14px] font-bold text-blue-700 border-l border-slate-200">
+        {calcSemesterAverage(semData) ?? "--"}
+      </td>
+      <td className="px-3 py-3 text-center text-[14px] font-bold text-emerald-700">
+        {yearAvg ?? "--"}
+      </td>
+
+      <td className="px-3 py-3 text-center border-l border-slate-200">
+        <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold whitespace-nowrap">
+          {getLearningLevelLabel(learningLevel)}
+        </span>
+      </td>
+    </tr>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.rawRecord === nextProps.rawRecord &&
+         prevProps.selectedSemester === nextProps.selectedSemester &&
+         prevProps.rowBg === nextProps.rowBg &&
+         prevProps.selectedPolicy === nextProps.selectedPolicy &&
+         prevProps.learningLevel === nextProps.learningLevel &&
+         prevProps.selectedSubject?.id === nextProps.selectedSubject?.id;
+});
+
+export default function NhapDiem() {
+  const filters = useTeacherFilters({ teachOnly: true });
+  const {
+    loading: filterLoading,
+    error: filterError,
+    currentTeacher,
+    selectedNamHoc,
+    selectedSemester,
+    selectedGrade,
+    selectedClassId: selectedClass,
+    selectedSubjectObj: selectedSubject,
+    selectedSubjectId,
+    allStudents: students,
+    filteredClasses,
+    allowedSubjects,
+    isHomeroomTeacherOfSelected,
+    isSelectedSubjectTaughtByMe,
+    phanCongData,
+    selectedClassObj
+  } = filters;
 
   const [draftRecords, setDraftRecords] = useState({});
   const [savedRecordIds, setSavedRecordIds] = useState({});
-  const [phanCongData, setPhanCongData] = useState([]);
-  const [namHoc, setNamHoc] = useState("");
   const [scoreLocks, setScoreLocks] = useState(() => readScoreLocks());
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterRef = useRef(null);
-  const PAGE_SIZE = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     let active = true;
@@ -127,216 +304,17 @@ export default function NhapDiem() {
   }, []);
 
   useEffect(() => {
-    if (!filterOpen) return;
-    const handleClick = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) {
-        setFilterOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [filterOpen]);
-
-  useEffect(() => {
-    let active = true;
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const [studentsRes, classesRes, subjectsRes, teachersRes, phanCongRes, currentGvRes, namHocRes] = await Promise.all([
-          getHocSinh(),
-          getLop(),
-          getMonHoc(),
-          getGiaoVien(),
-          getPhanCongDay(),
-          getCurrentGiaoVien(),
-          getNamHoc().catch(() => null)
-        ]);
-
-        if (!active) return;
-
-        const subjectData = subjectsRes?.data?.data || [];
-        const allClasses = classesRes?.data?.data || [];
-        const currentTeacherData = currentGvRes?.data?.data || null;
-        const phanCong = phanCongRes?.data?.data || [];
-
-        // Determine current nam hoc
-        const allNamHoc = namHocRes?.data?.data || [];
-        const years = allNamHoc
-          .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => {
-            const yearA = Number(String(a).match(/(\d{4})/)?.[1] || 0);
-            const yearB = Number(String(b).match(/(\d{4})/)?.[1] || 0);
-            return yearB - yearA;
-          });
-        setNamHocList(years);
-        const activeNamHoc = allNamHoc.find((nh) => nh.trangThai === "DANG_MO") || allNamHoc[allNamHoc.length - 1];
-        const currentNamHoc = activeNamHoc?.tenNamHoc || "";
-        setSelectedNamHoc((prev) => prev || currentNamHoc);
-
-        setApiTeacher(currentTeacherData);
-
-        let visibleClasses = allClasses;
-        if (currentTeacherData) {
-          const assignedClassIds = new Set(
-            phanCong
-              .filter((p) => {
-                const entryTeacherId = p?.giaoVienId ?? p?.giaoVien?.id;
-                return (
-                  entryTeacherId !== undefined &&
-                  entryTeacherId !== null &&
-                  String(entryTeacherId).trim() !== "" &&
-                  Number(entryTeacherId) === Number(currentTeacherData.id)
-                );
-              })
-              .map((p) => String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? ""))
-              .filter(Boolean)
-          );
-
-          if (assignedClassIds.size > 0) {
-            visibleClasses = allClasses.filter((c) => assignedClassIds.has(String(c.id)));
-          }
-        }
-
-        setStudents(studentsRes?.data?.data || []);
-        setClasses(visibleClasses);
-        setSubjects(subjectData);
-        setTeachers(teachersRes?.data?.data || []);
-        setPhanCongData(phanCong);
-        setNamHoc(currentNamHoc);
-
-        if (subjectData.length > 0) {
-          setSelectedSubjectId(String(subjectData[0].id));
-        }
-
-        // Load existing scores from DB
-        if (currentTeacherData?.id && currentNamHoc) {
-          try {
-            const [hk1Res, hk2Res] = await Promise.all([
-              getDiem({ giaoVienId: currentTeacherData.id, hocKy: 1, namHoc: currentNamHoc }),
-              getDiem({ giaoVienId: currentTeacherData.id, hocKy: 2, namHoc: currentNamHoc })
-            ]);
-
-            if (!active) return;
-
-            const allDiem = [
-              ...(hk1Res?.data?.data || []),
-              ...(hk2Res?.data?.data || [])
-            ];
-
-            const { records, ids } = convertDiemRowsToDraft(allDiem);
-            setSavedRecordIds(ids);
-
-            // Merge with localStorage cache
-            try {
-              const cached = window.localStorage.getItem(STORAGE_KEY);
-              if (cached) {
-                const cachedRecords = JSON.parse(cached);
-                if (cachedRecords && typeof cachedRecords === "object") {
-                  // DB data takes priority, but fill gaps from cache
-                  const merged = { ...cachedRecords };
-                  Object.keys(records).forEach((key) => {
-                    merged[key] = records[key];
-                  });
-                  setDraftRecords(merged);
-                  return;
-                }
-              }
-            } catch {
-              // ignore cache errors
-            }
-
-            setDraftRecords(records);
-          } catch {
-            // If DB load fails, fall back to localStorage
-            try {
-              const raw = window.localStorage.getItem(STORAGE_KEY);
-              if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === "object") {
-                  setDraftRecords(parsed);
-                }
-              }
-            } catch {
-              // ignore
-            }
-          }
-        }
-      } catch {
-        if (!active) return;
-        setError("Không thể tải dữ liệu nhập điểm.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const syncLocks = () => setScoreLocks(readScoreLocks());
-    window.addEventListener("storage", syncLocks);
-    window.addEventListener("score_locks_changed", syncLocks);
-    return () => {
-      window.removeEventListener("storage", syncLocks);
-      window.removeEventListener("score_locks_changed", syncLocks);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!saveMessage) return undefined;
-    const timer = window.setTimeout(() => setSaveMessage(""), 2500);
-    return () => window.clearTimeout(timer);
-  }, [saveMessage]);
-
-  // When available classes for the selected grade change, default to the first class
-  useEffect(() => {
-    const byGrade = selectedGrade === "all" ? classes : classes.filter((item) => String(item?.khoi || "") === selectedGrade);
-    if (byGrade.length > 0) {
-      setSelectedClass(String(byGrade[0].id));
-    } else {
-      setSelectedClass("");
-    }
-  }, [selectedGrade, classes]);
-
-  const availableGrades = useMemo(() => {
-    const gradeSet = new Set(
-      classes
-        .map((item) => item?.khoi)
-        .filter((item) => item !== null && item !== undefined && String(item).trim() !== "")
-    );
-
-    return Array.from(gradeSet).sort((a, b) => Number(a) - Number(b));
-  }, [classes]);
-
-  const filteredClasses = useMemo(() => {
-    if (selectedGrade === "all") return classes;
-    return classes.filter((item) => String(item?.khoi || "") === selectedGrade);
-  }, [classes, selectedGrade]);
-
-  const [apiTeacher, setApiTeacher] = useState(null);
-
-  const currentTeacher = useMemo(() => {
-    if (apiTeacher) return apiTeacher;
-    return findTeacherByUsername(teachers, currentUsername);
-  }, [apiTeacher, teachers, currentUsername]);
-
-  // Reload scores when selectedNamHoc changes
-  useEffect(() => {
-    if (!selectedNamHoc || !currentTeacher?.id) return;
+    if (!selectedNamHoc || !currentTeacher?.id || !selectedClass) return;
     let active = true;
 
     const reloadScores = async () => {
       try {
+        setLoading(true);
+        // Fetch scores for this specific class and year
+        // We use lopId to get all scores for the class, so GVCN can view them.
         const [hk1Res, hk2Res] = await Promise.all([
-          getDiem({ giaoVienId: currentTeacher.id, hocKy: 1, namHoc: selectedNamHoc }),
-          getDiem({ giaoVienId: currentTeacher.id, hocKy: 2, namHoc: selectedNamHoc })
+          getDiem({ lopId: selectedClass, hocKy: 1, namHoc: selectedNamHoc }),
+          getDiem({ lopId: selectedClass, hocKy: 2, namHoc: selectedNamHoc })
         ]);
         if (!active) return;
 
@@ -349,48 +327,28 @@ export default function NhapDiem() {
         setDraftRecords(records);
       } catch {
         // ignore
+      } finally {
+        if (active) setLoading(false);
       }
     };
 
     reloadScores();
     return () => { active = false; };
-  }, [selectedNamHoc, currentTeacher?.id]);
+  }, [selectedNamHoc, currentTeacher?.id, selectedClass]);
 
-  const allowedSubjects = useMemo(() => {
-    if (!currentTeacher) return subjects;
-
-    const boMon = normalizeSubjectText(currentTeacher?.boMon || "");
-    if (!boMon) return subjects;
-
-    const matched = subjects.filter((subject) => {
-      const subjectName = normalizeSubjectText(subject?.tenMon || "");
-      return subjectName.includes(boMon) || boMon.includes(subjectName);
-    });
-
-    return matched.length > 0 ? matched : subjects;
-  }, [subjects, currentTeacher]);
-
+  // Auto-save to localStorage
   useEffect(() => {
-    if (!allowedSubjects.length) {
-      setSelectedSubjectId("");
-      return;
-    }
-
-    const exists = allowedSubjects.some((subject) => String(subject.id) === selectedSubjectId);
-    if (!exists) {
-      setSelectedSubjectId(String(allowedSubjects[0].id));
-    }
-  }, [allowedSubjects, selectedSubjectId]);
-
-  const selectedSubject = useMemo(
-    () => allowedSubjects.find((subject) => String(subject.id) === selectedSubjectId) || null,
-    [allowedSubjects, selectedSubjectId]
-  );
-
-  const selectedClassObj = useMemo(
-    () => classes.find((c) => String(c.id) === selectedClass) || null,
-    [classes, selectedClass]
-  );
+    if (!isDirty) return;
+    const timeoutId = setTimeout(() => {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draftRecords));
+        setLastSavedAt("Auto-saved lúc " + new Date().toLocaleString("vi-VN"));
+      } catch (e) {
+        // ignore
+      }
+    }, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [draftRecords, isDirty]);
 
   const selectedPolicy = useMemo(
     () => getPolicyBySubjectName(selectedSubject?.tenMon || ""),
@@ -422,7 +380,7 @@ export default function NhapDiem() {
   }, [scoreLocks, selectedSemester, selectedPolicy.mode, selectedPolicy.txCount, selectedSubject?.id]);
 
   const filteredStudents = useMemo(() => {
-    let result = students;
+    let result = students.filter((student) => student.trangThai === 1);
 
     if (selectedGrade !== "all") {
       result = result.filter((student) => String(getStudentClass(student)?.khoi || "") === selectedGrade);
@@ -442,10 +400,10 @@ export default function NhapDiem() {
     setCurrentPage(1);
   }, [selectedClass, selectedGrade, selectedSubjectId, selectedSemester, selectedNamHoc]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
   const paginatedStudents = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredStudents.slice(start, start + PAGE_SIZE);
+    const start = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
   }, [filteredStudents, currentPage]);
 
   const getFullRecord = (studentId, subject) => {
@@ -473,11 +431,8 @@ export default function NhapDiem() {
     };
   };
 
-  const updateRecord = (studentId, subjectId, semester, patch) => {
-    const subject = subjects.find((item) => item.id === subjectId);
-    if (!subject) return;
-
-    const policy = getPolicyBySubjectName(subject.tenMon);
+  const updateRecord = useCallback((studentId, subjectId, semester, patch, tenMon) => {
+    const policy = getPolicyBySubjectName(tenMon);
     const key = getRecordKey(studentId, subjectId);
 
     setDraftRecords((prev) => {
@@ -499,12 +454,13 @@ export default function NhapDiem() {
 
     setSaveMessage("");
     setIsDirty(true);
-  };
+  }, []);
 
-  const isColumnLocked = (column) => {
+  const isColumnLocked = useCallback((column) => {
+    if (!isSelectedSubjectTaughtByMe) return true;
     if (!selectedSubject?.id) return false;
     return isScoreColumnLocked(scoreLocks, selectedSubject.id, selectedSemester, column);
-  };
+  }, [isSelectedSubjectTaughtByMe, selectedSubject?.id, scoreLocks, selectedSemester]);
 
   const handleSave = async () => {
     if (!currentTeacher?.id || !selectedNamHoc) {
@@ -771,404 +727,181 @@ export default function NhapDiem() {
     return `minmax(160px, 1fr) repeat(${selectedPolicy.txCount}, minmax(64px, 1fr)) 96px 96px 96px 96px 120px`;
   }, [selectedPolicy.mode, selectedPolicy.txCount]);
 
+  const inputClassFilter = "w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-700";
+
   return (
-    <div className="page users-page teacher-page">
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">Bảng nhập điểm theo môn</div>
-          <div className="users-subtitle">
-            Bấm môn học để hiển thị loại điểm và quy định tương ứng
-            {lastSavedAt ? ` · Cập nhật lúc ${lastSavedAt}` : ""}
-          </div>
-        </div>
-        <div className="users-actions" style={{ flexWrap: "nowrap" }}>
-          <div className="filter-dropdown-wrap" ref={filterRef}>
-            <button
-              type="button"
-              className={`btn-outline filter-toggle${selectedNamHoc || selectedSemester !== "HK1" || selectedGrade !== "all" || selectedClass ? " filter-active" : ""}`}
-              onClick={() => setFilterOpen((v) => !v)}
-              title="Lọc"
-            >
-              <span className="material-symbols-outlined">filter_list</span>
-              {(selectedSemester !== "HK1" || selectedGrade !== "all" || selectedClass) && <span className="filter-dot" />}
-            </button>
-
-            {filterOpen && (
-              <div className="filter-dropdown" style={{ zIndex: 9999, bottom: "calc(100% + 8px)", top: "auto" }}>
-                <div className="filter-dropdown-title">Lọc danh sách</div>
-                <label className="filter-dropdown-label">
-                  <span>Năm học</span>
-                  <select value={selectedNamHoc} onChange={(event) => setSelectedNamHoc(event.target.value)}>
-                    {namHocList.length > 0 ? (
-                      namHocList.map((year) => (
-                        <option key={year} value={year}>{year}</option>
-                      ))
-                    ) : (
-                      <option value="">Đang tải...</option>
-                    )}
-                  </select>
-                </label>
-                <label className="filter-dropdown-label">
-                  <span>Học kỳ</span>
-                  <select value={selectedSemester} onChange={(event) => setSelectedSemester(event.target.value)}>
-                    <option value="HK1">Học kỳ I</option>
-                    <option value="HK2">Học kỳ II</option>
-                  </select>
-                </label>
-                <label className="filter-dropdown-label">
-                  <span>Khối</span>
-                  <select value={selectedGrade} onChange={(event) => setSelectedGrade(event.target.value)}>
-                    <option value="all">Tất cả khối</option>
-                    {availableGrades.map((grade) => (
-                      <option key={String(grade)} value={String(grade)}>
-                        Khối {grade}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="filter-dropdown-label">
-                  <span>Lớp</span>
-                  <select value={selectedClass} onChange={(event) => setSelectedClass(event.target.value)}>
-                    {filteredClasses.length === 0 ? (
-                      <option value="">Không có lớp</option>
-                    ) : (
-                      filteredClasses.map((lop) => (
-                        <option key={lop.id} value={String(lop.id)}>
-                          {lop.tenLop}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </label>
-                {(selectedGrade !== "all" || selectedClass || selectedSemester !== "HK1") && (
-                  <button
-                    type="button"
-                    className="filter-clear"
-                    onClick={() => {
-                      setSelectedGrade("all");
-                      setSelectedClass("");
-                      setSelectedSemester("HK1");
-                    }}
-                  >
-                    Xóa bộ lọc
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={!isDirty || saving}>
-            {saving ? "Đang lưu..." : "Cập nhật"}
-          </button>
-        </div>
-      </div>
-
-      <div className="users-stats">
-        <div className="stat-card stat-blue">
-          <div className="stat-label">Học sinh trong danh sách</div>
-          <div className="stat-value">{loading ? "..." : statistics.students}</div>
-        </div>
-
-        <div className="stat-card stat-sky">
-          <div className="stat-label">Đã hoàn tất nhập liệu</div>
-          <div className="stat-value">{loading ? "..." : statistics.completed}</div>
-        </div>
-
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Điểm TBHK môn đang chọn</div>
-          <div className="stat-value">{loading ? "..." : statistics.avg}</div>
-        </div>
-      </div>
-
-
-
-      <div className="card users-table">
-        <div className="table-header">
-          <div className="panel-title">Bảng nhập điểm</div>
-          <div className="panel-pill">
-            {selectedClassObj ? `Lớp ${selectedClassObj.tenLop} · ` : ""}
-            {filteredStudents.length} học sinh
-          </div>
-        </div>
-
-        {error && <div className="table-empty">{error}</div>}
-        {!error && saveMessage && <div className="table-success">{saveMessage}</div>}
-        {!error && !loading && filteredStudents.length === 0 && (
-          <div className="table-empty">Không có học sinh phù hợp.</div>
-        )}
-
-        {!!selectedSubject && (
-          <div className="score-grid">
-            <div className="score-row score-head" style={{ gridTemplateColumns: scoreGridColumns }}>
-              <div>Học sinh</div>
-
-              {selectedPolicy.mode === "COMMENT" ? (
+    <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans text-slate-900 w-full">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8 max-w-[1600px] mx-auto flex flex-col gap-6">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-slate-200">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+              Bảng nhập điểm theo môn
+              {selectedClassObj && (
+                <span className="text-sm font-semibold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md border border-slate-200 flex items-center gap-1.5">
+                  Lớp {selectedClassObj.tenLop}
+                  <span className="text-slate-300">•</span>
+                  {filteredStudents.length} học sinh
+                </span>
+              )}
+            </h1>
+            <p className="mt-1.5 text-[15px] font-medium text-slate-500 flex items-center gap-2">
+              Bấm chọn môn học để nhập điểm.
+              {lastSavedAt && (
                 <>
-                  <div>Đánh giá ({selectedSemester})</div>
-                  <div>Kết quả cả năm</div>
-                  <div>Xếp loại</div>
-                </>
-              ) : (
-                <>
-                  {Array.from({ length: selectedPolicy.txCount }).map((_, index) => (
-                    <div key={`tx-head-${index}`}>TX {index + 1}</div>
-                  ))}
-                  <div>Giữa kỳ</div>
-                  <div>Cuối kỳ</div>
-                  <div>TBHK</div>
-                  <div>TBNH</div>
-                  <div>Xếp loại</div>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    Cập nhật lúc {lastSavedAt}
+                  </span>
                 </>
               )}
-            </div>
+            </p>
+          </div>
 
-            {loading
-              ? Array.from({ length: 5 }).map((_, index) => (
-                  <div
-                    className="score-row"
-                    key={`score-skeleton-${index}`}
-                    style={{ gridTemplateColumns: scoreGridColumns }}
-                  >
-                    <div className="skeleton" />
-                    <div className="skeleton" />
-                    <div className="skeleton" />
-                    <div className="skeleton" />
-                    <div className="skeleton" />
-                  </div>
-                ))
-              : paginatedStudents.map((student) => {
-                  const fullRecord = getFullRecord(student.id, selectedSubject);
-                  const semData = fullRecord[selectedSemester];
-                  const hk1Avg = calcSemesterAverage(fullRecord.HK1);
-                  const hk2Avg = calcSemesterAverage(fullRecord.HK2);
-                  const yearAvg = calcYearAverage(hk1Avg, hk2Avg);
+          <div className="flex items-center gap-3">
+            <TeacherFilter filters={filters} showClass={false} showGrade={false} showSubject={false} />
 
-                  if (selectedPolicy.mode === "COMMENT") {
-                    const finalComment =
-                      fullRecord.HK1.nhanXet === "DAT" && fullRecord.HK2.nhanXet === "DAT"
-                        ? "DAT"
-                        : "CHUA_DAT";
+            <button 
+              type="button" 
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-[10px] text-[14px] font-medium transition-all shadow-sm shadow-blue-500/20 disabled:opacity-60" 
+              onClick={handleSave} 
+              disabled={!isDirty || saving || !isSelectedSubjectTaughtByMe}
+            >
+              <span className="material-symbols-outlined text-[18px]">save</span>
+              {saving ? "Đang lưu..." : "Cập nhật"}
+            </button>
+          </div>
+        </div>
 
-                    return (
-                      <div
-                        className="score-row"
-                        key={student.id}
-                        style={{ gridTemplateColumns: scoreGridColumns }}
-                      >
-                        <div className="table-main">
-                          <div className="table-title">{student.hoTen}</div>
-                          <div className="table-meta">{getStudentClass(student)?.tenLop || "--"}</div>
-                        </div>
-
-                        <div>
-                          <select
-                            className="score-input"
-                            value={semData.nhanXet}
-                            disabled={isColumnLocked("comment")}
-                            onChange={(event) =>
-                              updateRecord(student.id, selectedSubject.id, selectedSemester, {
-                                nhanXet: event.target.value
-                              })
-                            }
-                          >
-                            <option value="DAT">Đạt</option>
-                            <option value="CHUA_DAT">Chưa đạt</option>
-                          </select>
-                        </div>
-
-                        <div>{finalComment === "DAT" ? "Đạt" : "Chưa đạt"}</div>
-
-                        <div>
-                          <span className="status-pill status-active">
-                            {getLearningLevelLabel(learningLevels[student.id])}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      className="score-row"
-                      key={student.id}
-                      style={{ gridTemplateColumns: scoreGridColumns }}
-                    >
-                      <div className="table-main">
-                        <div className="table-title">{student.hoTen}</div>
-                        <div className="table-meta">{getStudentClass(student)?.tenLop || "--"}</div>
-                      </div>
-
-                      {Array.from({ length: selectedPolicy.txCount }).map((_, index) => (
-                        <div key={`${student.id}-tx-${index}`}>
-                          <input
-                            className="score-input"
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.1"
-                            value={semData.tx[index] ?? ""}
-                            disabled={isColumnLocked(`tx-${index}`)}
-                            onChange={(event) => {
-                              const raw = event.target.value;
-                              if (raw === "") {
-                                const nextTx = [...(semData.tx || [])];
-                                nextTx[index] = "";
-                                updateRecord(student.id, selectedSubject.id, selectedSemester, {
-                                  tx: nextTx
-                                });
-                                return;
-                              }
-
-                              const n = Number(raw);
-                              if (Number.isNaN(n) || n < 0 || n > 10) {
-                                notifyError("Điểm phải là số trong khoảng 0 - 10");
-                                return;
-                              }
-
-                              const nextTx = [...(semData.tx || [])];
-                              nextTx[index] = raw;
-                              updateRecord(student.id, selectedSubject.id, selectedSemester, {
-                                tx: nextTx
-                              });
-                            }}
-                          />
-                        </div>
-                      ))}
-
-                      <div>
-                        <input
-                          className="score-input"
-                          type="number"
-                          min="0"
-                          max="10"
-                          step="0.1"
-                          value={semData.gk}
-                          disabled={isColumnLocked("gk")}
-                          onChange={(event) => {
-                              const raw = event.target.value;
-                              if (raw === "") {
-                                updateRecord(student.id, selectedSubject.id, selectedSemester, { gk: "" });
-                                return;
-                              }
-                              const n = Number(raw);
-                              if (Number.isNaN(n) || n < 0 || n > 10) {
-                                notifyError("Điểm phải là số trong khoảng 0 - 10");
-                                return;
-                              }
-
-                              updateRecord(student.id, selectedSubject.id, selectedSemester, { gk: raw });
-                            } }
-                        />
-                      </div>
-
-                      <div>
-                        <input
-                          className="score-input"
-                          type="number"
-                          min="0"
-                          max="10"
-                          step="0.1"
-                          value={semData.ck}
-                          disabled={isColumnLocked("ck")}
-                          onChange={(event) => {
-                              const raw = event.target.value;
-                              if (raw === "") {
-                                updateRecord(student.id, selectedSubject.id, selectedSemester, { ck: "" });
-                                return;
-                              }
-                              const n = Number(raw);
-                              if (Number.isNaN(n) || n < 0 || n > 10) {
-                                notifyError("Điểm phải là số trong khoảng 0 - 10");
-                                return;
-                              }
-
-                              updateRecord(student.id, selectedSubject.id, selectedSemester, { ck: raw });
-                            } }
-                        />
-                      </div>
-
-                      <div>{calcSemesterAverage(semData) ?? "--"}</div>
-                      <div>{yearAvg ?? "--"}</div>
-
-                      <div>
-                        <span className="status-pill status-active">
-                          {getLearningLevelLabel(learningLevels[student.id])}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+        {/* Tabs chọn lớp ngang */}
+        {filteredClasses && filteredClasses.length > 0 && (
+          <div className="flex gap-6 overflow-x-auto border-b border-slate-200 hide-scrollbar bg-white px-2 rounded-t-xl mb-4">
+            {filteredClasses.map(c => {
+              const isSelected = String(filters.selectedClassId) === String(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => filters.setSelectedClassId(String(c.id))}
+                  className={`flex items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold text-[14px] transition-all border-b-2 ${
+                    isSelected
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                  }`}
+                >
+                  Lớp {c.tenLop}
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* Pagination */}
-        {!loading && filteredStudents.length > PAGE_SIZE && (
-          <div className="pagination">
-            <div className="pagination-info">
-              Hiển thị {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredStudents.length)} / {filteredStudents.length} học sinh
-            </div>
-            <div className="pagination-controls">
-              <button
-                type="button"
-                className="pagination-btn"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage(1)}
-              >
-                «
-              </button>
-              <button
-                type="button"
-                className="pagination-btn"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              >
-                ‹
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((page) => {
-                  if (totalPages <= 7) return true;
-                  if (page === 1 || page === totalPages) return true;
-                  if (Math.abs(page - currentPage) <= 1) return true;
-                  return false;
-                })
-                .reduce((acc, page, idx, arr) => {
-                  if (idx > 0 && page - arr[idx - 1] > 1) {
-                    acc.push("...");
-                  }
-                  acc.push(page);
-                  return acc;
-                }, [])
-                .map((page, idx) =>
-                  page === "..." ? (
-                    <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>
+        {/* Thống kê nhẹ nhàng (Không Card) */}
+        <div className="flex flex-wrap items-center gap-6 text-[14px] text-slate-600 font-medium pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-blue-500 text-[18px]">group</span>
+            Học sinh: <strong className="text-slate-900">{(loading || filterLoading) ? "..." : statistics.students}</strong>
+          </div>
+          <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-emerald-500 text-[18px]">task_alt</span>
+            Đã nhập: <strong className="text-slate-900">{(loading || filterLoading) ? "..." : statistics.completed}</strong>
+          </div>
+          <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-500 text-[18px]">school</span>
+            {selectedSemester === "HK1" ? "Học kỳ 1" : "Học kỳ 2"}
+          </div>
+        </div>
+
+        {/* Message */}
+        {(error || filterError) && <div className="text-[14px] font-bold text-red-600 bg-red-50 px-4 py-3 rounded-xl border border-red-200">{error || filterError}</div>}
+        {!(error || filterError) && saveMessage && <div className="text-[14px] font-bold text-emerald-700 bg-emerald-50 px-4 py-3 rounded-xl border border-emerald-200 flex items-center gap-2"><span className="material-symbols-outlined">check_circle</span>{saveMessage}</div>}
+        {!(error || filterError) && !(loading || filterLoading) && filteredStudents.length === 0 && (
+          <div className="text-[14px] font-medium text-slate-500 bg-slate-50 px-4 py-6 rounded-xl border border-dashed border-slate-300 text-center">Không có học sinh phù hợp. Vui lòng chọn lớp khác.</div>
+        )}
+
+        {/* Bảng nhập điểm Data Table */}
+        {!!selectedSubject && filteredStudents.length > 0 && (
+          <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-max">
+                {/* Sticky Header */}
+                <thead className="bg-slate-50/80 sticky top-0 z-10 backdrop-blur-sm border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider sticky left-0 bg-slate-50 border-r border-slate-200 z-20" style={{ minWidth: "180px" }}>
+                      Học sinh
+                    </th>
+                    {selectedPolicy.mode === "COMMENT" ? (
+                      <>
+                        <th className="px-4 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center">Đánh giá ({selectedSemester})</th>
+                        <th className="px-4 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center">Kết quả cả năm</th>
+                        <th className="px-4 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center">Xếp loại</th>
+                      </>
+                    ) : (
+                      <>
+                        {Array.from({ length: selectedPolicy.txCount }).map((_, index) => (
+                          <th key={`tx-head-${index}`} className="px-3 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center" style={{ width: "80px" }}>
+                            TX {index + 1}
+                          </th>
+                        ))}
+                        <th className="px-3 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center border-l border-slate-200" style={{ width: "90px" }}>Giữa kỳ</th>
+                        <th className="px-3 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center" style={{ width: "90px" }}>Cuối kỳ</th>
+                        <th className="px-3 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center border-l border-slate-200" style={{ width: "80px" }}>TBHK</th>
+                        <th className="px-3 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center" style={{ width: "80px" }}>TBNH</th>
+                        <th className="px-3 py-3.5 text-[13px] font-bold text-slate-700 uppercase tracking-wider text-center border-l border-slate-200" style={{ width: "120px" }}>Xếp loại</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {(loading || filterLoading) ? (
+                    <tr>
+                      <td colSpan={15} className="px-4 py-8 text-center text-slate-500 font-medium">Đang tải điểm...</td>
+                    </tr>
                   ) : (
-                    <button
-                      key={page}
-                      type="button"
-                      className={`pagination-btn${page === currentPage ? " pagination-active" : ""}`}
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
-              <button
-                type="button"
-                className="pagination-btn"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              >
-                ›
-              </button>
-              <button
-                type="button"
-                className="pagination-btn"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage(totalPages)}
-              >
-                »
-              </button>
+                    paginatedStudents.map((student, idx) => {
+                      const key = getRecordKey(student.id, selectedSubject.id);
+                      const rawRecord = draftRecords[key];
+                      const isEven = idx % 2 === 0;
+                      const rowBg = isEven ? "bg-white" : "bg-slate-50/40";
+
+                      return (
+                        <StudentScoreRow
+                          key={student.id}
+                          student={student}
+                          selectedSubject={selectedSubject}
+                          selectedSemester={selectedSemester}
+                          selectedPolicy={selectedPolicy}
+                          rawRecord={rawRecord}
+                          learningLevel={learningLevels[student.id]}
+                          rowBg={rowBg}
+                          isColumnLocked={isColumnLocked}
+                          updateRecord={updateRecord}
+                        />
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
+
+            {/* Pagination */}
+            {!loading && (
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredStudents.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                  pageSizeOptions={[20, 30, 50, 100]}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

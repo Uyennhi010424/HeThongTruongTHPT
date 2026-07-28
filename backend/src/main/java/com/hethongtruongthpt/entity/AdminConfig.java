@@ -20,7 +20,7 @@ public class AdminConfig {
     @Column(name = "description", length = 255)
     private String description;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "updated_by")
     private User updatedBy;
 

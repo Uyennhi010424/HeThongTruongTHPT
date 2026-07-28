@@ -60,12 +60,7 @@ public class SampleDataSeeder implements CommandLineRunner {
     public void run(String... args) {
         log.info("=== SampleDataSeeder START ===");
         
-        // Reset admin password to admin123
-        userRepository.findByUsername("admin").ifPresent(admin -> {
-            admin.setPassword(passwordEncoder.encode("admin123"));
-            userRepository.save(admin);
-            log.info("Reset admin password to admin123");
-        });
+        // Removed unconditional admin password reset to allow users to keep their changed passwords.
 
         seedMonHoc();
         seedToHopMon();

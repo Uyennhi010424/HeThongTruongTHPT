@@ -23,7 +23,7 @@ public class GiaoVienController {
 		this.giaoVienService = giaoVienService;
 	}
 
-	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
+	@PreAuthorize("hasRole('ADMIN')")
 	@GetMapping
 	public ResponseEntity<ApiResponse<?>> getAll(
 			@RequestParam(required = false) Integer page,
@@ -33,6 +33,22 @@ public class GiaoVienController {
 			return ResponseEntity.ok(ApiResponse.ok(result));
 		}
 		return ResponseEntity.ok(ApiResponse.ok(giaoVienService.getAll()));
+	}
+
+	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
+	@GetMapping("/public")
+	public ResponseEntity<ApiResponse<java.util.List<java.util.Map<String, Object>>>> getPublicTeachers() {
+		java.util.List<java.util.Map<String, Object>> result = giaoVienService.getAll().stream()
+			.map(gv -> {
+				java.util.Map<String, Object> map = new java.util.HashMap<>();
+				map.put("id", gv.getId());
+				map.put("hoTen", gv.getHoTen());
+				map.put("maGiaoVien", gv.getMaGiaoVien());
+				map.put("boMon", gv.getBoMon());
+				return map;
+			})
+			.collect(java.util.stream.Collectors.toList());
+		return ResponseEntity.ok(ApiResponse.ok(result));
 	}
 
 	@PreAuthorize("isAuthenticated()")
@@ -63,12 +79,21 @@ public class GiaoVienController {
 		return ResponseEntity.ok(ApiResponse.ok(giaoVienService.create(giaoVien)));
 	}
 
-	@PreAuthorize("hasRole('ADMIN')")
+	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
 	@PutMapping("/{id:\\d+}")
 	public ResponseEntity<ApiResponse<GiaoVienDTO>> update(
 			@PathVariable("id") Integer id,
 			@RequestBody GiaoVien giaoVien
 	) {
+		org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+		boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+		if (!isAdmin) {
+			String currentUsername = auth != null ? auth.getName() : null;
+			GiaoVienDTO currentTeacher = giaoVienService.getByUsername(currentUsername);
+			if (currentTeacher == null || !currentTeacher.getId().equals(id)) {
+				throw new com.hethongtruongthpt.exception.ApiException("Bạn không có quyền cập nhật thông tin của giáo viên khác.");
+			}
+		}
 		return ResponseEntity.ok(ApiResponse.ok(giaoVienService.update(id, giaoVien)));
 	}
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import PageHeader from "../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../components/edu/MaterialIcon.jsx";
 import { getCurrentGiaoVien } from "../../api/giaovienApi.js";
@@ -10,8 +11,10 @@ import {
   huyNghi,
 } from "../../api/giaoVienNghiApi.js";
 import { notifyError, notifySuccess } from "../../utils/notify.js";
+import { useConfirm } from "../../contexts/ConfirmContext.jsx";
 
 export default function TeacherLeaveRequestPage() {
+  const { confirm } = useConfirm();
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -22,6 +25,23 @@ export default function TeacherLeaveRequestPage() {
   const [timetable, setTimetable] = useState([]);
 
   const [currentYear, setCurrentYear] = useState("2025-2026");
+  const [targetYear, setTargetYear] = useState(null);
+  const [allYears, setAllYears] = useState([]);
+  const [detailTarget, setDetailTarget] = useState(null);
+  const location = useLocation();
+
+  // Tính targetYear dựa trên ngày được chọn (hoặc hôm nay nếu chưa chọn)
+  useEffect(() => {
+    if (allYears.length === 0) return;
+    const checkDate = date ? new Date(date) : new Date();
+    const time = checkDate.getTime();
+    const matched = allYears.find(
+      (y) =>
+        time >= new Date(y.ngayBatDauHk1).getTime() &&
+        time <= new Date(y.ngayKetThucHk2).getTime()
+    );
+    setTargetYear(matched ? matched.tenNamHoc : null);
+  }, [date, allYears]);
 
   // Tải thông tin giáo viên đăng nhập
   useEffect(() => {
@@ -38,8 +58,10 @@ export default function TeacherLeaveRequestPage() {
         setTeacher(found);
 
         const years = namHocRes?.data?.data || [];
+        setAllYears(years);
         if (years.length > 0) {
-          setCurrentYear(years[years.length - 1].tenNamHoc);
+          const activeYear = years.find((nh) => nh.trangThai === "DANG_MO");
+          setCurrentYear(activeYear ? activeYear.tenNamHoc : years[years.length - 1].tenNamHoc);
         }
       } catch {
         /* ignore */
@@ -53,28 +75,40 @@ export default function TeacherLeaveRequestPage() {
     };
   }, []);
 
-  const loadRequestsAndSchedule = async () => {
+  // Auto-open detail when navigating from a notification
+  useEffect(() => {
+    const refId = location.state?.referenceId;
+    if (refId && requests.length > 0) {
+      const found = requests.find((r) => r.id === Number(refId));
+      if (found) setDetailTarget(found);
+    }
+  }, [location.state, requests]);
+
+  const loadRequests = async () => {
     if (!teacher?.id) return;
     try {
-      // 1. Tải danh sách đơn xin nghỉ
       const res = await getNghiByGiaoVien(teacher.id);
       const data = res?.data?.data || [];
       const sorted = [...data].sort((a, b) => new Date(b.ngay).getTime() - new Date(a.ngay).getTime());
       setRequests(sorted);
+    } catch {
+      /* ignore */
+    }
+  };
 
-      // 2. Tải thời khóa biểu cá nhân của giáo viên
-      const tkbRes = await getThoiKhoaBieu({
-        namHoc: currentYear,
-      });
+  const loadSchedule = async () => {
+    if (!teacher?.id) return;
+    if (!targetYear) {
+      setTimetable([]);
+      return;
+    }
+    try {
+      const tkbRes = await getThoiKhoaBieu({ namHoc: targetYear });
       const allSlots = tkbRes?.data?.data || [];
-      
-      // Lọc các tiết mà giáo viên này giảng dạy
       const teacherSlots = allSlots.filter(s => 
         String(s?.giaoVien?.id ?? s?.giaoVienId) === String(teacher.id)
       );
 
-      // Lọc duy nhất (Distinct) dựa trên các thuộc tính chính: thu, tietBatDau, lopId, monHocId
-      // để tránh bị lặp lại lịch dạy do hệ thống lưu lịch cho nhiều tuần
       const uniqueSlots = [];
       const seenKeys = new Set();
       for (const slot of teacherSlots) {
@@ -85,21 +119,35 @@ export default function TeacherLeaveRequestPage() {
         }
       }
 
-      // Sắp xếp lịch giảng dạy theo Thứ và Tiết tăng dần
       uniqueSlots.sort((a, b) => Number(a.thu) - Number(b.thu) || Number(a.tietBatDau) - Number(b.tietBatDau));
       setTimetable(uniqueSlots);
     } catch {
-      /* ignore */
+      setTimetable([]);
     }
   };
 
-  // Tính toán ngày trong tuần hiện tại dựa trên "Thứ" (2 = Thứ hai -> 7 = Thứ bảy)
+  useEffect(() => {
+    if (teacher?.id) {
+      loadRequests();
+    }
+  }, [teacher?.id]);
+
+  useEffect(() => {
+    if (teacher?.id) {
+      loadSchedule();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacher?.id, targetYear]);
+
+  // Tính toán ngày trong tuần hiện tại dựa trên "Thứ" (2 = Thứ hai -> 7 = Thứ bảy) của tuần chứa ngày xin nghỉ
   const getCalculatedDateForDay = (thuValue) => {
-    const today = new Date();
-    const currentDay = today.getDay(); // 0 = Chủ nhật, 1 = Thứ hai,...
+    if (!date) return "--/--"; // Nếu chưa chọn ngày nghỉ thì không hiển thị ngày cụ thể
+    const baseDate = new Date(date);
+    let currentDay = baseDate.getDay(); // 0 = Chủ nhật, 1 = Thứ hai,...
+    if (currentDay === 0) currentDay = 7; // Coi Chủ nhật là cuối tuần (ngày 7)
     const distance = (thuValue - 1) - currentDay; // Tính khoảng cách ngày
-    const targetDate = new Date(today);
-    targetDate.setDate(today.getDate() + distance);
+    const targetDate = new Date(baseDate);
+    targetDate.setDate(baseDate.getDate() + distance);
     return targetDate.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
   };
 
@@ -116,16 +164,29 @@ export default function TeacherLeaveRequestPage() {
 
     setSaving(true);
     try {
+      let submitYear = currentYear;
+      if (allYears.length > 0) {
+        const time = new Date(date).getTime();
+        const matched = allYears.find(y => time >= new Date(y.ngayBatDauHk1).getTime() && time <= new Date(y.ngayKetThucHk2).getTime());
+        if (matched) {
+          submitYear = matched.tenNamHoc;
+        } else {
+          const dy = new Date(date).getFullYear();
+          const dm = new Date(date).getMonth() + 1;
+          submitYear = dm >= 8 ? `${dy}-${dy + 1}` : `${dy - 1}-${dy}`;
+        }
+      }
+
       await dangKyNghi({
         giaoVienId: teacher.id,
         ngay: date,
-        namHoc: currentYear,
+        namHoc: submitYear,
         lyDo: reason.trim() || "Nghỉ phép",
       });
       notifySuccess("Đã gửi đơn xin nghỉ dạy. Vui lòng chờ BGH phê duyệt.");
       setDate("");
       setReason("");
-      await loadRequestsAndSchedule();
+      await loadRequests();
     } catch (err) {
       notifyError(err?.response?.data?.message || err?.response?.data?.error || "Gửi yêu cầu thất bại.");
     } finally {
@@ -134,11 +195,11 @@ export default function TeacherLeaveRequestPage() {
   };
 
   const handleCancel = async (id) => {
-    if (!window.confirm("Bạn có chắc chắn muốn hủy đơn xin nghỉ dạy này?")) return;
+    if (!(await confirm("Bạn có chắc chắn muốn hủy đơn xin nghỉ dạy này?"))) return;
     try {
       await huyNghi(id);
       notifySuccess("Đã hủy đơn thành công.");
-      await loadRequestsAndSchedule();
+      await loadRequests();
     } catch {
       notifyError("Không thể hủy đơn.");
     }
@@ -261,15 +322,13 @@ export default function TeacherLeaveRequestPage() {
           </div>
 
           {/* Lịch dạy của giáo viên */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-green-600">calendar_month</span>
-              Lịch giảng dạy trong tuần
-            </h3>
-            <p className="text-xs text-gray-400 mb-4">Các tiết dạy chính thức được xếp lịch dạy của bạn:</p>
-            {timetable.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">Chưa được phân công lịch dạy trong học kỳ này.</p>
-            ) : (
+          {timetable.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-green-600">calendar_month</span>
+                Lịch giảng dạy trong tuần
+              </h3>
+              <p className="text-xs text-gray-400 mb-4">Các tiết dạy chính thức được xếp lịch dạy của bạn:</p>
               <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
                 {timetable.map((s) => (
                   <div key={s.id} className="rounded-lg bg-gray-50 p-2.5 text-xs border border-gray-100">
@@ -284,8 +343,8 @@ export default function TeacherLeaveRequestPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Lịch sử đơn báo nghỉ */}
@@ -329,41 +388,56 @@ export default function TeacherLeaveRequestPage() {
               {filteredRequests.map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-xl border border-gray-100 p-4 bg-gray-50/30 flex flex-col md:flex-row md:items-center justify-between gap-3"
+                  className="rounded-xl border border-gray-100 p-4 bg-gray-50/30 flex flex-col gap-3"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-gray-800">
-                        Ngày nghỉ: {new Date(r.ngay).toLocaleDateString("vi-VN")}
-                      </span>
-                      <span
-                        className="rounded px-1.5 py-0.5 text-[9px] font-semibold"
-                        style={getStatusStyle(r.trangThai)}
-                      >
-                        {getStatusLabel(r.trangThai)}
-                      </span>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-gray-800">
+                          Ngày nghỉ: {new Date(r.ngay).toLocaleDateString("vi-VN")}
+                        </span>
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[9px] font-semibold"
+                          style={getStatusStyle(r.trangThai)}
+                        >
+                          {getStatusLabel(r.trangThai)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">Lý do: {r.lyDo}</p>
+                      {r.trangThai === "APPROVED" && (
+                        <p className="text-xs text-green-600 font-medium">
+                          Giáo viên dạy thay thế: {r.giaoVienThay?.hoTen || "Không sắp xếp dạy thay"}
+                        </p>
+                      )}
+                      {r.trangThai === "REJECTED" && r.lyDoTuChoi && (
+                        <p className="text-xs text-red-600 font-medium">
+                          Lý do từ chối: {r.lyDoTuChoi}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-500">Lý do: {r.lyDo}</p>
-                    {r.trangThai === "APPROVED" && (
-                      <p className="text-xs text-green-600 font-medium">
-                        Giáo viên dạy thay thế: {r.giaoVienThay?.hoTen || "Không sắp xếp dạy thay"}
-                      </p>
-                    )}
-                    {r.trangThai === "REJECTED" && r.lyDoTuChoi && (
-                      <p className="text-xs text-red-600 font-medium">
-                        Lý do từ chối: {r.lyDoTuChoi}
-                      </p>
+
+                    {(r.trangThai === "PENDING" || !r.trangThai) && (
+                      <button
+                        type="button"
+                        onClick={() => handleCancel(r.id)}
+                        className="self-start md:self-auto rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        Hủy đơn
+                      </button>
                     )}
                   </div>
 
-                  {(r.trangThai === "PENDING" || !r.trangThai) && (
-                    <button
-                      type="button"
-                      onClick={() => handleCancel(r.id)}
-                      className="self-start md:self-auto rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      Hủy đơn
-                    </button>
+                  {/* Admin feedback */}
+                  {r.adminMessage && (
+                    <div style={{ background: "#eff6ff", borderRadius: 8, padding: "10px 14px", border: "1px solid #bfdbfe" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", marginBottom: 4 }}>Phản hồi từ Ban giám hiệu</div>
+                      <div style={{ fontSize: 13, color: "#1e40af" }}>{r.adminMessage}</div>
+                      {r.approvedAt && (
+                        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                          {new Date(r.approvedAt).toLocaleDateString("vi-VN")}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}

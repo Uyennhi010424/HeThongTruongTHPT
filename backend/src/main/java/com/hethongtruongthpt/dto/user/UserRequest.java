@@ -20,6 +20,8 @@ public class UserRequest {
              message = "Role không hợp lệ")
     private String role;
 
+    private String anhDaiDien;
+
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
     public String getEmail() { return email; }
@@ -30,4 +32,6 @@ public class UserRequest {
     public void setStatus(Integer status) { this.status = status; }
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+    public String getAnhDaiDien() { return anhDaiDien; }
+    public void setAnhDaiDien(String anhDaiDien) { this.anhDaiDien = anhDaiDien; }
 }

@@ -12,11 +12,11 @@ public class TkbDayThay {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "tkb_id", nullable = false)
     private ThoiKhoaBieu thoiKhoaBieu;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "giao_vien_thay_id", nullable = false)
     private GiaoVien giaoVienThay;
 

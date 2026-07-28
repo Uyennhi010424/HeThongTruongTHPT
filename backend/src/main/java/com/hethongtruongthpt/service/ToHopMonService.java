@@ -177,8 +177,11 @@ public class ToHopMonService {
                 .collect(Collectors.toList()));
 
         // Đếm số lớp đang dùng tổ hợp này
-        long soLop = lopHocRepository.countByToHopId(toHop.getId());
-        dto.setSoLopSuDung((int) soLop);
+        List<com.hethongtruongthpt.entity.LopHoc> lops = lopHocRepository.findByToHopId(toHop.getId());
+        dto.setSoLopSuDung(lops.size());
+        dto.setDanhSachLop(lops.stream()
+                .map(com.hethongtruongthpt.entity.LopHoc::getTenLop)
+                .collect(Collectors.toList()));
 
         return dto;
     }

@@ -68,6 +68,12 @@ public class LopHocController {
 		return ResponseEntity.ok(ApiResponse.ok(lopHocService.update(id, lopHoc)));
 	}
 
+	@PreAuthorize("hasAnyRole('ADMIN')")
+	@PutMapping("/{id}/gvcn")
+	public ResponseEntity<ApiResponse<LopHoc>> assignGvcn(@PathVariable Integer id, @RequestBody Map<String, Integer> payload) {
+		return ResponseEntity.ok(ApiResponse.ok(lopHocService.assignGvcn(id, payload.get("gvcnId"))));
+	}
+
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
 	@DeleteMapping("/{id}")
 	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable Integer id) {

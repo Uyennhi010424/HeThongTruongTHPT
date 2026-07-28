@@ -54,6 +54,7 @@ public class GiaoVienService {
     private final DiemRepository diemRepository;
     private final DefaultAccountPasswordPolicy passwordPolicy;
     private final MonHocRepository monHocRepository;
+    private final com.hethongtruongthpt.repository.LopHocRepository lopHocRepository;
 
     public GiaoVienService(
             GiaoVienRepository giaoVienRepository,
@@ -65,7 +66,8 @@ public class GiaoVienService {
             HanhKiemRepository hanhKiemRepository,
             DiemRepository diemRepository,
             DefaultAccountPasswordPolicy passwordPolicy,
-            MonHocRepository monHocRepository
+            MonHocRepository monHocRepository,
+            com.hethongtruongthpt.repository.LopHocRepository lopHocRepository
     ) {
         this.giaoVienRepository = giaoVienRepository;
         this.userService = userService;
@@ -77,6 +79,7 @@ public class GiaoVienService {
         this.diemRepository = diemRepository;
         this.passwordPolicy = passwordPolicy;
         this.monHocRepository = monHocRepository;
+        this.lopHocRepository = lopHocRepository;
     }
 
     public List<GiaoVienDTO> getAll() {
@@ -151,6 +154,9 @@ public class GiaoVienService {
         existing.setGioiTinh(giaoVien.getGioiTinh());
         existing.setBoMon(giaoVien.getBoMon());
         existing.setTrinhDo(giaoVien.getTrinhDo());
+        if (giaoVien.getAnhDaiDien() != null) {
+            existing.setAnhDaiDien(giaoVien.getAnhDaiDien());
+        }
 
         String username = giaoVien.getEmail();
         if (username == null || username.isBlank()) {
@@ -277,9 +283,24 @@ public class GiaoVienService {
         dto.setGioiTinh(giaoVien.getGioiTinh());
         dto.setNgaySinh(giaoVien.getNgaySinh());
         dto.setDiaChi(giaoVien.getDiaChi());
+        dto.setAnhDaiDien(giaoVien.getAnhDaiDien());
         if (giaoVien.getUser() != null) {
             dto.setUsername(giaoVien.getUser().getUsername());
         }
+
+        // Map GVCN info from LopHoc
+        java.util.List<com.hethongtruongthpt.entity.LopHoc> lopHocs = lopHocRepository.findByGvcnId(giaoVien.getId());
+        if (lopHocs != null && !lopHocs.isEmpty()) {
+            dto.setIsGvcn(true);
+            String classNames = lopHocs.stream()
+                .map(com.hethongtruongthpt.entity.LopHoc::getTenLop)
+                .collect(java.util.stream.Collectors.joining(", "));
+            dto.setTenLopChuNhiem(classNames);
+        } else {
+            dto.setIsGvcn(false);
+            dto.setTenLopChuNhiem(null);
+        }
+
         return dto;
     }
 

@@ -22,11 +22,11 @@ const MonHocList = lazy(() => import("../features/admin/monhoc/MonHocList.jsx"))
 const NamHocHocKyPage = lazy(() => import("../features/admin/namhoc-hocky/NamHocHocKyPage.jsx"));
 const ThongBaoManager = lazy(() => import("../features/admin/thongbao/ThongBaoManager.jsx"));
 const ReportPage = lazy(() => import("../features/admin/report/ReportPage.jsx"));
-const AdminConfigPage = lazy(() => import("../features/admin/config/AdminConfigPage.jsx"));
+const SettingsPage = lazy(() => import("../features/admin/settings/SettingsPage.jsx"));
 const PhanCongPage = lazy(() => import("../features/admin/phancong/PhanCongPage.jsx"));
 const LichThiAdminPage = lazy(() => import("../features/admin/lichthi/LichThiAdminPage.jsx"));
-const AuditLogPage = lazy(() => import("../features/admin/audit/AuditLogPage.jsx"));
 const AdminThoiKhoaBieuPage = lazy(() => import("../features/admin/thoikhoabieu/AdminThoiKhoaBieuPage.jsx"));
+const AdminNghiDayPage = lazy(() => import("../features/admin/nghiday/AdminNghiDayPage.jsx"));
 const AdminNhapDiemPage = lazy(() => import("../features/admin/diem/AdminNhapDiemPage.jsx"));
 const AdminProfile = lazy(() => import("../features/admin/profile/AdminProfile.jsx"));
 const BackupPage = lazy(() => import("../features/admin/backup/BackupPage.jsx"));
@@ -35,9 +35,7 @@ const ToHopMonList = lazy(() => import("../features/admin/tohopmon/ToHopMonList.
 const AdminHanhKiemPage = lazy(() => import("../features/admin/hanhkiem/AdminHanhKiemPage.jsx"));
 
 // Shared account pages
-const EditProfile = lazy(() => import("../features/account/EditProfile.jsx"));
 const ChangePassword = lazy(() => import("../features/account/ChangePassword.jsx"));
-const SettingsPage = lazy(() => import("../features/account/SettingsPage.jsx"));
 
 // Teacher pages
 const TeacherProfile = lazy(() => import("../features/teacher/TeacherProfile.jsx"));
@@ -139,9 +137,7 @@ const routes = [
     children: [
       { path: "dashboard", element: withSuspense(AdminDashboard) },
       { path: "profile", element: withSuspense(AdminProfile) },
-      { path: "profile/edit", element: withSuspense(EditProfile) },
       { path: "profile/change-password", element: withSuspense(ChangePassword) },
-      { path: "profile/settings", element: withSuspense(SettingsPage) },
       { path: "namhoc-hocky", element: withSuspense(NamHocHocKyPage) },
       { path: "namhoc", element: <Navigate to="/admin/namhoc-hocky" replace /> },
       { path: "hocky", element: <Navigate to="/admin/namhoc-hocky" replace /> },
@@ -153,15 +149,15 @@ const routes = [
       { path: "tohopmon", element: withSuspense(ToHopMonList) },
       { path: "phancong", element: withSuspense(PhanCongPage) },
       { path: "diem", element: withSuspense(AdminNhapDiemPage) },
+      { path: "diem/lop/:lopId", element: withSuspense(lazy(() => import("../features/admin/diem/AdminBangDiemLop.jsx"))) },
       { path: "hanhkiem", element: withSuspense(AdminHanhKiemPage) },
       { path: "thoikhoabieu", element: withSuspense(AdminThoiKhoaBieuPage) },
+      { path: "nghi-day", element: withSuspense(AdminNghiDayPage) },
       { path: "lichthi", element: withSuspense(LichThiAdminPage) },
       { path: "users", element: withSuspense(UserList) },
-      { path: "config", element: withSuspense(AdminConfigPage) },
+      { path: "settings", element: withSuspense(SettingsPage) },
       { path: "report", element: withSuspense(ReportPage) },
-      { path: "audit", element: withSuspense(AuditLogPage) },
-      { path: "thongbao", element: withSuspense(ThongBaoManager) },
-      { path: "backup", element: withSuspense(BackupPage) }
+      { path: "thongbao", element: withSuspense(ThongBaoManager) }
     ]
   },
   {
@@ -178,9 +174,7 @@ const routes = [
     children: [
       { path: "dashboard", element: withSuspense(TeacherDashboard) },
       { path: "profile", element: withSuspense(TeacherProfile) },
-      { path: "profile/edit", element: withSuspense(EditProfile) },
       { path: "profile/change-password", element: withSuspense(ChangePassword) },
-      { path: "profile/settings", element: withSuspense(SettingsPage) },
       { path: "diem/nhap", element: withSuspense(NhapDiem) },
       { path: "diem/bangdiem", element: withSuspense(TeacherBangDiem) },
       { path: "thongbao", element: withSuspense(TeacherThongBao) },
@@ -215,7 +209,6 @@ const routes = [
       { path: "thongbao", element: withSuspense(StudentThongBao) },
       { path: "lichthi", element: withSuspense(StudentLichThi) },
       { path: "profile", element: withSuspense(ProfilePage) },
-      { path: "profile/edit", element: withSuspense(EditProfile) },
       { path: "profile/change-password", element: withSuspense(ChangePassword) }
     ]
   },
@@ -237,7 +230,6 @@ const routes = [
       { path: "profile", element: withSuspense(ParentProfile) },
       { path: "diemdanh", element: withSuspense(ParentDiemDanh) },
       { path: "thongbao", element: withSuspense(ParentThongBao) },
-      { path: "profile/edit", element: withSuspense(EditProfile) },
       { path: "profile/change-password", element: withSuspense(ChangePassword) }
     ]
   },

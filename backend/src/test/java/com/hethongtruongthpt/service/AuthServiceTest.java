@@ -38,6 +38,7 @@ class AuthServiceTest {
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private TokenBlacklistRepository tokenBlacklistRepository;
     @Mock private TokenBlacklistCache tokenBlacklistCache;
+    @Mock private UserAuditLogService userAuditLogService;
 
     // Use real JwtTokenProvider since Mockito can't mock it on Java 23
     private JwtTokenProvider jwtTokenProvider;
@@ -69,7 +70,7 @@ class AuthServiceTest {
             throw new RuntimeException(e);
         }
 
-        authService = new AuthService(userRepository, hocSinhRepository, passwordEncoder, jwtTokenProvider, refreshTokenRepository, tokenBlacklistRepository, tokenBlacklistCache);
+        authService = new AuthService(userRepository, hocSinhRepository, passwordEncoder, jwtTokenProvider, refreshTokenRepository, tokenBlacklistRepository, tokenBlacklistCache, userAuditLogService);
 
         sampleUser = new User();
         sampleUser.setId(1);

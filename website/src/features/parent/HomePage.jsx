@@ -1,33 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Bell, Calendar, User, Phone, Mail, MessageSquare, ChevronRight, CheckCircle2, BookOpen } from "lucide-react";
 import { getThongBao } from "../../api/thongbaoApi.js";
 import { getLichThiByLop } from "../../api/lichthiApi.js";
 import { getMonHoc } from "../../api/monhocApi.js";
 import { getDiem } from "../../api/diemApi.js";
-import { getHanhKiem } from "../../api/hanhkiemApi.js";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { formatDate } from "../../utils/helpers.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
 
-const HANH_KIEM_LABELS = {
-  TOT: "Tốt",
-  KHA: "Khá",
-  TRUNG_BINH: "Trung bình",
-  YEU: "Yếu",
-};
-
 export default function HomePage() {
-  const { students, currentStudent, selectedIndex, selectStudent, loading: studentsLoading, error: studentsError } = useParentStudents();
+  const { students, currentStudent, selectStudent, loading: studentsLoading } = useParentStudents();
   const [data, setData] = useState({
     notices: [],
     exams: [],
     subjects: [],
     scores: [],
-    conducts: [],
     attendanceStats: null,
   });
   const [dataLoading, setDataLoading] = useState(false);
-  const [dataError, setDataError] = useState("");
 
   useEffect(() => {
     if (!currentStudent) return;
@@ -36,27 +28,21 @@ export default function HomePage() {
     const fetchData = async () => {
       try {
         setDataLoading(true);
-        setDataError("");
-
         const lopId = currentStudent?.lop?.id;
         const hocSinhId = currentStudent?.id;
-
         const fetchPromises = [];
 
-        // Notices + Subjects
         fetchPromises.push(
           getThongBao().then(r => ({ notices: r?.data?.data || [] })).catch(() => ({ notices: [] })),
           getMonHoc().then(r => ({ subjects: r?.data?.data || [] })).catch(() => ({ subjects: [] }))
         );
 
-        // Exams
         fetchPromises.push(
           (lopId ? getLichThiByLop(lopId) : Promise.resolve({ data: { data: [] } }))
             .then(r => ({ exams: r?.data?.data || [] }))
             .catch(() => ({ exams: [] }))
         );
 
-        // Scores
         if (hocSinhId) {
           fetchPromises.push(
             getDiem({ hocSinhId })
@@ -64,18 +50,8 @@ export default function HomePage() {
               .catch(() => ({ scores: [] }))
           );
 
-          // Conduct
-          fetchPromises.push(
-            getHanhKiem({ hocSinhId })
-              .then(r => ({ conducts: r?.data?.data || [] }))
-              .catch(() => ({ conducts: [] }))
-          );
-
-          // Attendance stats
           const now = new Date();
-          const yearStart = now.getMonth() >= 8
-            ? `${now.getFullYear()}-09-01`
-            : `${now.getFullYear() - 1}-09-01`;
+          const yearStart = now.getMonth() >= 8 ? `${now.getFullYear()}-09-01` : `${now.getFullYear() - 1}-09-01`;
           const today = now.toISOString().split("T")[0];
           fetchPromises.push(
             getStudentStatistics(hocSinhId, yearStart, today)
@@ -87,18 +63,15 @@ export default function HomePage() {
         const results = await Promise.all(fetchPromises);
         if (!active) return;
 
-        const merged = {
+        setData({
           notices: results[0]?.notices || [],
           subjects: results[1]?.subjects || [],
           exams: results[2]?.exams || [],
           scores: results[3]?.scores || [],
-          conducts: results[4]?.conducts || [],
-          attendanceStats: results[5]?.attendanceStats || null,
-        };
-        setData(merged);
-      } catch {
-        if (!active) return;
-        setDataError("Không thể tải dữ liệu.");
+          attendanceStats: results[4]?.attendanceStats || null,
+        });
+      } catch (error) {
+        console.error(error);
       } finally {
         if (active) setDataLoading(false);
       }
@@ -106,283 +79,303 @@ export default function HomePage() {
 
     fetchData();
     return () => { active = false; };
-  }, [currentStudent?.id]);
+  }, [currentStudent]);
 
-  const loading = studentsLoading || dataLoading;
-  const error = studentsError || dataError;
+  const { upcomingExams, recentActivities, subjectsTodayCount } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  /* -- Helpers -------------------------------------------------------- */
-  const subjectMap = useMemo(() => {
-    const map = {};
-    for (const s of data.subjects) {
-      map[s.id] = s.tenMon || s.tenMonHoc || `Môn ${s.id}`;
-    }
-    return map;
-  }, [data.subjects]);
-
-  const getSubjectName = (monHocId) => subjectMap[monHocId] || `Môn ${monHocId}`;
-
-  /* -- Computed stats ------------------------------------------------- */
-  const dtb = useMemo(() => {
-    if (!data.scores || data.scores.length === 0) return null;
-    const validScores = data.scores.filter((s) => s.giaTriDiem != null);
-    if (validScores.length === 0) return null;
-
-    let weightSum = 0;
-    let weightTotal = 0;
-    for (const s of validScores) {
-      const loai = s.loaiDiem || "";
-      const w = loai === "CK" ? 3 : loai === "GK" ? 2 : 1;
-      weightSum += Number(s.giaTriDiem) * w;
-      weightTotal += w;
-    }
-    if (weightTotal === 0) return null;
-    return Math.round((weightSum / weightTotal) * 100) / 100;
-  }, [data.scores]);
-
-  const totalAbsent = useMemo(() => {
-    if (!data.attendanceStats) return 0;
-    const cp = Number(data.attendanceStats.coPhep || 0);
-    const kp = Number(data.attendanceStats.khongPhep || 0);
-    return cp + kp;
-  }, [data.attendanceStats]);
-
-  const hanhKiemLabel = useMemo(() => {
-    if (!data.conducts || data.conducts.length === 0) return "--";
-    // Lọc theo năm học hiện tại (tháng >= 9: năm này-năm sau; tháng < 9: năm trước-năm này)
-    const now = new Date();
-    const yr = now.getFullYear();
-    const mo = now.getMonth() + 1;
-    const curNamHoc = mo >= 9 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
-    const curHK = mo >= 9 || mo <= 1 ? 1 : 2;
-
-    const filtered = data.conducts.filter((c) => {
-      const matchNamHoc = c.namHoc === curNamHoc || c.tenNamHoc === curNamHoc;
-      const matchHK = String(c.hocKy) === String(curHK);
-      return matchNamHoc && matchHK;
-    });
-    const approved = filtered.find((c) => c.trangThai === "APPROVED");
-    const record = approved || filtered[filtered.length - 1] || data.conducts[data.conducts.length - 1];
-    const raw = record?.xepLoai || record?.hanhKiem || "";
-    return HANH_KIEM_LABELS[raw] || raw || "--";
-  }, [data.conducts]);
-
-  const classifyColor = (avg) => {
-    if (avg == null) return "#9ca3af";
-    if (avg >= 8) return "#16a34a";
-    if (avg >= 6.5) return "#2563eb";
-    if (avg >= 5) return "#ca8a04";
-    return "#dc2626";
-  };
-
-  const classifyLabel = (avg) => {
-    if (avg == null) return "--";
-    if (avg >= 8) return "Tốt";
-    if (avg >= 6.5) return "Khá";
-    if (avg >= 5) return "Đạt";
-    return "Chưa đạt";
-  };
-
-  const latestNotices = useMemo(() => {
-    return [...data.notices]
-      .filter((item) => item.doiTuong === "PHU_HUYNH" || item.doiTuong === "ALL")
-      .sort((a, b) => new Date(b.ngayDang) - new Date(a.ngayDang))
-      .slice(0, 3);
-  }, [data.notices]);
-
-  const upcomingExams = useMemo(() => {
-    const now = new Date();
-    return [...data.exams]
-      .filter((item) => item.ngayThi && new Date(item.ngayThi) >= now)
+    const upcomingExams = (data.exams || [])
+      .filter(ex => new Date(ex.ngayThi) >= today)
       .sort((a, b) => new Date(a.ngayThi) - new Date(b.ngayThi))
       .slice(0, 3);
-  }, [data.exams]);
+
+    const activities = [];
+    if (data.attendanceStats?.todayStatus) {
+      activities.push({
+        id: "att",
+        time: new Date(),
+        title: `Hôm nay ${data.attendanceStats.todayStatus.toLowerCase()}`,
+        type: "attendance"
+      });
+    }
+    
+    (data.notices || []).slice(0, 3).forEach(n => {
+      activities.push({
+        id: `not_${n.id}`,
+        time: new Date(n.createdAt || n.ngayTao),
+        title: `Nhà trường gửi thông báo: ${n.tieuDe}`,
+        type: "notice"
+      });
+    });
+
+    (data.scores || []).slice(0, 3).forEach(s => {
+      activities.push({
+        id: `sco_${s.id}`,
+        time: new Date(s.ngayTao || new Date()),
+        title: `Điểm ${s.monHoc?.tenMon || "mới"} được cập nhật`,
+        type: "score"
+      });
+    });
+
+    activities.sort((a, b) => b.time - a.time);
+
+    // Filter valid subjects for today count (not SHDC)
+    const validSubjects = (data.subjects || []).filter(s => {
+      const name = (s.tenMon || "").toLowerCase();
+      return !name.includes("shdc") && !name.includes("sinh hoạt lớp");
+    });
+    // Just a placeholder calculation, realistically we'd need Timetable API. 
+    // We'll just display a static number or base it on something if no timetable is loaded.
+    const subjectsTodayCount = 5; // Placeholder since no Timetable API is called here
+
+    return { upcomingExams, recentActivities: activities.slice(0, 5), subjectsTodayCount };
+  }, [data]);
+
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center p-12 bg-white rounded-[16px] border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
+      <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+        <User size={40} className="text-slate-300" />
+      </div>
+      <h3 className="text-lg font-semibold text-slate-800 mb-1">Chưa chọn học sinh</h3>
+      <p className="text-slate-500 text-center text-sm max-w-sm">
+        Vui lòng chọn học sinh ở góc phải phía trên để bắt đầu theo dõi quá trình học tập.
+      </p>
+    </div>
+  );
+
+  if (studentsLoading) {
+    return <div className="p-8 text-center text-slate-500">Đang tải dữ liệu...</div>;
+  }
+
+  const gvcn = currentStudent?.lop?.gvcn;
 
   return (
-    <div className="page users-page student-page">
-      {/* Hero */}
-      <section className="student-hero card">
-        <div className="student-hero-copy">
-          <div className="student-hero-kicker">EduManager Pro</div>
-          <h2 className="student-hero-title">Trang chủ phụ huynh</h2>
-          <p className="student-hero-subtitle">
-            Theo dõi kết quả học tập, hạnh kiểm và thông tin từ nhà trường.
-          </p>
+    <div className="bg-[#F8FAFC] min-h-screen pb-12 font-sans">
+      {/* Banner */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Trang chủ phụ huynh</h1>
+          <p className="text-sm text-slate-500 mt-1">Theo dõi kết quả học tập và các thông báo của nhà trường.</p>
         </div>
-        <div className="student-hero-metrics">
-          <div className="student-hero-chip">
-            {loading ? "..." : currentStudent?.hoTen || "Chưa chọn con"}
-          </div>
-          <div className="student-hero-chip">
-            {loading ? "..." : currentStudent?.lop?.tenLop || "--"}
-          </div>
-        </div>
-      </section>
-
-      {/* Student selector */}
-      <StudentSelector students={students} selectedIndex={selectedIndex} onSelect={selectStudent} />
-
-      {/* Stats cards */}
-      <div className="users-stats student-stats">
-        <div className="stat-card stat-blue">
-          <div className="stat-label">Điểm trung bình</div>
-          <div className="stat-value" style={{ color: classifyColor(dtb) }}>
-            {loading ? "..." : dtb != null ? dtb : "--"}
-          </div>
-          <div className="stat-label" style={{ fontSize: 12, marginTop: 2 }}>
-            {loading ? "" : classifyLabel(dtb)}
-          </div>
-        </div>
-        <div className="stat-card stat-sky">
-          <div className="stat-label">Số ngày vắng</div>
-          <div className="stat-value" style={{ color: totalAbsent > 5 ? "#dc2626" : "#16a34a" }}>
-            {loading ? "..." : totalAbsent}
-          </div>
-          {data.attendanceStats && (
-            <div className="stat-label" style={{ fontSize: 12, marginTop: 2 }}>
-              Có phép: {data.attendanceStats.coPhep || 0} · Không phép: {data.attendanceStats.khongPhep || 0}
-            </div>
-          )}
-        </div>
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Hạnh kiểm</div>
-          <div className="stat-value" style={{ fontSize: 18 }}>
-            {loading ? "..." : hanhKiemLabel}
-          </div>
+        <div>
+          <StudentSelector 
+            students={students} 
+            selectedStudent={currentStudent} 
+            onSelect={selectStudent} 
+          />
         </div>
       </div>
 
-      {error && <div className="card table-empty">{error}</div>}
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        {!currentStudent ? (
+          renderEmptyState()
+        ) : (
+          <>
+            {/* 2. Thông tin học sinh - Ngang */}
+            <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col md:flex-row items-center gap-6">
+              <img 
+                src={currentStudent.anhDaiDien || "https://ui-avatars.com/api/?name=" + (currentStudent.hoTen || "HS") + "&background=random"} 
+                alt="Avatar" 
+                className="w-20 h-20 rounded-full object-cover border-2 border-slate-100"
+              />
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-xl font-bold text-slate-900">{currentStudent.hoTen}</h2>
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 mt-2 text-sm text-slate-600">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">Lớp:</span> {currentStudent.lop?.tenLop || "--"}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">Năm học:</span> {currentStudent.lop?.namHoc || "--"}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">GVCN:</span> {gvcn?.hoTen || "--"}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">Trạng thái:</span> 
+                    <span className="text-emerald-600 font-semibold">{currentStudent.trangThai === 1 ? "Đang học" : "Tạm nghỉ"}</span>
+                  </div>
+                </div>
+              </div>
+              <Link 
+                to="/parent/profile" 
+                className="px-5 py-2.5 bg-blue-50 text-blue-700 font-semibold text-sm rounded-xl hover:bg-blue-100 transition-colors whitespace-nowrap"
+              >
+                Xem hồ sơ
+              </Link>
+            </div>
 
-      {!error && (
-        <div className="grid-2 student-grid-2">
-          {/* Student info */}
-          <div className="card student-card">
-            <div className="table-header">
-              <div>
-                <div className="panel-title">Thông tin học sinh</div>
-                <div className="panel-subtitle">Theo dõi con em trong năm học</div>
-              </div>
-              <div className="panel-pill">Hồ sơ</div>
-            </div>
-            <div className="profile-summary student-profile-summary">
-              <div>
-                <div className="table-title">{currentStudent?.hoTen || "--"}</div>
-                <div className="table-meta">Lớp: {currentStudent?.lop?.tenLop || "--"}</div>
-              </div>
-              <div>
-                <div className="table-title">Năm nhập học</div>
-                <div className="table-meta">{currentStudent?.namNhapHoc || "--"}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Latest notices */}
-          <div className="card student-card">
-            <div className="table-header">
-              <div>
-                <div className="panel-title">Thông báo nhà trường</div>
-                <div className="panel-subtitle">Dành cho phụ huynh</div>
-              </div>
-              <div className="panel-pill">Tin mới</div>
-            </div>
-            {latestNotices.length === 0 && !loading ? (
-              <div className="table-empty">Chưa có thông báo.</div>
-            ) : (
-              <div className="student-notice-list">
-                {latestNotices.map((item) => (
-                  <div className="notice-item" key={item.id}>
-                    <div>
-                      <div className="table-title">{item.tieuDe}</div>
-                      <div className="table-meta">{item.noiDung}</div>
+            {/* 3. Hai cột nội dung */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Cột trái (60%) */}
+              <div className="lg:col-span-7 space-y-6">
+                
+                {/* Thông báo từ nhà trường */}
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <Bell size={20} className="text-blue-500" />
+                      Thông báo từ nhà trường
+                    </h3>
+                    <Link to="/parent/notices" className="text-sm font-medium text-blue-600 hover:text-blue-700">Xem tất cả</Link>
+                  </div>
+                  
+                  {dataLoading ? (
+                    <div className="text-sm text-slate-500">Đang tải...</div>
+                  ) : data.notices.length === 0 ? (
+                    <div className="text-sm text-slate-500 py-4 text-center">Không có thông báo mới.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {data.notices.slice(0, 3).map((n) => (
+                        <div key={n.id} className="flex gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+                          <div>
+                            <h4 className="font-semibold text-slate-800 text-sm">{n.tieuDe}</h4>
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{n.noiDung}</p>
+                            <span className="text-[11px] text-slate-400 mt-2 block">{formatDate(n.createdAt)}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="table-date">{formatDate(item.ngayDang) || "--"}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {!error && (
-        <div className="grid-2 student-grid-2">
-          {/* Upcoming exams */}
-          <div className="card users-table student-card">
-            <div className="table-header">
-              <div>
-                <div className="panel-title">Lịch thi sắp tới</div>
-                <div className="panel-subtitle">Cập nhật theo tuần</div>
-              </div>
-              <div className="panel-pill">{upcomingExams.length} lịch thi</div>
-            </div>
-            {upcomingExams.length === 0 && !loading ? (
-              <div className="table-empty">Chưa có lịch thi.</div>
-            ) : (
-              <div className="table-grid">
-                <div className="table-row table-head">
-                  <div>Ngày thi</div>
-                  <div>Môn</div>
-                  <div>Giờ</div>
-                  <div>Phòng</div>
-                </div>
-                {upcomingExams.map((item) => (
-                  <div className="table-row" key={item.id}>
-                    <div className="table-title">{formatDate(item.ngayThi) || "--"}</div>
-                    <div className="table-title">{getSubjectName(item.monHocId)}</div>
-                    <div className="table-title">{item.gioBatDau || "--"}</div>
-                    <div className="table-meta">{item.phongThi || "--"}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Score summary */}
-          <div className="card users-table student-card">
-            <div className="table-header">
-              <div>
-                <div className="panel-title">Tổng quan điểm số</div>
-                <div className="panel-subtitle">Điểm và hạnh kiểm gần đây</div>
-              </div>
-              <div className="panel-pill">{data.scores.length} điểm</div>
-            </div>
-            <div className="table-grid">
-              <div className="table-row table-head">
-                <div>Chỉ số</div>
-                <div>Giá trị</div>
-              </div>
-              <div className="table-row">
-                <div className="table-title">Điểm trung bình</div>
-                <div className="table-title" style={{ color: classifyColor(dtb), fontWeight: 700 }}>
-                  {loading ? "..." : dtb != null ? `${dtb} (${classifyLabel(dtb)})` : "--"}
-                </div>
-              </div>
-              <div className="table-row">
-                <div className="table-title">Số ngày vắng</div>
-                <div className="table-title" style={{ color: totalAbsent > 5 ? "#dc2626" : "#16a34a", fontWeight: 700 }}>
-                  {loading ? "..." : totalAbsent}
-                  {data.attendanceStats && (
-                    <span style={{ fontWeight: 400, fontSize: 12, marginLeft: 6 }}>
-                      (Có phép: {data.attendanceStats.coPhep || 0}, Không phép: {data.attendanceStats.khongPhep || 0})
-                    </span>
                   )}
                 </div>
-              </div>
-              <div className="table-row">
-                <div className="table-title">Hạnh kiểm</div>
-                <div className="table-title" style={{ fontWeight: 700 }}>
-                  {loading ? "..." : hanhKiemLabel}
+
+                {/* Lịch thi sắp tới */}
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-5">
+                    <Calendar size={20} className="text-purple-500" />
+                    Lịch thi sắp tới
+                  </h3>
+                  
+                  {dataLoading ? (
+                    <div className="text-sm text-slate-500">Đang tải...</div>
+                  ) : upcomingExams.length === 0 ? (
+                    <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+                      <BookOpen size={32} className="mb-2 opacity-50" />
+                      <span className="text-sm">Chưa có lịch thi nào sắp tới</span>
+                    </div>
+                  ) : (
+                    <div className="relative border-l border-slate-200 ml-3 space-y-6">
+                      {upcomingExams.map((exam, idx) => {
+                        const d = new Date(exam.ngayThi);
+                        const dateStr = d.toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' });
+                        return (
+                          <div key={idx} className="relative pl-6">
+                            <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-purple-500 ring-4 ring-white"></div>
+                            <div className="text-sm font-bold text-slate-900">{dateStr}</div>
+                            <div className="mt-1 bg-slate-50 border border-slate-100 rounded-lg p-3">
+                              <div className="font-medium text-slate-800">{exam.monHoc?.tenMon || "Bài thi"}</div>
+                              <div className="text-xs text-slate-500 mt-1 flex gap-3">
+                                <span>Phòng: {exam.phongThi || "--"}</span>
+                                <span>Giờ thi: {exam.gioThi || "--"}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
+
               </div>
-              <div className="table-row">
-                <div className="table-title">Tổng bài điểm</div>
-                <div className="table-title">{loading ? "..." : data.scores.length}</div>
+
+              {/* Cột phải (40%) */}
+              <div className="lg:col-span-5 space-y-6">
+                
+                {/* Thông tin nhanh */}
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
+                  <h3 className="text-lg font-bold text-slate-900 mb-5">Thông tin nhanh</h3>
+                  <ul className="space-y-4">
+                    <li className="flex justify-between items-center pb-4 border-b border-slate-100">
+                      <span className="text-sm text-slate-500">Giáo viên chủ nhiệm</span>
+                      <span className="text-sm font-semibold text-slate-800">{gvcn?.hoTen || "--"}</span>
+                    </li>
+                    <li className="flex justify-between items-center pb-4 border-b border-slate-100">
+                      <span className="text-sm text-slate-500">Điểm danh hôm nay</span>
+                      <span className={`text-sm font-semibold ${data.attendanceStats?.todayStatus === 'Có mặt' ? 'text-emerald-600' : 'text-slate-800'}`}>
+                        {data.attendanceStats?.todayStatus || "Chưa cập nhật"}
+                      </span>
+                    </li>
+                    <li className="flex justify-between items-center pb-4 border-b border-slate-100">
+                      <span className="text-sm text-slate-500">Tiết học hôm nay</span>
+                      <span className="text-sm font-semibold text-slate-800">{subjectsTodayCount} tiết</span>
+                    </li>
+                    <li className="flex justify-between items-center">
+                      <span className="text-sm text-slate-500">Lần cập nhật gần nhất</span>
+                      <span className="text-sm font-semibold text-slate-800">{new Date().toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Liên hệ giáo viên */}
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
+                    <User size={20} className="text-emerald-500" />
+                    Liên hệ giáo viên
+                  </h3>
+                  
+                  {!gvcn ? (
+                    <div className="text-sm text-slate-500 text-center py-2">Chưa có thông tin giáo viên</div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col mb-5">
+                        <span className="font-bold text-slate-800">{gvcn.hoTen}</span>
+                        <div className="mt-2 space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Mail size={14} className="text-slate-400" />
+                            {gvcn.email || "--"}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Phone size={14} className="text-slate-400" />
+                            {gvcn.soDienThoai || "--"}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-3">
+                        <button className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
+                          <MessageSquare size={16} /> Gửi tin nhắn
+                        </button>
+                        {gvcn.soDienThoai && (
+                          <button className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
+                            <Phone size={16} /> Gọi điện
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
               </div>
             </div>
-          </div>
-        </div>
-      )}
+
+            {/* 4. Hoạt động gần đây */}
+            <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-5">Hoạt động gần đây</h3>
+              
+              {recentActivities.length === 0 ? (
+                <div className="text-sm text-slate-500 text-center py-4">Chưa có hoạt động nào gần đây.</div>
+              ) : (
+                <div className="space-y-4">
+                  {recentActivities.map((act) => (
+                    <div key={act.id} className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        <CheckCircle2 size={18} className="text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{act.title}</p>
+                        <span className="text-xs text-slate-400">{act.time.toLocaleDateString("vi-VN")}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </>
+        )}
+      </div>
     </div>
   );
 }

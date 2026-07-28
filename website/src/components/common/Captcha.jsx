@@ -51,8 +51,8 @@ export default function Captcha({ onGenerate, disabled }) {
 
     // Background gradient
     const gradient = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-    gradient.addColorStop(0, randomColor(200, 240));
-    gradient.addColorStop(1, randomColor(200, 240));
+    gradient.addColorStop(0, randomColor(230, 255));
+    gradient.addColorStop(1, randomColor(230, 255));
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -142,18 +142,20 @@ export default function Captcha({ onGenerate, disabled }) {
   }, [generateCaptcha]);
 
   return (
-    <div className="captcha-row">
-      <canvas
-        ref={canvasRef}
-        width={WIDTH}
-        height={HEIGHT}
-        className="captcha-canvas"
-        onClick={() => !disabled && generateCaptcha()}
-        title="Nhấn để tạo CAPTCHA mới"
-      />
+    <div className="flex items-center gap-2 h-full w-full">
+      <div className="flex-1 h-full rounded-[14px] overflow-hidden border border-gray-200 shadow-sm bg-white">
+        <canvas
+          ref={canvasRef}
+          width={WIDTH}
+          height={HEIGHT}
+          className={`w-full h-full object-cover cursor-pointer transition-opacity ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
+          onClick={() => !disabled && generateCaptcha()}
+          title="Nhấn để tạo CAPTCHA mới"
+        />
+      </div>
       <button
         type="button"
-        className="captcha-refresh"
+        className={`flex-shrink-0 flex items-center justify-center w-[52px] h-[52px] bg-white border border-gray-200 rounded-[14px] shadow-sm text-gray-500 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-[#1D4ED8] hover:bg-blue-50 hover:border-blue-200'} focus:outline-none`}
         onClick={() => !disabled && generateCaptcha()}
         disabled={disabled}
         title="Tạo CAPTCHA mới"

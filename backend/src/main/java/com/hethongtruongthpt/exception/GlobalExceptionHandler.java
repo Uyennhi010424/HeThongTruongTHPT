@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -39,7 +40,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Object>> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .map(fe -> fe.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message.isEmpty() ? "Dữ liệu không hợp lệ" : message));
@@ -51,7 +52,9 @@ public class GlobalExceptionHandler {
         logger.warn("Data integrity violation: {}", detail);
         String msg = "Dữ liệu vi phạm ràng buộc. Có thể bản ghi đã tồn tại.";
         if (detail != null) {
-            if (detail.contains("username") || detail.contains("UK_r43af9ap4edm43mmtq01oddj6")) {
+            if (detail.contains("a foreign key constraint fails") || detail.toLowerCase().contains("cannot delete or update a parent row")) {
+                msg = "Dữ liệu đang được sử dụng ở nơi khác. Vui lòng xóa dữ liệu liên quan trước (vd: chuyển học sinh sang lớp khác trước khi xóa lớp).";
+            } else if (detail.contains("username") || detail.contains("UK_r43af9ap4edm43mmtq01oddj6")) {
                 msg = "Tài khoản người dùng đã tồn tại.";
             } else if (detail.contains("ma_hoc_sinh") || detail.contains("maHocSinh")) {
                 msg = "Mã học sinh đã tồn tại.";
@@ -62,6 +65,13 @@ public class GlobalExceptionHandler {
             }
         }
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(msg));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Object>> handleOptimisticLocking(ObjectOptimisticLockingFailureException ex) {
+        logger.warn("Optimistic locking failure: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("Điểm của học sinh này vừa được một giáo viên khác cập nhật. Vui lòng tải lại trang để xem điểm mới nhất trước khi sửa tiếp."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

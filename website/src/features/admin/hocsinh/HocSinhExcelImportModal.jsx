@@ -1,15 +1,13 @@
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 
-export default function HocSinhExcelImportModal({
-  excelModalOpen,
-  setExcelModalOpen,
-  importing,
-  excelError,
-  excelWarning,
-  excelSuccess,
-  handleDownloadTemplate,
-  handleExcelUpload
-}) {
+export default function HocSinhExcelImportModal({ hooks }) {
+  const {
+    excelModalOpen, setExcelModalOpen,
+    handleDownloadTemplate,
+    handleExcelUpload,
+    importing, excelError, excelSuccess
+  } = hooks;
+
   return (
     <SimpleModal
       open={excelModalOpen}
@@ -18,7 +16,7 @@ export default function HocSinhExcelImportModal({
       width={760}
     >
       <div className="excel-import-wrap">
-        <div className="table-meta" style={{ fontWeight: 700, color: "var(--navy-900)", marginBottom: 12 }}>
+        <div className="table-meta">
           Dùng đúng biểu mẫu Việt hóa. Cột bắt buộc: Họ tên, Lớp. Các cột ID học bạ /
           ID dân tộc / ID phụ huynh sẽ mặc định là 1 nếu để trống.
         </div>
@@ -39,7 +37,6 @@ export default function HocSinhExcelImportModal({
         </div>
 
         {excelError && <div className="form-error">{excelError}</div>}
-        {excelWarning && <div className="table-success">{excelWarning}</div>}
         {excelSuccess && <div className="table-success">{excelSuccess}</div>}
 
         <div className="form-actions">

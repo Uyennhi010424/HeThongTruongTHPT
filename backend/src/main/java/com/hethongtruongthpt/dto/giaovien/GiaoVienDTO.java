@@ -14,6 +14,9 @@ public class GiaoVienDTO {
     private LocalDate ngaySinh;
     private String diaChi;
     private String username;
+    private Boolean isGvcn;
+    private String tenLopChuNhiem;
+    private String anhDaiDien;
 
     public Integer getId() {
         return id;
@@ -101,5 +104,29 @@ public class GiaoVienDTO {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public Boolean getIsGvcn() {
+        return isGvcn;
+    }
+
+    public void setIsGvcn(Boolean isGvcn) {
+        this.isGvcn = isGvcn;
+    }
+
+    public String getTenLopChuNhiem() {
+        return tenLopChuNhiem;
+    }
+
+    public void setTenLopChuNhiem(String tenLopChuNhiem) {
+        this.tenLopChuNhiem = tenLopChuNhiem;
+    }
+
+    public String getAnhDaiDien() {
+        return anhDaiDien;
+    }
+
+    public void setAnhDaiDien(String anhDaiDien) {
+        this.anhDaiDien = anhDaiDien;
     }
 }

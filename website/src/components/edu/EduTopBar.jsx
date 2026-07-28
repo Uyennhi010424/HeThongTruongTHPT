@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import MaterialIcon from "./MaterialIcon.jsx";
+import {
+  Menu,
+  Bell,
+  Search,
+  ChevronDown,
+  LogOut,
+  User as UserIcon,
+  Lock
+} from "lucide-react";
 import { clearAuth, getRole } from "../../store/authStore.js";
 import { getCurrentUsernameFromToken } from "../../utils/teacherProfile.js";
 import { readCachedAvatar } from "../../utils/avatarCache.js";
@@ -14,7 +22,8 @@ export default function EduTopBar({
   onToggle,
   isOpen = false,
   hideEdit = false,
-  navLinks = null
+  navLinks = null,
+  sidebarWidth // new prop
 }) {
   const currentUsername = getCurrentUsernameFromToken();
   const currentRole = getRole();
@@ -148,263 +157,55 @@ export default function EduTopBar({
     navigate("/login", { replace: true });
   };
 
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const dynamicStyle = sidebarWidth !== undefined ? {
+    left: window.innerWidth >= 1024 ? sidebarWidth : 0,
+    width: window.innerWidth >= 1024 ? `calc(100% - ${sidebarWidth}px)` : '100%'
+  } : {};
+
   return (
-    <header className={`fixed left-0 top-0 z-40 flex h-16 w-full items-center justify-between border-b border-outline-variant bg-surface-container-lowest px-md transition-all duration-200 lg:px-lg ${!navLinks && isOpen ? "lg:left-[280px] lg:w-[calc(100%-280px)]" : "lg:left-0 lg:w-full"}`}>
-      <div className="flex items-center gap-sm">
-        {/* Hamburger button - only for sidebar layouts */}
+    <header 
+      className={`fixed top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6 transition-all duration-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${sidebarWidth === undefined ? (!navLinks ? (isOpen ? "lg:left-[250px] lg:w-[calc(100%-250px)]" : "lg:left-[80px] lg:w-[calc(100%-80px)]") : "lg:left-0 lg:w-full") : ""}`}
+      style={dynamicStyle}
+    >
+      {/* LEFT SECTION: Hamburger (for Sidebar) or Nav Links (for Header Nav) */}
+      <div className="flex items-center gap-4 flex-1">
+        {/* Hamburger for Admin/Teacher (Sidebar) */}
         {!navLinks && (
           <button
             type="button"
-            className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-lg border border-outline-variant bg-surface transition-all hover:bg-surface-container-low"
+            className="group flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white transition-all duration-300 ease-out hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             aria-label={isOpen ? "Đóng menu" : "Mở menu"}
-            aria-controls="admin-sidebar"
-            aria-expanded={isOpen}
             onClick={onToggle}
           >
-            <span className={`block h-0.5 w-5 bg-primary transition-all rounded-full ${isOpen ? "translate-y-2 rotate-45" : ""}`}></span>
-            <span className={`block h-0.5 w-5 bg-primary transition-all rounded-full ${isOpen ? "opacity-0" : ""}`}></span>
-            <span className={`block h-0.5 w-5 bg-primary transition-all rounded-full ${isOpen ? "-translate-y-2 -rotate-45" : ""}`}></span>
+            <Menu className={`w-5 h-5 text-slate-700 transition-transform duration-300 group-hover:scale-110 ${!isOpen ? "rotate-90" : ""}`} />
           </button>
         )}
 
-        {/* Mobile menu button for header nav */}
+        {/* Hamburger for Mobile Header Nav */}
         {navLinks && (
           <button
             type="button"
-            className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-lg border border-outline-variant bg-surface transition-all hover:bg-surface-container-low lg:hidden"
-            aria-label={isOpen ? "Đóng menu" : "Mở menu"}
-            aria-expanded={isOpen}
+            className="lg:hidden group flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white transition-all duration-300 ease-out hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            aria-label="Mở menu"
             onClick={onToggle}
           >
-            <span className={`block h-0.5 w-5 bg-primary transition-all rounded-full ${isOpen ? "translate-y-2 rotate-45" : ""}`}></span>
-            <span className={`block h-0.5 w-5 bg-primary transition-all rounded-full ${isOpen ? "opacity-0" : ""}`}></span>
-            <span className={`block h-0.5 w-5 bg-primary transition-all rounded-full ${isOpen ? "-translate-y-2 -rotate-45" : ""}`}></span>
+            <Menu className="w-5 h-5 text-slate-700 transition-transform duration-300 group-hover:scale-110" />
           </button>
         )}
-      </div>
 
-      {/* Navigation links in header */}
-      {navLinks && (
-        <nav className="hidden lg:flex items-center gap-1 flex-1 mx-4">
-          {navLinks.map((item, idx) => {
-            // Flat link
-            if (item.path) {
-              const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
-                    isActive
-                      ? "bg-primary text-white"
-                      : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                  }`}
-                >
-                  {item.icon && (
-                    <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                  )}
-                  <span>{item.label}</span>
-                </Link>
-              );
-            }
-
-            // Grouped link with dropdown
-            if (item.group) {
-              const hasActiveChild = item.children?.some(
-                (child) => pathname === child.path || pathname.startsWith(`${child.path}/`)
-              );
-              const isDropdownOpen = openGroup === item.group;
-
-              return (
-                <div key={item.group} className="relative" ref={(el) => { groupRefsMap.current[item.group] = el; }}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenGroup(isDropdownOpen ? null : item.group)}
-                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
-                      hasActiveChild
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                    }`}
-                  >
-                    <span>{item.group}</span>
-                    <span
-                      className="material-symbols-outlined text-[18px] transition-transform duration-200"
-                      style={{ transform: isDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                    >
-                      expand_more
-                    </span>
-                  </button>
-                  {isDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1 z-50 min-w-[180px] overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-card">
-                      {item.children?.map((child) => {
-                        const isActive = pathname === child.path || pathname.startsWith(`${child.path}/`);
-                        return (
-                          <Link
-                            key={child.path}
-                            to={child.path}
-                            onClick={() => setOpenGroup(null)}
-                            className={`flex items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-150 ${
-                              isActive
-                                ? "bg-primary text-white font-semibold"
-                                : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                            }`}
-                          >
-                            {child.icon && (
-                              <span className="material-symbols-outlined text-[18px]">{child.icon}</span>
-                            )}
-                            <span>{child.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            return null;
-          })}
-        </nav>
-      )}
-
-      <div className="flex items-center gap-md">
-        <div className="relative" ref={notiRef}>
-          <button
-            type="button"
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-surface-container-low"
-            aria-label="Thông báo"
-            title="Thông báo"
-            onClick={() => setNotiOpen((v) => !v)}
-          >
-            <span className="material-symbols-outlined text-[22px] text-on-surface-variant">notifications</span>
-            {notices.length > 0 && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-error" />
-            )}
-          </button>
-          {notiOpen && (
-            <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-card">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
-                <span className="font-label-md text-label-md text-on-surface font-semibold">Thông báo</span>
-                <span className="text-label-sm text-on-surface-variant">{notices.length} mục</span>
-              </div>
-              <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                {notices.length === 0 ? (
-                  <div className="px-4 py-6 text-center text-on-surface-variant text-sm">Chưa có thông báo</div>
-                ) : (
-                  notices.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-3 px-4 py-3 border-b border-outline-variant/50 transition-colors hover:bg-surface-container-low cursor-pointer"
-                      onClick={() => {
-                        setNotiOpen(false);
-                        const base = pathname.startsWith("/admin") ? "/admin"
-                          : pathname.startsWith("/teacher") ? "/teacher"
-                          : pathname.startsWith("/student") ? "/student"
-                          : pathname.startsWith("/parent") ? "/parent" : "/";
-                        navigate(`${base}/thongbao`);
-                      }}
-                    >
-                      <div className="flex-shrink-0 mt-0.5">
-                        <span className={`material-symbols-outlined text-[18px] ${item.doiTuong === "ALL" ? "text-primary" : "text-warning"}`}>
-                          {item.doiTuong === "ALL" ? "campaign" : "school"}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-on-surface truncate">{item.tieuDe}</p>
-                        <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-2">{item.noiDung}</p>
-                        <p className="text-xs text-on-surface-variant mt-1">{formatDate(item.ngayDang)}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              {notices.length > 0 && (
-                <button
-                  type="button"
-                  className="w-full px-4 py-2.5 text-sm font-medium text-primary text-center border-t border-outline-variant transition-colors hover:bg-surface-container-low"
-                  onClick={() => {
-                    setNotiOpen(false);
-                    const base = pathname.startsWith("/admin") ? "/admin"
-                      : pathname.startsWith("/teacher") ? "/teacher"
-                      : pathname.startsWith("/student") ? "/student"
-                      : pathname.startsWith("/parent") ? "/parent" : "/";
-                    navigate(`${base}/thongbao`);
-                  }}
-                >
-                  Xem tất cả thông báo
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="relative flex items-center gap-2 border-l border-outline-variant pl-3" ref={accountRef}>
-          <div className="hidden text-right leading-tight sm:block">
-            <p className="font-label-md text-label-md leading-tight text-on-surface">{userName}</p>
-            <p className="font-label-sm text-label-sm leading-tight text-on-surface-variant">{userRole}</p>
-          </div>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-container text-on-primary overflow-hidden border border-outline-variant"
-            aria-label="Tài khoản"
-            aria-expanded={accountOpen}
-            onClick={() => setAccountOpen((current) => !current)}
-          >
-            {avatar ? (
-              <img src={avatar} alt="avatar" className="h-10 w-10 object-cover" />
-            ) : (
-              <span className="font-bold text-sm uppercase text-primary-fixed-variant bg-primary-fixed w-full h-full flex items-center justify-center">
-                {String(userName || "U").charAt(0)}
-              </span>
-            )}
-          </button>
-          {accountOpen && (
-            <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-72 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-card">
-              <div className="rounded-xl bg-surface-container-low px-4 py-3">
-                <p className="font-label-md text-label-md text-on-surface">{userName}</p>
-                <p className="font-label-sm text-label-sm text-on-surface-variant">{userRole}</p>
-              </div>
-
-              <div className="mt-2 space-y-1">
-                {[
-                    { label: "Thông tin cá nhân", to: "profile" },
-                    { label: "Chỉnh sửa hồ sơ", to: "profile/edit" },
-                    { label: "Đổi mật khẩu", to: "profile/change-password" },
-                    { label: "Cài đặt", to: "profile/settings" }
-                  ]
-                  .filter((item) => !hideEdit || item.to === "profile")
-                  .map((item) => (
-                    <button
-                      key={item.label}
-                      type="button"
-                      className="flex w-full items-center rounded-xl px-4 py-2 text-left font-label-md text-label-md text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
-                      onClick={() => {
-                        setAccountOpen(false);
-                        const base = resolveBasePath();
-                        const path = base === "/" ? `/${item.to}` : `${base}/${item.to}`;
-                        navigate(path, { replace: false });
-                      }}
-                    >
-                      <span>{item.label}</span>
-                    </button>
-                  ))}
-                <button
-                  type="button"
-                  className="flex w-full items-center rounded-xl px-4 py-2 text-left font-label-md text-label-md text-error transition-colors hover:bg-error-container/40"
-                  onClick={handleLogout}
-                >
-                  <span>Đăng xuất</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile navigation dropdown */}
-      {navLinks && isOpen && (
-        <div className="fixed left-0 top-16 z-40 w-full bg-surface-container-lowest border-b border-outline-variant shadow-lg lg:hidden">
-          <nav className="flex flex-col p-md gap-1 max-h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar">
-            {navLinks.map((item) => {
+        {/* Navigation links in header (Desktop) */}
+        {navLinks && (
+          <nav className="hidden lg:flex items-center gap-6">
+            {navLinks.map((item, idx) => {
               // Flat link
               if (item.path) {
                 const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
@@ -412,48 +213,65 @@ export default function EduTopBar({
                   <Link
                     key={item.path}
                     to={item.path}
-                    onClick={() => onToggle()}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-150 ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-[10px] text-[15px] font-medium whitespace-nowrap transition-colors duration-200 ${
                       isActive
-                        ? "bg-primary text-white"
-                        : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-600 bg-transparent hover:bg-slate-100"
                     }`}
                   >
-                    {item.icon && (
-                      <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                    )}
                     <span>{item.label}</span>
                   </Link>
                 );
               }
 
-              // Grouped links
+              // Grouped link with dropdown
               if (item.group) {
+                const hasActiveChild = item.children?.some(
+                  (child) => pathname === child.path || pathname.startsWith(`${child.path}/`)
+                );
+                const isDropdownOpen = openGroup === item.group;
+
                 return (
-                  <div key={item.group} className="mt-2">
-                    <p className="px-4 py-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                      {item.group}
-                    </p>
-                    {item.children?.map((child) => {
-                      const isActive = pathname === child.path || pathname.startsWith(`${child.path}/`);
-                      return (
-                        <Link
-                          key={child.path}
-                          to={child.path}
-                          onClick={() => onToggle()}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors duration-150 ${
-                            isActive
-                              ? "bg-primary text-white"
-                              : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                          }`}
-                        >
-                          {child.icon && (
-                            <span className="material-symbols-outlined text-[20px]">{child.icon}</span>
-                          )}
-                          <span>{child.label}</span>
-                        </Link>
-                      );
-                    })}
+                  <div key={item.group} className="relative" ref={(el) => { groupRefsMap.current[item.group] = el; }}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenGroup(isDropdownOpen ? null : item.group)}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[15px] font-medium whitespace-nowrap transition-colors duration-200 ${
+                        hasActiveChild
+                          ? "text-blue-600"
+                          : "text-slate-600 bg-transparent hover:bg-slate-100"
+                      }`}
+                    >
+                      <span>{item.group}</span>
+                      <ChevronDown size={16} className={`transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    <div
+                      className={`absolute left-0 top-full mt-2 w-[220px] rounded-xl bg-white border border-slate-100 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)] transition-all duration-200 origin-top-left ${
+                        isDropdownOpen ? "opacity-100 scale-100 visible" : "opacity-0 scale-95 invisible"
+                      }`}
+                    >
+                      <div className="py-2 flex flex-col gap-0.5">
+                        {item.children?.map((child) => {
+                          const isChildActive = pathname === child.path || pathname.startsWith(`${child.path}/`);
+                          return (
+                            <Link
+                              key={child.path}
+                              to={child.path}
+                              onClick={() => setOpenGroup(null)}
+                              className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors duration-150 ${
+                                isChildActive
+                                  ? "bg-blue-50 text-blue-700 font-semibold"
+                                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium"
+                              }`}
+                            >
+                              <span>{child.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 );
               }
@@ -461,8 +279,168 @@ export default function EduTopBar({
               return null;
             })}
           </nav>
+        )}
+      </div>
+
+      {/* CENTER SECTION: Logo */}
+      <div className="flex justify-center items-center shrink-0">
+        {(() => {
+          const targetPath = currentRole === "ADMIN" ? "/admin/dashboard" : (currentRole === "GIAOVIEN" || currentRole === "TEACHER") ? "/teacher/dashboard" : (currentRole === "HOCSINH" || currentRole === "STUDENT") ? "/student/home" : (currentRole === "PHUHUYNH" || currentRole === "PARENT") ? "/parent/home" : "/admin/dashboard";
+          return (
+            <Link 
+              to={targetPath} 
+              onClick={(e) => {
+                if (pathname === targetPath) {
+                  e.preventDefault();
+                  window.location.reload();
+                }
+              }}
+              className="flex items-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+              title="Về trang tổng quan"
+            >
+              <img src="/logo.png" alt="Logo Edu Manager" className="h-[56px] scale-110 w-auto object-contain drop-shadow-sm" />
+            </Link>
+          );
+        })()}
+      </div>
+
+      {/* RIGHT SECTION: Search + Notifications + Account */}
+      <div className="flex items-center justify-end gap-3 lg:gap-4 flex-1">
+        
+        {/* Search Bar */}
+        <form onSubmit={handleSearch} className="hidden lg:flex items-center relative mr-2">
+          <div className="absolute left-3 text-slate-400">
+            <Search size={16} />
+          </div>
+          <input
+            type="text"
+            placeholder={searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full lg:w-[220px] xl:w-[280px] h-[38px] pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-full text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all"
+          />
+        </form>
+        
+        {/* Notifications */}
+        <div className="relative shrink-0" ref={notiRef}>
+          <button
+            type="button"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors duration-200 hover:bg-slate-100 focus:outline-none"
+            onClick={() => setNotiOpen(!notiOpen)}
+            aria-label="Thông báo"
+          >
+            <Bell size={20} className={`transition-transform duration-300 ${notiOpen ? "rotate-[15deg]" : ""}`} />
+            {notices.length > 0 && (
+              <span className="absolute top-2 right-2 flex h-2 w-2">
+                <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+            )}
+          </button>
+
+          {/* Noti Dropdown */}
+          <div
+            className={`absolute right-0 top-full mt-2 w-80 md:w-96 rounded-2xl bg-white border border-slate-100 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)] transition-all duration-200 origin-top-right ${
+              notiOpen ? "opacity-100 scale-100 visible" : "opacity-0 scale-95 invisible"
+            }`}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <h3 className="font-bold text-slate-800">Thông báo</h3>
+            </div>
+            <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-2 flex flex-col gap-1">
+              {notices.length === 0 ? (
+                <div className="p-6 text-center text-sm text-slate-500 font-medium">Không có thông báo mới</div>
+              ) : (
+                notices.map((n) => (
+                  <div key={n.id} className="flex flex-col gap-1 px-3 py-2.5 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                    <span className="text-sm font-semibold text-slate-800 line-clamp-2">{n.tieuDe}</span>
+                    <span className="text-xs text-slate-500 font-medium">{formatDate(n.ngayDang)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Account Dropdown */}
+        <div className="relative shrink-0" ref={accountRef}>
+          <button
+            type="button"
+            className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors duration-200 hover:bg-slate-50 border border-transparent hover:border-slate-200 focus:outline-none"
+            onClick={() => setAccountOpen(!accountOpen)}
+            aria-label="Tài khoản"
+          >
+            <img
+              src={avatar}
+              alt="Avatar"
+              className="h-[34px] w-[34px] rounded-full object-cover shadow-sm border border-slate-200 bg-white"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
+              }}
+            />
+            <div className="hidden flex-col items-start md:flex">
+              <span className="text-sm font-semibold text-slate-800 line-clamp-1">{userName}</span>
+              <span className="text-xs font-medium text-slate-500">{userRole}</span>
+            </div>
+          </button>
+
+          <div
+            className={`absolute right-0 top-full mt-2 w-64 rounded-2xl bg-white border border-slate-100 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)] transition-all duration-200 origin-top-right ${
+              accountOpen ? "opacity-100 scale-100 visible" : "opacity-0 scale-95 invisible"
+            }`}
+          >
+            <div className="flex items-center gap-3 border-b border-slate-100 p-4">
+              <img
+                src={avatar}
+                alt="Avatar"
+                className="h-12 w-12 rounded-full object-cover shadow-sm border border-slate-200"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
+                }}
+              />
+              <div className="flex flex-col">
+                <span className="font-bold text-slate-800 line-clamp-1">{userName}</span>
+                <span className="text-xs font-medium text-slate-500">{userRole}</span>
+              </div>
+            </div>
+            
+            <div className="p-2 flex flex-col gap-1">
+              {!hideEdit && (
+                <>
+                  <Link
+                    to={`${resolveBasePath()}/profile`}
+                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                    onClick={() => setAccountOpen(false)}
+                  >
+                    <UserIcon size={18} className="text-slate-400" />
+                    Hồ sơ cá nhân
+                  </Link>
+                  <Link
+                    to={`${resolveBasePath()}/profile/change-password`}
+                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                    onClick={() => setAccountOpen(false)}
+                  >
+                    <Lock size={18} className="text-slate-400" />
+                    Đổi mật khẩu
+                  </Link>
+                  <div className="h-px bg-slate-100 my-1"></div>
+                </>
+              )}
+              <button
+                type="button"
+                className="flex items-center w-full gap-3 px-3 py-2 text-sm font-semibold text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                onClick={handleLogout}
+              >
+                <LogOut size={18} />
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </header>
   );
 }

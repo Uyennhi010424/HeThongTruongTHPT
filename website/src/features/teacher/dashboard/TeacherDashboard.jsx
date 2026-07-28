@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import { Link } from "react-router-dom";
+import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
 import WeekPicker from "../../../components/edu/WeekPicker.jsx";
 import { getChuNhiem } from "../../../api/chunhiemApi.js";
 import { getGiaoVien, getCurrentGiaoVien } from "../../../api/giaovienApi.js";
@@ -130,7 +131,7 @@ export default function TeacherDashboard() {
             getThongBao(),
             getLop(),
             getMonHoc(),
-            getGiaoVien(),
+            getCurrentGiaoVien(),
             getChuNhiem(),
             getPhanCongDay(),
             getNamHoc()
@@ -180,7 +181,7 @@ export default function TeacherDashboard() {
           classes: classesRes?.data?.data || [],
           subjects: subjectsRes?.data?.data || [],
           timetable: tkbData,
-          teachers: teachersRes?.data?.data || [],
+          teachers: teachersRes?.data?.data ? [teachersRes.data.data] : [],
           assignments: chuNhiemRes?.data?.data || [],
           phanCong: phanCongRes?.data?.data || []
         });
@@ -412,13 +413,17 @@ export default function TeacherDashboard() {
   }, [weekDates]);
 
   return (
-    <div className="page users-page teacher-page">
+    <div style={{ maxWidth: "100%", padding: "24px 32px", display: "flex", flexDirection: "column", gap: 32 }}>
       {/* Teacher strip header */}
-      <div className="teacher-strip">
-        <div className="teacher-strip-avatar">
-          {getInitials(currentTeacher?.hoTen)}
-        </div>
-        <div className="teacher-strip-info">
+      <div style={{ display: "flex", alignItems: "center", gap: 20, paddingBottom: 24, borderBottom: "1px solid #e2e8f0" }}>
+        <CachedAvatar
+          username={currentUsername}
+          role="teacher"
+          fallback={getInitials(currentTeacher?.hoTen)}
+          className="teacher-strip-avatar"
+          fallbackClassName="teacher-strip-avatar"
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div className="teacher-strip-name">
             {currentTeacher?.hoTen || "Giáo viên"}
             {homeroomAssignment && <span className="teacher-strip-badge">GVCN</span>}
@@ -447,9 +452,9 @@ export default function TeacherDashboard() {
       {!error && (
         <>
           {/* Timetable */}
-          <div className="card users-table">
-            <div className="tkb-toolbar">
-              <div className="tkb-toolbar-title">Thời khóa biểu</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>Thời khóa biểu</div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <select
                   value={yearInfo.tenNamHoc}
@@ -469,7 +474,7 @@ export default function TeacherDashboard() {
                   <option value={2}>Học kỳ II</option>
                 </select>
               </div>
-              <div className="tkb-toolbar-right">
+              <div style={{ display: "flex", gap: 12, alignItems: "center", background: "#f8fafc", padding: "4px 12px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
                 <button
                   className="tkb-btn"
                   onClick={() => setSelectedTuan((w) => Math.max(1, w - 1))}
@@ -533,8 +538,8 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            <div style={{ overflowX: "auto" }}>
-              <table className="tkb-table">
+            <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800 }}>
                 <thead>
                   <tr>
                     <th className="tkb-header-ca">Ca học</th>
@@ -630,17 +635,17 @@ export default function TeacherDashboard() {
               </table>
             </div>
 
-            <div className="tkb-legend">
-              <div className="tkb-legend-item">
-                <div className="tkb-legend-dot" style={{ background: "#fff" }} />
+            <div style={{ display: "flex", gap: 24, fontSize: 13, marginTop: 12, color: "#64748b" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid #e2e8f0", background: "#fff" }} />
                 Lịch dạy buổi sáng
               </div>
-              <div className="tkb-legend-item">
-                <div className="tkb-legend-dot" style={{ background: "#fef9c3", borderColor: "#f59e0b" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid #f59e0b", background: "#fef9c3" }} />
                 Lịch dạy buổi chiều
               </div>
-              <div className="tkb-legend-item">
-                <div className="tkb-legend-dot" style={{ background: "#f0f9ff", borderColor: "#38bdf8" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid #38bdf8", background: "#f0f9ff" }} />
                 Ngày hôm nay
               </div>
             </div>

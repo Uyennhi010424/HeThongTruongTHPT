@@ -17,6 +17,9 @@ public class User {
     @Column(name = "username", length = 50, nullable = false, unique = true)
     private String username;
 
+    @Column(name = "email", length = 100)
+    private String email;
+
     @JsonIgnore
     @Column(name = "password", length = 255, nullable = false)
     private String password;
@@ -39,6 +42,15 @@ public class User {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "permissions", columnDefinition = "TEXT")
+    private String permissions;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    @Column(name = "anh_dai_dien", columnDefinition = "TEXT")
+    private String anhDaiDien;
 
     @PrePersist
     public void prePersist() {
@@ -68,6 +80,14 @@ public class User {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public String getPassword() {
@@ -124,5 +144,29 @@ public class User {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getPermissions() {
+        return permissions;
+    }
+
+    public void setPermissions(String permissions) {
+        this.permissions = permissions;
+    }
+
+    public LocalDateTime getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public void setLockedUntil(LocalDateTime lockedUntil) {
+        this.lockedUntil = lockedUntil;
+    }
+
+    public String getAnhDaiDien() {
+        return anhDaiDien;
+    }
+
+    public void setAnhDaiDien(String anhDaiDien) {
+        this.anhDaiDien = anhDaiDien;
     }
 }

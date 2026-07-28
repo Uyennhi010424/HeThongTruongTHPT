@@ -28,13 +28,12 @@ public class LopHocService {
     private static final Logger log = LoggerFactory.getLogger(LopHocService.class);
     private final LopHocRepository lopHocRepository;
     private final HocSinhRepository hocSinhRepository;
-    private final ChuNhiemRepository chuNhiemRepository;
+    private final com.hethongtruongthpt.repository.GiaoVienRepository giaoVienRepository;
 
-    public LopHocService(LopHocRepository lopHocRepository, HocSinhRepository hocSinhRepository,
-                         ChuNhiemRepository chuNhiemRepository) {
+    public LopHocService(LopHocRepository lopHocRepository, HocSinhRepository hocSinhRepository, com.hethongtruongthpt.repository.GiaoVienRepository giaoVienRepository) {
         this.lopHocRepository = lopHocRepository;
         this.hocSinhRepository = hocSinhRepository;
-        this.chuNhiemRepository = chuNhiemRepository;
+        this.giaoVienRepository = giaoVienRepository;
     }
 
     public List<LopHoc> getAll() {
@@ -162,8 +161,6 @@ public class LopHocService {
             String tenLop = oldLop.getTenLop();
 
             List<HocSinh> students = hocSinhRepository.findByLopId(oldLop.getId());
-            List<ChuNhiem> chuNhiemList = chuNhiemRepository.findById_LopId(oldLop.getId());
-
             if (khoi == 12) {
                 // Tot nghiep: hoc sinh trangThai=2, xoa chu nhiem
                 for (HocSinh hs : students) {
@@ -172,10 +169,10 @@ public class LopHocService {
                     hocSinhRepository.save(hs);
                     graduatedCount++;
                 }
-                for (ChuNhiem cn : chuNhiemList) {
-                    chuNhiemRepository.delete(cn);
+                if (oldLop.getGvcn() != null) {
                     log.info("Xóa chủ nhiệm: GV {} thôi chủ nhiệm lớp {} (tốt nghiệp)",
-                        cn.getId().getGiaoVienId(), tenLop);
+                        oldLop.getGvcn().getId(), tenLop);
+                    oldLop.setGvcn(null);
                 }
                 // Dong bo siSo lop da tot nghiep = 0
                 oldLop.setSiSo(0);
@@ -213,24 +210,18 @@ public class LopHocService {
                 // Cap nhat siSo lop cu
                 long oldCount = hocSinhRepository.countByLopIdAndTrangThai(oldLop.getId(), 1);
                 oldLop.setSiSo((int) oldCount);
-                lopHocRepository.save(oldLop);
 
                 // Chuyen giao vien chu nhiem sang lop moi
-                for (ChuNhiem oldCn : chuNhiemList) {
-                    Integer gvId = oldCn.getId().getGiaoVienId();
-                    ChuNhiemId newCnId = new ChuNhiemId();
-                    newCnId.setGiaoVienId(gvId);
-                    newCnId.setLopId(newLop.getId());
-
-                    if (!chuNhiemRepository.existsById(newCnId)) {
-                        ChuNhiem newCn = new ChuNhiem();
-                        newCn.setId(newCnId);
-                        chuNhiemRepository.save(newCn);
+                if (oldLop.getGvcn() != null) {
+                    if (newLop.getGvcn() == null || !newLop.getGvcn().getId().equals(oldLop.getGvcn().getId())) {
+                        newLop.setGvcn(oldLop.getGvcn());
+                        lopHocRepository.save(newLop);
                         teacherMovedCount++;
-                        log.info("Chuyển chủ nhiệm: GV {} từ {} sang {}", gvId, tenLop, newTenLop);
+                        log.info("Chuyển chủ nhiệm: GV {} từ {} sang {}", oldLop.getGvcn().getId(), tenLop, newTenLop);
                     }
-                    chuNhiemRepository.delete(oldCn);
+                    oldLop.setGvcn(null);
                 }
+                lopHocRepository.save(oldLop);
 
                 log.info("Chuyển {} học sinh từ {} sang {} năm {}", students.size(), tenLop, newTenLop, nextNamHoc);
             }
@@ -246,17 +237,36 @@ public class LopHocService {
     }
 
     public LopHoc update(Integer id, LopHoc lopHoc) {
-        getById(id);
+        LopHoc existing = getById(id);
         validateLopHoc(lopHoc);
-        lopHoc.setId(id);
+        
         String tenLop = lopHoc.getTenLop().trim();
         String namHoc = lopHoc.getNamHoc().trim();
         lopHocRepository.findByTenLopAndNamHoc(tenLop, namHoc)
-                .filter(existing -> !id.equals(existing.getId()))
-                .ifPresent(existing -> {
+                .filter(ext -> !id.equals(ext.getId()))
+                .ifPresent(ext -> {
                     throw new ApiException("Lớp đã tồn tại cho năm học này");
                 });
-        return lopHocRepository.save(lopHoc);
+
+        existing.setTenLop(tenLop);
+        existing.setKhoi(lopHoc.getKhoi());
+        existing.setNamHoc(namHoc);
+        existing.setToHopId(lopHoc.getToHopId());
+        
+        return lopHocRepository.save(existing);
+    }
+
+    @Transactional
+    public LopHoc assignGvcn(Integer lopId, Integer gvcnId) {
+        LopHoc lop = getById(lopId);
+        if (gvcnId == null) {
+            lop.setGvcn(null);
+        } else {
+            com.hethongtruongthpt.entity.GiaoVien gv = giaoVienRepository.findById(gvcnId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy giáo viên"));
+            lop.setGvcn(gv);
+        }
+        return lopHocRepository.save(lop);
     }
 
     public void delete(Integer id) {

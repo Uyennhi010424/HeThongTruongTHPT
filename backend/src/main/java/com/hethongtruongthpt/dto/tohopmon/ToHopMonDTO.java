@@ -13,6 +13,7 @@ public class ToHopMonDTO {
     private List<String> tenMonHocs;
     private List<Integer> soTiets;
     private Integer soLopSuDung;
+    private List<String> danhSachLop;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -34,4 +35,6 @@ public class ToHopMonDTO {
     public void setSoLopSuDung(Integer soLopSuDung) { this.soLopSuDung = soLopSuDung; }
     public List<Integer> getSoTiets() { return soTiets; }
     public void setSoTiets(List<Integer> soTiets) { this.soTiets = soTiets; }
+    public List<String> getDanhSachLop() { return danhSachLop; }
+    public void setDanhSachLop(List<String> danhSachLop) { this.danhSachLop = danhSachLop; }
 }

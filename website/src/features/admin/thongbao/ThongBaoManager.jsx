@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
@@ -46,7 +47,7 @@ export default function ThongBaoManager() {
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [keyword, setKeyword] = useState("");
+  const { searchQuery: keyword, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(6);
   const [modalOpen, setModalOpen] = useState(false);
@@ -83,6 +84,15 @@ export default function ThongBaoManager() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    setSearchPlaceholder("Tìm kiếm thông báo...");
+    setIsSearchVisible(true);
+    return () => {
+      setSearchPlaceholder("Tìm kiếm...");
+      setIsSearchVisible(true);
+    };
+  }, [setSearchPlaceholder, setIsSearchVisible]);
 
   const stats = useMemo(() => {
     const total = notices.length;
@@ -213,14 +223,6 @@ export default function ThongBaoManager() {
           </div>
         </div>
         <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm theo tiêu đề, nội dung, đối tượng"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </div>
           <button className="btn-primary" onClick={openCreate}>
             Thêm thông báo
           </button>

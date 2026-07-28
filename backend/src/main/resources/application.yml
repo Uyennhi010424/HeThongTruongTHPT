@@ -9,6 +9,9 @@ server:
       force: true
 
 spring:
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
   lifecycle:
     timeout-per-shutdown-phase: 10s
   servlet:

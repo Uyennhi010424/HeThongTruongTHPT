@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
-import { getHocSinh, getHocSinhStats } from "../../../api/hocsinhApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getLop, syncSiSo } from "../../../api/lopApi.js";
 import { getChuNhiem } from "../../../api/chunhiemApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { getDiemAvgByGrade, getDiemDistribution } from "../../../api/diemApi.js";
-import { notifySuccess, notifyError } from "../../../utils/notify.js";
+import { notifyError } from "../../../utils/notify.js";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const formatNumber = (value) =>
   new Intl.NumberFormat("vi-VN").format(Number(value || 0));
-const formatScore = (value) =>
-  Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "--";
 
 const withTimeout = (promise, ms = 15000) =>
   Promise.race([
@@ -21,7 +19,6 @@ const withTimeout = (promise, ms = 15000) =>
   ]);
 
 const GRADE_COLORS = ["#16a34a", "#2563eb", "#ca8a04", "#dc2626"];
-const GRADE_LABELS = { "TỐT": "Tốt", "KHÁ": "Khá", "ĐẠT": "Đạt", "CHƯA ĐẠT": "Chưa đạt" };
 
 const sortClasses = (a, b) => {
   const ga = Number(a?.khoi || 0);
@@ -33,7 +30,130 @@ const sortClasses = (a, b) => {
   });
 };
 
+const CustomPieTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="rounded-xl border border-white/10 bg-black/80 px-4 py-3 text-white shadow-xl backdrop-blur-md transition-all">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: data.color }} />
+          <p className="text-sm font-semibold text-white/90">Xếp loại {data.label}</p>
+        </div>
+        <p className="text-lg font-bold text-white">
+          {formatNumber(data.count)} <span className="text-sm font-normal text-white/70">Học sinh</span>
+        </p>
+        <p className="text-xs text-white/50 mt-0.5">Chiếm {data.pct}%</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomBarTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-black/80 px-4 py-3 text-white shadow-xl backdrop-blur-md transition-all">
+        <p className="mb-1 text-sm font-semibold text-white/90">{label}</p>
+        <p className="text-lg font-bold text-primary-300">
+          {payload[0].value} <span className="text-sm font-normal text-white/70">ĐTB</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Module-level timestamp — persists across React StrictMode double-mounts (which happen within ms)
+// but resets naturally when the page is reloaded or enough time has passed between navigations.
+let _barAnimMs = 0;
+
+const GrowBarShape = ({ x, y, width, height, fill, index, animate }) => {
+  if (!height || height <= 0) return null;
+  const r = Math.min(6, width / 2, height / 2);
+  const delay = animate ? (index || 0) * 120 : 0;
+  const path = `M${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} L${x},${y + height} Z`;
+  return (
+    <path
+      d={path}
+      fill={fill}
+      style={animate ? {
+        transformBox: 'fill-box',
+        transformOrigin: 'bottom',
+        animation: `growBarUp 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms both`,
+      } : {}}
+    />
+  );
+};
+
+const TypewriterText = ({ text }) => {
+  const [displayText, setDisplayText] = useState("");
+
+  useEffect(() => {
+    let index = 0;
+    setDisplayText("");
+    const interval = setInterval(() => {
+      setDisplayText(text.slice(0, index + 1));
+      index++;
+      if (index >= text.length) clearInterval(interval);
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [text]);
+
+  return <span>{displayText}</span>;
+};
+
+const CountUp = ({ end, duration = 1500, decimals = 0, isNumber = true }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!isNumber || isNaN(Number(end))) {
+       setCount(end);
+       return;
+    }
+    
+    const target = Number(end);
+    if (target === 0) {
+      setCount(0);
+      return;
+    }
+
+    let startTimestamp = null;
+    let animationFrameId = null;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      
+      setCount(easeProgress * target);
+      
+      if (progress < 1) {
+        animationFrameId = window.requestAnimationFrame(step);
+      } else {
+        setCount(target);
+      }
+    };
+    animationFrameId = window.requestAnimationFrame(step);
+
+    return () => {
+      if (animationFrameId) window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [end, duration, isNumber]);
+
+  if (!isNumber || isNaN(Number(end))) {
+    return <span>{end}</span>;
+  }
+
+  const formatted = new Intl.NumberFormat("vi-VN", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(count);
+
+  return <span>{formatted}</span>;
+};
+
 export default function AdminDashboard() {
+  const [adminName, setAdminName] = useState("Quản trị viên");
   const [schoolYears, setSchoolYears] = useState([]);
   const [stats, setStats] = useState({
     students: 0,
@@ -47,36 +167,57 @@ export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState({
     classes: [],
     teachers: [],
-    students: [],
     homeroomByClassId: {},
     teacherNameById: {},
+    siSoByLopId: {},
     blockAvg: [],
     distributionCounts: { "TỐT": 0, "KHÁ": 0, "ĐẠT": 0, "CHƯA ĐẠT": 0 },
     totalStudents: 0,
+    grade10Students: 0,
+    grade11Students: 0,
+    grade12Students: 0,
   });
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(true);
   const [error, setError] = useState("");
- 
+  const chartDataRef = useRef([]); // prevents re-showing spinner when data already exists
+
+  // Determine if bars should animate: only on first mount per navigation.
+  // StrictMode double-mounts happen within ~10ms; real navigations take >500ms.
+  const barAnimRef = useRef(null);
+  if (barAnimRef.current === null) {
+    const _now = Date.now();
+    barAnimRef.current = _now - _barAnimMs > 500;
+    if (barAnimRef.current) _barAnimMs = _now;
+  }
+  const barShouldAnimate = barAnimRef.current;
+
   useEffect(() => {
-    let active = true;
-    (async () => {
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const userObj = JSON.parse(userStr);
+        setAdminName(userObj.hoTen || userObj.username || "Quản trị viên");
+      }
+    } catch { }
+
+    let cancelled = false;
+
+    const fetchMain = async () => {
       try {
         setLoading(true);
- 
-        // Đồng bộ sĩ số tự động trên server trước khi load dữ liệu lớp
+
         try {
           await withTimeout(syncSiSo(), 5000);
         } catch { /* ignore */ }
 
-        // Load lại danh sách lớp sau khi đã sync sĩ số trên DB
         const [gv, lop, namHocRes, chuNhiemRes] = await Promise.all([
           getGiaoVien().catch(() => ({ data: { data: [] } })),
           getLop().catch(() => ({ data: { data: [] } })),
           getNamHoc().catch(() => ({ data: { data: [] } })),
           getChuNhiem().catch(() => ({ data: { data: [] } })),
         ]);
-        if (!active) return;
+        if (cancelled) return;
 
         const teachersArr = gv?.data?.data || [];
         const classesArr = lop?.data?.data || [];
@@ -104,79 +245,106 @@ export default function AdminDashboard() {
 
         const totalStudentCount = classesArr.reduce((acc, c) => acc + (c.siSo || 0), 0);
 
+        const g10Classes = classesArr.filter((c) => String(c.khoi) === "10");
+        const g11Classes = classesArr.filter((c) => String(c.khoi) === "11");
+        const g12Classes = classesArr.filter((c) => String(c.khoi) === "12");
+
+        const grade10Students = g10Classes.reduce((acc, c) => acc + (c.siSo || 0), 0);
+        const grade11Students = g11Classes.reduce((acc, c) => acc + (c.siSo || 0), 0);
+        const grade12Students = g12Classes.reduce((acc, c) => acc + (c.siSo || 0), 0);
+
+        const siSoByLopId = classesArr.reduce((acc, item) => {
+          acc[String(item.id)] = item.siSo || 0;
+          return acc;
+        }, {});
+
+        if (cancelled) return;
+
         setStats({
           students: totalStudentCount,
           teachers: teachersArr.length,
           classes: classesArr.length,
-          grade10: classesArr.filter((c) => String(c.khoi) === "10").length,
-          grade11: classesArr.filter((c) => String(c.khoi) === "11").length,
-          grade12: classesArr.filter((c) => String(c.khoi) === "12").length,
+          grade10: g10Classes.length,
+          grade11: g11Classes.length,
+          grade12: g12Classes.length,
           avgScore: null,
         });
 
-        setDashboardData({
+        setDashboardData((prev) => ({
+          ...prev,
           classes: classesArr,
           teachers: teachersArr,
-          students: [], // Không load mảng students lớn nữa
           homeroomByClassId,
           teacherNameById,
-          siSoByLopId: {}, // Dùng siSo trực tiếp của DB
-          blockAvg: [],
-          distributionCounts: { "TỐT": 0, "KHÁ": 0, "ĐẠT": 0, "CHƯA ĐẠT": 0 },
-          totalStudents: 0,
-        });
+          siSoByLopId,
+          grade10Students,
+          grade11Students,
+          grade12Students,
+        }));
 
-        setLoading(false); // ← Hiện UI cực nhanh
-        if (!active) return;
- 
-        // ─── Đợt 2: Data chậm (aggregate) → load sau, update chart ───
-        setChartLoading(true);
+        setLoading(false);
+
+        // Now fetch chart data — only show spinner if we don't have data yet
+        if (chartDataRef.current.length === 0) {
+          setChartLoading(true);
+        }
         const [avgRes, distRes] = await Promise.all([
-          withTimeout(getDiemAvgByGrade()).catch(() => ({ data: { data: [] } })),
-          withTimeout(getDiemDistribution()).catch(() => ({ data: { data: { counts: {}, total: 0, avgScore: null } } })),
+          withTimeout(getDiemAvgByGrade(), 30000).catch(() => ({ data: { data: [] } })),
+          withTimeout(getDiemDistribution(), 120000).catch(() => ({ data: { data: { counts: {}, total: 0, avgScore: null } } })),
         ]);
-        if (!active) return;
- 
+
+        if (cancelled) return;
+
         const avgByGrade = avgRes?.data?.data || [];
         const dist = distRes?.data?.data || {};
- 
+
         const blockAvg = avgByGrade.map((item) => ({
           name: `Khối ${item.khoi}`,
-          value: item.avgScore != null ? Number(item.avgScore.toFixed(2)) : "--",
-          h: item.avgScore != null
-            ? `${Math.max(10, Math.min(100, (item.avgScore / 10) * 100)).toFixed(0)}%`
-            : "10%",
+          value: item.avgScore != null ? Number(item.avgScore) : null,
           count: item.studentCount || 0,
         }));
- 
+
         const distributionCounts = dist.counts || { "TỐT": 0, "KHÁ": 0, "ĐẠT": 0, "CHƯA ĐẠT": 0 };
- 
+
+        if (cancelled) return;
+
+        chartDataRef.current = blockAvg;
         setDashboardData((prev) => ({
           ...prev,
           blockAvg,
           distributionCounts,
           totalStudents: dist.total || 0,
         }));
- 
+
         setStats((prev) => ({
           ...prev,
           avgScore: dist.avgScore ?? null,
         }));
- 
-        setChartLoading(false); 
- 
-      } catch {
-        if (active) setError("Không thể tải thống kê.");
+
+        setChartLoading(false);
+
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setError("Không thể tải thống kê.");
       } finally {
-        if (active) {
+        if (!cancelled) {
           setLoading(false);
           setChartLoading(false);
         }
       }
-    })();
-    return () => { active = false; };
+    };
+
+    fetchMain();
+
+    const handleSoftRefresh = () => { fetchMain(); };
+    window.addEventListener("httt_refresh_dashboard", handleSoftRefresh);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("httt_refresh_dashboard", handleSoftRefresh);
+    };
   }, []);
- 
+
   const gradeDistribution = useMemo(() => {
     const total = dashboardData.totalStudents || 1;
     const counts = dashboardData.distributionCounts;
@@ -196,333 +364,282 @@ export default function AdminDashboard() {
     });
   }, [dashboardData.distributionCounts, dashboardData.totalStudents]);
 
-  const handleExportReport = async () => {
-    try {
-      notifySuccess("Đang tải dữ liệu để xuất báo cáo...");
-      const hsRes = await getHocSinh();
-      const studentsList = hsRes?.data?.data || [];
-      if (!studentsList.length) {
-        notifyError("Không có dữ liệu học sinh để xuất.");
-        return;
-      }
-
-      const header = "STT,Họ tên,Lớp\n";
-      const rows = studentsList.map((s, i) =>
-        `${i + 1},"${s.hoTen}","${s.lop?.tenLop || ""}"`
-      );
-      const summary = `\n\nTổng học sinh,${studentsList.length}\nTổng giáo viên,${stats.teachers}\nTổng lớp,${dashboardData.classes.length}`;
-      const csv = "﻿" + header + rows.join("\n") + summary;
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bao_cao_tong_quan_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      notifySuccess("Đã xuất báo cáo thành công!");
-    } catch {
-      notifyError("Không thể tải danh sách học sinh để xuất báo cáo.");
-    }
-  };
-
   return (
-    <div className="space-y-lg">
-      <PageHeader
-        title="Tổng quan quản lý"
-        description="Chào mừng trở lại! Dưới đây là dữ liệu cập nhật của trường THPT."
-        actions={
-          <button type="button" onClick={handleExportReport} className="btn-primary flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">download</span>
-            Xuất báo cáo
-          </button>
-        }
-      />
+    <div className="space-y-6 pb-12 bg-[#f8fafc] min-h-screen text-slate-900 font-sans">
 
-      {error && (
-        <p className="rounded-xl bg-error-container px-md py-sm text-body-sm text-on-error-container">{error}</p>
-      )}
-
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 gap-lg md:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Tổng lớp", value: stats.classes, border: "border-primary" },
-          { label: "Khối 10", value: stats.grade10, border: "border-secondary" },
-          { label: "Khối 11", value: stats.grade11, border: "border-tertiary" },
-          { label: "Khối 12", value: stats.grade12, border: "border-error" },
-        ].map((card) => (
-          <div key={card.label} className={`flex items-center justify-between rounded-2xl border-l-4 bg-surface-container-lowest p-lg shadow-card ${card.border}`}>
-            <div>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">{card.label}</p>
-              <p className="text-headline-md font-bold text-primary">{loading ? "..." : formatNumber(card.value)}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-lg lg:grid-cols-12">
-        {/* Bar chart - ĐTB theo khối */}
-        <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-lg shadow-sm lg:col-span-8">
-          <div className="mb-xl border-b border-outline-variant/30 pb-sm">
-            <h3 className="text-headline-md font-semibold text-primary">ĐTB theo khối</h3>
-          </div>
-          {chartLoading ? (
-            <div className="flex h-64 items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
-          ) : dashboardData.blockAvg.length === 0 || dashboardData.blockAvg.every((b) => b.count === 0) ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 text-gray-400">
-              <span className="text-sm">Chưa có dữ liệu điểm</span>
-            </div>
-          ) : (
-            <BlockAvgChart blockAvg={dashboardData.blockAvg} />
-          )}
-        </section>
-
-        {/* Pie chart - Tỷ lệ xếp loại */}
-        <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-lg shadow-sm lg:col-span-4">
-          <h3 className="mb-md text-headline-md font-semibold text-primary">Tỷ lệ xếp loại</h3>
-          {chartLoading ? (
-            <div className="flex h-64 items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
-          ) : dashboardData.totalStudents === 0 ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-2 text-gray-400">
-              <span className="text-sm">Chưa có dữ liệu</span>
-            </div>
-          ) : (
-            <DonutChart
-              data={gradeDistribution}
-              avgScore={stats.avgScore}
-              total={dashboardData.totalStudents}
-            />
-          )}
-        </section>
-      </div>
-
-      {/* Recent classes */}
-      <RecentClasses
-        classes={dashboardData.classes}
-        students={dashboardData.students}
-        siSoByLopId={dashboardData.siSoByLopId || {}}
-        homeroomByClassId={dashboardData.homeroomByClassId}
-        teacherNameById={dashboardData.teacherNameById}
-        loading={loading}
-      />
-    </div>
-  );
-}
-
-function BlockAvgChart({ blockAvg }) {
-  const CHART_HEIGHT = 200;
-
-  const validScores = blockAvg
-    .filter((b) => b.count > 0 && b.value !== "--")
-    .map((b) => Number(b.value));
-  const minScore = Math.min(5, ...validScores);
-  const maxScore = 10;
-  const range = maxScore - minScore || 1;
-
-  const barColors = [
-    "linear-gradient(180deg, #3b82f6 0%, #93c5fd 100%)",
-    "linear-gradient(180deg, #8b5cf6 0%, #c4b5fd 100%)",
-    "linear-gradient(180deg, #10b981 0%, #6ee7b7 100%)",
-  ];
-
-  return (
-    <div style={{ padding: "0 16px" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", height: CHART_HEIGHT, gap: 20 }}>
-        {blockAvg.map((b, i) => {
-          const score = Number(b.value);
-          const barHeightPx =
-            b.count === 0 || b.value === "--"
-              ? 12
-              : Math.max(12, ((score - minScore) / range) * (CHART_HEIGHT * 0.85) + CHART_HEIGHT * 0.1);
-
-          return (
-            <div key={b.name} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-              <span style={{
-                fontSize: 15, fontWeight: 700,
-                color: b.count === 0 ? "#9ca3af" : "#1e3a5f",
-                marginBottom: 6,
-              }}>
-                {b.value === "--" ? "--" : b.value}
-              </span>
-              <div style={{
-                width: "60%", minWidth: 48, maxWidth: 80,
-                height: barHeightPx,
-                background: b.count === 0 ? "#e5e7eb" : barColors[i % barColors.length],
-                borderRadius: "8px 8px 0 0",
-                transition: "height 0.4s ease",
-              }} />
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ height: 2, background: "#e5e7eb", margin: "4px 0 8px 0", borderRadius: 2 }} />
-      <div style={{ display: "flex", gap: 20 }}>
-        {blockAvg.map((b) => (
-          <div key={b.name} style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>{b.name}</div>
-            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
-              {b.count > 0 ? `${b.count} học sinh` : "Chưa có điểm"}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DonutChart({ data, avgScore, total }) {
-  const SIZE = 180;
-  const STROKE = 28;
-  const R = (SIZE - STROKE) / 2;
-  const CIRCUMFERENCE = 2 * Math.PI * R;
-  const GAP = 3;
-
-  const validData = data.filter((d) => d.count > 0);
-  let cumulativePct = 0;
-
-  const segments = validData.map((d) => {
-    const pct = d.count / total;
-    const arcLen = pct * CIRCUMFERENCE - GAP;
-    const offset = CIRCUMFERENCE - cumulativePct * CIRCUMFERENCE;
-    cumulativePct += pct;
-    return { ...d, arcLen: Math.max(0, arcLen), offset };
-  });
-
-  const LABEL_COLORS = {
-    "Tốt": { bg: "#dcfce7", text: "#15803d" },
-    "Khá": { bg: "#dbeafe", text: "#1d4ed8" },
-    "Đạt": { bg: "#fef9c3", text: "#a16207" },
-    "Chưa đạt": { bg: "#fee2e2", text: "#b91c1c" },
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-      <div style={{ position: "relative", width: SIZE, height: SIZE }}>
-        <svg width={SIZE} height={SIZE} style={{ transform: "rotate(-90deg)" }}>
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="#f3f4f6" strokeWidth={STROKE} />
-          {segments.map((seg) => (
-            <circle
-              key={seg.label}
-              cx={SIZE / 2} cy={SIZE / 2} r={R}
-              fill="none" stroke={seg.color} strokeWidth={STROKE}
-              strokeDasharray={`${seg.arcLen} ${CIRCUMFERENCE}`}
-              strokeDashoffset={-(CIRCUMFERENCE - seg.offset)}
-              strokeLinecap="butt"
-              style={{ transition: "stroke-dasharray 0.5s ease" }}
-            />
-          ))}
-        </svg>
-        <div style={{
-          position: "absolute", inset: 0,
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-        }}>
-          <span style={{ fontSize: 26, fontWeight: 800, color: "#1e3a5f", lineHeight: 1.1 }}>
-            {avgScore == null ? "--" : Number(avgScore).toFixed(2)}
-          </span>
-          <span style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.06em", marginTop: 3, textTransform: "uppercase" }}>
-            ĐTB toàn trường
-          </span>
+      {/* 2. Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
+            <TypewriterText text={`Chào mừng trở lại, ${adminName}`} />
+          </h1>
+          <p className="text-slate-500 mt-1 font-medium">Cập nhật dữ liệu mới nhất của trường hôm nay</p>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px", width: "100%" }}>
-        {data.map((d) => {
-          const colors = LABEL_COLORS[d.label] || { bg: "#f3f4f6", text: "#374151" };
+
+      {error && (
+        <p className="rounded-2xl bg-red-100 px-6 py-4 text-sm font-semibold text-red-700">{error}</p>
+      )}
+
+      {/* 3. Dãy thống kê đầu trang (4 cards) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: "Tổng học sinh", value: stats.students, desc: "Tăng so với năm trước", color: "blue", icon: "school", trend: "12%", isLoading: loading },
+          { label: "Tổng giáo viên", value: stats.teachers, desc: "Đang giảng dạy", color: "green", icon: "badge", trend: "4%", isLoading: loading },
+          { label: "Tổng lớp học", value: stats.classes, desc: "Khối 10, 11 và 12", color: "purple", icon: "meeting_room", trend: "2%", isLoading: loading },
+          { label: "Điểm trung bình", value: stats.avgScore || "Chưa có", desc: "Toàn trường", color: "orange", icon: "insights", trend: "8%", isLoading: chartLoading },
+        ].map((card, i) => {
+          const bgColors = { blue: "bg-blue-100 text-blue-600", green: "bg-green-100 text-green-600", purple: "bg-purple-100 text-purple-600", orange: "bg-orange-100 text-orange-600" };
           return (
-            <div key={d.label} style={{
-              display: "flex", alignItems: "center", gap: 8,
-              background: colors.bg, borderRadius: 10, padding: "6px 10px",
-            }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: d.color, flexShrink: 0 }} />
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: colors.text }}>{d.label}</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>{d.count} HS · {d.pct}%</div>
+            <div key={i} className="group flex flex-col justify-center rounded-[24px] bg-white p-6 border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 h-[120px]">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${bgColors[card.color]} transition-transform duration-300 group-hover:scale-110`}>
+                    <span className="material-symbols-outlined text-[24px]">{card.icon}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500">{card.label}</p>
+                    <div className="h-8 flex items-center mt-1">
+                      {card.isLoading ? (
+                        <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${bgColors[card.color].split(' ')[1]}`}></div>
+                      ) : (
+                        <h4 className="text-2xl font-bold text-slate-900"><CountUp end={card.value} isNumber={!isNaN(Number(card.value))} decimals={card.label === "Điểm trung bình" && !isNaN(Number(card.value)) ? 2 : 0} /></h4>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs font-bold">
+                  <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
+                  {card.trend}
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* 4. Biểu đồ */}
+      <div className="flex flex-col lg:flex-row gap-6">
+
+        {/* Bar Chart (70%) */}
+        <div className="lg:w-[70%] h-[420px] rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-slate-900">Điểm trung bình theo khối (Năm học hiện tại)</h3>
+          </div>
+          <div className="flex-1 w-full relative">
+            {chartLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
+              </div>
+            ) : dashboardData.blockAvg.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-semibold">Chưa có dữ liệu điểm</div>
+            ) : (
+              <>
+                <style>{`@keyframes growBarUp { from { transform: scaleY(0); opacity: 0.4; } to { transform: scaleY(1); opacity: 1; } }`}</style>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dashboardData.blockAvg} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: "#64748b", fontWeight: 600 }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: "#94a3b8", fontWeight: 600 }} domain={[0, 10]} />
+                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "transparent" }} />
+                    <Bar dataKey="value" maxBarSize={60} shape={<GrowBarShape animate={barShouldAnimate} />} isAnimationActive={false} label={{ position: 'top', fill: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>
+                      {dashboardData.blockAvg.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill="#2563eb" />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Pie Chart (30%) */}
+        <div className="lg:w-[30%] h-[420px] rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-slate-900">Xếp loại học lực (Cả năm)</h3>
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center relative">
+            {chartLoading ? (
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent" />
+            ) : dashboardData.totalStudents === 0 ? (
+              <div className="text-slate-400 text-sm font-semibold">Chưa có dữ liệu</div>
+            ) : (
+              <>
+                <div className="h-[200px] w-full relative flex items-center justify-center">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tổng học sinh</p>
+                    <p className="text-3xl font-black text-slate-900 leading-tight"><CountUp end={dashboardData.totalStudents} /></p>
+                  </div>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={gradeDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={65}
+                        outerRadius={90}
+                        paddingAngle={4}
+                        dataKey="count"
+                        nameKey="label"
+                        stroke="none"
+                        isAnimationActive={true}
+                        animationDuration={1000}
+                      >
+                        {gradeDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomPieTooltip />} cursor={{ fill: 'transparent' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Legend */}
+                <div className="w-full mt-6 flex flex-col gap-3 px-2">
+                  {gradeDistribution.map((d) => (
+                    <div key={d.label} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: d.color }} />
+                        <span className="text-sm font-bold text-slate-700">{d.label}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-slate-500 font-semibold">{formatNumber(d.count)}</span>
+                        <span className="text-sm font-bold text-slate-900 w-8 text-right">{d.pct}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* 7. Phần dưới (3 cards) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Card 1: Lớp học gần đây */}
+        <div className="rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col h-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-slate-900">Lớp học gần đây</h3>
+            <Link to="/admin/lop" className="text-[#2563eb] text-sm font-bold hover:underline">Xem tất cả</Link>
+          </div>
+          <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+            <RecentClassesList
+              classes={dashboardData.classes}
+              siSoByLopId={dashboardData.siSoByLopId}
+              homeroomByClassId={dashboardData.homeroomByClassId}
+              teacherNameById={dashboardData.teacherNameById}
+              loading={loading}
+            />
+          </div>
+        </div>
+
+        {/* Card 2: Thông báo mới */}
+        <div className="rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col h-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-slate-900">Thông báo mới</h3>
+            <button className="text-[#2563eb] text-sm font-bold hover:underline">Thêm</button>
+          </div>
+          <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
+            {[
+              { icon: "campaign", title: "Họp hội đồng sư phạm tháng 11", time: "2 giờ trước", color: "text-blue-600", bg: "bg-blue-50" },
+              { icon: "event", title: "Lịch thi học kì 1 khối 12", time: "5 giờ trước", color: "text-orange-600", bg: "bg-orange-50" },
+              { icon: "school", title: "Cập nhật danh sách đội tuyển HSG", time: "1 ngày trước", color: "text-green-600", bg: "bg-green-50" },
+              { icon: "warning", title: "Bảo trì hệ thống điểm điện tử", time: "2 ngày trước", color: "text-red-600", bg: "bg-red-50" }
+            ].map((n, i) => (
+              <div key={i} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                <div className={`w-10 h-10 rounded-full flex shrink-0 items-center justify-center ${n.bg} ${n.color}`}>
+                  <span className="material-symbols-outlined text-[20px]">{n.icon}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{n.title}</p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">{n.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Card 3: Giáo viên mới */}
+        <div className="rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col h-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-slate-900">Giáo viên mới</h3>
+            <Link to="/admin/giaovien" className="text-[#2563eb] text-sm font-bold hover:underline">Quản lý</Link>
+          </div>
+          <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
+            {loading ? (
+              <div className="flex items-center justify-center h-full"><div className="w-6 h-6 border-2 border-[#2563eb] border-t-transparent rounded-full animate-spin"></div></div>
+            ) : dashboardData.teachers.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-sm text-slate-400 font-semibold">Chưa có giáo viên</div>
+            ) : (
+              dashboardData.teachers.slice(0, 4).map((gv, i) => (
+                <div key={gv.id || i} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(gv.hoTen || "GV")}&background=random&color=fff`} alt={gv.hoTen} className="w-10 h-10 rounded-full shadow-sm shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{gv.hoTen}</p>
+                    <p className="text-xs font-semibold text-slate-500 mt-0.5 truncate">{gv.monHoc?.tenMonHoc || "Giáo viên bộ môn"}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+      </div>
+
     </div>
   );
 }
 
-function RecentClasses({ classes = [], students = [], siSoByLopId = {}, homeroomByClassId = {}, teacherNameById = {}, loading = false }) {
-  const rows = useMemo(
-    () =>
-      (classes || [])
-        .slice()
-        .sort(sortClasses)
-        .slice(0, 5)
-        .map((item) => {
-          // Sử dụng sĩ số tính từ danh sách học sinh thực tế
-          const realSiSo = siSoByLopId[String(item.id)];
-          if (realSiSo === undefined) {
-            // fallback: đếm từ mảng students nếu có
-            const derivedCount = (students || []).filter((s) => {
-              const lopId = s?.lop?.id ?? s?.lopId ?? null;
-              return lopId !== null && String(lopId) === String(item.id);
-            }).length;
-            return {
-              id: item.id,
-              lop: item.tenLop || "--",
-              siSo: derivedCount > 0 ? derivedCount : (item.siSo ?? 0),
-              gvcn: teacherNameById[String(homeroomByClassId[String(item.id)] || "")] || "--",
-              status: homeroomByClassId[String(item.id)] ? "Hoạt động" : "Thiếu GV",
-            };
-          }
-          return {
-            id: item.id,
-            lop: item.tenLop || "--",
-            siSo: realSiSo,
-            gvcn: teacherNameById[String(homeroomByClassId[String(item.id)] || "")] || "--",
-            status: homeroomByClassId[String(item.id)] ? "Hoạt động" : "Thiếu GV",
-          };
-        }),
-    [classes, students, siSoByLopId, homeroomByClassId, teacherNameById]
+function RecentClassesList({ classes = [], siSoByLopId = {}, homeroomByClassId = {}, teacherNameById = {}, loading = false }) {
+  const rows = useMemo(() => {
+    const sorted = (classes || []).slice().sort(sortClasses);
+    const grade10 = sorted.filter(c => c.khoi === 10).slice(0, 2);
+    const grade11 = sorted.filter(c => c.khoi === 11).slice(0, 2);
+    const grade12 = sorted.filter(c => c.khoi === 12).slice(0, 1);
+    const combined = [...grade10, ...grade11, ...grade12];
+
+    return combined.map((item) => {
+      return {
+        id: item.id,
+        lop: item.tenLop || "--",
+        siSo: siSoByLopId[String(item.id)] ?? item.siSo ?? 0,
+        gvcn: teacherNameById[String(homeroomByClassId[String(item.id)] || "")] || "Chưa có GVCN",
+      };
+    });
+  }, [classes, siSoByLopId, homeroomByClassId, teacherNameById]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-full">
+      <div className="w-6 h-6 border-2 border-[#2563eb] border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+
+  if (rows.length === 0) return (
+    <div className="flex items-center justify-center h-full text-sm text-slate-400 font-semibold">Chưa có lớp học</div>
   );
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-card">
-      <div className="flex items-center justify-between border-b border-outline-variant/30 bg-surface-container-low/50 px-lg py-md">
-        <h3 className="text-headline-md font-semibold text-primary">Lớp học gần đây</h3>
-        <Link to="/admin/lop" className="font-label-md text-secondary hover:underline">Xem tất cả</Link>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-surface-container-low/80 text-label-md text-on-surface">
-              <th className="px-lg py-md">Lớp</th>
-              <th className="px-lg py-md">Sĩ số</th>
-              <th className="px-lg py-md">GVCN</th>
-              <th className="px-lg py-md">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant/20">
-            {loading
-              ? Array.from({ length: 5 }).map((_, index) => (
-                  <tr key={`skeleton-${index}`}>
-                    <td className="px-lg py-md" colSpan={4}><div className="skeleton h-6 w-full" /></td>
-                  </tr>
-                ))
-              : rows.map((r) => (
-                  <tr key={r.id} className="transition-colors hover:bg-surface-container-low">
-                    <td className="px-lg py-md font-bold text-primary">{r.lop}</td>
-                    <td className="px-lg py-md">{r.siSo}</td>
-                    <td className="px-lg py-md">{r.gvcn}</td>
-                    <td className="px-lg py-md">
-                      <span className={`rounded-full px-sm py-xs text-[12px] font-bold ${r.status === "Hoạt động" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
-                        {r.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <>
+      {rows.map((r) => (
+        <div key={r.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100 group/item">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex shrink-0 items-center justify-center transition-transform duration-300 group-hover/item:scale-110">
+              <span className="material-symbols-outlined text-[20px]">class</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-900 truncate">{r.lop}</p>
+              <p className="text-xs font-semibold text-slate-500 mt-0.5 truncate">{r.gvcn}</p>
+            </div>
+          </div>
+          <div className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
+            {r.siSo} HS
+          </div>
+        </div>
+      ))}
+    </>
   );
 }

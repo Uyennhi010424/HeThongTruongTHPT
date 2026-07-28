@@ -27,8 +27,15 @@ public class PhanCongDayController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<PhanCongDayDTO>>> getAll(
             @RequestParam(required = false) String namHoc,
-            @RequestParam(required = false) Integer hocKy
+            @RequestParam(required = false) Integer hocKy,
+            @RequestParam(required = false) Integer lopId
     ) {
+        if (lopId != null && namHoc != null && hocKy != null) {
+            return ResponseEntity.ok(ApiResponse.ok(service.getByLopIdAndNamHocAndHocKy(lopId, namHoc, hocKy)));
+        }
+        if (lopId != null) {
+            return ResponseEntity.ok(ApiResponse.ok(service.getByLopId(lopId)));
+        }
         if (namHoc != null && hocKy != null) {
             return ResponseEntity.ok(ApiResponse.ok(service.getByNamHocAndHocKy(namHoc, hocKy)));
         }

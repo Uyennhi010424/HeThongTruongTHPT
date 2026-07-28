@@ -14,7 +14,7 @@ public class HocSinh {
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
@@ -35,13 +35,15 @@ public class HocSinh {
     @Column(name = "gioi_tinh", nullable = false)
     private String gioiTinh; // NAM or NU
 
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "lop_id")
     private LopHoc lop;
 
     @Column(name = "dia_chi")
     private String diaChi;
 
+    @NotNull(message = "Năm nhập học không được để trống")
+    @Min(value = 2000, message = "Năm nhập học phải từ năm 2000 trở đi")
     @Column(name = "nam_nhap_hoc", nullable = false)
     private Integer namNhapHoc;
 

@@ -86,7 +86,7 @@ public class HocSinhService {
     }
 
     public List<HocSinh> getAll() {
-        List<HocSinh> list = hocSinhRepository.findAll();
+        List<HocSinh> list = hocSinhRepository.findAllWithLop();
         assignParentIds(list);
         return list;
     }
@@ -129,7 +129,7 @@ public class HocSinhService {
     }
 
     public List<HocSinh> getByLopId(Integer lopId) {
-        List<HocSinh> list = hocSinhRepository.findByLopId(lopId);
+        List<HocSinh> list = hocSinhRepository.findByLopIdAndTrangThai(lopId, 1);
         assignParentIds(list);
         return list;
     }
@@ -144,7 +144,7 @@ public class HocSinhService {
 
     public HocSinh getById(Integer id) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
-        HocSinh hs = hocSinhRepository.findById(id)
+        HocSinh hs = hocSinhRepository.findByIdWithLop(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh"));
         assignParentId(hs);
         return hs;
@@ -160,6 +160,8 @@ public class HocSinhService {
         LopHoc lop = resolveLop(hocSinh);
         if (hocSinh.getTrangThai() == null) hocSinh.setTrangThai(1);
         if (hocSinh.getNamNhapHoc() == null) hocSinh.setNamNhapHoc(Year.now().getValue());
+        
+        validateStudentRules(hocSinh, lop);
 
         final LopHoc lopRef = lop;
         final Integer phuHuynhId = hocSinh.getPhuHuynhId();
@@ -243,17 +245,23 @@ public class HocSinhService {
         Integer oldLopId = existing.getLop() != null ? existing.getLop().getId() : null;
 
         if (hocSinh.getLop() != null && hocSinh.getLop().getId() != null) {
-            hocSinh.setLop(resolveLop(hocSinh));
-        } else {
-            hocSinh.setLop(existing.getLop());
+            existing.setLop(resolveLop(hocSinh));
         }
-        if (hocSinh.getUser() == null) {
-            hocSinh.setUser(existing.getUser() != null
-                    ? existing.getUser()
-                    : createStudentUser(hocSinh.getHoTen()));
-        }
-        hocSinh.setId(id);
-        HocSinh saved = hocSinhRepository.save(hocSinh);
+
+        if (hocSinh.getHoTen() != null) existing.setHoTen(hocSinh.getHoTen());
+        if (hocSinh.getNgaySinh() != null) existing.setNgaySinh(hocSinh.getNgaySinh());
+        if (hocSinh.getGioiTinh() != null) existing.setGioiTinh(hocSinh.getGioiTinh());
+        if (hocSinh.getDanToc() != null) existing.setDanToc(hocSinh.getDanToc());
+        if (hocSinh.getTonGiao() != null) existing.setTonGiao(hocSinh.getTonGiao());
+        if (hocSinh.getSdt() != null) existing.setSdt(hocSinh.getSdt());
+        if (hocSinh.getEmail() != null) existing.setEmail(hocSinh.getEmail());
+        if (hocSinh.getDiaChi() != null) existing.setDiaChi(hocSinh.getDiaChi());
+        if (hocSinh.getNamNhapHoc() != null) existing.setNamNhapHoc(hocSinh.getNamNhapHoc());
+        if (hocSinh.getAnhDaiDien() != null) existing.setAnhDaiDien(hocSinh.getAnhDaiDien());
+        
+        validateStudentRules(existing, existing.getLop());
+        
+        HocSinh saved = hocSinhRepository.save(existing);
 
         // Auto-sync sĩ số: lớp cũ và lớp mới (nếu khác nhau)
         Integer newLopId = saved.getLop() != null ? saved.getLop().getId() : null;
@@ -424,6 +432,33 @@ public class HocSinhService {
             }
         } catch (Exception e) {
             log.warn("Không thể cập nhật sĩ số lớp {}: {}", lopId, e.getMessage());
+        }
+    }
+
+    private void validateStudentRules(HocSinh hocSinh, LopHoc lop) {
+        int currentYear = java.time.Year.now().getValue();
+        
+        if (hocSinh.getNamNhapHoc() != null) {
+            if (hocSinh.getNamNhapHoc() > currentYear + 1) {
+                throw new ApiException("Năm nhập học không được vượt quá " + (currentYear + 1));
+            }
+            if (hocSinh.getNamNhapHoc() < 2000) {
+                throw new ApiException("Năm nhập học phải từ năm 2000 trở đi");
+            }
+        }
+        
+        if (hocSinh.getNgaySinh() != null && lop != null && lop.getKhoi() != null) {
+            int age = currentYear - hocSinh.getNgaySinh().getYear();
+            int khoi = lop.getKhoi();
+            
+            boolean validAge = false;
+            if (khoi == 10 && (age >= 16 && age <= 18)) validAge = true;
+            else if (khoi == 11 && (age >= 17 && age <= 19)) validAge = true;
+            else if (khoi == 12 && (age >= 18 && age <= 20)) validAge = true;
+            
+            if (!validAge) {
+                throw new ApiException("Độ tuổi " + age + " không phù hợp với Khối " + khoi + " (Năm sinh: " + hocSinh.getNgaySinh().getYear() + ", Năm hiện tại: " + currentYear + ")");
+            }
         }
     }
 }
