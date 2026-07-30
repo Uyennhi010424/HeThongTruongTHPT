@@ -42,6 +42,7 @@ public class GlobalExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(fe -> fe.getDefaultMessage())
                 .collect(Collectors.joining("; "));
+        logger.error("Validation failed: {}", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message.isEmpty() ? "Dữ liệu không hợp lệ" : message));
     }
@@ -122,20 +123,29 @@ public class GlobalExceptionHandler {
         String message = ex.getConstraintViolations().stream()
                 .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .collect(Collectors.joining("; "));
+        logger.error("Constraint violation: {}", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message.isEmpty() ? "Dữ liệu không hợp lệ" : message));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        logger.error("Illegal argument: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleOther(Exception ex) {
-        logger.error("Unhandled exception: {}", ex.getClass().getSimpleName(), ex);
+        logger.error("Unhandled exception [{}]: {}", ex.getClass().getName(), ex.getMessage(), ex);
+        String detail = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
+        // Include cause chain for better debugging
+        Throwable cause = ex.getCause();
+        while (cause != null) {
+            logger.error("  Caused by [{}]: {}", cause.getClass().getName(), cause.getMessage());
+            cause = cause.getCause();
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Lỗi hệ thống. Vui lòng thử lại sau."));
+                .body(ApiResponse.error("Lỗi hệ thống: " + detail));
     }
 }

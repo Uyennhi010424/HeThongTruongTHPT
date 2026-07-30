@@ -352,7 +352,7 @@ export default function EduTopBar({
                 <div className="p-6 text-center text-sm text-slate-500 font-medium">Không có thông báo mới</div>
               ) : (
                 notices.map((n) => (
-                  <div key={n.id} className="flex flex-col gap-1 px-3 py-2.5 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                  <div key={n.id} onClick={() => { setNotiOpen(false); navigate(`${resolveBasePath()}/thongbao`); }} className="flex flex-col gap-1 px-3 py-2.5 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
                     <span className="text-sm font-semibold text-slate-800 line-clamp-2">{n.tieuDe}</span>
                     <span className="text-xs text-slate-500 font-medium">{formatDate(n.ngayDang)}</span>
                   </div>
@@ -371,12 +371,12 @@ export default function EduTopBar({
             aria-label="Tài khoản"
           >
             <img
-              src={avatar}
+              src={avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`}
               alt="Avatar"
               className="h-[34px] w-[34px] rounded-full object-cover shadow-sm border border-slate-200 bg-white"
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
+                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`;
               }}
             />
             <div className="hidden flex-col items-start md:flex">
@@ -392,12 +392,12 @@ export default function EduTopBar({
           >
             <div className="flex items-center gap-3 border-b border-slate-100 p-4">
               <img
-                src={avatar}
+                src={avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`}
                 alt="Avatar"
-                className="h-12 w-12 rounded-full object-cover shadow-sm border border-slate-200"
+                className="h-12 w-12 rounded-full object-cover shadow-sm border border-slate-200 bg-white"
                 onError={(e) => {
                   e.target.onerror = null;
-                  e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`;
                 }}
               />
               <div className="flex flex-col">

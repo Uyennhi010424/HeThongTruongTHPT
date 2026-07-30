@@ -41,7 +41,7 @@ export const readCachedAvatar = ({ username, role } = {}) => {
 
   for (const key of keys) {
     const value = localStorage.getItem(key);
-    if (value) {
+    if (value && value !== "null" && value !== "undefined") {
       if (value.startsWith("blob:")) {
         localStorage.removeItem(key);
       } else {
@@ -55,7 +55,7 @@ export const readCachedAvatar = ({ username, role } = {}) => {
   for (const fallbackRole of allRoles) {
     const fallbackKey = getAvatarStorageKey(resolvedUsername, fallbackRole);
     const value = localStorage.getItem(fallbackKey);
-    if (value) {
+    if (value && value !== "null" && value !== "undefined") {
       if (value.startsWith("blob:")) {
         localStorage.removeItem(fallbackKey);
       } else {

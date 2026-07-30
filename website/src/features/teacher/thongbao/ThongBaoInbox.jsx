@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { getThread, replyThongBao } from "../../../api/thongbaoApi.js";
+import { getThread, replyThongBao, createThongBao } from "../../../api/thongbaoApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
 
 const formatDateTime = (value) => {
@@ -32,6 +32,11 @@ export default function ThongBaoInbox({ notices, onRefresh, teacher }) {
   const [loadingThread, setLoadingThread] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+
+  // Compose Modal states
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeForm, setComposeForm] = useState({ category: "Báo cáo", title: "", content: "" });
+  const [composing, setComposing] = useState(false);
 
   // Lọc thông báo bên trái
   const filteredNotices = useMemo(() => {
@@ -101,6 +106,32 @@ export default function ThongBaoInbox({ notices, onRefresh, teacher }) {
     }
   };
 
+  const handleCompose = async (e) => {
+    e.preventDefault();
+    if (!composeForm.title.trim() || !composeForm.content.trim()) {
+      notifyError("Vui lòng nhập đầy đủ tiêu đề và nội dung.");
+      return;
+    }
+    setComposing(true);
+    try {
+      await createThongBao({
+        tieuDe: `[${composeForm.category}] ${composeForm.title.trim()}`,
+        noiDung: composeForm.content.trim(),
+        loai: "ADMIN",
+        doiTuong: "ADMIN",
+        senderRole: "GIAO_VIEN"
+      });
+      notifySuccess("Đã gửi tin nhắn cho BGH!");
+      setComposeForm({ category: "Báo cáo", title: "", content: "" });
+      setShowCompose(false);
+      onRefresh?.();
+    } catch {
+      notifyError("Không thể gửi tin nhắn.");
+    } finally {
+      setComposing(false);
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-280px)] min-h-[600px] border border-gray-200 rounded-2xl bg-white overflow-hidden shadow-sm">
       {/* LEFT COL: INBOX LIST */}
@@ -139,6 +170,13 @@ export default function ThongBaoInbox({ notices, onRefresh, teacher }) {
               Khẩn
             </button>
           </div>
+          <button 
+            onClick={() => setShowCompose(true)}
+            className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 py-2.5 rounded-xl font-semibold text-sm transition-colors mt-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">edit_square</span>
+            Soạn tin nhắn cho BGH
+          </button>
         </div>
 
         {/* List */}
@@ -179,6 +217,81 @@ export default function ThongBaoInbox({ notices, onRefresh, teacher }) {
           )}
         </div>
       </div>
+
+      {/* Compose Modal */}
+      {showCompose && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-600">edit_square</span>
+                Soạn tin nhắn mới
+              </h3>
+              <button onClick={() => setShowCompose(false)} className="p-1 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleCompose} className="p-5 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase">Loại tin nhắn</label>
+                <select
+                  value={composeForm.category}
+                  onChange={e => setComposeForm({...composeForm, category: e.target.value})}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                >
+                  <option>Báo cáo</option>
+                  <option>Xin nghỉ phép</option>
+                  <option>Hỗ trợ kỹ thuật</option>
+                  <option>Đề xuất</option>
+                  <option>Khác</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase">Tiêu đề</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Nhập tiêu đề ngắn gọn..." 
+                  value={composeForm.title}
+                  onChange={e => setComposeForm({...composeForm, title: e.target.value})}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase">Nội dung</label>
+                <textarea
+                  required
+                  placeholder="Trình bày nội dung chi tiết..."
+                  rows={5}
+                  value={composeForm.content}
+                  onChange={e => setComposeForm({...composeForm, content: e.target.value})}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCompose(false)}
+                  className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={composing || !composeForm.title.trim() || !composeForm.content.trim()}
+                  className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  {composing && <span className="material-symbols-outlined animate-spin text-[18px]">autorenew</span>}
+                  Gửi tin nhắn
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* RIGHT COL: DETAIL & REPLY */}
       <div className="flex-1 flex flex-col bg-white">

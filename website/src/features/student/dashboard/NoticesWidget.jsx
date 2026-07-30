@@ -95,7 +95,7 @@ const NoticesWidget = ({ unreadNotices, attendanceRate, dtb }) => {
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1.5">
                 <span className="text-slate-600">Điểm Trung Bình</span>
-                <span className="text-blue-600">{dtb !== null ? dtb.toFixed(2) : "--"} / 10</span>
+                <span className="text-blue-600">{dtb !== null ? dtb.toFixed(1) : "--"} / 10</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2">
                 <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${(dtb / 10) * 100}%` }}></div>

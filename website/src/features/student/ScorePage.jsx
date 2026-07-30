@@ -2,33 +2,60 @@ import { useEffect, useMemo, useState } from "react";
 import { getMonHoc } from "../../api/monhocApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getDiem, exportStudentScorecard } from "../../api/diemApi.js";
+import { getNamHoc } from "../../api/namhocApi.js";
+import { getHanhKiem } from "../../api/hanhkiemApi.js";
+import { getHocBa } from "../../api/hocbaApi.js";
+import { getToHopMonById } from "../../api/toHopMonApi.js";
 import { Download } from "lucide-react";
+import PdfPreviewModal from "../../components/common/PdfPreviewModal.jsx";
 import {
   getPolicyBySubject,
-  toScore,
   createEmptySemester,
   calcSemesterAverage,
-  calcYearAverage,
-  classifyHocLuc
+  classifyHocLuc,
+  calcYearAverage
 } from "../../utils/scorePolicy.js";
-import AiSuggestionCard from "./ai/AiSuggestionCard.jsx";
+
+const getHocLucLabel = (value) => {
+  switch (value) {
+    case "TOT": return { label: "Tốt", color: "text-emerald-600" };
+    case "GIOI": return { label: "Giỏi", color: "text-emerald-600" };
+    case "KHA": return { label: "Khá", color: "text-blue-600" };
+    case "DAT": return { label: "Đạt", color: "text-amber-500" };
+    case "TRUNG_BINH": return { label: "Trung bình", color: "text-amber-500" };
+    case "CHUA_DAT": return { label: "Chưa đạt", color: "text-red-500" };
+    case "YEU":
+    case "KEM": return { label: "Yếu", color: "text-red-500" };
+    default: return { label: value || "--", color: "text-slate-600" };
+  }
+};
+
+const getHanhKiemLabel = (value) => {
+  switch (value) {
+    case "TOT": return { label: "Tốt", color: "text-emerald-600" };
+    case "KHA": return { label: "Khá", color: "text-blue-600" };
+    case "TRUNG_BINH": return { label: "Trung bình", color: "text-amber-500" };
+    case "YEU": return { label: "Yếu", color: "text-red-500" };
+    default: return { label: value || "--", color: "text-slate-600" };
+  }
+};
 
 export default function ScorePage() {
   const [student, setStudent] = useState(null);
   const [subjects, setSubjects] = useState([]);
   const [scoreRecords, setScoreRecords] = useState({});
+  const [hanhKiemList, setHanhKiemList] = useState([]);
+  const [hocBaList, setHocBaList] = useState([]);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [namHocList, setNamHocList] = useState([]);
+  const [namHocListObj, setNamHocListObj] = useState([]);
+  const [selectedNamHoc, setSelectedNamHoc] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("HK1");
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [toHopMonIds, setToHopMonIds] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Tính năm học hiện tại động theo tháng
-  const currentNamHoc = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    return month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -38,31 +65,54 @@ export default function ScorePage() {
         setLoading(true);
         setError("");
 
-        // Bước 1: Lấy học sinh + môn học song song
-        const [studentRes, subjectsRes] = await Promise.all([
+        const [studentRes, subjectsRes, namHocRes] = await Promise.all([
           getCurrentHocSinh(),
-          getMonHoc()
+          getMonHoc(),
+          getNamHoc()
         ]);
         if (!active) return;
 
         const currentStudent = studentRes?.data?.data || null;
+        setStudent(currentStudent);
+
+        let fetchedToHopMonIds = null;
+        if (currentStudent?.lop?.toHopId) {
+           try {
+              const toHopRes = await getToHopMonById(currentStudent.lop.toHopId);
+              fetchedToHopMonIds = toHopRes?.data?.data?.monHocIds || [];
+              setToHopMonIds(fetchedToHopMonIds);
+           } catch (err) {
+              console.error("Lỗi fetch tổ hợp môn:", err);
+           }
+        }
+
         const rawSubjects = subjectsRes?.data?.data || [];
         const subjectList = rawSubjects.filter(s => {
           const name = (s.tenMon || "").toLowerCase();
           return !name.includes("shdc") && !name.includes("sinh hoạt lớp");
         });
-
-        setStudent(currentStudent);
         setSubjects(subjectList);
 
-        if (subjectList.length > 0) {
-          setSelectedSubjectId(String(subjectList[0].id));
+        const years = (namHocRes?.data?.data || [])
+          .map((item) => item?.tenNamHoc || "")
+          .filter(Boolean)
+          .sort((a, b) => Number(b.match(/(\d{4})/)?.[1] || 0) - Number(a.match(/(\d{4})/)?.[1] || 0));
+        
+        setNamHocList(years);
+        setNamHocListObj(namHocRes?.data?.data || []);
+
+        if (years.length > 0) {
+          const activeYearObj = (namHocRes?.data?.data || []).find(y => y.trangThai === "DANG_MO");
+          setSelectedNamHoc(activeYearObj?.tenNamHoc || years[0]);
         }
 
-        if (!currentStudent?.id) return;
+        if (!currentStudent?.id) {
+          setLoading(false);
+          return;
+        }
 
-        // Bước 2: Lấy điểm theo học sinh (chỉ trả về điểm của học sinh này)
-        const diemsRes = await getDiem({ hocSinhId: currentStudent.id });
+        const diemsRes = await getDiem({ hocSinhId: currentStudent.id }).catch(() => null);
+
         if (!active) return;
 
         try {
@@ -76,10 +126,14 @@ export default function ScorePage() {
 
           diems.forEach((d) => {
             const subjectId = d?.monHoc?.id;
-            if (!subjectId) return;
-            const key = `${currentStudent.id}_${subjectId}`;
+            const namHocDiem = d?.namHoc; 
+            const namHocStr = typeof namHocDiem === 'object' ? namHocDiem?.tenNamHoc : namHocDiem;
+
+            if (!subjectId || !namHocStr) return;
+            const key = `${namHocStr}_${subjectId}`;
 
             const subject = subjectById[String(subjectId)];
+            if (!subject) return;
             const policy = getPolicyBySubject(subject);
 
             if (!records[key]) {
@@ -112,6 +166,7 @@ export default function ScorePage() {
         } catch (e) {
           console.error("Lỗi parse điểm:", e);
         }
+
       } catch (err) {
         if (!active) return;
         const status = err?.response?.status;
@@ -135,353 +190,401 @@ export default function ScorePage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedSubjectId && subjects.length > 0) {
-      setSelectedSubjectId(String(subjects[0].id));
-    }
-  }, [selectedSubjectId, subjects]);
+    let active = true;
+    const fetchScores = async () => {
+      if (!student?.id || !selectedNamHoc || !selectedSemester) return;
+      try {
+        setLoading(true);
+        const activeYearObj = namHocListObj.find(y => y.tenNamHoc === selectedNamHoc);
+        
+        const [hkRes, hocBaRes] = await Promise.all([
+          getHanhKiem({ hocSinhId: student.id, namHocId: activeYearObj?.id }).catch(() => null),
+          getHocBa({ hocSinhId: student.id }).catch(() => null)
+        ]);
 
-  const selectedSubject = useMemo(
-    () => subjects.find((subject) => String(subject.id) === selectedSubjectId) || null,
-    [subjects, selectedSubjectId]
-  );
+        if (!active) return;
 
-  const selectedPolicy = useMemo(
-    () => getPolicyBySubject(selectedSubject),
-    [selectedSubject]
-  );
-
-  const fullRecord = useMemo(() => {
-    if (!student?.id || !selectedSubject?.id) {
-      return {
-        HK1: createEmptySemester(3),
-        HK2: createEmptySemester(3)
-      };
-    }
-
-    const key = `${student.id}_${selectedSubject.id}`;
-    const policy = getPolicyBySubject(selectedSubject);
-    const current = scoreRecords[key] || {};
-    return {
-      HK1: { ...createEmptySemester(policy.txCount), ...(current.HK1 || {}) },
-      HK2: { ...createEmptySemester(policy.txCount), ...(current.HK2 || {}) }
+        setHanhKiemList(hkRes?.data?.data || []);
+        setHocBaList(hocBaRes?.data?.data || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setLoading(false);
+      }
     };
-  }, [scoreRecords, selectedSubject, student?.id]);
-
-  const semesterView = fullRecord[selectedSemester] || createEmptySemester(selectedPolicy.txCount);
-
-  const hk1Avg = useMemo(() => {
-    if (selectedPolicy.mode === "COMMENT") return null;
-    return calcSemesterAverage(fullRecord.HK1);
-  }, [fullRecord.HK1, selectedPolicy.mode]);
-
-  const hk2Avg = useMemo(() => {
-    if (selectedPolicy.mode === "COMMENT") return null;
-    return calcSemesterAverage(fullRecord.HK2);
-  }, [fullRecord.HK2, selectedPolicy.mode]);
-
-  const yearAvg = useMemo(() => calcYearAverage(hk1Avg, hk2Avg), [hk1Avg, hk2Avg]);
-
-  const stats = useMemo(() => {
-    if (!student?.id || subjects.length === 0) {
-      return { subjects: subjects.length, completed: 0, average: "--" };
-    }
-
-    let completed = 0;
-    const averages = [];
-
-    subjects.forEach((subject) => {
-      const policy = getPolicyBySubject(subject);
-      const key = `${student.id}_${subject.id}`;
-      const current = scoreRecords[key] || {};
-      const semester = {
-        ...createEmptySemester(policy.txCount),
-        ...(current[selectedSemester] || {})
-      };
-
-      if (policy.mode === "COMMENT") {
-        if (semester.nhanXet) completed += 1;
-        return;
-      }
-
-      const avg = calcSemesterAverage(semester);
-      if (avg !== null) {
-        completed += 1;
-        averages.push(avg);
-      }
-    });
-
-    const average = averages.length
-      ? (averages.reduce((sum, value) => sum + value, 0) / averages.length).toFixed(2)
-      : "--";
-
-    return {
-      subjects: subjects.length,
-      completed,
-      average
-    };
-  }, [scoreRecords, selectedSemester, student?.id, subjects]);
-
-  // Tính xếp loại học lực theo TT22 (dựa trên ĐTB cả năm tất cả môn)
-  const hocLucInfo = useMemo(() => {
-    if (!student?.id || subjects.length === 0) return null;
-
-    const yearAverages = [];
-    const commentResults = [];
-
-    subjects.forEach((subject) => {
-      const policy = getPolicyBySubject(subject);
-      
-      const key = `${student.id}_${subject.id}`;
-      const current = scoreRecords[key] || {};
-      
-      if (policy.mode === "COMMENT") {
-        const hk1 = current.HK1?.nhanXet || "DAT";
-        const hk2 = current.HK2?.nhanXet || "DAT";
-        const yearResult = (hk1 === "DAT" && hk2 === "DAT") ? "DAT" : "CHUA_DAT";
-        commentResults.push(yearResult);
-        return;
-      }
-
-      const hk1 = { ...createEmptySemester(policy.txCount), ...(current.HK1 || {}) };
-      const hk2 = { ...createEmptySemester(policy.txCount), ...(current.HK2 || {}) };
-
-      const hk1Avg = calcSemesterAverage(hk1);
-      const hk2Avg = calcSemesterAverage(hk2);
-      const yearAvg = calcYearAverage(hk1Avg, hk2Avg);
-
-      if (yearAvg !== null) yearAverages.push(yearAvg);
-    });
-
-    if (yearAverages.length === 0) return null;
-
-    const diemTBCaNam = Number(
-      (yearAverages.reduce((s, v) => s + v, 0) / yearAverages.length).toFixed(2)
-    );
-    const classification = classifyHocLuc(diemTBCaNam, yearAverages, commentResults);
-
-    return { diemTBCaNam, ...classification };
-  }, [scoreRecords, student?.id, subjects]);
+    fetchScores();
+    return () => { active = false; };
+  }, [student?.id, selectedNamHoc, selectedSemester, namHocListObj]);
 
   const handleExportPdf = async () => {
-    if (!student?.id) return;
+    if (!student?.id || !selectedNamHoc) return;
     try {
-      setLoading(true);
+      setIsExporting(true);
       const res = await exportStudentScorecard({
         hocSinhId: student.id,
         hocKy: selectedSemester === "HK1" ? 1 : 2,
-        namHoc: currentNamHoc
+        namHoc: selectedNamHoc
       });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `bang_diem_${student.id}_${selectedSemester}_${currentNamHoc}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      setPdfUrl(url);
+      setShowPdfPreview(true);
     } catch (err) {
       console.error(err);
       alert("Xuất PDF thất bại!");
     } finally {
-      setLoading(false);
+      setIsExporting(false);
     }
   };
 
-  const hasStudent = Boolean(student?.id);
-  const hasScoreRecord = Boolean(
-    hasStudent &&
-      selectedSubject?.id &&
-      scoreRecords[`${student.id}_${selectedSubject.id}`] &&
-      typeof scoreRecords[`${student.id}_${selectedSubject.id}`] === "object"
-  );
+  const { scoredSubjects, commentSubjects } = useMemo(() => {
+    const scored = [];
+    const comment = [];
+    
+    const gradedSubjectIds = new Set(Object.keys(scoreRecords).map(k => Number(k.split("_")[1])).filter(Boolean));
 
-  const scoreList = useMemo(() => {
-    return (semesterView.tx || []).map((value, index) => ({
-      label: `TX ${index + 1}`,
-      value: value === "" ? "--" : value
-    }));
-  }, [semesterView.tx]);
+    subjects.forEach((subject) => {
+      const name = (subject.tenMon || "").toLowerCase();
+      const isMandatory = name.includes("toán") || name.includes("ngữ văn") || name.includes("tiếng anh") || name.includes("ngoại ngữ") || name.includes("lịch sử") || name.includes("giáo dục thể chất") || name.includes("thể dục") || name.includes("quốc phòng") || name.includes("trải nghiệm") || name.includes("địa phương");
+      
+      let shouldDisplay = true;
+      if (toHopMonIds && toHopMonIds.length > 0) {
+         shouldDisplay = toHopMonIds.includes(subject.id) || isMandatory || gradedSubjectIds.has(subject.id);
+      } else {
+         shouldDisplay = true; 
+      }
+
+      if (!shouldDisplay) return;
+
+      const policy = getPolicyBySubject(subject);
+      if (policy.mode === "COMMENT") {
+        comment.push(subject);
+      } else {
+        scored.push(subject);
+      }
+    });
+    return { scoredSubjects: scored, commentSubjects: comment };
+  }, [subjects, toHopMonIds, scoreRecords]);
+
+  const semesterSummary = useMemo(() => {
+    if (!student?.id || !selectedNamHoc) return null;
+
+    const activeYearObj = namHocListObj.find(y => y.tenNamHoc === selectedNamHoc);
+
+    let totalAvg = 0;
+    let avgCount = 0;
+    const yearAverages = [];
+    const commentResults = [];
+
+    if (selectedSemester === "CA_NAM") {
+      scoredSubjects.forEach(subject => {
+        const key = `${selectedNamHoc}_${subject.id}`;
+        const record = scoreRecords[key];
+        const policy = getPolicyBySubject(subject);
+        const hk1 = { ...createEmptySemester(policy.txCount), ...(record?.["HK1"] || {}) };
+        const hk2 = { ...createEmptySemester(policy.txCount), ...(record?.["HK2"] || {}) };
+        const hk1Avg = calcSemesterAverage(hk1);
+        const hk2Avg = calcSemesterAverage(hk2);
+        const yearAvg = calcYearAverage(hk1Avg, hk2Avg);
+        if (yearAvg !== null) {
+          totalAvg += yearAvg;
+          avgCount += 1;
+          yearAverages.push(yearAvg);
+        }
+      });
+
+      commentSubjects.forEach(subject => {
+        const key = `${selectedNamHoc}_${subject.id}`;
+        const record = scoreRecords[key];
+        const hk1 = record?.["HK1"];
+        const hk2 = record?.["HK2"];
+        const nx1 = hk1?.nhanXet || "DAT";
+        const nx2 = hk2?.nhanXet || "DAT";
+        if (hk1?.nhanXet && hk2?.nhanXet) {
+            commentResults.push(nx2 === "DAT" && nx1 === "DAT" ? "DAT" : "CHUA_DAT");
+        }
+      });
+
+      const dtbCaNam = avgCount > 0 ? Number((totalAvg / avgCount).toFixed(1)) : null;
+
+      let hbObj = hocBaList.find(hb => hb.namHoc === selectedNamHoc || hb.namHoc?.tenNamHoc === selectedNamHoc || hb.namHoc?.id === activeYearObj?.id || hb.namHoc === activeYearObj?.id);
+      
+      if (!hbObj && hocBaList.length === 1 && hocBaList[0].namHoc === null) {
+          hbObj = hocBaList[0];
+      }
+      
+      const hocLucDisplay = getHocLucLabel(hbObj?.hocLuc || classifyHocLuc(dtbCaNam, yearAverages, commentResults)?.value);
+      
+      const hk2Obj = hanhKiemList.find(hk => hk.hocKy === 2);
+      const hk1Obj = hanhKiemList.find(hk => hk.hocKy === 1);
+      const dynamicHanhKiem = hk2Obj?.xepLoai || hk1Obj?.xepLoai;
+      const hanhKiemDisplay = getHanhKiemLabel(dynamicHanhKiem || hbObj?.hanhKiem);
+
+      return {
+        label: "Điểm trung bình cả năm:",
+        dtb: dtbCaNam !== null ? (hbObj?.diemTBCaNam ?? dtbCaNam) : null,
+        hocLuc: hocLucDisplay,
+        hanhKiem: hanhKiemDisplay
+      };
+    }
+
+    scoredSubjects.forEach(subject => {
+      const key = `${selectedNamHoc}_${subject.id}`;
+      const record = scoreRecords[key];
+      const policy = getPolicyBySubject(subject);
+      const hk = { ...createEmptySemester(policy.txCount), ...(record?.[selectedSemester] || {}) };
+      const avg = calcSemesterAverage(hk);
+      if (avg !== null) {
+        totalAvg += avg;
+        avgCount += 1;
+        yearAverages.push(avg);
+      }
+    });
+
+    commentSubjects.forEach(subject => {
+      const key = `${selectedNamHoc}_${subject.id}`;
+      const record = scoreRecords[key];
+      const hk = record?.[selectedSemester];
+      const result = hk?.nhanXet || "DAT";
+      if (hk?.nhanXet) {
+         commentResults.push(result);
+      }
+    });
+
+    const dtbHk = avgCount > 0 ? Number((totalAvg / avgCount).toFixed(1)) : null;
+    
+    let classification = { label: "--", color: "text-slate-600" };
+    if (dtbHk !== null) {
+        const cls = classifyHocLuc(dtbHk, yearAverages, commentResults);
+        classification = getHocLucLabel(cls?.value);
+    }
+
+    const targetHocKy = selectedSemester === "HK1" ? 1 : 2;
+
+    const hkObj = hanhKiemList.find(h => {
+      return String(h.hocKy) === String(targetHocKy);
+    });
+    
+    const hanhKiemDisplay = getHanhKiemLabel(hkObj?.xepLoai || hkObj?.hanhKiem);
+
+    return {
+      label: "Điểm trung bình học kỳ:",
+      dtb: dtbHk,
+      hocLuc: classification,
+      hanhKiem: hanhKiemDisplay
+    };
+  }, [scoreRecords, selectedNamHoc, selectedSemester, scoredSubjects, commentSubjects, hanhKiemList, hocBaList, namHocListObj, student?.id]);
+
+
 
   return (
-    <div className="student-page">
-      <section className="student-hero card">
-        <div className="student-hero-copy">
-          <div className="student-hero-kicker">EduManager Pro</div>
-          <h2 className="student-hero-title">Bảng điểm</h2>
-          <p className="student-hero-subtitle">Theo dõi điểm chi tiết theo từng môn học và từng học kỳ.</p>
-        </div>
-        <div className="student-hero-metrics">
-          <div className="student-hero-chip">{loading ? "..." : stats.subjects} môn</div>
-          <div className="student-hero-chip">{loading ? "..." : stats.completed} đã nhập</div>
-          <div className="student-hero-chip">{loading ? "..." : stats.average} TB</div>
-        </div>
-      </section>
-
-      <div className="users-stats student-stats">
-        <div className="stat-card stat-blue">
-          <div className="stat-label">Số môn học</div>
-          <div className="stat-value">{loading ? "..." : stats.subjects}</div>
-        </div>
-        <div className="stat-card stat-sky">
-          <div className="stat-label">Môn đã có điểm ({selectedSemester})</div>
-          <div className="stat-value">{loading ? "..." : stats.completed}</div>
-        </div>
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Điểm TB học kỳ</div>
-          <div className="stat-value">{loading ? "..." : stats.average}</div>
-        </div>
+    <div className="w-full min-h-screen bg-[#F8FAFC] pb-12">
+      <div className="bg-white border-b border-slate-200 pt-8 pb-6 px-6 md:px-12">
+        <h2 className="text-2xl font-bold text-slate-800 mb-1">Bảng điểm</h2>
+        <p className="text-sm font-medium text-slate-500">Tra cứu kết quả học tập chi tiết.</p>
       </div>
 
-      {hocLucInfo && (
-        <div className="card" style={{ padding: "16px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-            <div>
-              <div className="panel-title" style={{ marginBottom: 4 }}>Xếp loại học lực (Thông tư 22)</div>
-              <div className="panel-subtitle">
-                ĐTB cả năm: <strong>{hocLucInfo.diemTBCaNam}</strong> — Xếp loại:
-                <span
-                  className="inline-block ml-2 px-2 py-0.5 rounded text-sm font-semibold"
-                  style={{ display: "inline-block" }}
-                >
-                  <span className={hocLucInfo.color} style={{ padding: "2px 8px", borderRadius: 4 }}>
-                    {hocLucInfo.label}
-                  </span>
-                </span>
-              </div>
-              {hocLucInfo.note && (
-                <div className="text-xs text-orange-600 mt-1">{hocLucInfo.note}</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Suggestions */}
-      {hasStudent && (
-      <AiSuggestionCard
-          hocSinhId={student.id}
-          hocKy={selectedSemester === "HK1" ? 1 : 2}
-          namHoc={currentNamHoc}
-        />
-
-      )}
-
-      <div className="card users-table student-card">
-        <div className="table-header">
-          <div>
-            <div className="panel-title">Bảng điểm theo môn</div>
-            <div className="panel-subtitle">Chọn môn học để xem điểm chi tiết</div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="panel-pill">{student?.hoTen || "--"}</div>
-            <button
-              onClick={handleExportPdf}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-            >
-              <Download size={16} />
-              Xuất PDF
-            </button>
-          </div>
-        </div>
-
-        <div className="student-score-toolbar">
-          <div className="subject-tabs-wrap">
-            <div className="subject-tabs">
-              {subjects.map((subject) => (
-                <button
-                  type="button"
-                  key={subject.id}
-                  className={`subject-tab ${String(subject.id) === selectedSubjectId ? "active" : ""}`}
-                  onClick={() => setSelectedSubjectId(String(subject.id))}
-                >
-                  {subject.tenMon}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="semester-switch">
-            {[
-              { value: "HK1", label: "Học kỳ 1" },
-              { value: "HK2", label: "Học kỳ 2" }
-            ].map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                className={`semester-pill ${selectedSemester === item.value ? "active" : ""}`}
-                onClick={() => setSelectedSemester(item.value)}
+      <div className="p-6 md:p-12 w-full flex flex-col gap-6">
+        
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">Năm học</span>
+              <select 
+                value={selectedNamHoc} 
+                onChange={(e) => setSelectedNamHoc(e.target.value)}
+                className="bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 rounded-lg px-4 py-2 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               >
-                {item.label}
-              </button>
-            ))}
+                {namHocList.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">Học kỳ</span>
+              <select 
+                value={selectedSemester} 
+                onChange={(e) => setSelectedSemester(e.target.value)}
+                className="bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 rounded-lg px-4 py-2 min-w-[120px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              >
+                <option value="HK1">Học kỳ 1</option>
+                <option value="HK2">Học kỳ 2</option>
+                <option value="CA_NAM">Cả năm</option>
+              </select>
+            </div>
           </div>
+
+          <button
+            onClick={handleExportPdf}
+            disabled={selectedSemester === "CA_NAM" || isExporting}
+            className="flex items-center justify-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={16} />
+            {isExporting ? "Đang xử lý..." : "Xuất PDF"}
+          </button>
         </div>
 
-        {error && <div className="table-empty">{error}</div>}
-        {!error && !loading && !hasStudent && (
-          <div className="table-empty">Không tìm thấy thông tin học sinh hiện tại.</div>
-        )}
+        {error && <div className="bg-white rounded-xl border border-red-200 p-8 text-center text-red-600 font-medium shadow-sm">{error}</div>}
 
-        {!error && !loading && hasStudent && !selectedSubject && (
-          <div className="table-empty">Chưa có danh sách môn học.</div>
-        )}
+        {!error && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead className="bg-slate-50 sticky top-0 z-10">
+                  {selectedSemester === "CA_NAM" ? (
+                    <tr className="border-b border-slate-200">
+                      <th className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider sticky left-0 bg-slate-50 z-20 border-r border-slate-200 w-1/3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle">Môn học</th>
+                      <th className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider text-center border-r border-slate-200">ĐTB HK1</th>
+                      <th className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider text-center border-r border-slate-200">ĐTB HK2</th>
+                      <th className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider text-center">ĐTB Cả Năm</th>
+                    </tr>
+                  ) : (
+                    <>
+                      <tr className="border-b border-slate-200">
+                        <th rowSpan={2} className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider sticky left-0 bg-slate-50 z-20 border-r border-slate-200 w-1/4 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] align-middle">Môn học</th>
+                        <th colSpan={4} className="px-5 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider text-center border-b border-slate-200 border-r border-slate-200">Thường xuyên</th>
+                        <th rowSpan={2} className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider text-center w-24 align-middle border-r border-slate-200">Giữa kỳ</th>
+                        <th rowSpan={2} className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider text-center w-24 align-middle border-r border-slate-200">Cuối kỳ</th>
+                        <th rowSpan={2} className="px-5 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider text-center w-24 align-middle">TB môn</th>
+                      </tr>
+                      <tr className="border-b border-slate-200 bg-slate-50">
+                        <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase text-center border-r border-slate-200 w-16">Lần 1</th>
+                        <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase text-center border-r border-slate-200 w-16">Lần 2</th>
+                        <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase text-center border-r border-slate-200 w-16">Lần 3</th>
+                        <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase text-center w-16 border-r border-slate-200">Lần 4</th>
+                      </tr>
+                    </>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  
+                  {scoredSubjects.map((subject, idx) => {
+                    const key = `${selectedNamHoc}_${subject.id}`;
+                    const record = scoreRecords[key];
+                    const policy = getPolicyBySubject(subject);
+                    const isEven = idx % 2 === 0;
 
-        {!error && !loading && hasStudent && selectedSubject && !hasScoreRecord && (
-          <div className="table-empty">
-            Chưa có điểm cho môn {selectedSubject.tenMon} ở {selectedSemester}. Vui lòng liên hệ giáo viên bộ môn.
-          </div>
-        )}
+                    if (selectedSemester === "CA_NAM") {
+                      const hk1 = { ...createEmptySemester(policy.txCount), ...(record?.["HK1"] || {}) };
+                      const hk2 = { ...createEmptySemester(policy.txCount), ...(record?.["HK2"] || {}) };
+                      const hk1Avg = calcSemesterAverage(hk1);
+                      const hk2Avg = calcSemesterAverage(hk2);
+                      const yearAvg = calcYearAverage(hk1Avg, hk2Avg);
+                      
+                      return (
+                        <tr key={subject.id} className={`hover:bg-blue-50/40 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
+                          <td className={`px-5 py-3.5 text-sm font-semibold text-slate-700 sticky left-0 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)] ${isEven ? 'bg-white' : 'bg-slate-50'}`}>{subject.tenMon}</td>
+                          <td className="px-5 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk1Avg !== null ? hk1Avg.toFixed(1) : ""}</td>
+                          <td className="px-5 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk2Avg !== null ? hk2Avg.toFixed(1) : ""}</td>
+                          <td className="px-5 py-3.5 text-sm font-bold text-slate-800 text-center">{yearAvg !== null ? yearAvg.toFixed(1) : ""}</td>
+                        </tr>
+                      );
+                    }
 
-        {!error && !loading && hasStudent && selectedSubject && hasScoreRecord && (
-          <div className="student-score-content">
-            <div className="student-score-card">
-              <div className="panel-title">{selectedSubject.tenMon}</div>
-              <div className="panel-subtitle">Chi tiết điểm {selectedSemester}</div>
+                    const hk = { ...createEmptySemester(policy.txCount), ...(record?.[selectedSemester] || {}) };
+                    const avg = calcSemesterAverage(hk);
 
-              {selectedPolicy.mode === "COMMENT" ? (
-                <div className="score-metrics">
-                  <div className="score-metric full">
-                    <div className="score-metric-label">Đánh giá</div>
-                    <div className="score-metric-value">
-                      {semesterView.nhanXet === "CHUA_DAT" ? "Chưa đạt" : "Đạt"}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="score-list">
-                    {scoreList.map((item) => (
-                      <div className="score-tag" key={item.label}>
-                        <span>{item.label}</span>
-                        <strong>{item.value}</strong>
-                      </div>
-                    ))}
-                    <div className="score-tag">
-                      <span>Giữa kỳ</span>
-                      <strong>{semesterView.gk === "" ? "--" : semesterView.gk}</strong>
-                    </div>
-                    <div className="score-tag">
-                      <span>Cuối kỳ</span>
-                      <strong>{semesterView.ck === "" ? "--" : semesterView.ck}</strong>
-                    </div>
-                  </div>
+                    return (
+                      <tr key={subject.id} className={`hover:bg-blue-50/40 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
+                        <td className={`px-5 py-3.5 text-sm font-semibold text-slate-700 sticky left-0 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)] ${isEven ? 'bg-white' : 'bg-slate-50'}`}>{subject.tenMon}</td>
+                        <td className="px-3 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk.tx[0] || ""}</td>
+                        <td className="px-3 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk.tx[1] || ""}</td>
+                        <td className="px-3 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk.tx[2] || ""}</td>
+                        <td className="px-3 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk.tx[3] || ""}</td>
+                        <td className="px-5 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk.gk || ""}</td>
+                        <td className="px-5 py-3.5 text-sm font-medium text-slate-600 text-center border-r border-slate-200">{hk.ck || ""}</td>
+                        <td className="px-5 py-3.5 text-sm font-bold text-slate-800 text-center">{avg !== null ? avg.toFixed(1) : ""}</td>
+                      </tr>
+                    );
+                  })}
 
-                  <div className="score-metrics">
-                    <div className="score-metric">
-                      <div className="score-metric-label">TB {selectedSemester === "HK1" ? "HK1" : "HK2"}</div>
-                      <div className="score-metric-value">{selectedSemester === "HK1" ? (hk1Avg ?? "--") : (hk2Avg ?? "--")}</div>
-                    </div>
-                    <div className="score-metric">
-                      <div className="score-metric-label">TB cả năm</div>
-                      <div className="score-metric-value">{yearAvg ?? "--"}</div>
-                    </div>
-                  </div>
-                </>
-              )}
+                  {commentSubjects.map((subject, idx) => {
+                    const key = `${selectedNamHoc}_${subject.id}`;
+                    const record = scoreRecords[key];
+                    const isEven = (scoredSubjects.length + idx) % 2 === 0;
+                    
+                    if (selectedSemester === "CA_NAM") {
+                      const hk1 = record?.["HK1"];
+                      const hk2 = record?.["HK2"];
+                      let nx1 = "";
+                      let nx2 = "";
+                      let nxCaNam = "";
+                      if (hk1?.nhanXet === "DAT") nx1 = "Đạt";
+                      else if (hk1?.nhanXet === "CHUA_DAT") nx1 = "Chưa đạt";
+                      if (hk2?.nhanXet === "DAT") nx2 = "Đạt";
+                      else if (hk2?.nhanXet === "CHUA_DAT") nx2 = "Chưa đạt";
+                      
+                      if (hk1?.nhanXet && hk2?.nhanXet) {
+                          nxCaNam = (hk1.nhanXet === "DAT" && hk2.nhanXet === "DAT") ? "Đạt" : "Chưa đạt";
+                      }
+
+                      return (
+                        <tr key={subject.id} className={`hover:bg-blue-50/40 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
+                          <td className={`px-5 py-3.5 text-sm font-semibold text-slate-700 sticky left-0 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)] ${isEven ? 'bg-white' : 'bg-slate-50'}`}>{subject.tenMon}</td>
+                          <td className="px-5 py-3.5 text-sm font-medium text-slate-800 text-center border-r border-slate-200">{nx1}</td>
+                          <td className="px-5 py-3.5 text-sm font-medium text-slate-800 text-center border-r border-slate-200">{nx2}</td>
+                          <td className="px-5 py-3.5 text-sm font-bold text-slate-800 text-center">{nxCaNam}</td>
+                        </tr>
+                      );
+                    }
+
+                    const hk = record?.[selectedSemester] || {};
+                    let displayNx = "";
+                    if (hk.nhanXet === "DAT") displayNx = "Đạt";
+                    else if (hk.nhanXet === "CHUA_DAT") displayNx = "Chưa đạt";
+
+                    return (
+                      <tr key={subject.id} className={`hover:bg-blue-50/40 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
+                        <td className={`px-5 py-3.5 text-sm font-semibold text-slate-700 sticky left-0 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)] ${isEven ? 'bg-white' : 'bg-slate-50'}`}>{subject.tenMon}</td>
+                        <td className="px-5 py-3.5 text-sm font-medium text-slate-400 text-center italic border-r border-slate-200" colSpan={6}>Đánh giá bằng nhận xét</td>
+                        <td className="px-5 py-3.5 text-sm font-bold text-slate-800 text-center">{displayNx}</td>
+                      </tr>
+                    );
+                  })}
+
+                  {subjects.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-5 py-8 text-center text-sm font-medium text-slate-500">
+                        Chưa có danh sách môn học.
+                      </td>
+                    </tr>
+                  )}
+
+                </tbody>
+              </table>
             </div>
+
+            <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-4 md:gap-8">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-600">{semesterSummary?.label || "Điểm trung bình học kỳ:"}</span>
+                <span className="text-lg font-bold text-slate-800">{semesterSummary?.dtb !== null ? semesterSummary?.dtb?.toFixed(1) : "--"}</span>
+              </div>
+              <div className="hidden md:block w-px h-5 bg-slate-300"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-600">Học lực:</span>
+                <span className={`text-lg font-bold ${semesterSummary?.hocLuc?.color || "text-slate-800"}`}>{semesterSummary?.hocLuc?.label || "--"}</span>
+              </div>
+              <div className="hidden md:block w-px h-5 bg-slate-300"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-600">Hạnh kiểm:</span>
+                <span className={`text-lg font-bold ${semesterSummary?.hanhKiem?.color}`}>{semesterSummary?.hanhKiem?.label}</span>
+              </div>
+            </div>
+
           </div>
         )}
       </div>
+      <div className="fixed bottom-0 right-0 p-2 text-[10px] text-slate-300 opacity-50 font-mono pointer-events-none whitespace-pre">
+        DEBUG HK: {hanhKiemList?.length} - Y: {selectedNamHoc} - S: {selectedSemester}
+        HB: {hocBaList?.length}
+        {JSON.stringify(hocBaList.map(h => ({ namHoc: h.namHoc, hanhKiem: h.hanhKiem })))}
+      </div>
+
+      <PdfPreviewModal 
+        isOpen={showPdfPreview}
+        onClose={() => setShowPdfPreview(false)}
+        pdfUrl={pdfUrl}
+        title="Xem trước Bảng điểm PDF"
+      />
     </div>
   );
 }

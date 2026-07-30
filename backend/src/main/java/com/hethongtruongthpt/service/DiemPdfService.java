@@ -29,10 +29,29 @@ import java.util.stream.Collectors;
 @Service
 public class DiemPdfService {
 
+    private static final List<String> nhanXetSubjects = Arrays.asList(
+            "Giáo dục thể chất",
+            "Hoạt động trải nghiệm, hướng nghiệp",
+            "Nội dung giáo dục địa phương"
+    );
+
     private final LopHocRepository lopHocRepository;
     private final MonHocRepository monHocRepository;
     private final HocSinhRepository hocSinhRepository;
     private final DiemRepository diemRepository;
+
+
+    private com.itextpdf.text.pdf.BaseFont getBaseFont() {
+        try {
+            return com.itextpdf.text.pdf.BaseFont.createFont("C:/Windows/Fonts/arial.ttf", com.itextpdf.text.pdf.BaseFont.IDENTITY_H, com.itextpdf.text.pdf.BaseFont.EMBEDDED);
+        } catch (Exception e) {
+            try {
+                return com.itextpdf.text.pdf.BaseFont.createFont(com.itextpdf.text.pdf.BaseFont.TIMES_ROMAN, com.itextpdf.text.pdf.BaseFont.CP1252, com.itextpdf.text.pdf.BaseFont.NOT_EMBEDDED);
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+    }
 
     public DiemPdfService(LopHocRepository lopHocRepository,
                           MonHocRepository monHocRepository,
@@ -80,24 +99,19 @@ public class DiemPdfService {
         document.open();
 
         // School name header
-        Font schoolFont = new Font(Font.FontFamily.TIMES_ROMAN, 14, Font.BOLD);
-        Paragraph schoolName = new Paragraph("TRUONG THPT ABC", schoolFont);
-        schoolName.setAlignment(Element.ALIGN_CENTER);
-        schoolName.setSpacingAfter(4);
-        document.add(schoolName);
 
         // Title
-        Font titleFont = new Font(Font.FontFamily.TIMES_ROMAN, 16, Font.BOLD);
-        Paragraph title = new Paragraph("BANG DIEM LOP", titleFont);
+        Font titleFont = new Font(getBaseFont(), 16, Font.BOLD);
+        Paragraph title = new Paragraph("BẢNG ĐIỂM LỚP", titleFont);
         title.setAlignment(Element.ALIGN_CENTER);
         title.setSpacingAfter(8);
         document.add(title);
 
         // Subtitle: class, subject, semester, year
-        Font subFont = new Font(Font.FontFamily.TIMES_ROMAN, 11);
-        String hkLabel = hocKy == 1 ? "Hoc ky I" : "Hoc ky II";
+        Font subFont = new Font(getBaseFont(), 11);
+        String hkLabel = hocKy == 1 ? "Học kỳ I" : "Học kỳ II";
         Paragraph sub = new Paragraph(
-                "Lop: " + lopHoc.getTenLop()
+                "Lớp: " + lopHoc.getTenLop()
                         + "    |    Mon: " + monHoc.getTenMon()
                         + "    |    " + hkLabel
                         + "    |    Nam hoc: " + namHoc, subFont);
@@ -111,9 +125,9 @@ public class DiemPdfService {
         table.setWidths(new float[]{1f, 2f, 3.5f, 1.5f, 1.5f, 1.5f, 1.5f});
 
         // Header
-        Font headerFont = new Font(Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD, BaseColor.WHITE);
+        Font headerFont = new Font(getBaseFont(), 10, Font.BOLD, BaseColor.WHITE);
         BaseColor headerBg = new BaseColor(59, 130, 246);
-        String[] headers = {"STT", "Ma HS", "Ho ten", "TX (avg)", "GK", "CK", "TB"};
+        String[] headers = {"STT", "Mã HS", "Họ tên", "TX (avg)", "GK", "CK", "TB"};
 
         for (String header : headers) {
             PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
@@ -125,8 +139,8 @@ public class DiemPdfService {
         }
 
         // Data rows
-        Font dataFont = new Font(Font.FontFamily.TIMES_ROMAN, 10);
-        Font dataBoldFont = new Font(Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD);
+        Font dataFont = new Font(getBaseFont(), 10);
+        Font dataBoldFont = new Font(getBaseFont(), 10, Font.BOLD);
         BaseColor evenRowBg = new BaseColor(248, 251, 255);
 
         int stt = 0;
@@ -185,35 +199,42 @@ public class DiemPdfService {
             addCell(table, String.valueOf(stt), dataFont, rowBg, Element.ALIGN_CENTER);
             addCell(table, hs.getMaHocSinh() != null ? hs.getMaHocSinh() : "", dataFont, rowBg, Element.ALIGN_CENTER);
             addCell(table, hs.getHoTen() != null ? hs.getHoTen() : "", dataFont, rowBg, Element.ALIGN_LEFT);
-            addCell(table, txAvg != null ? txAvg.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
-            addCell(table, gkScore != null ? gkScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
-            addCell(table, ckScore != null ? ckScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
-            addCell(table, tb != null ? tb.toPlainString() : "--", dataBoldFont, rowBg, Element.ALIGN_CENTER);
+            if (nhanXetSubjects.contains(monHoc.getTenMon())) {
+                addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, "Đạt", dataBoldFont, rowBg, Element.ALIGN_CENTER);
+            } else {
+                addCell(table, txAvg != null ? txAvg.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, gkScore != null ? gkScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, ckScore != null ? ckScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, tb != null ? tb.toPlainString() : "--", dataBoldFont, rowBg, Element.ALIGN_CENTER);
+            }
         }
 
         document.add(table);
 
         // Footer
         document.add(new Paragraph(" "));
-        Font footerFont = new Font(Font.FontFamily.TIMES_ROMAN, 10, Font.ITALIC);
-        Paragraph footer = new Paragraph("Tong so: " + hocSinhs.size() + " hoc sinh", footerFont);
+        Font footerFont = new Font(getBaseFont(), 10, Font.ITALIC);
+        Paragraph footer = new Paragraph("Tổng số: " + hocSinhs.size() + " học sinh", footerFont);
         footer.setAlignment(Element.ALIGN_RIGHT);
         document.add(footer);
 
         // Signature area
         document.add(new Paragraph(" "));
-        Font sigFont = new Font(Font.FontFamily.TIMES_ROMAN, 10);
-        Paragraph sigLeft = new Paragraph("Giao vien bo mon", sigFont);
+        Font sigFont = new Font(getBaseFont(), 10);
+        Paragraph sigLeft = new Paragraph("Giáo viên bộ môn", sigFont);
         sigLeft.setAlignment(Element.ALIGN_LEFT);
-        Paragraph sigRight = new Paragraph("Giao vien chu nhiem", sigFont);
+        Paragraph sigRight = new Paragraph("Giáo viên chủ nhiệm", sigFont);
         sigRight.setAlignment(Element.ALIGN_RIGHT);
 
         PdfPTable sigTable = new PdfPTable(2);
         sigTable.setWidthPercentage(100);
-        PdfPCell leftCell = new PdfPCell(new Phrase("(Ky, ghi ro ho ten)", new Font(Font.FontFamily.TIMES_ROMAN, 9, Font.ITALIC)));
+        PdfPCell leftCell = new PdfPCell(new Phrase("(Ký, ghi rõ họ tên)", new Font(getBaseFont(), 9, Font.ITALIC)));
         leftCell.setBorder(PdfPCell.NO_BORDER);
         leftCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        PdfPCell rightCell = new PdfPCell(new Phrase("(Ky, ghi ro ho ten)", new Font(Font.FontFamily.TIMES_ROMAN, 9, Font.ITALIC)));
+        PdfPCell rightCell = new PdfPCell(new Phrase("(Ký, ghi rõ họ tên)", new Font(getBaseFont(), 9, Font.ITALIC)));
         rightCell.setBorder(PdfPCell.NO_BORDER);
         rightCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         sigTable.addCell(leftCell);
@@ -249,23 +270,17 @@ public class DiemPdfService {
         PdfWriter.getInstance(document, out);
         document.open();
 
-        Font schoolFont = new Font(Font.FontFamily.TIMES_ROMAN, 14, Font.BOLD);
-        Paragraph schoolName = new Paragraph("TRUONG THPT ABC", schoolFont);
-        schoolName.setAlignment(Element.ALIGN_CENTER);
-        schoolName.setSpacingAfter(4);
-        document.add(schoolName);
-
-        Font titleFont = new Font(Font.FontFamily.TIMES_ROMAN, 16, Font.BOLD);
-        Paragraph title = new Paragraph("KET QUA HOC TAP", titleFont);
+        Font titleFont = new Font(getBaseFont(), 16, Font.BOLD);
+        Paragraph title = new Paragraph("KẾT QUẢ HỌC TẬP", titleFont);
         title.setAlignment(Element.ALIGN_CENTER);
         title.setSpacingAfter(8);
         document.add(title);
 
-        Font infoFont = new Font(Font.FontFamily.TIMES_ROMAN, 12);
-        String hkLabel = hocKy == 1 ? "Hoc ky I" : "Hoc ky II";
-        Paragraph info1 = new Paragraph("Ho ten: " + hocSinh.getHoTen() + "    |    Ma HS: " + hocSinh.getMaHocSinh(), infoFont);
+        Font infoFont = new Font(getBaseFont(), 12);
+        String hkLabel = hocKy == 1 ? "Học kỳ I" : "Học kỳ II";
+        Paragraph info1 = new Paragraph("Họ tên: " + hocSinh.getHoTen() + "    |    Ma HS: " + hocSinh.getMaHocSinh(), infoFont);
         info1.setAlignment(Element.ALIGN_CENTER);
-        Paragraph info2 = new Paragraph("Lop: " + tenLop + "    |    " + hkLabel + "    |    Nam hoc: " + namHoc, infoFont);
+        Paragraph info2 = new Paragraph("Lớp: " + tenLop + "    |    " + hkLabel + "    |    Nam hoc: " + namHoc, infoFont);
         info2.setAlignment(Element.ALIGN_CENTER);
         info2.setSpacingAfter(16);
         document.add(info1);
@@ -275,21 +290,27 @@ public class DiemPdfService {
         table.setWidthPercentage(100);
         table.setWidths(new float[]{1f, 3.5f, 1.5f, 1.5f, 1.5f, 1.5f});
 
-        Font headerFont = new Font(Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD, BaseColor.WHITE);
+        Font headerFont = new Font(getBaseFont(), 10, Font.BOLD, BaseColor.WHITE);
         BaseColor headerBg = new BaseColor(59, 130, 246);
-        String[] headers = {"STT", "Mon hoc", "TX (avg)", "GK", "CK", "TB"};
+        String[] headers = {"STT", "Môn học", "TX (avg)", "GK", "CK", "TB"};
 
         for (String header : headers) {
             addCell(table, header, headerFont, headerBg, Element.ALIGN_CENTER);
         }
 
-        Font dataFont = new Font(Font.FontFamily.TIMES_ROMAN, 10);
-        Font dataBoldFont = new Font(Font.FontFamily.TIMES_ROMAN, 10, Font.BOLD);
+        Font dataFont = new Font(getBaseFont(), 10);
+        Font dataBoldFont = new Font(getBaseFont(), 10, Font.BOLD);
         BaseColor evenRowBg = new BaseColor(248, 251, 255);
 
         int stt = 0;
         List<MonHoc> monHocs = diemByMonHoc.keySet().stream()
-                .sorted(Comparator.comparing(MonHoc::getTenMon))
+                .sorted((m1, m2) -> {
+                    boolean isNx1 = nhanXetSubjects.contains(m1.getTenMon());
+                    boolean isNx2 = nhanXetSubjects.contains(m2.getTenMon());
+                    if (isNx1 && !isNx2) return 1;
+                    if (!isNx1 && isNx2) return -1;
+                    return m1.getTenMon().compareTo(m2.getTenMon());
+                })
                 .collect(Collectors.toList());
 
         for (MonHoc monHoc : monHocs) {
@@ -325,10 +346,17 @@ public class DiemPdfService {
             BaseColor rowBg = (stt % 2 == 0) ? evenRowBg : BaseColor.WHITE;
             addCell(table, String.valueOf(stt), dataFont, rowBg, Element.ALIGN_CENTER);
             addCell(table, monHoc.getTenMon(), dataFont, rowBg, Element.ALIGN_LEFT);
-            addCell(table, txAvg != null ? txAvg.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
-            addCell(table, gkScore != null ? gkScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
-            addCell(table, ckScore != null ? ckScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
-            addCell(table, tb != null ? tb.toPlainString() : "--", dataBoldFont, rowBg, Element.ALIGN_CENTER);
+            if (nhanXetSubjects.contains(monHoc.getTenMon())) {
+                addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, "Đạt", dataBoldFont, rowBg, Element.ALIGN_CENTER);
+            } else {
+                addCell(table, txAvg != null ? txAvg.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, gkScore != null ? gkScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, ckScore != null ? ckScore.toPlainString() : "--", dataFont, rowBg, Element.ALIGN_CENTER);
+                addCell(table, tb != null ? tb.toPlainString() : "--", dataBoldFont, rowBg, Element.ALIGN_CENTER);
+            }
         }
 
         document.add(table);

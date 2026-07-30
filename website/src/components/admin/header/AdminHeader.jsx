@@ -70,7 +70,7 @@ export default function AdminHeader({
 
   return (
     <header 
-      className={`fixed top-0 z-40 flex h-16 items-center justify-between border-b border-outline-variant bg-surface px-4 lg:px-8 transition-all duration-250 ease-[cubic-bezier(0.2,0.8,0.2,1)]`}
+      className={`fixed top-0 z-40 flex h-16 items-center justify-between border-b border-outline-variant bg-surface px-4 lg:px-8 transition-all duration-250 ease-[cubic-bezier(0.2,0.8,0.2,1)] print-hidden`}
       style={dynamicStyle}
     >
       <div className="flex items-center gap-4 flex-1">

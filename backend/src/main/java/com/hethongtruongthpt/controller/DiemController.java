@@ -126,7 +126,13 @@ public class DiemController {
         }
         return ResponseEntity.ok(ApiResponse.ok(diemService.getSummaryAll()));
     }
-
+    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
+    @GetMapping("/teacher-summary")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getTeacherSummary(
+            @RequestParam String namHoc,
+            @RequestParam Integer giaoVienId) {
+        return ResponseEntity.ok(ApiResponse.ok(diemService.getTeacherReportStats(namHoc, giaoVienId)));
+    }
     @PreAuthorize("hasAnyRole('ADMIN')")
     @GetMapping("/progress/summary")
     public ResponseEntity<ApiResponse<List<com.hethongtruongthpt.dto.DiemProgressDTO>>> getProgressSummary(

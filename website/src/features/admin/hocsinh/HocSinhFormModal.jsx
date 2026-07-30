@@ -38,9 +38,14 @@ export default function HocSinhFormModal({ hooks }) {
           <span>Họ và tên</span>
           <input
             value={form.hoTen}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, hoTen: event.target.value }))
-            }
+            onChange={(event) => {
+              const newName = event.target.value;
+              setForm((prev) => ({ 
+                ...prev, 
+                hoTen: newName,
+                email: buildStudentEmailPreview(newName)
+              }));
+            }}
             placeholder="vd: Nguyễn Văn A"
           />
         </label>
@@ -63,8 +68,8 @@ export default function HocSinhFormModal({ hooks }) {
               setForm((prev) => ({ ...prev, gioiTinh: event.target.value }))
             }
           >
-            <option value="NAM">Nam</option>
-            <option value="NU">Nữ</option>
+            <option value="true">Nam</option>
+            <option value="false">Nữ</option>
           </select>
         </label>
         <label className="form-field">

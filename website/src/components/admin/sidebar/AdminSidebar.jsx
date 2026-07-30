@@ -64,7 +64,7 @@ export default function AdminSidebar({ isMobileOpen, onMobileClose, onPanelState
       {/* Sidebar Container */}
       <aside 
         ref={sidebarRef}
-        className={`fixed top-0 left-0 h-screen z-50 bg-primary shadow-2xl transition-all duration-250 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col overflow-hidden ${
+        className={`fixed top-0 left-0 h-screen z-50 bg-primary shadow-2xl transition-all duration-250 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col overflow-hidden print-hidden ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${
           isExpanded || isMobileOpen ? 'w-[250px]' : 'w-[72px]'

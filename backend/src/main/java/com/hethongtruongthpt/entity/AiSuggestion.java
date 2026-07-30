@@ -11,8 +11,10 @@ public class AiSuggestion {
     @Column(name = "id")
     private Integer id;
 
-    @Column(name = "hoc_sinh_id", nullable = false)
-    private Integer hocSinhId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hoc_sinh_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private HocSinh hocSinh;
 
     @Column(name = "noi_dung_json", nullable = false, columnDefinition = "TEXT")
     private String noiDungJson;
@@ -48,11 +50,25 @@ public class AiSuggestion {
     }
 
     public Integer getHocSinhId() {
-        return hocSinhId;
+        return hocSinh != null ? hocSinh.getId() : null;
     }
 
     public void setHocSinhId(Integer hocSinhId) {
-        this.hocSinhId = hocSinhId;
+        if (hocSinhId == null) {
+            this.hocSinh = null;
+        } else {
+            HocSinh hs = new HocSinh();
+            hs.setId(hocSinhId);
+            this.hocSinh = hs;
+        }
+    }
+
+    public HocSinh getHocSinh() {
+        return hocSinh;
+    }
+
+    public void setHocSinh(HocSinh hocSinh) {
+        this.hocSinh = hocSinh;
     }
 
     public String getNoiDungJson() {

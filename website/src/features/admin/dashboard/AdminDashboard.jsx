@@ -63,27 +63,6 @@ const CustomBarTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-// Module-level timestamp — persists across React StrictMode double-mounts (which happen within ms)
-// but resets naturally when the page is reloaded or enough time has passed between navigations.
-let _barAnimMs = 0;
-
-const GrowBarShape = ({ x, y, width, height, fill, index, animate }) => {
-  if (!height || height <= 0) return null;
-  const r = Math.min(6, width / 2, height / 2);
-  const delay = animate ? (index || 0) * 120 : 0;
-  const path = `M${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} L${x},${y + height} Z`;
-  return (
-    <path
-      d={path}
-      fill={fill}
-      style={animate ? {
-        transformBox: 'fill-box',
-        transformOrigin: 'bottom',
-        animation: `growBarUp 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms both`,
-      } : {}}
-    />
-  );
-};
 
 const TypewriterText = ({ text }) => {
   const [displayText, setDisplayText] = useState("");
@@ -182,15 +161,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const chartDataRef = useRef([]); // prevents re-showing spinner when data already exists
 
-  // Determine if bars should animate: only on first mount per navigation.
-  // StrictMode double-mounts happen within ~10ms; real navigations take >500ms.
-  const barAnimRef = useRef(null);
-  if (barAnimRef.current === null) {
-    const _now = Date.now();
-    barAnimRef.current = _now - _barAnimMs > 500;
-    if (barAnimRef.current) _barAnimMs = _now;
-  }
-  const barShouldAnimate = barAnimRef.current;
+  // Use simple boolean for default Recharts animation
+  const barShouldAnimate = true;
 
   useEffect(() => {
     try {
@@ -435,13 +407,12 @@ export default function AdminDashboard() {
               <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-semibold">Chưa có dữ liệu điểm</div>
             ) : (
               <>
-                <style>{`@keyframes growBarUp { from { transform: scaleY(0); opacity: 0.4; } to { transform: scaleY(1); opacity: 1; } }`}</style>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dashboardData.blockAvg} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: "#64748b", fontWeight: 600 }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: "#94a3b8", fontWeight: 600 }} domain={[0, 10]} />
                     <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "transparent" }} />
-                    <Bar dataKey="value" maxBarSize={60} shape={<GrowBarShape animate={barShouldAnimate} />} isAnimationActive={false} label={{ position: 'top', fill: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>
+                    <Bar dataKey="value" maxBarSize={60} radius={[6, 6, 0, 0]} isAnimationActive={barShouldAnimate} animationDuration={800} label={{ position: 'top', fill: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>
                       {dashboardData.blockAvg.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill="#2563eb" />
                       ))}

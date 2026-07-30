@@ -5,6 +5,7 @@ import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import { updateTkbNote } from "../../../api/thoikhoabieuApi.js";
+import { getLimitedSemesterWeeks } from "../../../utils/helpers.js";
 
 const DAYS = [
   { value: 2, label: "Thứ Hai" },
@@ -271,8 +272,8 @@ export default function TeacherRegisterPhanCong() {
               onChange={(e) => setTuan(parseInt(e.target.value))}
               style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ccc", fontSize: 13 }}
             >
-              {Array.from({ length: 36 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>Tuần {i + 1}</option>
+              {getLimitedSemesterWeeks(namHoc, hocKy).map((w) => (
+                <option key={w} value={w}>Tuần {w}</option>
               ))}
             </select>
           </div>

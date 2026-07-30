@@ -5,7 +5,12 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "thoi_khoa_bieu")
+@Table(name = "thoi_khoa_bieu", indexes = {
+    @Index(name = "idx_tkb_lop_hk_nam", columnList = "lop_id, hoc_ky, nam_hoc")
+}, uniqueConstraints = {
+    @UniqueConstraint(name = "uq_tkb_gv_tiet_thu", columnNames = {"giao_vien_id", "tiet_bat_dau", "thu", "tuan", "nam_hoc", "hoc_ky"}),
+    @UniqueConstraint(name = "uq_tkb_phong_tiet_thu", columnNames = {"phong_hoc", "tiet_bat_dau", "thu", "tuan", "nam_hoc", "hoc_ky"})
+})
 @SQLDelete(sql = "UPDATE thoi_khoa_bieu SET is_deleted = true WHERE id = ?")
 @SQLRestriction("is_deleted = false")
 public class ThoiKhoaBieu {

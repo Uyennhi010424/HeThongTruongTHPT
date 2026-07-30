@@ -141,7 +141,7 @@ export default function ProfilePage() {
       case "lop": return student?.lop?.tenLop || "Chưa có lớp";
       case "giaoVienChuNhiem": return student?.lop?.gvcn?.hoTen || "--";
       case "ngaySinh": return formatDisplayDate(student?.ngaySinh);
-      case "gioiTinh": return student?.gioiTinh === "NU" ? "Nữ" : "Nam";
+      case "gioiTinh": return (student?.gioiTinh === "NU" || student?.gioiTinh === "false" || student?.gioiTinh === false) ? "Nữ" : "Nam";
       case "sdt": return student?.sdt || "--";
       case "diaChi": return student?.diaChi || "--";
       case "danToc": return student?.danToc || "Không rõ";

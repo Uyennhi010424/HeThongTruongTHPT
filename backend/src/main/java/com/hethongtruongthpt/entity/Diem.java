@@ -1,6 +1,7 @@
 package com.hethongtruongthpt.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -17,9 +18,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Table(name = "diem", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"hoc_sinh_id", "mon_hoc_id", "loai_diem", "so_thu_tu", "hoc_ky", "nam_hoc"})
 }, indexes = {
-    @Index(name = "idx_diem_nam_hoc", columnList = "nam_hoc"),
-    @Index(name = "idx_diem_hoc_sinh", columnList = "hoc_sinh_id"),
-    @Index(name = "idx_diem_gv_nhap", columnList = "giao_vien_nhap_id")
+    @Index(name = "idx_diem_hs_nam_hk", columnList = "hoc_sinh_id, nam_hoc, hoc_ky"),
+    @Index(name = "idx_diem_gv_nam_hk", columnList = "giao_vien_nhap_id, nam_hoc, hoc_ky")
 })
 public class Diem {
     @Id
@@ -37,7 +37,7 @@ public class Diem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "phan_cong_day_id", nullable = false)
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private PhanCongDay phanCongDay;
 
     @NotBlank(message = "Loại điểm không được để trống")
@@ -94,8 +94,8 @@ public class Diem {
     private String ghiChu;
 
     @Version
-    @Column(name = "version")
-    private Long version;
+    @Column(name = "version", nullable = false, columnDefinition = "bigint default 0")
+    private long version;
 
     @PrePersist
     public void prePersist() {
@@ -216,11 +216,11 @@ public class Diem {
         this.ghiChu = ghiChu;
     }
 
-    public Long getVersion() {
+    public long getVersion() {
         return version;
     }
 
-    public void setVersion(Long version) {
+    public void setVersion(long version) {
         this.version = version;
     }
 

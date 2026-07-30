@@ -5,6 +5,8 @@ import { getHocKy } from "../../../api/hockyApi.js";
 import {
   generateThoiKhoaBieu,
   getThoiKhoaBieu,
+  moveThoiKhoaBieu,
+  swapThoiKhoaBieu
 } from "../../../api/thoikhoabieuApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import {
@@ -16,6 +18,7 @@ import {
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import { getLimitedSemesterWeeks } from "../../../utils/helpers.js";
 import PdfPreviewModal from "../../../components/common/PdfPreviewModal.jsx";
 
 const getApiMessage = (err, fallback) =>
@@ -45,37 +48,7 @@ export default function AdminThoiKhoaBieuPage() {
   }, [namHocs, selectedYearId]);
 
   const semesterWeeks = useMemo(() => {
-    if (!selectedYear || !selectedHocKy) {
-      return Array.from({ length: 18 }, (_, i) => i + 1);
-    }
-    const hk = Number(selectedHocKy) === 2 ? 2 : 1;
-    const startDateStr = hk === 2 ? selectedYear.ngayBatDauHk2 : selectedYear.ngayBatDauHk1;
-    const endDateStr = hk === 2 ? selectedYear.ngayKetThucHk2 : selectedYear.ngayKetThucHk1;
-
-    if (!startDateStr || !endDateStr) {
-      return Array.from({ length: 18 }, (_, i) => i + 1);
-    }
-
-    const getWeekNo = (dateVal) => {
-      if (!selectedYear.ngayBatDauHk1) return 1;
-      const schoolStart = new Date(selectedYear.ngayBatDauHk1 + "T00:00:00");
-      const dayOfWeek = schoolStart.getDay();
-      const monday = new Date(schoolStart);
-      monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-      const targetDate = new Date(dateVal + "T00:00:00");
-      const diff = Math.floor((targetDate - monday) / (1000 * 60 * 60 * 24));
-      return Math.max(1, Math.floor(diff / 7) + 1);
-    };
-
-    const minW = getWeekNo(startDateStr);
-    const maxW = getWeekNo(endDateStr);
-    const from = Math.min(minW, maxW);
-    const to = Math.max(minW, maxW);
-    const wList = [];
-    for (let w = from; w <= to; w++) {
-      wList.push(w);
-    }
-    return wList.length > 0 ? wList : Array.from({ length: 18 }, (_, i) => i + 1);
+    return getLimitedSemesterWeeks(selectedYear, selectedHocKy);
   }, [selectedYear, selectedHocKy]);
 
   useEffect(() => {
@@ -248,6 +221,54 @@ export default function AdminThoiKhoaBieuPage() {
       notifyError(getApiMessage(err, "Không thể sắp xếp thời khóa biểu tự động."));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ─── DRAG & DROP TKB ───
+  const [draggedSlot, setDraggedSlot] = useState(null);
+
+  const handleDragStart = (e, slot) => {
+    setDraggedSlot(slot);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = async (e, thu, tiet, lopId, targetSlot) => {
+    e.preventDefault();
+    if (!draggedSlot) return;
+
+    const sourceLopId = draggedSlot.lop?.id || draggedSlot.lopHoc?.id;
+    if (sourceLopId !== lopId) {
+      notifyError("Chỉ có thể di chuyển/hoán đổi tiết học trong cùng một lớp.");
+      setDraggedSlot(null);
+      return;
+    }
+
+    if (draggedSlot.thu === thu && draggedSlot.tietBatDau === tiet) {
+      setDraggedSlot(null);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      if (targetSlot) {
+        await swapThoiKhoaBieu(draggedSlot.id, targetSlot.id);
+        notifySuccess("Đã hoán đổi lịch thành công.");
+      } else {
+        await moveThoiKhoaBieu(draggedSlot.id, thu, tiet);
+        notifySuccess("Đã di chuyển lịch thành công.");
+      }
+      axiosClient.invalidateCache("/thoikhoabieu");
+      fetchTimetable();
+    } catch (err) {
+      notifyError(getApiMessage(err, "Không thể sắp xếp lại thời khóa biểu."));
+    } finally {
+      setSaving(false);
+      setDraggedSlot(null);
     }
   };
 
@@ -740,15 +761,24 @@ export default function AdminThoiKhoaBieuPage() {
                         return (
                           <td
                             key={lop.id}
-                            className="p-1.5 border-r border-gray-150 align-middle border-b border-gray-150"
+                            className={`p-1.5 border-r border-gray-150 align-middle border-b border-gray-150 ${draggedSlot && (draggedSlot.lop?.id === lop.id || draggedSlot.lopHoc?.id === lop.id) ? "bg-blue-50/30" : ""}`}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, thu, tiet, lop.id, slot)}
                           >
                             {slot ? (
-                              <div className={`p-2 rounded-xl border flex flex-col justify-center gap-0.5 h-full shadow-xs transition-all hover:scale-[1.01] hover:shadow-sm ${getSubjectColor(slot.monHoc?.tenMon)}`}>
+                              <div 
+                                className={`p-2 rounded-xl border flex flex-col justify-center gap-0.5 h-full shadow-xs transition-all hover:scale-[1.01] hover:shadow-sm cursor-grab active:cursor-grabbing ${getSubjectColor(slot.monHoc?.tenMon)} ${slot.isLocked ? "ring-2 ring-blue-400" : ""}`}
+                                draggable={true}
+                                onDragStart={(e) => handleDragStart(e, slot)}
+                              >
                                 <span className="font-black text-blue-955 text-xs leading-snug">{slot.monHoc?.tenMon}</span>
                                 <span className="text-[10px] opacity-90 font-bold text-slate-600 flex items-center gap-1">
                                   <span className="material-symbols-outlined text-[12px] opacity-75">person</span>
                                   {slot.giaoVien?.hoTen || "Chưa phân"}
                                 </span>
+                                {slot.isLocked && (
+                                  <span className="text-[9px] font-bold text-blue-600 mt-0.5 bg-white/60 rounded px-1 self-start">Giáo viên ĐK</span>
+                                )}
                               </div>
                             ) : (
                               <div className="w-full text-center text-xs text-gray-300 italic py-2.5">—</div>

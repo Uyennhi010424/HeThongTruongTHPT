@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import java.text.Normalizer;
@@ -128,6 +130,7 @@ public class HocSinhService {
         return result;
     }
 
+    @Cacheable(value = "hocSinhList", key = "#lopId")
     public List<HocSinh> getByLopId(Integer lopId) {
         List<HocSinh> list = hocSinhRepository.findByLopIdAndTrangThai(lopId, 1);
         assignParentIds(list);
@@ -155,6 +158,7 @@ public class HocSinhService {
      * Nếu bất kỳ bước nào fail → rollback toàn bộ (không orphan User).
      * Retry tối đa 5 lần nếu trùng unique constraint.
      */
+    @CacheEvict(value = "hocSinhList", allEntries = true)
     public HocSinh create(HocSinh hocSinh) {
         // Validate trước khi vào transaction
         LopHoc lop = resolveLop(hocSinh);
@@ -240,6 +244,7 @@ public class HocSinhService {
         throw new ApiException("Không thể tạo học sinh sau " + maxRetries + " lần thử. Có thể dữ liệu bị trùng.");
     }
 
+    @CacheEvict(value = "hocSinhList", allEntries = true)
     public HocSinh update(Integer id, HocSinh hocSinh) {
         HocSinh existing = getById(id);
         Integer oldLopId = existing.getLop() != null ? existing.getLop().getId() : null;
@@ -254,7 +259,39 @@ public class HocSinhService {
         if (hocSinh.getDanToc() != null) existing.setDanToc(hocSinh.getDanToc());
         if (hocSinh.getTonGiao() != null) existing.setTonGiao(hocSinh.getTonGiao());
         if (hocSinh.getSdt() != null) existing.setSdt(hocSinh.getSdt());
-        if (hocSinh.getEmail() != null) existing.setEmail(hocSinh.getEmail());
+        if (hocSinh.getEmail() != null) {
+            String newEmail = hocSinh.getEmail().trim();
+            if (existing.getEmail() == null || !existing.getEmail().equalsIgnoreCase(newEmail)) {
+                var existingUserOpt = userRepository.findByUsername(newEmail);
+                if (existingUserOpt.isPresent()) {
+                    User existingUser = existingUserOpt.get();
+                    if (existing.getUser() == null || !existingUser.getId().equals(existing.getUser().getId())) {
+                        if (hocSinh.getHoTen() != null) {
+                            newEmail = generateUniqueUsername(hocSinh.getHoTen());
+                        } else {
+                            throw new ApiException("Email này đã được sử dụng bởi tài khoản khác.");
+                        }
+                    }
+                }
+                existing.setEmail(newEmail);
+                if (existing.getUser() != null) {
+                    User user = existing.getUser();
+                    user.setUsername(newEmail);
+                    user.setEmail(newEmail);
+                    userRepository.save(user);
+                } else {
+                    User user = new User();
+                    user.setUsername(newEmail);
+                    user.setEmail(newEmail);
+                    user.setPassword(passwordEncoder.encode(passwordPolicy.getStudentDefaultPassword()));
+                    user.setRole(RoleEnum.HOC_SINH);
+                    user.setIsActive(true);
+                    user.setMustChangePassword(true);
+                    user = userRepository.save(user);
+                    existing.setUser(user);
+                }
+            }
+        }
         if (hocSinh.getDiaChi() != null) existing.setDiaChi(hocSinh.getDiaChi());
         if (hocSinh.getNamNhapHoc() != null) existing.setNamNhapHoc(hocSinh.getNamNhapHoc());
         if (hocSinh.getAnhDaiDien() != null) existing.setAnhDaiDien(hocSinh.getAnhDaiDien());
@@ -271,6 +308,7 @@ public class HocSinhService {
         return getById(saved.getId());
     }
 
+    @CacheEvict(value = "hocSinhList", allEntries = true)
     public void delete(Integer id) {
         HocSinh existing = getById(id);
         Integer lopId = existing.getLop() != null ? existing.getLop().getId() : null;
@@ -283,6 +321,7 @@ public class HocSinhService {
     /**
      * Đánh dấu 1 học sinh đã tốt nghiệp (trangThai = 2).
      */
+    @CacheEvict(value = "hocSinhList", allEntries = true)
     public void markGraduated(Integer id) {
         HocSinh existing = getById(id);
         existing.setTrangThai(2); // 2 = đã tốt nghiệp
@@ -294,6 +333,7 @@ public class HocSinhService {
      * Trả về số lượng học sinh được đánh dấu.
      */
     @Transactional
+    @CacheEvict(value = "hocSinhList", allEntries = true)
     public int markAllGrade12Graduated() {
         List<HocSinh> allStudents = hocSinhRepository.findAll();
         int count = 0;

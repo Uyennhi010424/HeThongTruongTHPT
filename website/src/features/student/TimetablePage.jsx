@@ -4,7 +4,7 @@ import { getThoiKhoaBieu } from "../../api/thoikhoabieuApi.js";
 import { getLichThiByLop } from "../../api/lichthiApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { formatDateShort, getDayLabel } from "../../utils/helpers.js";
+import { formatDateShort, getDayLabel, getCurrentSemesterWeek } from "../../utils/helpers.js";
 import MaterialIcon from "../../components/edu/MaterialIcon.jsx";
 
 const WEEK_DAYS = [2, 3, 4, 5, 6, 7, 8];
@@ -99,15 +99,8 @@ export default function TimetablePage() {
   };
 
   const getDefaultTuan = (ngayBatDauHk1) => {
-    if (!ngayBatDauHk1) return 1;
-    const schoolStart = new Date(ngayBatDauHk1 + "T00:00:00");
-    const dayOfWeek = schoolStart.getDay();
-    const monday = new Date(schoolStart);
-    monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    const now = new Date();
-    const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return 1;
-    return Math.max(1, Math.floor(diffDays / 7) + 1);
+    // Call the shared helper. Since it expects an object with ngayBatDauHk1, we pass it.
+    return getCurrentSemesterWeek({ ngayBatDauHk1 });
   };
 
   useEffect(() => {
@@ -494,6 +487,7 @@ export default function TimetablePage() {
               className="tkb-btn"
               type="button"
               onClick={() => setSelectedTuan((prev) => Math.max(1, prev - 1))}
+              disabled={selectedTuan <= 1}
             >
               ← Trở về
             </button>
@@ -503,7 +497,8 @@ export default function TimetablePage() {
             <button
               className="tkb-btn"
               type="button"
-              onClick={() => setSelectedTuan((prev) => prev + 1)}
+              onClick={() => setSelectedTuan((prev) => Math.min(getCurrentSemesterWeek(yearInfo.tenNamHoc) + 2, prev + 1))}
+              disabled={selectedTuan >= getCurrentSemesterWeek(yearInfo.tenNamHoc) + 2}
             >
               Tiếp →
             </button>

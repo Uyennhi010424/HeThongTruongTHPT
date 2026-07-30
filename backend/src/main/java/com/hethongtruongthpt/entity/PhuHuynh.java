@@ -4,11 +4,13 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "phu_huynh")
 @SQLDelete(sql = "UPDATE phu_huynh SET is_deleted = true WHERE id = ?")
 @SQLRestriction("is_deleted = false")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class PhuHuynh {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

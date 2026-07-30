@@ -274,6 +274,7 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     allowedSubjects,
     allStudents,
     allNamHoc,
+    allSubjects,
     
     selectedNamHoc,
     setSelectedNamHoc,

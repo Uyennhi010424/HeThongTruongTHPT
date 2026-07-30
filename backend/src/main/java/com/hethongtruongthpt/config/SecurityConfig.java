@@ -51,6 +51,8 @@ public class SecurityConfig {
                 .requestMatchers("/uploads/**").permitAll()
                 // Upload API require authentication
                 .requestMatchers("/api/upload/**").authenticated()
+                // WebSocket
+                .requestMatchers("/ws/**").permitAll()
                 // Actuator - only ADMIN
                 .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
                 // All other endpoints require authentication

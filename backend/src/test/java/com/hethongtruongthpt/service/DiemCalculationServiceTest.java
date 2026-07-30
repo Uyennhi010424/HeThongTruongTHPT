@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.hethongtruongthpt.dto.DiemSummaryDTO;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,7 +28,7 @@ public class DiemCalculationServiceTest {
     @InjectMocks
     private DiemCalculationService diemCalculationService;
 
-    private List<Map<String, Object>> mockSummaryData;
+    private List<DiemSummaryDTO> mockSummaryData;
 
     @BeforeEach
     void setUp() {
@@ -57,16 +58,19 @@ public class DiemCalculationServiceTest {
         mockSummaryData.add(createDiemRow(4, 1, 1, 1, "CK", 4.0));
     }
 
-    private Map<String, Object> createDiemRow(int hsId, int mhId, int hk, int stt, String loai, double diem) {
-        Map<String, Object> row = new HashMap<>();
-        row.put("hoc_sinh_id", hsId);
-        row.put("mon_hoc_id", mhId);
-        row.put("loai_diem", loai);
-        row.put("so_thu_tu", stt);
-        row.put("hoc_ky", hk);
-        row.put("gia_tri", diem);
-        row.put("khoi", 10);
-        return row;
+    private DiemSummaryDTO createDiemRow(int hsId, int mhId, int hk, int stt, String loai, double diem) {
+        return new DiemSummaryDTO() {
+            @Override public Integer getHoc_sinh_id() { return hsId; }
+            @Override public Integer getMon_hoc_id() { return mhId; }
+            @Override public String getLoai_diem() { return loai; }
+            @Override public Integer getSo_thu_tu() { return stt; }
+            @Override public Integer getHoc_ky() { return hk; }
+            @Override public String getNam_hoc() { return "2023-2024"; }
+            @Override public java.math.BigDecimal getGia_tri() { return new java.math.BigDecimal(String.valueOf(diem)); }
+            @Override public String getNhan_xet() { return null; }
+            @Override public Integer getLop_id() { return 1; }
+            @Override public Integer getKhoi() { return 10; }
+        };
     }
 
     @Test

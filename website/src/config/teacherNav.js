@@ -39,13 +39,5 @@ export const TEACHER_NAV = [
       { path: "/teacher/hanhkiem", label: "Hạnh kiểm", icon: CheckCircle }
     ]
   },
-  {
-    id: "other",
-    group: "Khác",
-    icon: Settings,
-    children: [
-      { path: "/teacher/thongbao", label: "Thông báo", icon: BellRing },
-      { path: "/teacher/report", label: "Thống kê", icon: BarChart3 }
-    ]
-  }
+  { id: "thongbao", group: "Thông báo", icon: BellRing, path: "/teacher/thongbao" }
 ];

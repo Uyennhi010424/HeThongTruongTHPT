@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -28,9 +29,27 @@ public class PhuHuynhHocSinhController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH')")
     @GetMapping("/{id}/phuhuynh")
-    public ResponseEntity<ApiResponse<List<PhuHuynh>>> getParentsForStudent(@PathVariable("id") Integer id) {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getParentsForStudent(@PathVariable("id") Integer id) {
         List<PhuHuynhHocSinh> links = repository.findByHocSinhId(id);
-        List<PhuHuynh> parents = links.stream().map(PhuHuynhHocSinh::getPhuHuynh).collect(Collectors.toList());
+        List<Map<String, Object>> parents = links.stream()
+            .map(link -> {
+                try {
+                    PhuHuynh ph = link.getPhuHuynh();
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", ph.getId() != null ? ph.getId() : 0);
+                    map.put("userId", (ph.getUser() != null && ph.getUser().getId() != null) ? ph.getUser().getId() : null);
+                    map.put("hoTen", ph.getHoTen() != null ? ph.getHoTen() : "");
+                    map.put("soDienThoai", ph.getSoDienThoai() != null ? ph.getSoDienThoai() : "");
+                    map.put("email", ph.getEmail() != null ? ph.getEmail() : "");
+                    map.put("ngheNghiep", ph.getNgheNghiep() != null ? ph.getNgheNghiep() : "");
+                    map.put("quanHe", link.getQuanHe() != null ? link.getQuanHe() : "");
+                    return map;
+                } catch (Exception e) {
+                    return null;
+                }
+            })
+            .filter(p -> p != null)
+            .collect(Collectors.toList());
         return ResponseEntity.ok(ApiResponse.ok(parents));
     }
 

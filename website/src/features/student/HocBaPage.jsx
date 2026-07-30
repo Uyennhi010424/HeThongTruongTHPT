@@ -231,7 +231,7 @@ export default function HocBaPage() {
                   { (currentPhase === "HK1" || currentPhase === "HK2" || currentPhase === "ALL") && (
                     <tr className="hover:bg-slate-50/50 transition-colors bg-white">
                       <td className="px-6 py-5 text-sm font-bold text-slate-700">Học kỳ I</td>
-                      <td className="px-6 py-5 text-xl font-bold text-slate-800">{dtbHK1 !== null ? dtbHK1.toFixed(2) : "--"}</td>
+                      <td className="px-6 py-5 text-xl font-bold text-slate-800">{dtbHK1 !== null ? dtbHK1.toFixed(1) : "--"}</td>
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHocLucHK1.color}>{displayHocLucHK1.label}</span></td>
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHanhKiemHK1.color}>{displayHanhKiemHK1.label}</span></td>
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHocLucHK1.color}>{displayHocLucHK1.label}</span></td>
@@ -240,7 +240,7 @@ export default function HocBaPage() {
                   { (currentPhase === "HK2" || currentPhase === "ALL") && (
                     <tr className="hover:bg-slate-50/50 transition-colors bg-white">
                       <td className="px-6 py-5 text-sm font-bold text-slate-700">Học kỳ II</td>
-                      <td className="px-6 py-5 text-xl font-bold text-slate-800">{dtbHK2 !== null ? dtbHK2.toFixed(2) : "--"}</td>
+                      <td className="px-6 py-5 text-xl font-bold text-slate-800">{dtbHK2 !== null ? dtbHK2.toFixed(1) : "--"}</td>
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHocLucHK2.color}>{displayHocLucHK2.label}</span></td>
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHanhKiemHK2.color}>{displayHanhKiemHK2.label}</span></td>
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHocLucHK2.color}>{displayHocLucHK2.label}</span></td>

@@ -120,7 +120,7 @@ export const calcSemesterAverage = (semesterData) => {
 
   const sumTx = txScores.reduce((acc, curr) => acc + curr, 0);
   const avg = (sumTx + 2 * gk + 3 * ck) / (txScores.length + 5);
-  return Number(avg.toFixed(2));
+  return Number(avg.toFixed(1));
 };
 
 /**
@@ -129,7 +129,7 @@ export const calcSemesterAverage = (semesterData) => {
  */
 export const calcYearAverage = (hk1Avg, hk2Avg) => {
   if (hk1Avg === null || hk2Avg === null) return null;
-  return Number(((hk1Avg + 2 * hk2Avg) / 3).toFixed(2));
+  return Number(((hk1Avg + 2 * hk2Avg) / 3).toFixed(1));
 };
 
 // ─── Learning level classification ───
@@ -153,10 +153,10 @@ export const getOverallLearningLevel = ({ commentResults, numericAverages }) => 
   const commentNotReached = commentResults.filter((item) => item !== "DAT").length;
   const numericValid = numericAverages.filter((item) => item !== null);
 
-  if (numericValid.length !== numericAverages.length) return "CHUA_DAT";
+  if (numericValid.length !== numericAverages.length || numericAverages.length === 0) return null;
 
   const overallMean = numericValid.length
-    ? Number((numericValid.reduce((a, b) => a + b, 0) / numericValid.length).toFixed(2))
+    ? Number((numericValid.reduce((a, b) => a + b, 0) / numericValid.length).toFixed(1))
     : 0;
 
   if (overallMean < 4.0) return "CHUA_DAT";
@@ -175,7 +175,7 @@ export const getOverallLearningLevel = ({ commentResults, numericAverages }) => 
   const maxOneCommentFailed = totalCommentSubjects > 0 ? commentNotReached <= 1 : true;
   if (maxOneCommentFailed && countAbove50 >= 6 && allAbove35) return "DAT";
 
-  return "DAT";
+  return "CHUA_DAT";
 };
 
 /**
@@ -186,7 +186,8 @@ export const getLearningLevelLabel = (value) => {
     case "TOT": return "Tốt";
     case "KHA": return "Khá";
     case "DAT": return "Đạt";
-    default: return "Chưa đạt";
+    case "CHUA_DAT": return "Chưa đạt";
+    default: return "--";
   }
 };
 
@@ -203,7 +204,7 @@ export const classifyHocLuc = (diemTBCaNam, diemTBMons, commentResults = []) => 
   if (numericValid.length !== diemTBMons.length) return null;
 
   const overallMean = numericValid.length
-    ? Number((numericValid.reduce((a, b) => a + b, 0) / numericValid.length).toFixed(2))
+    ? Number((numericValid.reduce((a, b) => a + b, 0) / numericValid.length).toFixed(1))
     : 0;
 
   if (overallMean < 4.0) return { label: "Chưa đạt", color: "text-red-700 bg-red-50", value: "CHUA_DAT" };

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bell, Calendar, User, Phone, Mail, MessageSquare, ChevronRight, CheckCircle2, BookOpen } from "lucide-react";
+import NoticeModal from "../../components/thongbao/NoticeModal";
 import { getThongBao } from "../../api/thongbaoApi.js";
 import { getLichThiByLop } from "../../api/lichthiApi.js";
 import { getMonHoc } from "../../api/monhocApi.js";
@@ -9,9 +10,12 @@ import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { formatDate } from "../../utils/helpers.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
+import { webSocketService } from "../../utils/websocket.js";
 
 export default function HomePage() {
   const { students, currentStudent, selectStudent, loading: studentsLoading } = useParentStudents();
+  const [selectedNotice, setSelectedNotice] = useState(null);
+  const navigate = useNavigate();
   const [data, setData] = useState({
     notices: [],
     exams: [],
@@ -78,7 +82,42 @@ export default function HomePage() {
     };
 
     fetchData();
-    return () => { active = false; };
+    
+    // Đăng ký nhận thông báo real-time
+    webSocketService.connect(() => {
+      webSocketService.subscribe('/topic/notifications', (newNotice) => {
+        if ((newNotice.doiTuong === "PHU_HUYNH" || newNotice.doiTuong === "ALL") && 
+            !newNotice.isReply && 
+            newNotice.senderRole !== "PHU_HUYNH") {
+          setData(prev => {
+            if (prev.notices.find(n => n.id === newNotice.id)) return prev;
+            return { ...prev, notices: [newNotice, ...prev.notices] };
+          });
+        }
+      });
+      
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user?.id) {
+            webSocketService.subscribe(`/topic/user/${user.id}`, (newNotice) => {
+              if (!newNotice.isReply) {
+                setData(prev => {
+                  if (prev.notices.find(n => n.id === newNotice.id)) return prev;
+                  return { ...prev, notices: [newNotice, ...prev.notices] };
+                });
+              }
+            });
+          }
+        } catch(e) {}
+      }
+    });
+
+    return () => { 
+      active = false; 
+      webSocketService.unsubscribe('/topic/notifications');
+    };
   }, [currentStudent]);
 
   const { upcomingExams, recentActivities, subjectsTodayCount } = useMemo(() => {
@@ -228,12 +267,12 @@ export default function HomePage() {
                   ) : (
                     <div className="space-y-4">
                       {data.notices.slice(0, 3).map((n) => (
-                        <div key={n.id} className="flex gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                        <div key={n.id} onClick={() => setSelectedNotice(n)} className="flex gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
                           <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
                           <div>
                             <h4 className="font-semibold text-slate-800 text-sm">{n.tieuDe}</h4>
                             <p className="text-xs text-slate-500 mt-1 line-clamp-2">{n.noiDung}</p>
-                            <span className="text-[11px] text-slate-400 mt-2 block">{formatDate(n.createdAt)}</span>
+                            <span className="text-[11px] text-slate-400 mt-2 block">{formatDate(n.createdAt || n.ngayDang)}</span>
                           </div>
                         </div>
                       ))}
@@ -334,7 +373,7 @@ export default function HomePage() {
                       </div>
                       
                       <div className="flex gap-3">
-                        <button className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => navigate('/parent/thongbao')} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
                           <MessageSquare size={16} /> Gửi tin nhắn
                         </button>
                         {gvcn.soDienThoai && (
@@ -376,6 +415,10 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {selectedNotice && (
+        <NoticeModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.math.BigDecimal;
+import org.springframework.cache.annotation.Cacheable;
 import com.hethongtruongthpt.dto.DiemProgressDTO;
 
 import com.hethongtruongthpt.repository.LopHocRepository;
@@ -60,6 +61,10 @@ public class DiemCalculationService {
 
     public List<Map<String, Object>> getSummaryAll() {
         return convertSummary(diemRepository.findSummaryAll());
+    }
+
+    public List<Map<String, Object>> getTeacherReportStats(String namHoc, Integer giaoVienId) {
+        return diemRepository.findTeacherReportStats(namHoc, giaoVienId);
     }
 
     public List<DiemProgressDTO> getProgressSummary(String namHoc, Integer hocKy) {
@@ -233,43 +238,25 @@ public class DiemCalculationService {
         return new ClassScoreboardDTO(classInfo, subjects, students);
     }
 
-    public List<Map<String, Object>> convertSummary(List<Map<String, Object>> raw) {
+    public List<Map<String, Object>> convertSummary(List<com.hethongtruongthpt.dto.DiemSummaryDTO> raw) {
         List<Map<String, Object>> result = new ArrayList<>();
         if (raw.isEmpty()) {
             logger.warn("convertSummary: raw query trả về 0 rows!");
         } else {
-            logger.info("convertSummary: {} rows, sample keys: {}", raw.size(), raw.get(0).keySet());
+            logger.info("convertSummary: {} rows", raw.size());
         }
-        for (Map<String, Object> row : raw) {
+        for (com.hethongtruongthpt.dto.DiemSummaryDTO row : raw) {
             Map<String, Object> item = new HashMap<>();
-            item.put("hocSinhId", getVal(row, "hoc_sinh_id", "hocSinhId", "hocsinhid"));
-            item.put("monHocId", getVal(row, "mon_hoc_id", "monHocId", "monhocid"));
-            item.put("loaiDiem", getVal(row, "loai_diem", "loaiDiem", "loaidiem"));
-            item.put("soThuTu", getVal(row, "so_thu_tu", "soThuTu", "sothutu"));
-            item.put("hocKy", getVal(row, "hoc_ky", "hocKy", "hocky"));
-            item.put("namHoc", getVal(row, "nam_hoc", "namHoc", "namhoc"));
-            Object giaTri = getVal(row, "gia_tri", "giaTriDiem", "giatridiem");
-            if (giaTri != null) {
-                try {
-                    double val = Double.parseDouble(giaTri.toString());
-                    val = Math.round(val * 100.0) / 100.0;
-                    item.put("giaTriDiem", new java.math.BigDecimal(String.valueOf(val)));
-                } catch (Exception e) {
-                    item.put("giaTriDiem", new java.math.BigDecimal(giaTri.toString()));
-                }
-            } else {
-                item.put("giaTriDiem", null);
-            }
-            item.put("nhanXet", getVal(row, "nhan_xet", "nhanXet", "nhanxet"));
-            item.put("lopId", getVal(row, "lop_id", "lopId", "lopid"));
-            Object khoiVal = getVal(row, "khoi", "KHOI");
-            if (khoiVal != null) {
-                try {
-                    item.put("khoi", Integer.parseInt(khoiVal.toString()));
-                } catch (NumberFormatException ignored) {
-                    item.put("khoi", khoiVal);
-                }
-            }
+            item.put("hocSinhId", row.getHoc_sinh_id());
+            item.put("monHocId", row.getMon_hoc_id());
+            item.put("loaiDiem", row.getLoai_diem());
+            item.put("soThuTu", row.getSo_thu_tu());
+            item.put("hocKy", row.getHoc_ky());
+            item.put("namHoc", row.getNam_hoc());
+            item.put("giaTriDiem", row.getGia_tri());
+            item.put("nhanXet", row.getNhan_xet());
+            item.put("lopId", row.getLop_id());
+            item.put("khoi", row.getKhoi());
             result.add(item);
         }
         return result;
@@ -290,6 +277,7 @@ public class DiemCalculationService {
         return null;
     }
 
+    @Cacheable(value = "dashboardStats", key = "'avgByGrade_' + #namHoc")
     public List<Map<String, Object>> getAvgByGrade(String namHoc) {
         String effectiveNamHoc = (namHoc != null && !namHoc.isBlank()) ? namHoc : getDefaultNamHoc();
         List<Map<String, Object>> summary = getSummaryByNamHoc(effectiveNamHoc);
@@ -360,6 +348,10 @@ public class DiemCalculationService {
                     }
                     if (hasGk && hasCk) {
                         avg1 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
+                    } else if (hasGk) {
+                        avg1 = (sumTx + 2 * gk) / (txCount + 2);
+                    } else if (txCount > 0) {
+                        avg1 = sumTx / txCount;
                     }
                 }
 
@@ -375,6 +367,10 @@ public class DiemCalculationService {
                     }
                     if (hasGk && hasCk) {
                         avg2 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
+                    } else if (hasGk) {
+                        avg2 = (sumTx + 2 * gk) / (txCount + 2);
+                    } else if (txCount > 0) {
+                        avg2 = sumTx / txCount;
                     }
                 }
 
@@ -413,6 +409,7 @@ public class DiemCalculationService {
         return result;
     }
 
+    @Cacheable(value = "dashboardStats", key = "'distribution_' + #namHoc + '_' + #hocKy + '_' + #khoi")
     public Map<String, Object> getDistribution(String namHoc, Integer hocKy, Integer khoi) {
         String effectiveNamHoc = (namHoc != null && !namHoc.isBlank()) ? namHoc : getDefaultNamHoc();
         List<Map<String, Object>> summary = getSummaryByNamHoc(effectiveNamHoc);
@@ -485,6 +482,12 @@ public class DiemCalculationService {
                         if (hasGk && hasCk) {
                             double subjectSemesterAvg = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
                             studentSubjectAverages.add(subjectSemesterAvg);
+                        } else if (hasGk) {
+                            double subjectSemesterAvg = (sumTx + 2 * gk) / (txCount + 2);
+                            studentSubjectAverages.add(subjectSemesterAvg);
+                        } else if (txCount > 0) {
+                            double subjectSemesterAvg = sumTx / txCount;
+                            studentSubjectAverages.add(subjectSemesterAvg);
                         }
                     }
                 } else {
@@ -503,6 +506,10 @@ public class DiemCalculationService {
                         }
                         if (hasGk && hasCk) {
                             avg1 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
+                        } else if (hasGk) {
+                            avg1 = (sumTx + 2 * gk) / (txCount + 2);
+                        } else if (txCount > 0) {
+                            avg1 = sumTx / txCount;
                         }
                     }
 
@@ -518,6 +525,10 @@ public class DiemCalculationService {
                         }
                         if (hasGk && hasCk) {
                             avg2 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
+                        } else if (hasGk) {
+                            avg2 = (sumTx + 2 * gk) / (txCount + 2);
+                        } else if (txCount > 0) {
+                            avg2 = sumTx / txCount;
                         }
                     }
 

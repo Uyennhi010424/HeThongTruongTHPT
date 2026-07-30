@@ -19,7 +19,8 @@ import {
   calcSemesterAverage,
   calcYearAverage,
   getOverallLearningLevel,
-  getLearningLevelLabel
+  getLearningLevelLabel,
+  getSingleSubjectLevel
 } from "../../../utils/scorePolicy.js";
 import { normalizeSubjectText } from "../../../utils/normalizeText.js";
 import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
@@ -84,7 +85,6 @@ const StudentScoreRow = memo(({
   selectedSemester, 
   selectedPolicy, 
   rawRecord, 
-  learningLevel, 
   rowBg, 
   isColumnLocked, 
   updateRecord 
@@ -140,7 +140,7 @@ const StudentScoreRow = memo(({
         </td>
         <td className="px-4 py-3 text-center">
           <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold">
-            {getLearningLevelLabel(learningLevel)}
+            {finalComment === "DAT" ? "Đạt" : "Chưa đạt"}
           </span>
         </td>
       </tr>
@@ -235,7 +235,7 @@ const StudentScoreRow = memo(({
 
       <td className="px-3 py-3 text-center border-l border-slate-200">
         <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold whitespace-nowrap">
-          {getLearningLevelLabel(learningLevel)}
+          {getSingleSubjectLevel(calcSemesterAverage(semData))}
         </span>
       </td>
     </tr>
@@ -245,7 +245,6 @@ const StudentScoreRow = memo(({
          prevProps.selectedSemester === nextProps.selectedSemester &&
          prevProps.rowBg === nextProps.rowBg &&
          prevProps.selectedPolicy === nextProps.selectedPolicy &&
-         prevProps.learningLevel === nextProps.learningLevel &&
          prevProps.selectedSubject?.id === nextProps.selectedSubject?.id;
 });
 
@@ -264,6 +263,7 @@ export default function NhapDiem() {
     allStudents: students,
     filteredClasses,
     allowedSubjects,
+    allSubjects,
     isHomeroomTeacherOfSelected,
     isSelectedSubjectTaughtByMe,
     phanCongData,
@@ -485,7 +485,9 @@ export default function NhapDiem() {
         const student = students.find((s) => Number(s.id) === studentId);
         const classId = student ? getStudentClassId(student) : null;
 
-        ["HK1", "HK2"].forEach((semester) => {
+        // Chỉ lưu học kỳ đang chọn để giảm tải
+        const semestersToSave = [selectedSemester];
+        semestersToSave.forEach((semester) => {
           const semData = record[semester];
           if (!semData) return;
 
@@ -497,18 +499,20 @@ export default function NhapDiem() {
             const pSubjectId = p?.monHocId ?? p?.monHoc?.id;
             const pClassId = p?.lopId ?? p?.lop?.id;
             const pHocKy = p?.hocKy;
+            const pNamHoc = p?.namHoc;
             return (
               Number(pTeacherId) === Number(currentTeacher.id) &&
               Number(pSubjectId) === subjectId &&
               Number(pClassId) === Number(classId) &&
-              Number(pHocKy) === hocKy
+              Number(pHocKy) === hocKy &&
+              pNamHoc === selectedNamHoc
             );
           });
 
           if (!phanCong) return;
 
           const phanCongDayId = phanCong.id;
-          const subject = subjects.find((s) => Number(s.id) === subjectId);
+          const subject = allSubjects.find((s) => Number(s.id) === subjectId);
           const policy = getPolicyBySubjectName(subject?.tenMon || "");
 
           if (policy.mode === "COMMENT") {
@@ -532,12 +536,18 @@ export default function NhapDiem() {
           } else {
             // TX scores
             (semData.tx || []).forEach((val, index) => {
-              if (val === "" || val === null || val === undefined) return;
-              const score = Number(val);
-              if (Number.isNaN(score)) return;
+              let score = null;
+              if (val !== "" && val !== null && val !== undefined) {
+                score = Number(val);
+                if (Number.isNaN(score)) return;
+              }
 
               const idKey = `${key}_TX_${index + 1}_${semester}`;
               const existingId = savedRecordIds[idKey];
+              
+              // Skip if it's an empty score that hasn't been saved yet
+              if (score === null && !existingId) return;
+
               diemRows.push({
                 ...(existingId ? { id: existingId } : {}),
                 hocSinh: { id: studentId },
@@ -555,13 +565,18 @@ export default function NhapDiem() {
             });
 
             // GK
+            let gkScore = null;
             if (semData.gk !== "" && semData.gk !== null && semData.gk !== undefined) {
-              const gkScore = Number(semData.gk);
-              if (!Number.isNaN(gkScore)) {
-                const idKey = `${key}_GK_0_${semester}`;
-                const existingId = savedRecordIds[idKey];
+              gkScore = Number(semData.gk);
+              if (Number.isNaN(gkScore)) gkScore = null;
+            }
+
+            const idKeyGk = `${key}_GK_0_${semester}`;
+            const existingIdGk = savedRecordIds[idKeyGk];
+            
+            if (gkScore !== null || existingIdGk) {
                 diemRows.push({
-                  ...(existingId ? { id: existingId } : {}),
+                  ...(existingIdGk ? { id: existingIdGk } : {}),
                   hocSinh: { id: studentId },
                   monHoc: { id: subjectId },
                   phanCongDay: { id: phanCongDayId },
@@ -574,17 +589,21 @@ export default function NhapDiem() {
                   giaoVienNhap: { id: currentTeacher.id },
                   status: "DRAFT"
                 });
-              }
             }
 
             // CK
+            let ckScore = null;
             if (semData.ck !== "" && semData.ck !== null && semData.ck !== undefined) {
-              const ckScore = Number(semData.ck);
-              if (!Number.isNaN(ckScore)) {
-                const idKey = `${key}_CK_0_${semester}`;
-                const existingId = savedRecordIds[idKey];
+              ckScore = Number(semData.ck);
+              if (Number.isNaN(ckScore)) ckScore = null;
+            }
+
+            const idKeyCk = `${key}_CK_0_${semester}`;
+            const existingIdCk = savedRecordIds[idKeyCk];
+
+            if (ckScore !== null || existingIdCk) {
                 diemRows.push({
-                  ...(existingId ? { id: existingId } : {}),
+                  ...(existingIdCk ? { id: existingIdCk } : {}),
                   hocSinh: { id: studentId },
                   monHoc: { id: subjectId },
                   phanCongDay: { id: phanCongDayId },
@@ -597,7 +616,6 @@ export default function NhapDiem() {
                   giaoVienNhap: { id: currentTeacher.id },
                   status: "DRAFT"
                 });
-              }
             }
           }
         });
@@ -637,8 +655,8 @@ export default function NhapDiem() {
       setIsDirty(false);
       setLastSavedAt(new Date().toLocaleString("vi-VN"));
       setError("");
-      notifySuccess(`Đã lưu ${saved.length} điểm thành công.`);
-      setSaveMessage(`Đã lưu ${saved.length} điểm thành công.`);
+      notifySuccess("Đã lưu thành công");
+      setSaveMessage("Đã lưu thành công");
     } catch (err) {
       const msg = err?.response?.data?.message || "Không thể lưu điểm. Vui lòng thử lại.";
       setError(msg);
@@ -679,7 +697,7 @@ export default function NhapDiem() {
     });
 
     const mean = avgs.length
-      ? Number((avgs.reduce((a, b) => a + b, 0) / avgs.length).toFixed(2))
+      ? Number((avgs.reduce((a, b) => a + b, 0) / avgs.length).toFixed(1))
       : 0;
 
     return {
@@ -689,34 +707,7 @@ export default function NhapDiem() {
     };
   }, [filteredStudents, selectedSemester, selectedPolicy.mode, selectedSubject, draftRecords]);
 
-  const learningLevels = useMemo(() => {
-    const result = {};
 
-    filteredStudents.forEach((student) => {
-      const commentResults = [];
-      const numericAverages = [];
-
-      allowedSubjects.forEach((subject) => {
-        const policy = getPolicyBySubjectName(subject.tenMon);
-        const record = getFullRecord(student.id, subject);
-
-        if (policy.mode === "COMMENT") {
-          const finalComment =
-            record.HK1.nhanXet === "DAT" && record.HK2.nhanXet === "DAT" ? "DAT" : "CHUA_DAT";
-          commentResults.push(finalComment);
-          return;
-        }
-
-        const hk1Avg = calcSemesterAverage(record.HK1);
-        const hk2Avg = calcSemesterAverage(record.HK2);
-        numericAverages.push(calcYearAverage(hk1Avg, hk2Avg));
-      });
-
-      result[student.id] = getOverallLearningLevel({ commentResults, numericAverages });
-    });
-
-    return result;
-  }, [filteredStudents, allowedSubjects, draftRecords]);
 
   const scoreGridColumns = useMemo(() => {
     if (selectedPolicy.mode === "COMMENT") {
@@ -876,7 +867,6 @@ export default function NhapDiem() {
                           selectedSemester={selectedSemester}
                           selectedPolicy={selectedPolicy}
                           rawRecord={rawRecord}
-                          learningLevel={learningLevels[student.id]}
                           rowBg={rowBg}
                           isColumnLocked={isColumnLocked}
                           updateRecord={updateRecord}

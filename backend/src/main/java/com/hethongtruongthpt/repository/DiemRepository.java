@@ -50,17 +50,67 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
 
     // Không dùng AS aliases — để tên cột gốc (snake_case).
     // getVal() trong DiemService dùng equalsIgnoreCase nên match được cả camelCase lẫn snake_case.
+    
+    // TODO: [TỐI ƯU HIỆU NĂNG - QUAN TRỌNG] Các truy vấn Native Query dưới đây (findSummary*) 
+    // trả về toàn bộ dữ liệu dưới dạng List<Map<String, Object>>. Nếu triển khai thực tế với quy mô
+    // toàn trường học, điều này có thể gây lỗi tràn bộ nhớ (Out Of Memory - OOM).
+    // Giải pháp tương lai: Truyền thêm tham số Pageable và đổi kiểu trả về thành Page<Map<String, Object>>,
+    // hoặc sử dụng Materialized View / Redis để cache kết quả thống kê.
+    // Tạm thời giữ nguyên List để không làm gãy (break) kiến trúc hiển thị Grid của React Frontend trong phạm vi khóa luận.
+
     @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL", nativeQuery = true)
-    List<Map<String, Object>> findSummaryByNamHoc(@Param("namHoc") String namHoc);
+    List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryByNamHoc(@Param("namHoc") String namHoc);
 
     @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.nam_hoc = :namHoc AND hs.lop_id = :lopId AND d.gia_tri IS NOT NULL", nativeQuery = true)
-    List<Map<String, Object>> findSummaryByNamHocAndLopId(@Param("namHoc") String namHoc, @Param("lopId") Integer lopId);
+    List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryByNamHocAndLopId(@Param("namHoc") String namHoc, @Param("lopId") Integer lopId);
 
     @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.nam_hoc = :namHoc AND d.hoc_ky = :hocKy AND d.gia_tri IS NOT NULL", nativeQuery = true)
-    List<Map<String, Object>> findSummaryByNamHocAndHocKy(@Param("namHoc") String namHoc, @Param("hocKy") Integer hocKy);
+    List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryByNamHocAndHocKy(@Param("namHoc") String namHoc, @Param("hocKy") Integer hocKy);
 
     @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.gia_tri IS NOT NULL", nativeQuery = true)
-    List<Map<String, Object>> findSummaryAll();
+    List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryAll();
+
+    @Query(value = "SELECT hs.lop_id as classId, l.ten_lop as tenLop, l.khoi as khoi, l.si_so as siSo, " +
+            "COUNT(d.id) as totalScores, " +
+            "ROUND(AVG(d.gia_tri), 2) as avg, " +
+            "SUM(CASE WHEN d.gia_tri >= 8.0 THEN 1 ELSE 0 END) as tot, " +
+            "SUM(CASE WHEN d.gia_tri >= 6.5 AND d.gia_tri < 8.0 THEN 1 ELSE 0 END) as kha, " +
+            "SUM(CASE WHEN d.gia_tri >= 5.0 AND d.gia_tri < 6.5 THEN 1 ELSE 0 END) as dat, " +
+            "SUM(CASE WHEN d.gia_tri < 5.0 THEN 1 ELSE 0 END) as chuaDat " +
+            "FROM diem d " +
+            "JOIN hoc_sinh hs ON d.hoc_sinh_id = hs.id " +
+            "JOIN lop l ON hs.lop_id = l.id " +
+            "JOIN phan_cong_day pcd ON pcd.lop_id = hs.lop_id AND pcd.mon_hoc_id = d.mon_hoc_id AND pcd.nam_hoc = d.nam_hoc " +
+            "WHERE pcd.giao_vien_id = :giaoVienId AND d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL " +
+            "GROUP BY hs.lop_id, l.ten_lop, l.khoi, l.si_so", nativeQuery = true)
+    List<Map<String, Object>> findTeacherReportStats(@Param("namHoc") String namHoc, @Param("giaoVienId") Integer giaoVienId);
+
+    /**
+     * Lấy tất cả điểm LOCKED (đã khóa sổ) chưa được gửi trong kỳ kyGui.
+     * Dùng NOT IN với tập sentIds để tránh gửi trùng.
+     * Eager load hocSinh, lop, monHoc để tránh N+1 query khi sinh nội dung tin nhắn.
+     */
+    @Query("SELECT d FROM Diem d " +
+           "JOIN FETCH d.hocSinh hs " +
+           "LEFT JOIN FETCH hs.lop l " +
+           "JOIN FETCH d.monHoc " +
+           "WHERE d.hocKy = :hocKy AND d.namHoc = :namHoc " +
+           "AND d.id NOT IN :sentIds")
+    List<Diem> findDiemChuaGuiByHocKyAndNamHoc(@Param("hocKy") Integer hocKy, @Param("namHoc") String namHoc, @Param("sentIds") java.util.Collection<Integer> sentIds);
+
+
+
+    /**
+     * Lấy tất cả điểm LOCKED — dùng khi chưa có điểm nào được gửi (sentIds rỗng).
+     */
+    @Query("SELECT d FROM Diem d " +
+           "JOIN FETCH d.hocSinh hs " +
+           "LEFT JOIN FETCH hs.lop l " +
+           "JOIN FETCH d.monHoc " +
+           "WHERE d.hocKy = :hocKy AND d.namHoc = :namHoc")
+    List<Diem> findAllDiemByHocKyAndNamHoc(@Param("hocKy") Integer hocKy, @Param("namHoc") String namHoc);
+
+
 
     @Query(value = "SELECT " +
             "l.id as lopId, " +

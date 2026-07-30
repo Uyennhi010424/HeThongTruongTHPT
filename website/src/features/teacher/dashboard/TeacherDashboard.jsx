@@ -19,7 +19,7 @@ import {
   getHomeroomAssignment,
   getTeacherSubjectLabel
 } from "../../../utils/teacherProfile.js";
-import { formatDate } from "../../../utils/helpers.js";
+import { formatDate, getCurrentSemesterWeek } from "../../../utils/helpers.js";
 import { normalizeVietnameseDisplay } from "../../../utils/normalizeText.js";
 
 const nfc = normalizeVietnameseDisplay;
@@ -148,18 +148,7 @@ export default function TeacherDashboard() {
           if (today >= currentYear.ngayBatDauHk2) hocKy = 2;
         }
 
-        let defaultTuan = 1;
-        if (currentYear?.ngayBatDauHk1) {
-          const schoolStart = new Date(currentYear.ngayBatDauHk1 + "T00:00:00");
-          const dayOfWeek = schoolStart.getDay();
-          const monday = new Date(schoolStart);
-          monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-          const now = new Date();
-          const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
-          if (diffDays >= 0) {
-            defaultTuan = Math.max(1, Math.floor(diffDays / 7) + 1);
-          }
-        }
+        let defaultTuan = getCurrentSemesterWeek(currentYear);
         if (!active) return;
         setSelectedTuan(defaultTuan);
         setYearInfo({ tenNamHoc, hocKy });
@@ -167,12 +156,7 @@ export default function TeacherDashboard() {
         const timetableRes = await getGiaoVienThoiKhoaBieu({ namHoc: tenNamHoc, hocKy, tuan: defaultTuan });
         const tkbData = timetableRes?.data?.data || [];
 
-        try {
-          const allRes = await getThoiKhoaBieu({ namHoc: tenNamHoc, hocKy });
-          const allData = allRes?.data?.data || [];
-          const weeks = [...new Set(allData.map((item) => item.tuan).filter(Boolean))].sort((a, b) => a - b);
-          if (active) setAvailableWeeks(weeks);
-        } catch { /* ignore */ }
+        // (removed unused fetch for all timetable weeks)
 
         if (!active) return;
 
@@ -481,17 +465,18 @@ export default function TeacherDashboard() {
                   disabled={selectedTuan <= 1}
                   title="Tuần trước"
                 >
-                  ← Trở về
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
                 </button>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#374151", padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 8, backgroundColor: "#f9fafb", display: "inline-flex", alignItems: "center", height: 38 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#374151", minWidth: 160, textAlign: "center" }}>
                   {weekRangeText}
                 </span>
                 <button
                   className="tkb-btn"
-                  onClick={() => setSelectedTuan((w) => w + 1)}
+                  onClick={() => setSelectedTuan((w) => Math.min(getCurrentSemesterWeek(yearInfo.tenNamHoc) + 2, w + 1))}
+                  disabled={selectedTuan >= getCurrentSemesterWeek(yearInfo.tenNamHoc) + 2}
                   title="Tuần sau"
                 >
-                  Tiếp →
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
                 </button>
                 <span 
                   className="tkb-today-text" 

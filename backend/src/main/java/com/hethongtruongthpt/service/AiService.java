@@ -64,7 +64,7 @@ public class AiService {
     public AiSuggestionResponse goiYHocTap(Integer hocSinhId, Integer hocKy, String namHoc) {
         // 1. Check cache
         Optional<AiSuggestion> cached = aiSuggestionRepository
-                .findByHocSinhIdAndHocKyAndNamHocAndHetHanAfter(hocSinhId, hocKy, namHoc, LocalDateTime.now());
+                .findByHocSinh_IdAndHocKyAndNamHocAndHetHanAfter(hocSinhId, hocKy, namHoc, LocalDateTime.now());
         if (cached.isPresent()) {
             try {
                 return objectMapper.readValue(cached.get().getNoiDungJson(), AiSuggestionResponse.class);

@@ -47,7 +47,6 @@ const TeacherLichThi = lazy(() => import("../features/teacher/lichthi/TeacherLic
 const DiemDanhPage = lazy(() => import("../features/teacher/diemdanh/DiemDanhPage.jsx"));
 const HanhKiemPage = lazy(() => import("../features/teacher/hanhkiem/HanhKiemPage.jsx"));
 const LopChuNhiem = lazy(() => import("../features/teacher/lopchunhiem/LopChuNhiem.jsx"));
-const TeacherReport = lazy(() => import("../features/teacher/TeacherReport.jsx"));
 const TeacherRegisterPhanCong = lazy(() => import("../features/teacher/thoikhoabieu/TeacherRegisterPhanCong.jsx"));
 const TeacherLeaveRequestPage = lazy(() => import("../features/teacher/TeacherLeaveRequestPage.jsx"));
 
@@ -182,7 +181,6 @@ const routes = [
       { path: "diemdanh", element: withSuspense(DiemDanhPage) },
       { path: "hanhkiem", element: withSuspense(HanhKiemPage) },
       { path: "lopchunhiem", element: withSuspense(LopChuNhiem) },
-      { path: "report", element: withSuspense(TeacherReport) },
       { path: "dangky-lop", element: withSuspense(TeacherRegisterPhanCong) },
       { path: "xin-nghi", element: withSuspense(TeacherLeaveRequestPage) }
     ]

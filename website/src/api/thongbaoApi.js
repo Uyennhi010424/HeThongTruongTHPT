@@ -22,10 +22,14 @@ export const replyThongBao = (parentId, data) =>
 
 /** Lấy toàn bộ thread của một thông báo (root + replies) */
 export const getThread = (thongBaoId) =>
-  axiosClient.get(`/thongbao/thread/${thongBaoId}`);
+  axiosClient.get(`/thongbao/thread/${thongBaoId}`, { skipCache: true });
 
 /** Lấy inbox: thông báo gửi riêng cho user hiện tại */
 export const getInbox = () => axiosClient.get("/thongbao/inbox");
 
 /** Lấy danh sách phản hồi đã gửi bởi user hiện tại */
 export const getSentReplies = () => axiosClient.get("/thongbao/sent-replies");
+
+/** Lấy toàn bộ hội thoại (root + replies) theo học sinh ID */
+export const getConversationByHocSinh = (hocSinhId) =>
+  axiosClient.get(`/thongbao/hocsinh/${hocSinhId}`, { skipCache: true });

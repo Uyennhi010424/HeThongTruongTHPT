@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
-import { FileText } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
@@ -458,7 +458,10 @@ td.center{text-align:center}
               <h3 className="text-sm font-bold text-slate-800 mb-2 uppercase tracking-wide">Phân loại học lực</h3>
               <div className="flex-1 min-h-[280px] flex items-center justify-center relative">
                 {statsLoading ? (
-                  <span className="text-slate-400 text-sm">Đang tính toán...</span>
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                    <span className="text-slate-500 text-sm font-medium">Đang tính toán...</span>
+                  </div>
                 ) : (
                   <>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-20px]">
@@ -502,7 +505,10 @@ td.center{text-align:center}
               <h3 className="text-sm font-bold text-slate-800 mb-6 uppercase tracking-wide">ĐTB Theo môn học</h3>
               <div className="flex-1 min-h-[280px]">
                 {statsLoading ? (
-                  <div className="h-full flex items-center justify-center"><span className="text-slate-400 text-sm">Đang tải biểu đồ...</span></div>
+                  <div className="h-full flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                    <span className="text-slate-500 text-sm font-medium">Đang tải biểu đồ...</span>
+                  </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={lineData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>

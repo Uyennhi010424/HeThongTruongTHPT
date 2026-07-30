@@ -15,9 +15,9 @@ export default function TeacherThongBao() {
   const [allNotices, setAllNotices] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = async (hideLoading = false) => {
     try {
-      setLoading(true);
+      if (!hideLoading) setLoading(true);
       const [teacherRes, noticeRes, chuNhiemRes] = await Promise.all([
         getCurrentGiaoVien().catch(() => null),
         getThongBao().catch(() => null),
@@ -39,7 +39,7 @@ export default function TeacherThongBao() {
     } catch {
       // ignore
     } finally {
-      setLoading(false);
+      if (!hideLoading) setLoading(false);
     }
   };
 
@@ -48,9 +48,15 @@ export default function TeacherThongBao() {
   }, []);
 
   // Lọc thông báo cho các Tab
-  const bghNotices = allNotices.filter(n => n.doiTuong === "GIAO_VIEN" || n.doiTuong === "ALL");
-  const adminRequests = allNotices.filter(n => n.loai === "ADMIN" && n.senderRole === "GIAO_VIEN");
-  const parentMessages = allNotices.filter(n => n.loai === "PHU_HUYNH");
+  const bghNotices = allNotices.filter(n => 
+    (n.doiTuong === "GIAO_VIEN" || n.doiTuong === "ALL" || 
+    ((n.loai === "ADMIN" || n.doiTuong === "ADMIN") && n.senderRole === "GIAO_VIEN")) &&
+    n.senderRole !== "PHU_HUYNH" && n.nguoiTao?.role !== "PHU_HUYNH"
+  );
+  const parentMessages = allNotices.filter(n => 
+    n.loai === "PHU_HUYNH" || n.doiTuong === "PHU_HUYNH" || 
+    n.senderRole === "PHU_HUYNH" || n.nguoiTao?.role === "PHU_HUYNH"
+  );
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -73,20 +79,8 @@ export default function TeacherThongBao() {
           }`}
         >
           <span className="material-symbols-outlined text-[20px]">inbox</span>
-          Thông báo từ BGH
+          Liên hệ BGH / Admin
           {activeTab === 'inbox' && <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-blue-600 rounded-t-md"></div>}
-        </button>
-        <button 
-          onClick={() => setActiveTab("admin")}
-          className={`flex items-center gap-2 pb-3 text-sm font-semibold transition-colors relative ${
-            activeTab === 'admin' 
-              ? 'text-blue-600' 
-              : 'text-gray-500 hover:text-gray-800'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[20px]">support_agent</span>
-          Gửi cho Admin
-          {activeTab === 'admin' && <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-blue-600 rounded-t-md"></div>}
         </button>
         {isHomeroom && (
           <button 
@@ -112,9 +106,8 @@ export default function TeacherThongBao() {
           </div>
         ) : (
           <>
-            {activeTab === "inbox" && <ThongBaoInbox notices={bghNotices} onRefresh={fetchInitialData} />}
-            {activeTab === "admin" && <AdminRequestTab teacher={teacher} requests={adminRequests} onRefresh={fetchInitialData} />}
-            {activeTab === "parent" && isHomeroom && <ParentContactTab teacher={teacher} parentMessages={parentMessages} onRefresh={fetchInitialData} />}
+            {activeTab === "inbox" && <ThongBaoInbox notices={bghNotices} onRefresh={() => fetchInitialData(true)} />}
+            {activeTab === "parent" && isHomeroom && <ParentContactTab teacher={teacher} parentMessages={parentMessages} onRefresh={() => fetchInitialData(true)} />}
           </>
         )}
       </div>

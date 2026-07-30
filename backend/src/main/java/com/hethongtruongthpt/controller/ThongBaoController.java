@@ -41,11 +41,28 @@ public class ThongBaoController {
 	public ResponseEntity<ApiResponse<?>> getAll(
 			@RequestParam(required = false) Integer page,
 			@RequestParam(required = false) Integer size) {
+		
+		User currentUser = getCurrentUser();
+		java.util.List<ThongBao> allNotices;
+		
 		if (page != null && size != null) {
 			Page<ThongBao> result = thongBaoService.getAllPaged(page, size);
-			return ResponseEntity.ok(ApiResponse.ok(result));
+			allNotices = result.getContent();
+		} else {
+			allNotices = thongBaoService.getAll();
 		}
-		return ResponseEntity.ok(ApiResponse.ok(thongBaoService.getAll()));
+
+		// Filter out notifications that are private to other users
+		java.util.List<ThongBao> filtered = allNotices.stream()
+				.filter(n -> n.getRecipientId() == null || (currentUser != null && currentUser.getId().equals(n.getRecipientId())))
+				.collect(java.util.stream.Collectors.toList());
+
+		if (page != null && size != null) {
+			Page<ThongBao> result = thongBaoService.getAllPaged(page, size);
+			return ResponseEntity.ok(ApiResponse.ok(new org.springframework.data.domain.PageImpl<>(filtered, result.getPageable(), result.getTotalElements())));
+		}
+
+		return ResponseEntity.ok(ApiResponse.ok(filtered));
 	}
 
 	@GetMapping("/{id}")
@@ -114,6 +131,16 @@ public class ThongBaoController {
 	public ResponseEntity<ApiResponse<List<ThongBao>>> getThread(@PathVariable Integer id) {
 		List<ThongBao> thread = thongBaoService.getThread(id);
 		return ResponseEntity.ok(ApiResponse.ok(thread));
+	}
+
+	/**
+	 * Lấy toàn bộ hội thoại (root + replies) liên quan đến một học sinh.
+	 * GET /api/thongbao/hocsinh/{hocSinhId}
+	 */
+	@GetMapping("/hocsinh/{hocSinhId}")
+	public ResponseEntity<ApiResponse<List<ThongBao>>> getConversationByHocSinh(@PathVariable Integer hocSinhId) {
+		List<ThongBao> conversation = thongBaoService.getConversationByHocSinh(hocSinhId);
+		return ResponseEntity.ok(ApiResponse.ok(conversation));
 	}
 
 	/**

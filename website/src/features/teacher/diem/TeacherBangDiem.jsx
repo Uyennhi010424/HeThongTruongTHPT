@@ -17,12 +17,12 @@ const calcSemesterAvg = (tx, gk, ck) => {
   const ckVal = toScore(ck);
   if (txScores.length === 0 || gkVal === null || ckVal === null) return null;
   const sumTx = txScores.reduce((a, b) => a + b, 0);
-  return Number(((sumTx + 2 * gkVal + 3 * ckVal) / (txScores.length + 5)).toFixed(2));
+  return Number(((sumTx + 2 * gkVal + 3 * ckVal) / (txScores.length + 5)).toFixed(1));
 };
 
 const calcYearAvg = (hk1, hk2) => {
   if (hk1 === null || hk2 === null) return null;
-  return Number(((hk1 + 2 * hk2) / 3).toFixed(2));
+  return Number(((hk1 + 2 * hk2) / 3).toFixed(1));
 };
 
 const formatCmt = (val) => {
@@ -399,7 +399,7 @@ export default function TeacherBangDiem() {
           if (!d) return null;
           return calcSemesterAvg(d.tx, d.gk, d.ck);
         }).filter(v => v !== null);
-        const classAvg = allAvgs.length > 0 ? (allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length).toFixed(2) : "--";
+        const classAvg = allAvgs.length > 0 ? (allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length).toFixed(1) : "--";
         const gioi = allAvgs.filter(v => v >= 8).length;
         const khac = allAvgs.filter(v => v >= 6.5 && v < 8).length;
         const dat = allAvgs.filter(v => v >= 5 && v < 6.5).length;

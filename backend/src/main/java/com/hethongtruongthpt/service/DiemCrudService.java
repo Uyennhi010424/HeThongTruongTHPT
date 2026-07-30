@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public class DiemCrudService {
     private static final Logger logger = LoggerFactory.getLogger(DiemCrudService.class);
     private final DiemRepository diemRepository;
-    private final DiemAuditLogRepository diemAuditLogRepository;
+    private final DiemAuditLogService diemAuditLogService;
     private final AdminConfigService adminConfigService;
     private final ObjectMapper objectMapper;
 
@@ -34,11 +34,11 @@ public class DiemCrudService {
     private static final BigDecimal MAX_SCORE = BigDecimal.TEN;
 
     public DiemCrudService(DiemRepository diemRepository,
-                           DiemAuditLogRepository diemAuditLogRepository,
+                           DiemAuditLogService diemAuditLogService,
                            AdminConfigService adminConfigService,
                            ObjectMapper objectMapper) {
         this.diemRepository = diemRepository;
-        this.diemAuditLogRepository = diemAuditLogRepository;
+        this.diemAuditLogService = diemAuditLogService;
         this.adminConfigService = adminConfigService;
         this.objectMapper = objectMapper;
     }
@@ -116,7 +116,7 @@ public class DiemCrudService {
         if (diem == null) throw new IllegalArgumentException("Điểm không được để trống");
         validateDiem(diem);
         Diem saved = diemRepository.save(diem);
-        createAuditLog(saved, null, saved.getGiaTriDiem(), "INSERT");
+        diemAuditLogService.createAuditLogAsync(saved, null, saved.getGiaTriDiem(), "INSERT");
         return saved;
     }
 
@@ -135,7 +135,7 @@ public class DiemCrudService {
         if (diem.getSoThuTu() != null) existing.setSoThuTu(diem.getSoThuTu());
 
         Diem saved = diemRepository.save(existing);
-        createAuditLog(saved, oldValue, saved.getGiaTriDiem(), "UPDATE");
+        diemAuditLogService.createAuditLogAsync(saved, oldValue, saved.getGiaTriDiem(), "UPDATE");
         return saved;
     }
 
@@ -143,7 +143,7 @@ public class DiemCrudService {
     public void delete(Integer id) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
         Diem existing = getById(id);
-        createAuditLog(existing, existing.getGiaTriDiem(), null, "DELETE");
+        diemAuditLogService.createAuditLogAsync(existing, existing.getGiaTriDiem(), null, "DELETE");
         diemRepository.deleteById(id);
     }
 
@@ -195,32 +195,74 @@ public class DiemCrudService {
             }
         }
 
+        // ── 1. Batch-fetch by ID (for records that already have an ID) ──────────
         List<Integer> existingIds = diemList.stream()
             .filter(d -> d.getId() != null)
             .map(Diem::getId)
             .toList();
 
-        Map<Integer, Diem> existingMap = existingIds.isEmpty()
-            ? Map.of()
+        Map<Integer, Diem> existingMapById = existingIds.isEmpty()
+            ? new HashMap<>()
             : diemRepository.findAllById(existingIds).stream()
                 .collect(Collectors.toMap(Diem::getId, d -> d));
 
+        // ── 2. Bulk-fetch by unique key for records WITHOUT an id ────────────────
+        // Collect distinct (hocSinhId, namHoc, hocKy) groups to fetch in one query
+        List<Diem> noIdRecords = diemList.stream()
+            .filter(d -> d.getId() == null || !existingMapById.containsKey(d.getId()))
+            .toList();
+
+        // Build a composite key map: "hsId_mhId_loai_stt_hk_namHoc" -> Diem
+        Map<String, Diem> existingMapByKey = new HashMap<>();
+        if (!noIdRecords.isEmpty()) {
+            // Get distinct hocSinh ids to bulk-load
+            List<Integer> hocSinhIds = noIdRecords.stream()
+                .map(d -> d.getHocSinh() != null ? d.getHocSinh().getId() : null)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+            // Get distinct namHoc values
+            List<String> namHocList = noIdRecords.stream()
+                .map(Diem::getNamHoc)
+                .filter(n -> n != null)
+                .distinct()
+                .toList();
+            if (!hocSinhIds.isEmpty() && !namHocList.isEmpty()) {
+                // Fetch all diem rows for these students in one query
+                for (String namHoc : namHocList) {
+                    List<Diem> fetched = diemRepository.findByHocSinhIdInAndNamHoc(hocSinhIds, namHoc);
+                    for (Diem d : fetched) {
+                        String k = buildKey(d);
+                        existingMapByKey.put(k, d);
+                    }
+                }
+            }
+        }
+
+        // ── 3. Merge ─────────────────────────────────────────────────────────────
         List<Diem> toSave = new ArrayList<>();
         for (Diem incoming : diemList) {
-            if (incoming.getId() != null && existingMap.containsKey(incoming.getId())) {
-                Diem existing = existingMap.get(incoming.getId());
-                if (incoming.getGiaTriDiem() != null) existing.setGiaTriDiem(incoming.getGiaTriDiem());
-                if (incoming.getNhanXet() != null) existing.setNhanXet(incoming.getNhanXet());
+            // Clear stale id
+            if (incoming.getId() != null && !existingMapById.containsKey(incoming.getId())) {
+                incoming.setId(null);
+                incoming.setVersion(0L);
+            }
+
+            if (incoming.getId() != null && existingMapById.containsKey(incoming.getId())) {
+                Diem existing = existingMapById.get(incoming.getId());
+                existing.setGiaTriDiem(incoming.getGiaTriDiem());
+                existing.setNhanXet(incoming.getNhanXet());
                 if (incoming.getGhiChu() != null) existing.setGhiChu(incoming.getGhiChu());
                 if (incoming.getStatus() != null) existing.setStatus(incoming.getStatus());
                 if (incoming.getLoaiDiem() != null) existing.setLoaiDiem(incoming.getLoaiDiem());
                 if (incoming.getSoThuTu() != null) existing.setSoThuTu(incoming.getSoThuTu());
                 toSave.add(existing);
             } else {
-                Diem existing = findExistingByUniqueKey(incoming);
+                String k = buildKey(incoming);
+                Diem existing = existingMapByKey.get(k);
                 if (existing != null) {
-                    if (incoming.getGiaTriDiem() != null) existing.setGiaTriDiem(incoming.getGiaTriDiem());
-                    if (incoming.getNhanXet() != null) existing.setNhanXet(incoming.getNhanXet());
+                    existing.setGiaTriDiem(incoming.getGiaTriDiem());
+                    existing.setNhanXet(incoming.getNhanXet());
                     if (incoming.getGhiChu() != null) existing.setGhiChu(incoming.getGhiChu());
                     if (incoming.getStatus() != null) existing.setStatus(incoming.getStatus());
                     toSave.add(existing);
@@ -230,26 +272,9 @@ public class DiemCrudService {
             }
         }
 
-        List<Diem> saved = new ArrayList<>();
-        try {
-            saved = diemRepository.saveAll(toSave);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            for (Diem d : toSave) {
-                try {
-                    saved.add(diemRepository.save(d));
-                } catch (org.springframework.dao.DataIntegrityViolationException e2) {
-                    Diem existing = findExistingByUniqueKey(d);
-                    if (existing != null) {
-                        if (d.getGiaTriDiem() != null) existing.setGiaTriDiem(d.getGiaTriDiem());
-                        if (d.getNhanXet() != null) existing.setNhanXet(d.getNhanXet());
-                        if (d.getGhiChu() != null) existing.setGhiChu(d.getGhiChu());
-                        if (d.getStatus() != null) existing.setStatus(d.getStatus());
-                        saved.add(diemRepository.save(existing));
-                    }
-                }
-            }
-        }
+        List<Diem> saved = diemRepository.saveAll(toSave);
 
+        // ── 4. Audit log (async, non-blocking) ───────────────────────────────────
         List<DiemAuditLog> auditLogs = new ArrayList<>();
         for (Diem diem : saved) {
             DiemAuditLog log = new DiemAuditLog();
@@ -259,7 +284,7 @@ public class DiemCrudService {
             log.setGiaTriMoi(diem.getGiaTriDiem());
             log.setGiaoVien(diem.getGiaoVienNhap());
 
-            Diem old = existingMap.get(diem.getId());
+            Diem old = existingMapById.get(diem.getId());
             if (old != null) {
                 log.setGiaTriCu(old.getGiaTriDiem());
                 log.setHanhDong("UPDATE");
@@ -270,13 +295,16 @@ public class DiemCrudService {
             auditLogs.add(log);
         }
 
-        try {
-            diemAuditLogRepository.saveAll(auditLogs);
-        } catch (Exception e) {
-            logger.warn("Không thể lưu audit log: {}", e.getMessage());
-        }
+        diemAuditLogService.saveAllAuditLogsAsync(auditLogs);
 
         return saved;
+    }
+
+    /** Composite unique key for in-memory lookup */
+    private String buildKey(Diem d) {
+        Integer hsId = d.getHocSinh() != null ? d.getHocSinh().getId() : null;
+        Integer mhId = d.getMonHoc() != null ? d.getMonHoc().getId() : null;
+        return hsId + "_" + mhId + "_" + d.getLoaiDiem() + "_" + d.getSoThuTu() + "_" + d.getHocKy() + "_" + d.getNamHoc();
     }
 
     public Diem findExistingByUniqueKey(Diem d) {
@@ -293,19 +321,5 @@ public class DiemCrudService {
         }
     }
 
-    public void createAuditLog(Diem diem, BigDecimal oldValue, BigDecimal newValue, String action) {
-        try {
-            DiemAuditLog auditLog = new DiemAuditLog();
-            auditLog.setDiem(diem);
-            auditLog.setHocSinh(diem.getHocSinh());
-            auditLog.setMonHoc(diem.getMonHoc());
-            auditLog.setGiaTriCu(oldValue);
-            auditLog.setGiaTriMoi(newValue);
-            auditLog.setHanhDong(action);
-            auditLog.setGiaoVien(diem.getGiaoVienNhap());
-            diemAuditLogRepository.save(auditLog);
-        } catch (Exception e) {
-            logger.warn("Không thể lưu audit log: {}", e.getMessage());
-        }
-    }
+
 }

@@ -123,6 +123,7 @@ public class ThoiKhoaBieuGeneratorService {
                 }
             }
 
+            Collections.shuffle(allTasks, new Random(System.nanoTime())); // Break identical schedules for tasks with same weight
             allTasks.sort((a, b) -> {
                 if (a.afternoon != b.afternoon) return a.afternoon ? 1 : -1;
                 return b.count - a.count;
@@ -601,6 +602,7 @@ public class ThoiKhoaBieuGeneratorService {
             List<PhanCongDay> morning = new ArrayList<>(allPcs);
             List<PhanCongDay> afternoon = new ArrayList<>();
 
+            Collections.shuffle(morning, rng); // Break identical schedules for subjects with same weight
             morning.sort((a, b) -> {
                 int ha = isHeavy(a.getMonHoc().getTenMon()) ? 0 : 1;
                 int hb = isHeavy(b.getMonHoc().getTenMon()) ? 0 : 1;
@@ -797,6 +799,7 @@ public class ThoiKhoaBieuGeneratorService {
             Set<String> clsSlots = classSlots.get(lopId);
             Set<String> nbSlots  = neighborSlots.get(lopId);
             List<PhanCongDay> afternoonPcs = afternoonByLop.get(lopId);
+            Collections.shuffle(afternoonPcs, rng); // Break identical schedules for subjects with same weight
             afternoonPcs.sort((a, b) -> getPeriodCount(b.getMonHoc().getTenMon(), lop, toHopPeriodMap) - getPeriodCount(a.getMonHoc().getTenMon(), lop, toHopPeriodMap));
 
             Map<Integer, Integer> afternoonDayUsed = new HashMap<>();

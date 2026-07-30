@@ -10,7 +10,8 @@ import java.util.List;
 
 @Repository
 public interface PhuHuynhHocSinhRepository extends JpaRepository<PhuHuynhHocSinh, Integer> {
-    List<PhuHuynhHocSinh> findByHocSinhId(Integer hocSinhId);
+    @Query("SELECT phs FROM PhuHuynhHocSinh phs JOIN FETCH phs.phuHuynh ph WHERE phs.hocSinh.id = :hocSinhId")
+    List<PhuHuynhHocSinh> findByHocSinhId(@Param("hocSinhId") Integer hocSinhId);
     
     @Query("SELECT phs FROM PhuHuynhHocSinh phs " +
            "JOIN FETCH phs.hocSinh hs " +

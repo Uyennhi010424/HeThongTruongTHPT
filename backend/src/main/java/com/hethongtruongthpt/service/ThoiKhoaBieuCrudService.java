@@ -54,56 +54,46 @@ public class ThoiKhoaBieuCrudService {
 
         Integer mappedTuan = (tuan % 2 != 0) ? 1 : 2;
 
-        List<ThoiKhoaBieu> systemSlots;
-        if (lopId != null && namHoc != null && hocKy != null) {
-            systemSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, tuan);
-            if (systemSlots == null || systemSlots.isEmpty()) {
-                systemSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, mappedTuan);
-            }
-        }
-        else if (lopId != null && namHoc != null) {
-            systemSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, tuan);
-            if (systemSlots == null || systemSlots.isEmpty()) {
-                systemSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, mappedTuan);
-            }
-        }
-        else if (lopId != null) {
-            systemSlots = tkbRepo.findByLopIdAndTuan(lopId, tuan);
-            if (systemSlots == null || systemSlots.isEmpty()) {
-                systemSlots = tkbRepo.findByLopIdAndTuan(lopId, mappedTuan);
-            }
-        }
-        else if (namHoc != null && hocKy != null) {
-            systemSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, tuan);
-            if (systemSlots == null || systemSlots.isEmpty()) {
-                systemSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, mappedTuan);
-            }
-        }
-        else {
-            systemSlots = tkbRepo.findAll();
-        }
-
-        if (systemSlots == null) systemSlots = new java.util.ArrayList<>();
-        systemSlots = systemSlots.stream()
-                .filter(t -> t.getIsLocked() == null || !t.getIsLocked())
-                .collect(java.util.stream.Collectors.toList());
-
-        List<ThoiKhoaBieu> teacherSlots;
+        List<ThoiKhoaBieu> allSlots;
         if (lopId != null && namHoc != null && hocKy != null)
-            teacherSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, tuan);
+            allSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, tuan);
         else if (lopId != null && namHoc != null)
-            teacherSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, tuan);
+            allSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, tuan);
         else if (lopId != null)
-            teacherSlots = tkbRepo.findByLopIdAndTuan(lopId, tuan);
+            allSlots = tkbRepo.findByLopIdAndTuan(lopId, tuan);
         else if (namHoc != null && hocKy != null)
-            teacherSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, tuan);
+            allSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, tuan);
         else
-            teacherSlots = new java.util.ArrayList<>();
+            allSlots = tkbRepo.findAll();
 
-        if (teacherSlots == null) teacherSlots = new java.util.ArrayList<>();
-        teacherSlots = teacherSlots.stream()
-                .filter(t -> t.getIsLocked() != null && t.getIsLocked())
+        if (allSlots == null) allSlots = new java.util.ArrayList<>();
+
+        List<ThoiKhoaBieu> teacherSlots = allSlots.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsLocked()))
                 .collect(java.util.stream.Collectors.toList());
+
+        List<ThoiKhoaBieu> systemSlots = allSlots.stream()
+                .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
+                .collect(java.util.stream.Collectors.toList());
+
+        // Nếu systemSlots trống (ví dụ tuần > 2 chưa sinh TKB tự động), fallback lấy từ tuần mẫu (mappedTuan 1 hoặc 2)
+        if (systemSlots.isEmpty() && !tuan.equals(mappedTuan)) {
+            List<ThoiKhoaBieu> fallbackSlots;
+            if (lopId != null && namHoc != null && hocKy != null)
+                fallbackSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, mappedTuan);
+            else if (lopId != null && namHoc != null)
+                fallbackSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, mappedTuan);
+            else if (lopId != null)
+                fallbackSlots = tkbRepo.findByLopIdAndTuan(lopId, mappedTuan);
+            else if (namHoc != null && hocKy != null)
+                fallbackSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, mappedTuan);
+            else
+                fallbackSlots = new java.util.ArrayList<>();
+
+            systemSlots = fallbackSlots.stream()
+                    .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
+                    .collect(java.util.stream.Collectors.toList());
+        }
 
         List<ThoiKhoaBieu> all = new java.util.ArrayList<>();
         all.addAll(systemSlots);

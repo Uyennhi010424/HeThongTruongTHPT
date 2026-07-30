@@ -27,7 +27,7 @@ const StatCardsWidget = ({ weekTimetable, subjectsCount, dtb, hanhKiemLabel, hkC
           <Award size={80} />
         </div>
         <div className="text-slate-500 text-xs font-semibold mb-1">Điểm trung bình</div>
-        <div className="text-3xl font-bold text-green-500">{dtb !== null ? dtb.toFixed(2) : "--"}</div>
+        <div className="text-3xl font-bold text-green-500">{dtb !== null ? dtb.toFixed(1) : "--"}</div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all duration-200">

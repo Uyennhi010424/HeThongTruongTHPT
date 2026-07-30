@@ -9,6 +9,8 @@ import java.util.Optional;
 
 @Repository
 public interface AiSuggestionRepository extends JpaRepository<AiSuggestion, Integer> {
-    Optional<AiSuggestion> findByHocSinhIdAndHocKyAndNamHocAndHetHanAfter(
+    Optional<AiSuggestion> findByHocSinh_IdAndHocKyAndNamHocAndHetHanAfter(
             Integer hocSinhId, Integer hocKy, String namHoc, LocalDateTime now);
+            
+    void deleteByHetHanBefore(LocalDateTime now);
 }

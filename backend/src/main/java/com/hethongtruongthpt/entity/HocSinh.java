@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "hoc_sinh")
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class HocSinh {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

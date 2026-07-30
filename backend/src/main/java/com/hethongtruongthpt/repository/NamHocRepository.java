@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface NamHocRepository extends JpaRepository<NamHoc, Integer> {
 	Optional<NamHoc> findByTenNamHoc(String tenNamHoc);
 	
+	java.util.List<NamHoc> findByTrangThai(String trangThai);
+	
 	@Query("select coalesce(max(n.id), 0) from NamHoc n")
 	Integer findMaxId();
 }

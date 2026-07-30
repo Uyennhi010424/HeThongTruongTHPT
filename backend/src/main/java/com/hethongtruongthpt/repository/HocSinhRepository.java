@@ -14,20 +14,21 @@ import java.util.Optional;
 @Repository
 public interface HocSinhRepository extends JpaRepository<HocSinh, Integer> {
     Optional<HocSinh> findByMaHocSinh(String maHocSinh);
-    Optional<HocSinh> findByUserId(Integer userId);
+    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l LEFT JOIN FETCH l.gvcn g WHERE h.user.id = :userId")
+    Optional<HocSinh> findByUserId(@Param("userId") Integer userId);
     Optional<HocSinh> findByEmailIgnoreCase(String email);
-    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l WHERE l.id = :lopId")
+    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l LEFT JOIN FETCH l.gvcn g WHERE l.id = :lopId")
     List<HocSinh> findByLopId(@Param("lopId") Integer lopId);
 
-    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l WHERE l.id = :lopId AND h.trangThai = :trangThai")
+    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l LEFT JOIN FETCH l.gvcn g WHERE l.id = :lopId AND h.trangThai = :trangThai")
     List<HocSinh> findByLopIdAndTrangThai(@Param("lopId") Integer lopId, @Param("trangThai") Integer trangThai);
     @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l WHERE h.namNhapHoc = :namNhapHoc")
     List<HocSinh> findByNamNhapHoc(@Param("namNhapHoc") Integer namNhapHoc);
 
-    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l")
+    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l LEFT JOIN FETCH l.gvcn g")
     List<HocSinh> findAllWithLop();
     
-    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l WHERE h.id = :id")
+    @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l LEFT JOIN FETCH l.gvcn g WHERE h.id = :id")
     Optional<HocSinh> findByIdWithLop(@Param("id") Integer id);
     long countByLopId(Integer lopId);
 

@@ -2,11 +2,14 @@ package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.entity.Diem;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.List;
 import java.util.Map;
 
 @Service
+@Transactional(readOnly = true)
 public class DiemService {
 
     private final DiemCrudService diemCrudService;
@@ -37,6 +40,8 @@ public class DiemService {
         return diemCrudService.getByHocSinhId(hocSinhId);
     }
 
+    @Transactional
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public long deleteByNamHocAndHocKy(String namHoc, Integer hocKy) {
         return diemCrudService.deleteByNamHocAndHocKy(namHoc, hocKy);
     }
@@ -69,6 +74,10 @@ public class DiemService {
         return diemCalculationService.getSummaryAll();
     }
 
+    public List<Map<String, Object>> getTeacherReportStats(String namHoc, Integer giaoVienId) {
+        return diemCalculationService.getTeacherReportStats(namHoc, giaoVienId);
+    }
+
     public List<Map<String, Object>> getAvgByGrade(String namHoc) {
         return diemCalculationService.getAvgByGrade(namHoc);
     }
@@ -89,18 +98,26 @@ public class DiemService {
         return diemCrudService.getById(id);
     }
 
+    @Transactional
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public Diem create(Diem diem) {
         return diemCrudService.create(diem);
     }
 
+    @Transactional
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public Diem update(Integer id, Diem diem) {
         return diemCrudService.update(id, diem);
     }
 
+    @Transactional
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public void delete(Integer id) {
         diemCrudService.delete(id);
     }
 
+    @Transactional
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public List<Diem> saveAll(List<Diem> diemList) {
         return diemCrudService.saveAll(diemList);
     }

@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +16,11 @@ import java.util.List;
 @Service
 public class ThongBaoService {
     private final ThongBaoRepository thongBaoRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public ThongBaoService(ThongBaoRepository thongBaoRepository) {
+    public ThongBaoService(ThongBaoRepository thongBaoRepository, SimpMessagingTemplate messagingTemplate) {
         this.thongBaoRepository = thongBaoRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     public List<ThongBao> getAll() {
@@ -37,7 +40,9 @@ public class ThongBaoService {
 
     public ThongBao create(ThongBao thongBao) {
         if (thongBao == null) throw new IllegalArgumentException("Thông báo không được để trống");
-        return thongBaoRepository.save(thongBao);
+        ThongBao saved = thongBaoRepository.save(thongBao);
+        broadcastThongBao(saved);
+        return saved;
     }
 
     public ThongBao update(Integer id, ThongBao thongBao) {
@@ -72,7 +77,26 @@ public class ThongBaoService {
         if (reply.getLoai() == null || reply.getLoai().isBlank()) {
             reply.setLoai("REPLY");
         }
-        return thongBaoRepository.save(reply);
+        ThongBao saved = thongBaoRepository.save(reply);
+        broadcastThongBao(saved);
+        return saved;
+    }
+
+    private void broadcastThongBao(ThongBao thongBao) {
+        if (thongBao == null) return;
+        
+        // Nếu là tin nhắn có gán hocSinhId (thường là ChatBox)
+        if (thongBao.getHocSinh() != null) {
+            messagingTemplate.convertAndSend("/topic/chat/" + thongBao.getHocSinh().getId(), thongBao);
+        }
+        
+        // Nếu là thông báo chung toàn trường hoặc theo role (không phải gửi riêng cho cá nhân)
+        if (thongBao.getRecipientId() == null && ("ALL".equals(thongBao.getLoai()) || "PHU_HUYNH".equals(thongBao.getLoai()) || "GIAO_VIEN".equals(thongBao.getLoai()))) {
+            messagingTemplate.convertAndSend("/topic/notifications", thongBao);
+        } else if (thongBao.getRecipientId() != null) {
+            // Nhắn riêng
+            messagingTemplate.convertAndSend("/topic/user/" + thongBao.getRecipientId(), thongBao);
+        }
     }
 
     /**
@@ -98,5 +122,31 @@ public class ThongBaoService {
      */
     public List<ThongBao> getMyReplies(Integer userId) {
         return thongBaoRepository.findByNguoiTaoIdAndIsReplyTrueOrderByNgayDangDesc(userId);
+    }
+
+    /**
+     * Lấy toàn bộ hội thoại liên quan đến học sinh: 
+     * - Thông báo gốc gửi cho học sinh (hoc_sinh_id)
+     * - Các replies trong những thread đó
+     * Sắp xếp theo thời gian tăng dần.
+     */
+    public List<ThongBao> getConversationByHocSinh(Integer hocSinhId) {
+        // Lấy tất cả thông báo gốc gửi cho học sinh này
+        List<ThongBao> roots = thongBaoRepository.findByHocSinhId(hocSinhId);
+        if (roots.isEmpty()) return roots;
+
+        // Lấy tất cả replies của từng root
+        java.util.List<ThongBao> all = new java.util.ArrayList<>(roots);
+        for (ThongBao root : roots) {
+            all.addAll(thongBaoRepository.findByParentIdOrderByNgayDangAsc(root.getId()));
+        }
+
+        // Loại trừ trùng lặp và sắp xếp
+        java.util.Map<Integer, ThongBao> uniqueMap = new java.util.LinkedHashMap<>();
+        for (ThongBao tb : all) uniqueMap.put(tb.getId(), tb);
+        return new java.util.ArrayList<>(uniqueMap.values())
+            .stream()
+            .sorted(java.util.Comparator.comparing(ThongBao::getNgayDang))
+            .collect(java.util.stream.Collectors.toList());
     }
 }

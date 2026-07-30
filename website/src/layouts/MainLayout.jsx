@@ -65,11 +65,13 @@ export default function MainLayout({
       />
       <Toast />
       <main
-        className="mt-16 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar transition-all duration-300"
+        className="mt-16 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar transition-all duration-300 print:mt-0 print:h-auto print:overflow-visible print:ml-0 print:w-full print:p-0"
         style={{ marginLeft: typeof window !== "undefined" && window.innerWidth >= 1024 ? sidebarWidth : 0 }}
       >
-        <PasswordChangeBanner />
-        <div className="mx-auto max-w-container-max p-lg">
+        <div className="print-hidden">
+          <PasswordChangeBanner />
+        </div>
+        <div className="mx-auto max-w-container-max p-lg print:p-0 print:max-w-none print:mx-0">
           {children}
         </div>
       </main>

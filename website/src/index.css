@@ -114,3 +114,9 @@
 .tkb-entry-card.color-3 { border-color: #8b5cf6; background-color: #f5f3ff; }
 .tkb-entry-card.color-4 { border-color: #ef4444; background-color: #fef2f2; }
 
+
+@media print {
+  aside, header { display: none !important; }
+  main { margin-left: 0 !important; margin-top: 0 !important; height: auto !important; overflow: visible !important; }
+  .print-hidden { display: none !important; }
+}

@@ -134,7 +134,7 @@ export function useHocSinhList() {
       "Họ và tên": s.hoTen || "",
       "Lớp": s.lopHoc?.tenLop || s.lop?.tenLop || "",
       "Khối": s.lopHoc?.khoi || s.lop?.khoi || "",
-      "Giới tính": s.gioiTinh ? "Nam" : "Nữ",
+      "Giới tính": (s.gioiTinh === "NU" || s.gioiTinh === "false" || s.gioiTinh === false) ? "Nữ" : "Nam",
       "Ngày sinh": s.ngaySinh || "",
       "Số điện thoại": s.sdt || "",
       "Email": s.email || "",
@@ -399,15 +399,15 @@ export function useHocSinhList() {
             });
           }
         } catch (e) {
-          // ignore fetch errors — proceed with whatever we have
+          // ignore
         }
       }
 
       setForm({
-      hoTen: student.hoTen || "",
-      ngaySinh: formatDateInput(student.ngaySinh),
-      gioiTinh: String(student.gioiTinh ?? true),
-      lopHocId: student?.lopHoc?.id
+        hoTen: student.hoTen || "",
+        ngaySinh: formatDateInput(student.ngaySinh),
+        gioiTinh: (student.gioiTinh === "NU" || student.gioiTinh === "false" || student.gioiTinh === false) ? "false" : "true",
+        lopHocId: student?.lopHoc?.id
         ? String(student.lopHoc.id)
         : student?.lop?.id
         ? String(student.lop.id)
@@ -448,7 +448,7 @@ export function useHocSinhList() {
       setError("");
       setSuccessMessage("Xóa học sinh thành công.");
     } catch (err) {
-      setError("Không thể xóa học sinh.");Chu
+      setError("Không thể xóa học sinh.");
       setSuccessMessage("");
     }
   };
@@ -547,7 +547,7 @@ export function useHocSinhList() {
     const payload = {
       hoTen: form.hoTen.trim(),
       ngaySinh: form.ngaySinh || null,
-      gioiTinh: form.gioiTinh === "true",
+      gioiTinh: form.gioiTinh === "true" ? "NAM" : "NU",
       lop: form.lopHocId ? { id: Number(form.lopHocId) } : null,
       hocBaId: editingStudent?.hocBaId || 1,
       danTocId,
@@ -568,7 +568,41 @@ export function useHocSinhList() {
     try {
       if (editingStudent) {
         const response = await updateHocSinh(editingStudent.id, payload);
+        if (phuHuynhId) {
+          try {
+            await updatePhuHuynh(phuHuynhId, {
+              hoTen: form.phuHuynhHoTen.trim() || null,
+              soDienThoai: form.phuHuynhSdt.trim() || null,
+              email: form.phuHuynhEmail.trim() || null,
+              ngheNghiep: form.phuHuynhNgheNghiep.trim() || null,
+              quanHe: isFemaleVietnameseName(form.phuHuynhHoTen) ? "ME" : "CHA",
+              isSmSActive: true
+            });
+            // Update the local parents state to reflect the change
+            setParents((prev) =>
+              prev.map((p) =>
+                p.id === phuHuynhId
+                  ? {
+                      ...p,
+                      hoTen: form.phuHuynhHoTen.trim() || null,
+                      soDienThoai: form.phuHuynhSdt.trim() || null,
+                      email: form.phuHuynhEmail.trim() || null,
+                      ngheNghiep: form.phuHuynhNgheNghiep.trim() || null,
+                    }
+                  : p
+              )
+            );
+          } catch (e) {
+            console.error("Lỗi cập nhật phụ huynh:", e);
+          }
+        }
         const updated = normalizeStudent(response?.data?.data);
+        if (updated && updated.phuHuynh && phuHuynhId) {
+          updated.phuHuynh.hoTen = form.phuHuynhHoTen.trim() || null;
+          updated.phuHuynh.soDienThoai = form.phuHuynhSdt.trim() || null;
+          updated.phuHuynh.email = form.phuHuynhEmail.trim() || null;
+          updated.phuHuynh.ngheNghiep = form.phuHuynhNgheNghiep.trim() || null;
+        }
         setStudents((prev) =>
           prev.map((item) => (item.id === editingStudent.id ? updated : item))
         );
@@ -977,7 +1011,7 @@ export function useHocSinhList() {
           gioiTinh: parseBoolean(
             findColumnValue(row, EXCEL_FIELD_ALIASES.gioiTinh),
             true
-          ),
+          ) ? "NAM" : "NU",
           lop: { id: Number(classMatch.id) },
           hocBaId,
           danTocId,
@@ -1074,7 +1108,6 @@ export function useHocSinhList() {
     filteredStudents,
     classesByGrade,
     filteredClasses,
-    totalPages,
     pagedStudents,
     handleClassSelect,
     openCreate,

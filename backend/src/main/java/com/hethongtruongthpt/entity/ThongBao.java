@@ -37,8 +37,9 @@ public class ThongBao {
     private HocSinh hocSinh;
 
     @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
-    @JoinColumn(name = "nguoi_tao_id", nullable = false)
+    @JoinColumn(name = "nguoi_tao_id", nullable = true)
     private User nguoiTao;
+
 
     @Column(name = "ngay_dang", nullable = false)
     private LocalDateTime ngayDang;
