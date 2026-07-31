@@ -11,9 +11,10 @@ import {
 } from "lucide-react";
 import { clearAuth, getRole } from "../../store/authStore.js";
 import { getCurrentUsernameFromToken } from "../../utils/teacherProfile.js";
-import { readCachedAvatar } from "../../utils/avatarCache.js";
+import { readCachedAvatar, writeCachedAvatar } from "../../utils/avatarCache.js";
 import { getThongBao } from "../../api/thongbaoApi.js";
 import { formatDate } from "../../utils/helpers.js";
+import axiosClient from "../../api/axiosClient.js";
 
 export default function EduTopBar({
   searchPlaceholder = "Tìm kiếm...",
@@ -39,6 +40,26 @@ export default function EduTopBar({
   const groupRefsMap = useRef({});
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  // Fetch fresh avatar from DB on mount (syncs changes from mobile)
+  useEffect(() => {
+    if (!currentRole || !currentUsername) return;
+    const role = String(currentRole).toUpperCase();
+    const fetchFreshAvatar = async () => {
+      try {
+        let freshAvatar = null;
+        if (role === "HOCSINH" || role === "HOC_SINH") {
+          const res = await axiosClient.get("/hocsinh/me", { skipCache: true });
+          freshAvatar = res?.data?.data?.anhDaiDien || null;
+        }
+        if (freshAvatar) {
+          writeCachedAvatar({ avatar: freshAvatar, username: currentUsername, role: currentRole });
+          setAvatar(freshAvatar);
+        }
+      } catch {}
+    };
+    fetchFreshAvatar();
+  }, [currentUsername, currentRole]);
 
   useEffect(() => {
     const onAvatarChanged = (e) => {
@@ -157,7 +178,6 @@ export default function EduTopBar({
     navigate("/login", { replace: true });
   };
 
-  
   const [searchQuery, setSearchQuery] = useState("");
   const handleSearch = (e) => {
     e.preventDefault();
@@ -172,7 +192,7 @@ export default function EduTopBar({
   } : {};
 
   return (
-    <header 
+    <header
       className={`fixed top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6 transition-all duration-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${sidebarWidth === undefined ? (!navLinks ? (isOpen ? "lg:left-[250px] lg:w-[calc(100%-250px)]" : "lg:left-[80px] lg:w-[calc(100%-80px)]") : "lg:left-0 lg:w-full") : ""}`}
       style={dynamicStyle}
     >
@@ -287,8 +307,8 @@ export default function EduTopBar({
         {(() => {
           const targetPath = currentRole === "ADMIN" ? "/admin/dashboard" : (currentRole === "GIAOVIEN" || currentRole === "TEACHER") ? "/teacher/dashboard" : (currentRole === "HOCSINH" || currentRole === "STUDENT") ? "/student/home" : (currentRole === "PHUHUYNH" || currentRole === "PARENT") ? "/parent/home" : "/admin/dashboard";
           return (
-            <Link 
-              to={targetPath} 
+            <Link
+              to={targetPath}
               onClick={(e) => {
                 if (pathname === targetPath) {
                   e.preventDefault();
@@ -306,7 +326,7 @@ export default function EduTopBar({
 
       {/* RIGHT SECTION: Search + Notifications + Account */}
       <div className="flex items-center justify-end gap-3 lg:gap-4 flex-1">
-        
+
         {/* Search Bar */}
         <form onSubmit={handleSearch} className="hidden lg:flex items-center relative mr-2">
           <div className="absolute left-3 text-slate-400">
@@ -320,7 +340,7 @@ export default function EduTopBar({
             className="w-full lg:w-[220px] xl:w-[280px] h-[38px] pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-full text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all"
           />
         </form>
-        
+
         {/* Notifications */}
         <div className="relative shrink-0" ref={notiRef}>
           <button
@@ -405,7 +425,7 @@ export default function EduTopBar({
                 <span className="text-xs font-medium text-slate-500">{userRole}</span>
               </div>
             </div>
-            
+
             <div className="p-2 flex flex-col gap-1">
               {!hideEdit && (
                 <>

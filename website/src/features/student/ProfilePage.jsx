@@ -57,10 +57,20 @@ export default function ProfilePage() {
         const current = res?.data?.data || null;
         setStudent(current);
 
+        // Ưu tiên dữ liệu từ DB (đồng bộ với mobile), chỉ fallback cache nếu DB không có
         const avatar =
           current?.anhDaiDien ||
           readCachedAvatar({ username: currentUsername, role: "student" }) ||
           "";
+
+        // Nếu DB có ảnh mới khác cache, cập nhật cache luôn
+        if (current?.anhDaiDien) {
+          writeCachedAvatar({
+            avatar: current.anhDaiDien,
+            username: currentUsername,
+            role: "student"
+          });
+        }
         setAvatarPreview(avatar);
       } catch {
         if (!active) return;

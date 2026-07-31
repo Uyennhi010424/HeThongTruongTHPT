@@ -198,7 +198,7 @@ export default function LoginPage() {
         </style>
 
         {/* Content inside Beautiful Glass Panel */}
-        <div className="relative z-10 ml-[10%] w-full max-w-[60%]">
+        <div className="relative z-10 ml-[10%] w-full max-w-[80%]">
           <div 
             className="rounded-[28px] shadow-2xl border border-white/10"
             style={{
@@ -218,7 +218,7 @@ export default function LoginPage() {
               HỆ THỐNG QUẢN LÝ
             </h2>
             <h1 
-              className="text-4xl lg:text-5xl font-bold leading-[1.2] text-white mb-5 tracking-tight drop-shadow-lg" 
+              className="text-4xl lg:text-5xl font-bold leading-[1.2] text-white mb-5 tracking-tight drop-shadow-lg whitespace-nowrap" 
               style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}
             >
               Điểm học sinh THPT

@@ -94,8 +94,11 @@ public class DashboardService {
         List<LichThi> exams = new ArrayList<>();
         if (lopId != null) {
             exams = lichThiRepository.findByLopId(lopId).stream()
-                .filter(lt -> lt.getNgayThi() != null && !lt.getNgayThi().isBefore(now))
-                .sorted((a, b) -> a.getNgayThi().compareTo(b.getNgayThi()))
+                .sorted((a, b) -> {
+                    if (a.getNgayThi() == null) return 1;
+                    if (b.getNgayThi() == null) return -1;
+                    return b.getNgayThi().compareTo(a.getNgayThi());
+                })
                 .collect(Collectors.toList());
         }
         dashboardData.setExams(exams);

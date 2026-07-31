@@ -245,6 +245,14 @@ public class HocSinhService {
     }
 
     @CacheEvict(value = "hocSinhList", allEntries = true)
+    public void updateAvatar(Integer id, String anhDaiDien) {
+        HocSinh existing = hocSinhRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh với id: " + id));
+        existing.setAnhDaiDien(anhDaiDien);
+        hocSinhRepository.save(existing);
+    }
+
+    @CacheEvict(value = "hocSinhList", allEntries = true)
     public HocSinh update(Integer id, HocSinh hocSinh) {
         HocSinh existing = getById(id);
         Integer oldLopId = existing.getLop() != null ? existing.getLop().getId() : null;

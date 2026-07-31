@@ -209,7 +209,7 @@ export default function HomePage() {
               <span className="text-sm font-semibold text-slate-700">Lịch thi</span>
             </button>
             <button
-              onClick={() => navigate("/student/attendance")}
+              onClick={() => navigate("/student/diemdanh")}
               className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col items-center justify-center gap-3 group"
             >
               <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">

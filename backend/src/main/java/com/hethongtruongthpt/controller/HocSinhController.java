@@ -163,6 +163,20 @@ public class HocSinhController {
 		return ResponseEntity.ok(ApiResponse.ok(HocSinhResponseDTO.fromEntity(hocSinhService.update(id, hocSinh))));
 	}
 
+	@PreAuthorize("hasRole('HOC_SINH')")
+	@PatchMapping("/me/avatar")
+	public ResponseEntity<ApiResponse<Object>> updateMyAvatar(@RequestBody java.util.Map<String, String> body) {
+		String username = SecurityContextHolder.getContext().getAuthentication().getName();
+		String anhDaiDien = body.get("anhDaiDien");
+		if (anhDaiDien == null || anhDaiDien.isBlank()) {
+			return ResponseEntity.badRequest().body(ApiResponse.error("URL ảnh không hợp lệ"));
+		}
+		com.hethongtruongthpt.entity.HocSinh hs = hocSinhService.getByUsername(username);
+		hs.setAnhDaiDien(anhDaiDien);
+		hocSinhService.updateAvatar(hs.getId(), anhDaiDien);
+		return ResponseEntity.ok(ApiResponse.ok("Cập nhật ảnh đại diện thành công", null));
+	}
+
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
 	@DeleteMapping("/{id:\\d+}")
 	public ResponseEntity<ApiResponse<Object>> delete(@PathVariable("id") Integer id) {
