@@ -296,6 +296,7 @@ public class GiaoVienService {
                 .map(com.hethongtruongthpt.entity.LopHoc::getTenLop)
                 .collect(java.util.stream.Collectors.joining(", "));
             dto.setTenLopChuNhiem(classNames);
+            dto.setLopChuNhiemId(lopHocs.get(0).getId());
         } else {
             dto.setIsGvcn(false);
             dto.setTenLopChuNhiem(null);

@@ -132,7 +132,7 @@ export default function ProfileScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thông tin liên hệ</Text>
-          <InfoItem icon={<Mail size={20} color="#3B82F6" />} label="Email" value={student?.email || ''} />
+          <InfoItem icon={<Mail size={20} color="#3B82F6" />} label="Email" value={(student as any)?.email || ''} />
           <InfoItem icon={<Phone size={20} color="#10B981" />} label="Số điện thoại" value={(student as any)?.sdt || student?.soDienThoai || ''} />
           <InfoItem icon={<MapPin size={20} color="#F59E0B" />} label="Địa chỉ" value={student?.diaChi || ''} />
         </View>
@@ -147,7 +147,7 @@ export default function ProfileScreen() {
           <InfoItem 
             icon={<UserIcon size={20} color="#EC4899" />} 
             label="Giới tính" 
-            value={student?.gioiTinh === 'NAM' ? 'Nam' : student?.gioiTinh === 'NU' ? 'Nữ' : (student?.gioiTinh as any || '')} 
+            value={(student as any)?.gioiTinh === 'NAM' ? 'Nam' : (student as any)?.gioiTinh === 'NU' ? 'Nữ' : ((student as any)?.gioiTinh || '')} 
           />
         </View>
       </ScrollView>

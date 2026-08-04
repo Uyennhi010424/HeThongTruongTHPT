@@ -123,6 +123,17 @@ public class HocSinhController {
 		}
 	}
 
+	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'PHU_HUYNH', 'HOC_SINH')")
+	@GetMapping("/{id:\\d+}/dashboard")
+	public ResponseEntity<ApiResponse<com.hethongtruongthpt.dto.hocsinh.DashboardDataDTO>> getDashboardById(@PathVariable("id") Integer id) {
+		try {
+			return ResponseEntity.ok(ApiResponse.ok(dashboardService.getDashboardByHocSinhId(id)));
+		} catch (Exception ex) {
+			log.error("Lỗi khi lấy dashboard data cho học sinh " + id + ": ", ex);
+			return ResponseEntity.ok(ApiResponse.ok(null));
+		}
+	}
+
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
 	@GetMapping("/{id:\\d+}")
 	public ResponseEntity<ApiResponse<HocSinhResponseDTO>> getById(@PathVariable("id") Integer id) {
@@ -196,5 +207,19 @@ public class HocSinhController {
 	public ResponseEntity<ApiResponse<Object>> markAllGrade12Graduated() {
 		int count = hocSinhService.markAllGrade12Graduated();
 		return ResponseEntity.ok(ApiResponse.ok("Đã đánh dấu tốt nghiệp cho " + count + " học sinh lớp 12", null));
+	}
+
+	@PreAuthorize("hasAnyRole('ADMIN')")
+	@PostMapping("/{id:\\d+}/chuyen-lop")
+	public ResponseEntity<ApiResponse<Object>> transferClass(@PathVariable("id") Integer id, @RequestParam("lopId") Integer lopId) {
+		hocSinhService.transferClass(id, lopId);
+		return ResponseEntity.ok(ApiResponse.ok("Chuyển lớp thành công", null));
+	}
+
+	@PreAuthorize("hasAnyRole('ADMIN')")
+	@PostMapping("/{id:\\d+}/chuyen-truong")
+	public ResponseEntity<ApiResponse<Object>> transferSchool(@PathVariable("id") Integer id, @RequestParam("truongMoi") String truongMoi) {
+		hocSinhService.transferSchool(id, truongMoi);
+		return ResponseEntity.ok(ApiResponse.ok("Chuyển trường thành công", null));
 	}
 }

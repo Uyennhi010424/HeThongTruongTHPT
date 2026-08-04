@@ -43,7 +43,8 @@ public class GiaoVienDangKyController {
             @RequestParam String namHoc,
             @RequestParam Integer hocKy,
             @RequestParam Integer tuan) {
-        return ResponseEntity.ok(ApiResponse.ok(service.getThoiKhoaBieu(namHoc, hocKy, tuan)));
+        boolean isExamWeek = service.isExamWeek(namHoc, tuan);
+        return ResponseEntity.ok(ApiResponse.ok(isExamWeek ? "TUAN_THI" : "OK", service.getThoiKhoaBieu(namHoc, hocKy, tuan)));
     }
 
     @GetMapping("/lop-cua-toi")

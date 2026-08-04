@@ -25,6 +25,7 @@ public class GiaoVienDangKyService {
     private final GiaoVienNghiRepository giaoVienNghiRepository;
     private final TkbDayThayRepository tkbDayThayRepository;
     private final ChiTietToHopRepository chiTietToHopRepository;
+    private final ThoiKhoaBieuCrudService thoiKhoaBieuCrudService;
 
     public GiaoVienDangKyService(UserRepository userRepository,
                                  GiaoVienRepository giaoVienRepository,
@@ -35,7 +36,8 @@ public class GiaoVienDangKyService {
                                  MonHocRepository monHocRepository,
                                  GiaoVienNghiRepository giaoVienNghiRepository,
                                  TkbDayThayRepository tkbDayThayRepository,
-                                 ChiTietToHopRepository chiTietToHopRepository) {
+                                 ChiTietToHopRepository chiTietToHopRepository,
+                                 ThoiKhoaBieuCrudService thoiKhoaBieuCrudService) {
         this.userRepository = userRepository;
         this.giaoVienRepository = giaoVienRepository;
         this.giaoVienBanRepository = giaoVienBanRepository;
@@ -46,6 +48,7 @@ public class GiaoVienDangKyService {
         this.giaoVienNghiRepository = giaoVienNghiRepository;
         this.tkbDayThayRepository = tkbDayThayRepository;
         this.chiTietToHopRepository = chiTietToHopRepository;
+        this.thoiKhoaBieuCrudService = thoiKhoaBieuCrudService;
     }
 
     @Transactional(readOnly = true)
@@ -104,51 +107,41 @@ public class GiaoVienDangKyService {
     public List<ThoiKhoaBieu> getThoiKhoaBieu(String namHoc, Integer hocKy, Integer tuan) {
         GiaoVien gv = getCurrentTeacher();
         if (tuan == null) tuan = 1;
-        Integer mappedTuan = (tuan % 2 == 0) ? 2 : 1;
+        
+        Integer mappedTuan = (tuan % 2 != 0) ? 1 : 2;
 
-        // 1. Get all system-arranged slots (tuan = 1 or 2)
-        List<ThoiKhoaBieu> systemSlots = thoiKhoaBieuRepository.findByNamHocAndHocKyAndTuan(namHoc, hocKy, mappedTuan);
-        if (systemSlots == null) systemSlots = new ArrayList<>();
-        systemSlots = systemSlots.stream()
-                .filter(t -> t.getIsLocked() == null || !t.getIsLocked())
+        List<ThoiKhoaBieu> weekSlots = thoiKhoaBieuRepository.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, tuan);
+
+        List<ThoiKhoaBieu> teacherSlots = weekSlots.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsLocked()))
                 .collect(Collectors.toList());
 
-        // 2. Get all teacher-registered slots for this specific week
-        List<ThoiKhoaBieu> teacherSlots = thoiKhoaBieuRepository.findByNamHocAndHocKyAndTuan(namHoc, hocKy, tuan);
-        if (teacherSlots == null) teacherSlots = new ArrayList<>();
-        teacherSlots = teacherSlots.stream()
-                .filter(t -> t.getIsLocked() != null && t.getIsLocked())
+        List<ThoiKhoaBieu> systemSlots = weekSlots.stream()
+                .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
                 .collect(Collectors.toList());
 
-        // Combine
+        boolean isExamWeek = thoiKhoaBieuCrudService.isExamWeek(namHoc, tuan);
+        if (systemSlots.isEmpty() && !tuan.equals(mappedTuan) && !isExamWeek) {
+            List<ThoiKhoaBieu> fallbackSlots = thoiKhoaBieuRepository.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, mappedTuan);
+            systemSlots = fallbackSlots.stream()
+                    .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
+                    .collect(Collectors.toList());
+        }
+
         List<ThoiKhoaBieu> all = new ArrayList<>();
         all.addAll(systemSlots);
         all.addAll(teacherSlots);
 
-        // Filter by current teacher ID
-        List<ThoiKhoaBieu> result = all.stream()
-                .filter(t -> t.getGiaoVien() != null && t.getGiaoVien().getId().equals(gv.getId()))
-                .collect(Collectors.toList());
-
-        // Copy to detached list to avoid modifying persistent context entities
-        List<ThoiKhoaBieu> detachedResult = new ArrayList<>();
-        for (ThoiKhoaBieu t : result) {
-            ThoiKhoaBieu copy = new ThoiKhoaBieu();
-            copy.setId(t.getId());
-            copy.setLop(t.getLop());
-            copy.setMonHoc(t.getMonHoc());
-            copy.setGiaoVien(t.getGiaoVien());
-            copy.setThu(t.getThu());
-            copy.setTietBatDau(t.getTietBatDau());
-            copy.setSoTiet(t.getSoTiet());
-            copy.setPhongHoc(t.getPhongHoc());
-            copy.setHocKy(t.getHocKy());
-            copy.setNamHoc(t.getNamHoc());
-            copy.setIsLocked(t.getIsLocked());
-            copy.setTuan(tuan);
-            detachedResult.add(copy);
+        for (ThoiKhoaBieu tkb : all) {
+            tkb.setTuan(tuan);
         }
-        return detachedResult;
+
+        return all;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isExamWeek(String namHoc, Integer tuan) {
+        return thoiKhoaBieuCrudService.isExamWeek(namHoc, tuan);
     }
 
     @Transactional(readOnly = true)

@@ -210,7 +210,7 @@ function DetailDialog({ record, onClose }) {
               {(record.giaoVien?.hoTen || "?").charAt(0)}
             </div>
             <div>
-              <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 15 }}>{record.giaoVien?.hoTen || "--"}</div>
+              <div style={{ fontWeight: 700, color: "#1e3a8a", fontSize: 15 }}>{record.giaoVien?.hoTen || "--"}</div>
               <div style={{ fontSize: 12, color: "#64748b" }}>{record.giaoVien?.maGiaoVien || ""}</div>
             </div>
             <div style={{ marginLeft: "auto" }}><StatusBadge status={record.trangThai} /></div>
@@ -241,7 +241,7 @@ function DetailDialog({ record, onClose }) {
                 <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: i < timeline.length - 1 ? 12 : 0 }}>
                   <div style={{ width: 12, height: 12, borderRadius: "50%", background: t.color, flexShrink: 0, marginTop: 3 }} />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{t.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1e3a8a" }}>{t.label}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{t.time}</div>
                   </div>
                 </div>
@@ -261,7 +261,7 @@ function InfoRow({ label, value }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, color: "#0f172a" }}>{value}</div>
+      <div style={{ fontSize: 14, color: "#1e3a8a" }}>{value}</div>
     </div>
   );
 }
@@ -355,11 +355,11 @@ export default function AdminNghiDayPage() {
   };
 
   return (
-    <div style={{ padding: "28px 32px", background: "#f8fafc", minHeight: "100vh" }}>
+    <div style={{ background: "#f8fafc" }}>
 
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: 0 }}>Quản lý Nghỉ dạy &amp; Dạy thay</h1>
+      <div style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", letterSpacing: "-0.025em", margin: 0 }}>Quản lý Nghỉ dạy &amp; Dạy thay</h1>
         <p style={{ fontSize: 14, color: "#64748b", margin: "4px 0 0" }}>Xem xét và xử lý các đơn xin nghỉ của giáo viên.</p>
       </div>
 
@@ -418,12 +418,12 @@ export default function AdminNghiDayPage() {
                           {(r.giaoVien?.hoTen || "?").charAt(0)}
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700, color: "#0f172a" }}>{r.giaoVien?.hoTen || "--"}</div>
+                          <div style={{ fontWeight: 700, color: "#1e3a8a" }}>{r.giaoVien?.hoTen || "--"}</div>
                           <div style={{ fontSize: 12, color: "#94a3b8" }}>{r.giaoVien?.maGiaoVien || ""}</div>
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: "13px 16px", fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap" }}>{fmtDate(r.ngay)}</td>
+                    <td style={{ padding: "13px 16px", fontWeight: 600, color: "#1e3a8a", whiteSpace: "nowrap" }}>{fmtDate(r.ngay)}</td>
                     <td style={{ padding: "13px 16px", color: "#334155", maxWidth: 220 }}><div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lyDo || "--"}</div></td>
                     <td style={{ padding: "13px 16px", color: "#64748b", whiteSpace: "nowrap", fontSize: 13 }}>{fmtDateTime(r.createdAt)}</td>
                     <td style={{ padding: "13px 16px" }}><StatusBadge status={r.trangThai} /></td>
@@ -459,3 +459,4 @@ export default function AdminNghiDayPage() {
 }
 
 const actionBtn = { padding: "5px 12px", borderRadius: 6, border: "1px solid", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" };
+

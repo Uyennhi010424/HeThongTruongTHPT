@@ -165,6 +165,7 @@ export default function HomePage() {
           <TimetableWidget
             timetable={data?.timetable || []}
             isSummerBreak={isSummerBreak}
+            isExamWeek={data?.examWeek === true}
             todayDay={todayDay}
             subjectColorMap={subjectColorMap}
             getSubjectName={getSubjectName}

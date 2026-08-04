@@ -57,7 +57,7 @@ function ChangePasswordModal({ isOpen, onClose, userId }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="w-full max-w-md bg-[#FDFBF7] rounded-[20px] shadow-xl overflow-hidden border border-stone-200">
         <div className="flex items-center justify-between border-b border-stone-200 px-8 py-5 bg-white">
-          <h3 className="text-lg font-semibold text-stone-800">Đổi mật khẩu</h3>
+          <h3 className="text-lg font-semibold text-blue-900">Đổi mật khẩu</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700 transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -279,7 +279,7 @@ export default function AdminProfile() {
         
         {/* ── Header ── */}
         <div className="flex h-[90px] items-center border-b border-stone-200 bg-white px-10">
-          <h1 className="text-[28px] font-semibold text-stone-800 tracking-tight">Cài đặt tài khoản</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Cài đặt tài khoản</h1>
         </div>
 
         {/* ── Body ── */}
@@ -317,7 +317,7 @@ export default function AdminProfile() {
             {/* Tab: Profile */}
             {activeTab === "profile" && (
               <div className="max-w-[640px] animate-fade-in">
-                <h2 className="mb-10 text-[24px] font-semibold text-stone-800 tracking-tight">Hồ sơ của tôi</h2>
+                <h2 className="mb-10 text-2xl font-extrabold text-blue-900 tracking-tight">Hồ sơ của tôi</h2>
                 
                 {/* Avatar Section */}
                 <div className="mb-12 flex items-center gap-8 border-b border-stone-100 pb-10">
@@ -417,13 +417,13 @@ export default function AdminProfile() {
             {/* Tab: Security */}
             {activeTab === "security" && (
               <div className="max-w-[640px] animate-fade-in">
-                <h2 className="mb-10 text-[24px] font-semibold text-stone-800 tracking-tight">Bảo mật tài khoản</h2>
+                <h2 className="mb-10 text-2xl font-extrabold text-blue-900 tracking-tight">Bảo mật tài khoản</h2>
 
                 <div className="flex flex-col">
                   
                   {/* Password Section */}
                   <div className="border-b border-stone-100 pb-10 mb-10">
-                    <h3 className="text-[16px] font-medium text-stone-800 mb-6">Mật khẩu</h3>
+                    <h3 className="text-[16px] font-medium text-blue-900 mb-6">Mật khẩu</h3>
                     <div className="flex flex-col sm:flex-row sm:items-end gap-5">
                       <div className="flex-1">
                         <label className="mb-2 block text-[14px] font-medium text-stone-700">Mật khẩu hiện tại</label>
@@ -448,7 +448,7 @@ export default function AdminProfile() {
                   <div className="border-b border-stone-100 pb-10 mb-10">
                     <div className="flex items-start justify-between gap-6">
                       <div className="pr-8">
-                        <h3 className="text-[16px] font-medium text-stone-800 mb-2">Xác thực 2 bước (2FA)</h3>
+                        <h3 className="text-[16px] font-medium text-blue-900 mb-2">Xác thực 2 bước (2FA)</h3>
                         <p className="text-[14px] text-stone-500 leading-relaxed">
                           Thêm một lớp bảo mật phụ vào tài khoản của bạn. Cần cung cấp mã xác nhận mỗi khi đăng nhập trên thiết bị mới.
                         </p>
@@ -466,7 +466,7 @@ export default function AdminProfile() {
                   <div className="pb-4">
                     <div className="flex items-start justify-between gap-6">
                       <div className="pr-8">
-                        <h3 className="text-[16px] font-medium text-stone-800 mb-2">Quản lý thiết bị</h3>
+                        <h3 className="text-[16px] font-medium text-blue-900 mb-2">Quản lý thiết bị</h3>
                         <p className="text-[14px] text-stone-500 leading-relaxed">
                           Đăng xuất khỏi tất cả các thiết bị khác, ngoại trừ thiết bị hiện tại bạn đang sử dụng.
                         </p>
@@ -495,3 +495,4 @@ export default function AdminProfile() {
     </div>
   );
 }
+

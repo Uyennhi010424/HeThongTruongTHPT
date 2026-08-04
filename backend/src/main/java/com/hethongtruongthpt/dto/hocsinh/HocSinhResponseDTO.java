@@ -23,6 +23,7 @@ public class HocSinhResponseDTO {
     private Integer trangThai;
     private Integer phuHuynhId;
     private String anhDaiDien;
+    private String truongChuyenDen;
     private LocalDateTime createdAt;
 
     public static HocSinhResponseDTO fromEntity(HocSinh hs) {
@@ -45,6 +46,7 @@ public class HocSinhResponseDTO {
         dto.setTrangThai(hs.getTrangThai());
         dto.setPhuHuynhId(hs.getPhuHuynhId());
         dto.setAnhDaiDien(hs.getAnhDaiDien());
+        dto.setTruongChuyenDen(hs.getTruongChuyenDen());
         dto.setCreatedAt(hs.getCreatedAt());
         return dto;
     }
@@ -83,6 +85,8 @@ public class HocSinhResponseDTO {
     public void setPhuHuynhId(Integer phuHuynhId) { this.phuHuynhId = phuHuynhId; }
     public String getAnhDaiDien() { return anhDaiDien; }
     public void setAnhDaiDien(String anhDaiDien) { this.anhDaiDien = anhDaiDien; }
+    public String getTruongChuyenDen() { return truongChuyenDen; }
+    public void setTruongChuyenDen(String truongChuyenDen) { this.truongChuyenDen = truongChuyenDen; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

@@ -12,6 +12,7 @@ export const QuickFunctions: React.FC<QuickFunctionsProps> = ({ data }) => {
   const router = useRouter();
   
   const gpa = data?.gpa !== null && data?.gpa !== undefined ? data.gpa.toFixed(1) : '--';
+  const gpaNum = gpa !== '--' ? parseFloat(gpa) : null;
   
   const getConductText = () => {
     if (!data?.conducts || data.conducts.length === 0) return 'Chưa có';
@@ -30,7 +31,7 @@ export const QuickFunctions: React.FC<QuickFunctionsProps> = ({ data }) => {
   const quickFunctions = [
     { 
       icon: <Target size={28} color="#2563EB" />, 
-      name: 'Điểm TB môn', 
+      name: 'Điểm TB', 
       value: gpa,
       onPress: () => router.push('/(student)/scores' as any) 
     },
@@ -43,9 +44,9 @@ export const QuickFunctions: React.FC<QuickFunctionsProps> = ({ data }) => {
     { 
       icon: <BarChart2 size={28} color="#F59E0B" />, 
       name: 'Học lực', 
-      value: gpa === '--' ? 'Chưa có' : (gpa >= '8.0' ? 'Giỏi' : gpa >= '6.5' ? 'Khá' : gpa >= '5.0' ? 'TB' : 'Yếu'),
+      value: gpaNum === null ? 'Chưa có' : (gpaNum >= 8.0 ? 'Giỏi' : gpaNum >= 6.5 ? 'Khá' : gpaNum >= 5.0 ? 'TB' : 'Yếu'),
       onPress: () => router.push('/(student)/academic' as any) 
-    },
+    }
   ];
 
   return (

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ComposedChart,
@@ -20,7 +20,8 @@ import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getDiem } from "../../api/diemApi.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
-import { getDayLabel } from "../../utils/helpers.js";
+import { getDayLabel, getCurrentSemesterWeek } from "../../utils/helpers.js";
+import { getNamHoc } from "../../api/namhocApi.js";
 
 const HANH_KIEM_LABELS = {
   TOT: "Tá»‘t",
@@ -86,17 +87,40 @@ export default function HomePage() {
           scoresData = [],
           conductsData = [],
           attendanceStats = null;
-        const fetchPromises = [];
-        if (lopId) {
-          const now = new Date();
-          const curMonth = now.getMonth() + 1;
-          const curNamHoc =
-            curMonth >= 9
+        // Lấy thông tin năm học từ database để xác định đúng năm học/học kỳ/tuần hiện tại
+        let curNamHoc = "";
+        let curHocKy = 1;
+        let activeYearObj = null;
+        try {
+          const namHocRes = await getNamHoc();
+          const years = namHocRes?.data?.data || [];
+          activeYearObj = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1] || null;
+          if (activeYearObj) {
+            curNamHoc = activeYearObj.tenNamHoc || "";
+            // Xác định học kỳ hiện tại bằng ngày bắt đầu HK2 từ database
+            if (activeYearObj.ngayBatDauHk2) {
+              const today = new Date().toISOString().slice(0, 10);
+              if (today >= activeYearObj.ngayBatDauHk2) curHocKy = 2;
+            }
+          } else {
+            // Fallback: tính theo tháng hệ thống nếu không có năm học nào
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            curNamHoc = curMonth >= 9
               ? `${now.getFullYear()}-${now.getFullYear() + 1}`
               : `${now.getFullYear() - 1}-${now.getFullYear()}`;
-          const curHocKy = curMonth >= 9 || curMonth <= 1 ? 1 : 2;
+            curHocKy = curMonth >= 9 || curMonth <= 1 ? 1 : 2;
+          }
+        } catch { /* ignore, sẽ fallback */ }
+
+        // Tính tuần hiện tại từ ngayBatDauHk1 đã lưu trong database
+        const currentTuan = getCurrentSemesterWeek(activeYearObj);
+
+        const fetchPromises = [];
+        if (lopId) {
           fetchPromises.push(
-            getThoiKhoaBieu({ lopId, namHoc: curNamHoc, hocKy: curHocKy })
+            // Lấy TKB của tuần hiện tại đúng với cài đặt database
+            getThoiKhoaBieu({ lopId, namHoc: curNamHoc, hocKy: curHocKy, tuan: currentTuan })
               .then((r) => {
                 timetableData = r?.data?.data || [];
               })
@@ -137,16 +161,20 @@ export default function HomePage() {
         }
         await Promise.all(fetchPromises);
         if (!active) return;
+        // Fallback: nếu không có TKB theo tuần hiện tại, thử lấy theo tuần lớn nhất có dữ liệu
         if (lopId && timetableData.length === 0) {
           try {
-            const fb = await getThoiKhoaBieu({ lopId });
-            timetableData = fb?.data?.data || [];
+            const fb = await getThoiKhoaBieu({ lopId, namHoc: curNamHoc, hocKy: curHocKy });
+            const allData = fb?.data?.data || [];
+            if (allData.length > 0) {
+              // Tìm tuần gần nhất với tuần hiện tại có dữ liệu
+              const availableWeeks = [...new Set(allData.map((i) => i.tuan || 0).filter(Boolean))].sort((a, b) => a - b);
+              const closestWeek = availableWeeks.reduce((prev, curr) =>
+                Math.abs(curr - currentTuan) < Math.abs(prev - currentTuan) ? curr : prev
+              , availableWeeks[availableWeeks.length - 1]);
+              timetableData = allData.filter((i) => i.tuan === closestWeek);
+            }
           } catch {}
-        }
-        if (timetableData.length > 0) {
-          const maxTuan = Math.max(...timetableData.map((i) => i.tuan || 0));
-          if (maxTuan > 0)
-            timetableData = timetableData.filter((i) => i.tuan === maxTuan);
         }
         setData({
           notices: noticesRes?.data?.data || [],

@@ -46,10 +46,10 @@ const inferConfigFromYearName = (tenNamHoc) => {
     new Date(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
   const fmt = (dt) => dt.toISOString().slice(0, 10);
   const hk1Start = makeDate(start, 9, 5);
-  const hk1End = makeDate(start + 1, 1, 15);
+  const hk1End = makeDate(start + 1, 1, 4);
   const hk1Deadline = new Date(hk1End.getTime() - 5 * 24 * 60 * 60 * 1000);
-  const hk2Start = makeDate(start + 1, 1, 22);
-  const hk2End = makeDate(start + 1, 5, 25);
+  const hk2Start = makeDate(start + 1, 1, 5);
+  const hk2End = makeDate(start + 1, 5, 31);
   const hk2Deadline = new Date(hk2End.getTime() - 5 * 24 * 60 * 60 * 1000);
   return {
     hk1Start: fmt(hk1Start),
@@ -131,7 +131,7 @@ export default function NamHocHocKyPage() {
       try {
         const [yRes, hkRes] = await Promise.all([getNamHoc(), getHocKy()]);
         if (!active) return;
-        const yData = (yRes?.data?.data || []).sort((a,b) => b.tenNamHoc.localeCompare(a.tenNamHoc));
+        const yData = (yRes?.data?.data || []).sort((a, b) => b.tenNamHoc.localeCompare(a.tenNamHoc));
         setYears(yData);
         setHocKyList(hkRes?.data?.data || []);
         if (yData.length) {
@@ -224,7 +224,7 @@ export default function NamHocHocKyPage() {
       } catch { semesterCreateFailed = true; }
 
       const [freshYears, freshSemesters] = await Promise.all([getNamHoc(), getHocKy()]);
-      const nextYears = (freshYears?.data?.data || []).sort((a,b) => b.tenNamHoc.localeCompare(a.tenNamHoc));
+      const nextYears = (freshYears?.data?.data || []).sort((a, b) => b.tenNamHoc.localeCompare(a.tenNamHoc));
       setYears(nextYears);
       setHocKyList(freshSemesters?.data?.data || []);
       setSelectedYear(nextYears.find((y) => y.id === createdYear.id) || createdYear);
@@ -299,7 +299,7 @@ export default function NamHocHocKyPage() {
       setSaving(false);
     }
   };
-  
+
   const handleLockYear = async () => {
     if (!selectedYear) return;
     try {
@@ -346,15 +346,15 @@ export default function NamHocHocKyPage() {
 
   const getBadgeStatus = (y) => {
     if (y.trangThai === "DANG_MO" || y.trang_thai === "DANG_MO") return { label: "Hiện hành", type: "success" };
-    
+
     const startYear = parseInt(y.tenNamHoc.split("-")[0]);
     const currentYearObj = years.find(yr => yr.trangThai === "DANG_MO" || yr.trang_thai === "DANG_MO");
-    
+
     if (!currentYearObj) return { label: "Đã khóa", type: "warning" };
-    
+
     const currentStart = parseInt(currentYearObj.tenNamHoc.split("-")[0]);
     if (startYear <= currentStart - 2) return { label: "Lưu trữ", type: "neutral" };
-    
+
     return { label: "Đã khóa", type: "warning" };
   };
 
@@ -379,7 +379,7 @@ export default function NamHocHocKyPage() {
 
       <div className="p-6 flex-1 flex flex-col">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 items-start">
-          
+
           {/* CỘT TRÁI: DANH SÁCH NĂM HỌC */}
           <div className="lg:col-span-1 flex flex-col gap-3">
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-1">Danh sách năm học</h3>
@@ -391,16 +391,15 @@ export default function NamHocHocKyPage() {
                   const isActive = selectedYear?.id === y.id;
                   const badgeInfo = getBadgeStatus(y);
                   const countHk = hocKyList.filter(hk => hk.namHoc?.id === y.id || hk.nam_hoc_id === y.id).length || 2; // default 2
-                  
+
                   return (
                     <div
                       key={y.id}
                       onClick={() => setSelectedYear(y)}
-                      className={`relative group cursor-pointer p-4 rounded-xl border transition-all ${
-                        isActive 
-                          ? "bg-blue-50/50 border-blue-200 shadow-sm" 
-                          : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-                      }`}
+                      className={`relative group cursor-pointer p-4 rounded-xl border transition-all ${isActive
+                        ? "bg-blue-50/50 border-blue-200 shadow-sm"
+                        : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                        }`}
                     >
                       <button
                         type="button"
@@ -410,11 +409,11 @@ export default function NamHocHocKyPage() {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                      
+
                       <div className={`text-base font-bold ${isActive ? "text-blue-700" : "text-slate-800"}`}>
                         {y.tenNamHoc}
                       </div>
-                      
+
                       <div className="mt-2 flex items-center gap-2">
                         {badgeInfo.type === 'success' && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -449,7 +448,7 @@ export default function NamHocHocKyPage() {
                 {/* Header Chi Tiết */}
                 <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50 rounded-t-xl">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                    <h2 className="text-xl font-bold text-blue-900 flex items-center gap-3">
                       {selectedYear.tenNamHoc}
                       {selectedBadge?.type === 'success' && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -468,7 +467,7 @@ export default function NamHocHocKyPage() {
                       )}
                     </h2>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     {!isSelectedOngoing ? (
                       <button
@@ -508,12 +507,12 @@ export default function NamHocHocKyPage() {
                 {/* Form Học Kỳ */}
                 <div className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    
+
                     {/* Học kỳ I */}
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                       <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold">I</div>
-                        <h3 className="font-bold text-slate-800">Học kỳ I</h3>
+                        <h3 className="font-bold text-blue-900">Học kỳ I</h3>
                       </div>
                       <div className="p-4 space-y-4">
                         <LabeledDateField
@@ -540,7 +539,7 @@ export default function NamHocHocKyPage() {
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                       <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold">II</div>
-                        <h3 className="font-bold text-slate-800">Học kỳ II</h3>
+                        <h3 className="font-bold text-blue-900">Học kỳ II</h3>
                       </div>
                       <div className="p-4 space-y-4">
                         <LabeledDateField
@@ -596,7 +595,7 @@ export default function NamHocHocKyPage() {
           <div className="grid grid-cols-2 gap-4">
             {/* Cột HK1 */}
             <div className="space-y-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <h4 className="font-semibold text-slate-800 text-sm">Học kỳ I</h4>
+              <h4 className="font-semibold text-blue-900 text-sm">Học kỳ I</h4>
               <LabeledDateField
                 label="Bắt đầu"
                 value={createForm.hk1Start}
@@ -616,7 +615,7 @@ export default function NamHocHocKyPage() {
 
             {/* Cột HK2 */}
             <div className="space-y-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <h4 className="font-semibold text-slate-800 text-sm">Học kỳ II</h4>
+              <h4 className="font-semibold text-blue-900 text-sm">Học kỳ II</h4>
               <LabeledDateField
                 label="Bắt đầu"
                 value={createForm.hk2Start}
@@ -660,21 +659,21 @@ export default function NamHocHocKyPage() {
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4 mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Xóa năm học</h3>
+            <h3 className="text-lg font-bold text-blue-900 text-center mb-2">Xóa năm học</h3>
             <p className="text-sm text-slate-500 text-center mb-6">
               Bạn có chắc chắn muốn xóa năm học <strong>{deleteModal.year?.tenNamHoc}</strong>? Hành động này sẽ xóa các học kỳ liên quan và không thể hoàn tác.
             </p>
             <div className="flex gap-3 w-full">
-              <button 
-                type="button" 
-                className="flex-1 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors" 
+              <button
+                type="button"
+                className="flex-1 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 onClick={() => setDeleteModal({ open: false, year: null })}
               >
                 Hủy
               </button>
-              <button 
-                type="button" 
-                className="flex-1 py-2.5 bg-red-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-red-700 transition-colors" 
+              <button
+                type="button"
+                className="flex-1 py-2.5 bg-red-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-red-700 transition-colors"
                 onClick={handleDeleteConfirm}
                 disabled={saving}
               >

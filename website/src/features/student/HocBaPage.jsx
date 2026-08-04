@@ -183,7 +183,7 @@ export default function HocBaPage() {
       {/* Header */}
       <div className="bg-white border-b border-slate-200 pt-8 pb-6 px-6 md:px-12">
         <div className="w-full">
-          <h2 className="text-2xl font-bold text-slate-800 mb-1">Học bạ</h2>
+          <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight mb-1">Học bạ</h2>
           <p className="text-sm font-medium text-slate-500">Tra cứu kết quả học tập theo từng năm học.</p>
         </div>
       </div>
@@ -251,7 +251,7 @@ export default function HocBaPage() {
                       <td className="px-6 py-6 text-base font-bold text-blue-900">Cả năm</td>
                       <td className="px-6 py-6">
                         <div className="flex flex-col">
-                          <span className="text-2xl font-bold text-blue-900">{displayDtbCaNam}</span>
+                          <span className="text-2xl font-extrabold text-blue-900 tracking-tight">{displayDtbCaNam}</span>
                           {displayDtbCaNam !== "--" && (
                             <div className="w-24 bg-blue-100 rounded-full h-1.5 mt-2 overflow-hidden">
                               <div className="bg-blue-600 h-full rounded-full" style={{ width: `${(Number(displayDtbCaNam) / 10) * 100}%` }}></div>
@@ -321,3 +321,4 @@ export default function HocBaPage() {
     </div>
   );
 }
+

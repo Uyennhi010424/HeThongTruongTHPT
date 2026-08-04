@@ -133,7 +133,7 @@ export default function AdminNhapDiemPage() {
               <Send size={18} className="text-blue-600" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800 text-[15px]">Gửi bảng điểm cho phụ huynh</h3>
+              <h3 className="font-bold text-blue-900 text-[15px]">Gửi bảng điểm cho phụ huynh</h3>
               <p className="text-slate-500 text-[13px] mt-0.5">Gửi tất cả điểm đã khóa sổ (LOCKED) chưa thông báo trong kỳ này vào hộp chat phụ huynh.</p>
             </div>
           </div>

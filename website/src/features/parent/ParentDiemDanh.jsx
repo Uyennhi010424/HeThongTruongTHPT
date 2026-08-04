@@ -65,121 +65,107 @@ export default function ParentDiemDanh() {
   const attendanceRate = stats.total > 0 ? ((stats.coMat / stats.total) * 100).toFixed(1) : "--";
 
   return (
-    <div className="page users-page student-page">
-      <section className="student-hero card">
-        <div className="student-hero-copy">
-          <div className="student-hero-kicker">EduManager Pro</div>
-          <h2 className="student-hero-title">Điểm danh con em</h2>
-          <p className="student-hero-subtitle">Theo dõi tình hình đi học của con.</p>
-        </div>
-        <div className="student-hero-metrics">
-          <div className="student-hero-chip">{loading ? "..." : attendanceRate}% đi học</div>
-        </div>
-      </section>
-
-      <StudentSelector students={students} selectedIndex={selectedIndex} onSelect={selectStudent} />
-
-      <div className="card users-toolbar">
-        <div className="users-actions">
-          <label className="form-field">
-            <span>Từ ngày</span>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          </label>
-          <label className="form-field">
-            <span>Đến ngày</span>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          </label>
+    <div className="flex-1 bg-white min-h-screen">
+      <div className="px-4 md:px-6 lg:px-8 pt-6 pb-4 border-b border-slate-200 shrink-0">
+        <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
+          Điểm danh con em
+        </h2>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-slate-500 text-[14px]">
+            Theo dõi tình hình đi học của con.
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="bg-white p-1 rounded-full border border-slate-200 inline-flex items-center gap-2 shadow-sm">
+              <div className="flex items-center gap-2 pl-3 pr-1">
+                <span className="text-xs font-medium text-slate-500">Từ</span>
+                <input 
+                  type="date" 
+                  className="text-sm bg-transparent border-none outline-none font-semibold text-slate-700 cursor-pointer"
+                  value={fromDate} 
+                  onChange={(e) => setFromDate(e.target.value)} 
+                />
+              </div>
+              <div className="w-px h-4 bg-slate-200"></div>
+              <div className="flex items-center gap-2 pr-3 pl-1">
+                <span className="text-xs font-medium text-slate-500">Đến</span>
+                <input 
+                  type="date" 
+                  className="text-sm bg-transparent border-none outline-none font-semibold text-slate-700 cursor-pointer"
+                  value={toDate} 
+                  onChange={(e) => setToDate(e.target.value)} 
+                />
+              </div>
+            </div>
+            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold border border-blue-100 h-[34px] flex items-center">
+              {loading ? "..." : attendanceRate}% đi học
+            </div>
+          </div>
         </div>
       </div>
 
-      {error && <div className="card table-empty">{error}</div>}
+      <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 pt-2">
+        <div className="mb-6">
+          <StudentSelector students={students} selectedIndex={selectedIndex} onSelect={selectStudent} />
+        </div>
 
-      {!error && !loading && !statistics && (
-        <div className="card table-empty">Chưa có dữ liệu điểm danh.</div>
-      )}
+      {error ? (
+        <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-center border border-red-100">{error}</div>
+      ) : loading && !statistics ? (
+        <div className="p-12 text-center text-slate-400">Đang tải...</div>
+      ) : !statistics ? (
+        <div className="bg-slate-50 text-slate-500 p-8 rounded-2xl mb-6 text-center border border-slate-100">Chưa có dữ liệu điểm danh.</div>
+      ) : null}
 
+      {/* Only show these if we have valid statistics */}
       {!error && statistics && (
         <>
-          <div className="users-stats">
-            <div className="stat-card stat-blue">
-              <div className="stat-label">Tổng số ngày</div>
-              <div className="stat-value">{stats.total}</div>
-            </div>
-            <div className="stat-card stat-sky">
-              <div className="stat-label">Có mặt</div>
-              <div className="stat-value" style={{ color: "#10b981" }}>{stats.coMat}</div>
-            </div>
-            <div className="stat-card stat-ice">
-              <div className="stat-label">Vắng có phép</div>
-              <div className="stat-value" style={{ color: "#f59e0b" }}>{stats.vangCoPhep}</div>
-            </div>
-            <div className="stat-card stat-navy">
-              <div className="stat-label">Vắng không phép</div>
-              <div className="stat-value" style={{ color: "#ef4444" }}>{stats.vangKhongPhep}</div>
-            </div>
+          <div className="border-b border-gray-200 pb-4 mb-6 mt-4">
+            <h2 className="text-xl font-bold text-slate-800">Chi tiết điểm danh</h2>
           </div>
 
-          <div className="card" style={{ padding: "20px 24px" }}>
-            <div className="panel-title" style={{ marginBottom: 16 }}>Tỷ lệ đi học</div>
-            <div style={{ background: "#e5e7eb", borderRadius: 8, height: 32, overflow: "hidden" }}>
-              <div
-                style={{
-                  background: "#10b981",
-                  height: "100%",
-                  width: `${attendanceRate}%`,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontWeight: 600,
-                  fontSize: 14,
-                  minWidth: 60
-                }}
-              >
-                {attendanceRate}%
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {statistics.details && statistics.details.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-4 font-semibold text-slate-700 text-sm">Ngày</th>
+                      <th className="px-6 py-4 font-semibold text-slate-700 text-sm">Trạng thái</th>
+                      <th className="px-6 py-4 font-semibold text-slate-700 text-sm">Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {statistics.details.map((item, idx) => {
+                      const status = STATUS_MAP[item.trangThai] || STATUS_MAP.CO_MAT;
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 font-medium text-slate-700">
+                            {item.ngayDiemDanh ? new Date(item.ngayDiemDanh).toLocaleDateString("vi-VN") : "--"}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`${status.color} px-3 py-1 rounded-full text-sm font-medium`}>
+                              {status.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-500">{item.ghiChu || "--"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <div style={{ marginTop: 8, fontSize: 13, color: "#6b7280" }}>
-              {stats.coMat}/{stats.total} ngày đi học trong khoảng thời gian đã chọn
-            </div>
+            ) : (
+              <div className="p-16 flex flex-col items-center justify-center text-gray-400 gap-3">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-2">
+                  <i className="fi fi-rr-document text-2xl"></i>
+                </div>
+                <p>Chưa có chi tiết điểm danh nào</p>
+              </div>
+            )}
           </div>
-
-          {statistics.details && statistics.details.length > 0 && (
-            <div className="card users-table">
-              <div className="table-header">
-                <div>
-                  <div className="panel-title">Chi tiết điểm danh</div>
-                  <div className="panel-subtitle">Lịch sử điểm danh gần đây</div>
-                </div>
-              </div>
-              <div className="table-grid">
-                <div className="table-row table-head">
-                  <div>Ngày</div>
-                  <div>Trạng thái</div>
-                  <div>Ghi chú</div>
-                </div>
-                {statistics.details.map((item, idx) => {
-                  const status = STATUS_MAP[item.trangThai] || STATUS_MAP.CO_MAT;
-                  return (
-                    <div key={idx} className="table-row">
-                      <div className="table-title">
-                        {item.ngayDiemDanh ? new Date(item.ngayDiemDanh).toLocaleDateString("vi-VN") : "--"}
-                      </div>
-                      <div>
-                        <span className={status.color} style={{ padding: "2px 8px", borderRadius: 4 }}>
-                          {status.label}
-                        </span>
-                      </div>
-                      <div>{item.ghiChu || "--"}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </>
       )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Plus, X, MoreVertical, Edit, Trash2, Eye, Shield, RefreshCw, GraduationCap, Users } from "lucide-react";
-import { createLop, createLopBulk, deleteLop, getLop, syncSiSo, updateLop, assignGvcn } from "../../../api/lopApi.js";
+import { 
+  Users, UserPlus, BookOpen, Search, MoreVertical, 
+  Trash2, Edit, Save, X, Settings, RefreshCw, 
+  Plus, Check, Building2, Calendar, FileText,
+  UserCheck, AlertCircle, TrendingUp, Filter, GraduationCap, ArrowUpCircle, Eye, Shield
+} from "lucide-react";
+import { createLop, createLopBulk, deleteLop, getLop, syncSiSo, updateLop, assignGvcn, promoteStudents } from "../../../api/lopApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
@@ -114,7 +119,7 @@ const ClassDetailModal = ({ item, toHopList, onClose, onViewStudents }) => {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50 shrink-0">
-            <h2 className="text-lg font-bold text-slate-900">Chi tiết lớp học</h2>
+            <h2 className="text-lg font-bold text-blue-900">Chi tiết lớp học</h2>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
               <X className="w-5 h-5" />
             </button>
@@ -189,7 +194,7 @@ const ClassDetailModal = ({ item, toHopList, onClose, onViewStudents }) => {
 };
 
 // --- Modal Phân công GVCN ---
-const AssignTeacherModal = ({ item, onClose, onAssignSuccess }) => {
+const AssignTeacherModal = ({ item, classes, onClose, onAssignSuccess }) => {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -200,7 +205,21 @@ const AssignTeacherModal = ({ item, onClose, onAssignSuccess }) => {
       try {
         setLoading(true);
         const res = await getGiaoVien();
-        const data = res?.data?.data || [];
+        let data = res?.data?.data || [];
+        
+        // Lọc ra danh sách giáo viên đã chủ nhiệm lớp khác trong CÙNG năm học
+        const assignedTeacherIds = new Set();
+        if (classes) {
+          classes.forEach(c => {
+            if (c.namHoc === item.namHoc && c.gvcn && c.id !== item.id) {
+              assignedTeacherIds.add(c.gvcn.id);
+            }
+          });
+        }
+        
+        // Loại bỏ những giáo viên đã có lớp chủ nhiệm
+        data = data.filter(t => !assignedTeacherIds.has(t.id));
+
         setTeachers(data);
         const currentName = item?.gvcn?.hoTen || item?.gvcnTen;
         if (currentName) {
@@ -240,7 +259,7 @@ const AssignTeacherModal = ({ item, onClose, onAssignSuccess }) => {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
-            <h2 className="text-lg font-bold text-slate-900">Phân công GVCN</h2>
+            <h2 className="text-lg font-bold text-blue-900">Phân công GVCN</h2>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
               <X className="w-5 h-5" />
             </button>
@@ -352,7 +371,7 @@ const StudentListModal = ({ item, onClose }) => {
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Danh sách học sinh</h2>
+              <h2 className="text-lg font-bold text-blue-900">Danh sách học sinh</h2>
               <p className="text-sm text-slate-500 mt-0.5">Lớp: {item?.tenLop} - Sĩ số: {item?.siSo || 0}</p>
             </div>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
@@ -470,17 +489,56 @@ export default function LopList() {
     }
   };
 
+  const handlePromoteYear = async () => {
+    const currentYear = getCurrentAcademicYear();
+    const parts = currentYear.split("-");
+    if (parts.length !== 2) {
+      notifyError("Định dạng năm học không hợp lệ.");
+      return;
+    }
+    const [start, end] = parts.map(Number);
+    const nextYear = `${start + 1}-${end + 1}`;
+    
+    if (window.confirm(`Bạn có chắc chắn muốn kết thúc năm học ${currentYear} và đưa toàn bộ học sinh lên lớp cho năm học ${nextYear} không?\n\nLưu ý:\n- Khối 12 sẽ Tốt nghiệp.\n- Khối 10, 11 sẽ tự động lên lớp tiếp theo.\n- Giáo viên chủ nhiệm sẽ được luân chuyển theo lớp mới (nếu có).\n- Cần thiết lập danh sách năm học ${nextYear} trong hệ thống trước (nếu có chức năng quản lý năm học).`)) {
+      try {
+        setLoading(true);
+        const res = await promoteStudents({ currentNamHoc: currentYear, nextNamHoc: nextYear });
+        const d = res.data?.data;
+        notifySuccess(`Lên lớp thành công! ${d?.promoted || 0} học sinh lên lớp, ${d?.graduated || 0} học sinh tốt nghiệp.`);
+        loadData();
+      } catch (err) {
+        notifyError("Lỗi lên lớp: " + (err.response?.data?.message || err.message));
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
 
   const filteredClasses = useMemo(() => {
     const lower = keyword.toLowerCase();
-    return classes.filter((item) => {
+    const result = classes.filter((item) => {
       if (!keyword.trim()) return true;
       return [item.tenLop, item.khoi]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(lower));
+    });
+    
+    return result.sort((a, b) => {
+      // 1. Năm học mới nhất lên trên
+      const yearCompare = String(b.namHoc || "").localeCompare(String(a.namHoc || ""));
+      if (yearCompare !== 0) return yearCompare;
+      
+      // 2. Khối 10 -> 11 -> 12
+      const khoiA = Number(a.khoi || 0);
+      const khoiB = Number(b.khoi || 0);
+      if (khoiA !== khoiB) return khoiA - khoiB;
+      
+      // 3. Tên lớp theo A-Z (10A1 -> 10A2)
+      return String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { numeric: true, sensitivity: "base" });
     });
   }, [keyword, classes]);
 
@@ -576,7 +634,7 @@ export default function LopList() {
       {/* Header & Toolbar */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100">
-          <h1 className="text-2xl font-bold text-slate-900">Danh mục lớp học</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Danh mục lớp học</h1>
           <p className="text-slate-500 mt-1">Quản lý danh sách lớp học, phân công giáo viên và sĩ số.</p>
         </div>
         
@@ -591,6 +649,9 @@ export default function LopList() {
           </div>
           
           <div className="flex items-center gap-3">
+            <button onClick={handlePromoteYear} className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md hover:shadow-indigo-500/20 font-semibold rounded-xl transition-all">
+              <ArrowUpCircle className="w-5 h-5" /> Lên lớp năm học
+            </button>
             <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md hover:shadow-blue-500/20 font-semibold rounded-xl transition-all">
               <Plus className="w-5 h-5" /> Thêm lớp
             </button>
@@ -704,7 +765,7 @@ export default function LopList() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900">{editingClass ? "Chỉnh sửa lớp học" : "Thêm lớp học mới"}</h3>
+              <h3 className="text-xl font-bold text-blue-900">{editingClass ? "Chỉnh sửa lớp học" : "Thêm lớp học mới"}</h3>
               <button onClick={() => setModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -788,6 +849,7 @@ export default function LopList() {
       {assignTeacherModalOpen && selectedClass && (
         <AssignTeacherModal
           item={selectedClass}
+          classes={classes}
           onClose={() => setAssignTeacherModalOpen(false)}
           onAssignSuccess={() => {
             setAssignTeacherModalOpen(false);

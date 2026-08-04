@@ -147,6 +147,8 @@ export default function ScoresScreen() {
         tbmCN = ((parseFloat(tbm1) + parseFloat(tbm2) * 2) / 3).toFixed(1);
       } else if (tbm1) {
         tbmCN = tbm1; // Tạm tính bằng HK1 nếu chưa có HK2
+      } else if (tbm2) {
+        tbmCN = tbm2;
       }
 
       return (

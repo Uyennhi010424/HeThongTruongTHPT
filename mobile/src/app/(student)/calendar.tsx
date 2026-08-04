@@ -98,13 +98,21 @@ export default function CalendarScreen() {
           <User size={16} color="#64748B" />
           <Text style={styles.detailText}>GV: {item.giaoVien?.hoTen}</Text>
         </View>
+        {item.ghiChu ? (
+          <View style={[styles.detailRow, { marginTop: 4 }]}>
+            <Text style={{ fontSize: 12, color: '#D97706', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>
+              📝 {item.ghiChu}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
 
   const renderNgàyView = () => {
     const isSummerBreak = currentDate.getMonth() >= 5 && currentDate.getMonth() <= 7;
-    const todayClasses = isSummerBreak 
+    const isExamWeek = data?.examWeek === true;
+    const todayClasses = (isSummerBreak || isExamWeek)
       ? []
       : data?.timetable
         ?.filter((item: any) => item.thu === selectedDay)
@@ -114,10 +122,12 @@ export default function CalendarScreen() {
       todayClasses.map((item: any, index: number) => renderClassItem(item, index))
     ) : (
       <View style={styles.emptyContainer}>
-        <BookOpen size={48} color="#CBD5E1" style={{ marginBottom: 16 }} />
-        <Text style={styles.emptyText}>{isSummerBreak ? 'Nghỉ hè!' : 'Trống lịch!'}</Text>
+        <BookOpen size={48} color={isExamWeek ? '#FCA5A5' : '#CBD5E1'} style={{ marginBottom: 16 }} />
+        <Text style={[styles.emptyText, isExamWeek && { color: '#EF4444' }]}>
+          {isSummerBreak ? 'Nghỉ hè!' : isExamWeek ? 'Tuần Thi!' : 'Trống lịch!'}
+        </Text>
         <Text style={styles.emptySubtext}>
-          {isSummerBreak ? 'Đang trong thời gian nghỉ hè, không có lịch học.' : 'Không có lịch học nào trong ngày này.'}
+          {isSummerBreak ? 'Đang trong thời gian nghỉ hè, không có lịch học.' : isExamWeek ? 'Tuần này là tuần thi. Lịch học tạm dừng. Chúc bạn thi tốt!' : 'Không có lịch học nào trong ngày này.'}
         </Text>
       </View>
     );
@@ -125,13 +135,16 @@ export default function CalendarScreen() {
 
   const renderTuầnView = () => {
     const isSummerBreak = currentDate.getMonth() >= 5 && currentDate.getMonth() <= 7;
-    if (isSummerBreak || !data?.timetable || data.timetable.length === 0) {
+    const isExamWeek = data?.examWeek === true;
+    if (isSummerBreak || isExamWeek || !data?.timetable || data.timetable.length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <BookOpen size={48} color="#CBD5E1" style={{ marginBottom: 16 }} />
-          <Text style={styles.emptyText}>{isSummerBreak ? 'Nghỉ hè!' : 'Tuần trống!'}</Text>
+          <BookOpen size={48} color={isExamWeek ? '#FCA5A5' : '#CBD5E1'} style={{ marginBottom: 16 }} />
+          <Text style={[styles.emptyText, isExamWeek && { color: '#EF4444' }]}>
+            {isSummerBreak ? 'Nghỉ hè!' : isExamWeek ? 'Tuần Thi!' : 'Tuần trống!'}
+          </Text>
           <Text style={styles.emptySubtext}>
-            {isSummerBreak ? 'Đang trong thời gian nghỉ hè, không có lịch học.' : 'Không có lịch học nào trong tuần này.'}
+            {isSummerBreak ? 'Đang trong thời gian nghỉ hè, không có lịch học.' : isExamWeek ? 'Tuần này là tuần thi. Lịch học tạm dừng. Chúc bạn thi tốt!' : 'Không có lịch học nào trong tuần này.'}
           </Text>
         </View>
       );
@@ -264,7 +277,7 @@ export default function CalendarScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Chọn chế độ xem</Text>
             {['Ngày', 'Tuần', 'Tháng'].map((mode) => (
-              <TouchableOpacity key={mode} style={styles.modalOptionRow} onPress={() => { setViewMode(mode); setShowViewModeModal(false); }}>
+              <TouchableOpacity key={mode} style={styles.modalOptionRow} onPress={() => { setViewMode(mode as any); setShowViewModeModal(false); }}>
                 <Text style={[styles.modalOptionText, viewMode === mode && styles.modalOptionTextActive]}>Xem theo {mode}</Text>
                 {viewMode === mode && <Check size={20} color="#2563EB" />}
               </TouchableOpacity>

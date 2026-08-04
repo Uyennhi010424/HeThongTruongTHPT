@@ -494,9 +494,13 @@ public class PhanCongDayService {
             throw new ApiException("Giáo viên này đã được phân công dạy đủ 6 lớp trong học kỳ này");
         }
 
-        var existing = repository.findByGiaoVienIdAndMonHocIdAndLopIdAndHocKy(gvId, effectiveMonId, lopId, hocKy);
-        if (existing.isPresent()) {
-            return toDto(existing.get());
+        var existingSubjectAssign = repository.findByMonHocIdAndLopIdAndHocKy(effectiveMonId, lopId, hocKy);
+        if (existingSubjectAssign.isPresent()) {
+            if (existingSubjectAssign.get().getGiaoVien().getId().equals(gvId)) {
+                return toDto(existingSubjectAssign.get());
+            } else {
+                throw new ApiException("Môn học này của lớp đã được phân công cho giáo viên khác trong học kỳ này");
+            }
         }
 
         PhanCongDay entity = new PhanCongDay();

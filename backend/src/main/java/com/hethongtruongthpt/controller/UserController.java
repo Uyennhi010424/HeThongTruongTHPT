@@ -43,6 +43,21 @@ public class UserController {
 		return ResponseEntity.ok(ApiResponse.ok(userService.getAll()));
 	}
 
+	@GetMapping("/me")
+	@PreAuthorize("isAuthenticated()")
+	public ResponseEntity<ApiResponse<UserDTO>> getMe() {
+		org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+		String currentUsername = auth != null ? auth.getName() : null;
+		if (currentUsername == null) {
+			throw new com.hethongtruongthpt.exception.ApiException("Chưa xác thực");
+		}
+		UserDTO targetUser = userService.getByUsername(currentUsername);
+		if (targetUser == null) {
+			throw new com.hethongtruongthpt.exception.ResourceNotFoundException("Không tìm thấy người dùng");
+		}
+		return ResponseEntity.ok(ApiResponse.ok(targetUser));
+	}
+
 	@GetMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse<UserDTO>> getById(@PathVariable("id") Integer id) {

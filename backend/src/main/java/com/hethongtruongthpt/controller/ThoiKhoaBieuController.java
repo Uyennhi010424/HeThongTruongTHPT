@@ -30,7 +30,8 @@ public class ThoiKhoaBieuController {
 			@RequestParam(required = false) String namHoc,
 			@RequestParam(required = false) Integer hocKy,
 			@RequestParam(required = false) Integer tuan) {
-		return ResponseEntity.ok(ApiResponse.ok(thoiKhoaBieuService.getByFilter(lopId, namHoc, hocKy, tuan)));
+		boolean isExamWeek = thoiKhoaBieuService.isExamWeek(namHoc, tuan);
+		return ResponseEntity.ok(ApiResponse.ok(isExamWeek ? "TUAN_THI" : "OK", thoiKhoaBieuService.getByFilter(lopId, namHoc, hocKy, tuan)));
 	}
 
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")

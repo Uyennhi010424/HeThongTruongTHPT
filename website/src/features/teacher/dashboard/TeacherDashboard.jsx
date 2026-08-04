@@ -182,11 +182,30 @@ export default function TeacherDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!yearInfo.tenNamHoc || selectedTuan < 1) return;
+    if (!yearInfo.tenNamHoc || selectedTuan < 1 || !namHocList.length) return;
     let active = true;
+
+    const currentYearData = namHocList.find(y => y.tenNamHoc === yearInfo.tenNamHoc);
+    let actualHk = yearInfo.hocKy;
+    if (currentYearData && currentYearData.ngayBatDauHk2) {
+      const schoolStart = currentYearData.ngayBatDauHk1 ? new Date(currentYearData.ngayBatDauHk1 + "T00:00:00") : new Date(new Date().getFullYear(), 8, 5);
+      const dow = schoolStart.getDay();
+      const monday = new Date(schoolStart);
+      monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+      monday.setDate(monday.getDate() + (selectedTuan - 1) * 7);
+      
+      const hk2Start = new Date(currentYearData.ngayBatDauHk2 + "T00:00:00");
+      actualHk = (monday >= hk2Start) ? 2 : 1;
+      
+      if (actualHk !== yearInfo.hocKy) {
+        setYearInfo(prev => ({ ...prev, hocKy: actualHk }));
+        return; // Let the re-render trigger the effect with the new hocKy
+      }
+    }
+
     const refetchTkb = async () => {
       try {
-        const res = await getGiaoVienThoiKhoaBieu({ namHoc: yearInfo.tenNamHoc, hocKy: yearInfo.hocKy, tuan: selectedTuan });
+        const res = await getGiaoVienThoiKhoaBieu({ namHoc: yearInfo.tenNamHoc, hocKy: actualHk, tuan: selectedTuan });
         if (!active) return;
         setData((prev) => ({ ...prev, timetable: res?.data?.data || [] }));
       } catch {
@@ -195,7 +214,7 @@ export default function TeacherDashboard() {
     };
     refetchTkb();
     return () => { active = false; };
-  }, [selectedTuan, yearInfo.tenNamHoc, yearInfo.hocKy]);
+  }, [selectedTuan, yearInfo.tenNamHoc, yearInfo.hocKy, namHocList]);
 
   const [apiTeacher, setApiTeacher] = useState(null);
 
@@ -438,25 +457,11 @@ export default function TeacherDashboard() {
           {/* Timetable */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>Thời khóa biểu</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#00236f", marginLeft: "16px" }}>Thời khóa biểu</div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <select
-                  value={yearInfo.tenNamHoc}
-                  onChange={(e) => setYearInfo(prev => ({ ...prev, tenNamHoc: e.target.value }))}
-                  style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, fontWeight: 600, color: "#374151", background: "#fff", cursor: "pointer" }}
-                >
-                  {namHocList.map(y => (
-                    <option key={y.id} value={y.tenNamHoc}>Năm học {y.tenNamHoc}</option>
-                  ))}
-                </select>
-                <select
-                  value={yearInfo.hocKy}
-                  onChange={(e) => setYearInfo(prev => ({ ...prev, hocKy: parseInt(e.target.value) }))}
-                  style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, fontWeight: 600, color: "#374151", background: "#fff", cursor: "pointer" }}
-                >
-                  <option value={1}>Học kỳ I</option>
-                  <option value={2}>Học kỳ II</option>
-                </select>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#00236f", marginLeft: 16 }}>
+                  Năm học {yearInfo.tenNamHoc} - Học kỳ {yearInfo.hocKy === 1 ? 'I' : 'II'}
+                </span>
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", background: "#f8fafc", padding: "4px 12px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
                 <button
@@ -523,8 +528,8 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800 }}>
+            <div className="tkb-table-wrap">
+              <table className="tkb-table">
                 <thead>
                   <tr>
                     <th className="tkb-header-ca">Ca học</th>

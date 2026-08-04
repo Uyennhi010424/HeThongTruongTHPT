@@ -30,7 +30,7 @@ export default function HocSinhFilters({ hooks }) {
       {filterMenuOpen && (
         <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-            <h3 className="text-sm font-bold text-slate-800">Lọc học sinh</h3>
+            <h3 className="text-sm font-bold text-blue-900">Lọc học sinh</h3>
           </div>
           <div className="p-4 space-y-4">
             <div className="space-y-1.5">

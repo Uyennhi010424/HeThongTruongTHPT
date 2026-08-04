@@ -920,6 +920,7 @@ a {
 .panel-title {
   font-weight: 700;
   font-size: 16px;
+  color: var(--navy-900);
 }
 
 .panel-subtitle {
@@ -1560,7 +1561,7 @@ a {
   background: var(--surface);
   border: 1px solid #e5edff;
   font-weight: 700;
-  color: var(--ink-800);
+  color: var(--navy-900);
 }
 
 .table-id {
@@ -1576,6 +1577,7 @@ a {
 
 .table-title {
   font-weight: 600;
+  color: var(--navy-900);
 }
 
 .table-meta {

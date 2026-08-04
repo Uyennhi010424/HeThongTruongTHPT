@@ -69,4 +69,6 @@ export interface DashboardData {
   attendanceStats: AttendanceStats;
   subjectScores: any[];
   gpa: number | null;
+  baiKiemTraCount?: number;
+  examWeek?: boolean;
 }

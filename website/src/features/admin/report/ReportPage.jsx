@@ -55,7 +55,7 @@ export default function ReportPage() {
   const renderCardValue = (value) => {
     if (statsLoading) {
       return (
-        <span className="inline-block animate-pulse rounded bg-slate-200 h-[36px] w-[80px]"></span>
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin my-1" />
       );
     }
     return value;
@@ -455,7 +455,7 @@ td.center{text-align:center}
 
             {/* Doughnut Chart */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col">
-              <h3 className="text-sm font-bold text-slate-800 mb-2 uppercase tracking-wide">Phân loại học lực</h3>
+              <h3 className="text-sm font-bold text-blue-900 mb-2 uppercase tracking-wide">Phân loại học lực</h3>
               <div className="flex-1 min-h-[280px] flex items-center justify-center relative">
                 {statsLoading ? (
                   <div className="flex flex-col items-center justify-center gap-2">
@@ -502,7 +502,7 @@ td.center{text-align:center}
 
             {/* Line Chart */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col">
-              <h3 className="text-sm font-bold text-slate-800 mb-6 uppercase tracking-wide">ĐTB Theo môn học</h3>
+              <h3 className="text-sm font-bold text-blue-900 mb-6 uppercase tracking-wide">ĐTB Theo môn học</h3>
               <div className="flex-1 min-h-[280px]">
                 {statsLoading ? (
                   <div className="h-full flex flex-col items-center justify-center gap-2">
@@ -533,7 +533,7 @@ td.center{text-align:center}
         {activeTab === "academic" && (
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-8">
             <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Top 10 học sinh xuất sắc nhất</h3>
+              <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wide">Top 10 học sinh xuất sắc nhất</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600">
@@ -585,7 +585,7 @@ td.center{text-align:center}
             {statsAttendance?.theoLop?.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-6">
                 <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Chuyên cần theo lớp</h3>
+                  <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wide">Chuyên cần theo lớp</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm text-slate-600">
@@ -646,7 +646,7 @@ td.center{text-align:center}
 
             <div className="flex justify-center mb-8">
               <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col">
-                <h3 className="text-sm font-bold text-slate-800 mb-2 uppercase tracking-wide">Phân loại hạnh kiểm</h3>
+                <h3 className="text-sm font-bold text-blue-900 mb-2 uppercase tracking-wide">Phân loại hạnh kiểm</h3>
                 <div className="flex-1 min-h-[280px] flex items-center justify-center relative">
                   {statsLoading ? (
                     <span className="text-slate-400 text-sm">Đang tính toán...</span>

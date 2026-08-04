@@ -69,6 +69,7 @@ const TimetableFollow = lazy(() => import("../features/parent/TimetableFollow.js
 const ParentProfile = lazy(() => import("../features/parent/ParentProfile.jsx"));
 const ParentDiemDanh = lazy(() => import("../features/parent/ParentDiemDanh.jsx"));
 const ParentThongBao = lazy(() => import("../features/parent/ParentThongBao.jsx"));
+const ParentXinNghi = lazy(() => import("../features/parent/ParentXinNghi.jsx"));
 
 // ─── Loading fallback ───
 const PageLoader = () => (
@@ -182,7 +183,9 @@ const routes = [
       { path: "hanhkiem", element: withSuspense(HanhKiemPage) },
       { path: "lopchunhiem", element: withSuspense(LopChuNhiem) },
       { path: "dangky-lop", element: withSuspense(TeacherRegisterPhanCong) },
-      { path: "xin-nghi", element: withSuspense(TeacherLeaveRequestPage) }
+      { path: "xin-nghi", element: withSuspense(TeacherLeaveRequestPage) },
+      { path: "duyet-nghi", element: withSuspense(lazy(() => import("../features/teacher/TeacherDuyetNghi.jsx"))) },
+      { path: "baikiemtra", element: withSuspense(lazy(() => import("../features/teacher/baikiemtra/TeacherBaiKiemTra.jsx"))) }
     ]
   },
   {
@@ -206,6 +209,7 @@ const routes = [
       { path: "conduct", element: withSuspense(ConductPage) },
       { path: "thongbao", element: withSuspense(StudentThongBao) },
       { path: "lichthi", element: withSuspense(StudentLichThi) },
+      { path: "baikiemtra", element: withSuspense(lazy(() => import("../features/student/baikiemtra/StudentBaiKiemTra.jsx"))) },
       { path: "profile", element: withSuspense(ProfilePage) },
       { path: "profile/change-password", element: withSuspense(ChangePassword) }
     ]
@@ -228,6 +232,7 @@ const routes = [
       { path: "profile", element: withSuspense(ParentProfile) },
       { path: "diemdanh", element: withSuspense(ParentDiemDanh) },
       { path: "thongbao", element: withSuspense(ParentThongBao) },
+      { path: "xinnghi", element: withSuspense(ParentXinNghi) },
       { path: "profile/change-password", element: withSuspense(ChangePassword) }
     ]
   },

@@ -3,7 +3,7 @@ export default function PageHeader({ title, description, actions }) {
     <div className="mb-lg flex flex-col items-end justify-between gap-md sm:flex-row sm:items-start">
       <div className="self-start">
         {title && (
-          <h2 className="text-headline-lg font-bold text-primary">{title}</h2>
+          <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight">{title}</h2>
         )}
         {description && (
           <p className="mt-xs font-body-md text-body-md text-on-surface-variant">

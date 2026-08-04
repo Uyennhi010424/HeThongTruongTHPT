@@ -123,13 +123,15 @@ export const calcSemesterAverage = (semesterData) => {
   return Number(avg.toFixed(1));
 };
 
-/**
- * Calculate year average: (HK1 + 2*HK2) / 3
- * Returns null if either semester is incomplete.
- */
 export const calcYearAverage = (hk1Avg, hk2Avg) => {
-  if (hk1Avg === null || hk2Avg === null) return null;
-  return Number(((hk1Avg + 2 * hk2Avg) / 3).toFixed(1));
+  if (hk1Avg !== null && hk2Avg !== null) {
+    return Number(((hk1Avg + 2 * hk2Avg) / 3).toFixed(1));
+  } else if (hk1Avg !== null) {
+    return hk1Avg;
+  } else if (hk2Avg !== null) {
+    return hk2Avg;
+  }
+  return null;
 };
 
 // ─── Learning level classification ───

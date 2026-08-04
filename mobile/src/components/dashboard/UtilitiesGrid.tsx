@@ -8,8 +8,8 @@ export const UtilitiesGrid: React.FC = () => {
 
   const utilities = [
     { icon: <FileText size={24} color="#10B981" />, name: 'Xem điểm', route: '/(student)/scores' },
-    { icon: <Book size={24} color="#8B5CF6" />, name: 'Bài tập', route: '/(student)/assignments' },
-    { icon: <Award size={24} color="#F59E0B" />, name: 'Nề nếp', route: '/(student)/conduct' },
+    { icon: <Book size={24} color="#8B5CF6" />, name: 'Bài tập', route: '/(student)/exam' },
+    { icon: <Calendar size={24} color="#F59E0B" />, name: 'Chuyên cần', route: '/(student)/attendance' },
     { icon: <Library size={24} color="#EC4899" />, name: 'Thư viện', route: '/(student)/library' },
     { icon: <FileStack size={24} color="#14B8A6" />, name: 'Tài liệu', route: '/(student)/documents' },
     { icon: <MessageSquare size={24} color="#F43F5E" />, name: 'Góp ý', route: '/(student)/feedback' },

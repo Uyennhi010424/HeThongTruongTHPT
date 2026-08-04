@@ -149,12 +149,12 @@ public class BangDiemSchedulerService {
         String noiDung = buildNoiDungBangDiem(hocSinh, diemTheoMon, kyGui);
         String tieuDe = "[SLL] Thông báo bảng điểm " + formatKyGui(kyGui);
 
-        // Lưu ThongBao vào box chat (nguoiTao = null → hệ thống tự động)
+        // Lưu ThongBao (Không set hocSinh để tin nhắn này không bị đưa vào hộp thoại Chat với GVCN)
         ThongBao thongBao = new ThongBao();
         thongBao.setTieuDe(tieuDe);
         thongBao.setNoiDung(noiDung);
         thongBao.setLoai("PHU_HUYNH");
-        thongBao.setHocSinh(hocSinh);
+        // thongBao.setHocSinh(hocSinh); // <-- Bỏ gán học sinh để tránh vào màn hình Chat
         thongBao.setSenderRole("ADMIN");
         // recipientId = userId của phụ huynh để hiển thị đúng trong box chat
         if (phuHuynh.getUser() != null) {
@@ -199,15 +199,11 @@ public class BangDiemSchedulerService {
                                          Map<String, List<Diem>> diemTheoMon,
                                          String kyGui) {
         String tenLop = (hocSinh.getLop() != null) ? hocSinh.getLop().getTenLop() : "Chưa xếp lớp";
-        String ngayGui = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📚 THÔNG BÁO BẢNG ĐIỂM\n\n");
-        sb.append("Kính gửi Quý phụ huynh,\n\n");
-        sb.append("Hệ thống EduManager xin thông báo các điểm số mới được cập nhật của em:\n\n");
-        sb.append("Họ tên: ").append(hocSinh.getHoTen()).append("\n");
-        sb.append("Lớp: ").append(tenLop).append("\n");
-        sb.append("Ngày gửi: ").append(ngayGui).append("\n");
+        sb.append("THÔNG BÁO ĐIỂM MỚI\n");
+        sb.append("Học sinh: ").append(hocSinh.getHoTen()).append(" (Lớp ").append(tenLop).append(")\n");
+        sb.append("---\n");
 
         // Sắp xếp môn theo tên để hiển thị nhất quán
         List<String> danhSachMon = new ArrayList<>(diemTheoMon.keySet());
@@ -215,14 +211,13 @@ public class BangDiemSchedulerService {
 
         for (String tenMon : danhSachMon) {
             List<Diem> danhSachDiem = diemTheoMon.get(tenMon);
-            sb.append("\n=========================\n");
-            sb.append("MÔN ").append(tenMon.toUpperCase()).append("\n");
 
             // Sắp xếp điểm: TX1, TX2, TX3, TX4, GK, CK
             danhSachDiem.sort(Comparator
                     .comparing(Diem::getLoaiDiem)
                     .thenComparingInt(d -> d.getSoThuTu() != null ? d.getSoThuTu() : 0));
 
+            List<String> diemStrings = new ArrayList<>();
             for (Diem d : danhSachDiem) {
                 String tenLoai = formatLoaiDiem(d.getLoaiDiem(), d.getSoThuTu());
                 
@@ -232,14 +227,14 @@ public class BangDiemSchedulerService {
 
                 String giaTriStr = (d.getGiaTriDiem() != null)
                         ? d.getGiaTriDiem().stripTrailingZeros().toPlainString()
-                        : (nhanXet != null ? nhanXet : "—");
-                sb.append("  • ").append(tenLoai).append(": ").append(giaTriStr).append("\n");
+                        : (nhanXet != null ? nhanXet : "-");
+                diemStrings.add(tenLoai + ": " + giaTriStr);
             }
+            sb.append("- ").append(tenMon).append(": ").append(String.join(", ", diemStrings)).append("\n");
         }
 
-        sb.append("\n=========================\n\n");
-        sb.append("Quý phụ huynh vui lòng đăng nhập hệ thống để xem đầy đủ bảng điểm và nhận xét của giáo viên.\n\n");
-        sb.append("Trân trọng!");
+        sb.append("---\n");
+        sb.append("Quý phụ huynh vui lòng mở ứng dụng để xem chi tiết.");
 
         return sb.toString();
     }

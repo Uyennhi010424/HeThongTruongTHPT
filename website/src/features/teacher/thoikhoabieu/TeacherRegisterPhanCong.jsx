@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
@@ -26,6 +26,7 @@ export default function TeacherRegisterPhanCong() {
   const [timetable, setTimetable] = useState([]);
   const [myClasses, setMyClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isExamWeek, setIsExamWeek] = useState(false);
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -42,6 +43,61 @@ export default function TeacherRegisterPhanCong() {
   const [namHoc, setNamHoc] = useState("2025-2026");
   const [hocKy, setHocKy] = useState(1);
   const [tuan, setTuan] = useState(1);
+  const [allWeeks, setAllWeeks] = useState([]);
+
+  // Fetch initial year info to calculate correct initial hocKy and tuan
+  useEffect(() => {
+    const fetchInit = async () => {
+      try {
+        const res = await axiosClient.get("/dashboard/info");
+        const yList = res?.data?.data?.namHocList || [];
+        const currentYear = yList.find(y => y.trangThai === "DANG_HOAT_DONG");
+        if (currentYear) {
+          setNamHoc(currentYear.tenNamHoc);
+          
+          let schoolStart;
+          if (currentYear.ngayBatDauHk1) {
+            schoolStart = new Date(currentYear.ngayBatDauHk1 + "T00:00:00");
+          } else {
+            schoolStart = new Date(parseInt(currentYear.tenNamHoc.split("-")[0]), 8, 5);
+          }
+          
+          const dow = schoolStart.getDay();
+          const monday = new Date(schoolStart);
+          monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          
+          let currentWeek = 1;
+          const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
+          if (diffDays >= 0) {
+            currentWeek = Math.floor(diffDays / 7) + 1;
+          }
+          currentWeek = Math.min(38, Math.max(1, currentWeek));
+          
+          const maxAvailWeek = Math.min(38, currentWeek + 2);
+          const weeks = Array.from({length: maxAvailWeek}, (_, i) => i + 1);
+          setAllWeeks(weeks);
+          setTuan(currentWeek);
+          
+          // Auto calc hocKy
+          let actualHk = 1;
+          if (currentYear.ngayBatDauHk2) {
+            const currentMonday = new Date(schoolStart);
+            currentMonday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1) + (currentWeek - 1) * 7);
+            const hk2Start = new Date(currentYear.ngayBatDauHk2 + "T00:00:00");
+            if (currentMonday >= hk2Start) actualHk = 2;
+          } else if (currentWeek >= 19) {
+            actualHk = 2;
+          }
+          setHocKy(actualHk);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchInit();
+  }, []);
 
   const fetchData = async (silent = false) => {
     try {
@@ -52,6 +108,7 @@ export default function TeacherRegisterPhanCong() {
         axiosClient.get("/giaoviendangky/lop-cua-toi", { params: { namHoc, hocKy }, skipCache: true })
       ]);
       const serverSlots = resTkb?.data?.data || [];
+      setIsExamWeek(resTkb?.data?.message === "TUAN_THI");
       if (silent) {
         setTimetable((prev) => {
           const merged = [...serverSlots];
@@ -79,8 +136,33 @@ export default function TeacherRegisterPhanCong() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [namHoc, hocKy, tuan]);
+    // When tuan changes, recalculate hocKy if needed
+    if (tuan >= 19 && hocKy === 1) setHocKy(2);
+    else if (tuan < 19 && hocKy === 2) setHocKy(1);
+  }, [tuan]);
+
+  useEffect(() => {
+    if (allWeeks.length > 0) {
+      fetchData();
+    }
+  }, [namHoc, hocKy, tuan, allWeeks.length]);
+
+  const weekDates = useMemo(() => {
+    const startYear = parseInt(namHoc.split("-")[0]);
+    const schoolStart = new Date(startYear, 8, 5); // Default to Sept 5th
+    const dow = schoolStart.getDay();
+    const monday = new Date(schoolStart);
+    monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+    monday.setDate(monday.getDate() + (tuan - 1) * 7);
+
+    const dates = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }, [namHoc, tuan]);
 
   const findTkbEntry = (day, period) => {
     return timetable.find((t) => {
@@ -250,32 +332,18 @@ export default function TeacherRegisterPhanCong() {
         title="Đăng ký lịch dạy theo tuần"
         actions={
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <select
-              value={namHoc}
-              onChange={(e) => setNamHoc(e.target.value)}
-              style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ccc", fontSize: 13 }}
-            >
-              <option value="2025-2026">Năm học 2025-2026</option>
-              <option value="2024-2025">Năm học 2024-2025</option>
-              <option value="2023-2024">Năm học 2023-2024</option>
-            </select>
-            <select
-              value={hocKy}
-              onChange={(e) => setHocKy(parseInt(e.target.value))}
-              style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ccc", fontSize: 13 }}
-            >
-              <option value={1}>Học kỳ I</option>
-              <option value={2}>Học kỳ II</option>
-            </select>
-            <select
-              value={tuan}
-              onChange={(e) => setTuan(parseInt(e.target.value))}
-              style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ccc", fontSize: 13 }}
-            >
-              {getLimitedSemesterWeeks(namHoc, hocKy).map((w) => (
-                <option key={w} value={w}>Tuần {w}</option>
-              ))}
-            </select>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#00236f", marginLeft: 16 }}>
+              Năm học {namHoc} - Học kỳ {hocKy === 1 ? 'I' : 'II'}
+            </span>
+              <select
+                value={tuan}
+                onChange={(e) => setTuan(parseInt(e.target.value))}
+                style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ccc", fontSize: 13 }}
+              >
+                {(allWeeks.length > 0 ? allWeeks : [1,2,3]).map((w) => (
+                  <option key={w} value={w}>Tuần {w}</option>
+                ))}
+              </select>
           </div>
         }
       />
@@ -284,16 +352,24 @@ export default function TeacherRegisterPhanCong() {
 
         {loading ? (
           <div style={{ padding: "40px 0", textAlign: "center", color: "#888" }}>Đang tải lịch dạy...</div>
+        ) : isExamWeek ? (
+          <div style={{ padding: "80px 0", textAlign: "center", background: "#fef2f2", borderRadius: 12, border: "2px dashed #fca5a5", marginTop: 20 }}>
+            <h2 style={{ color: "#ef4444", margin: 0, fontSize: 24, fontWeight: 700 }}>TUẦN NÀY LÀ TUẦN THI</h2>
+            <p style={{ color: "#7f1d1d", marginTop: 8, fontSize: 16 }}>Thời khóa biểu học tập sẽ tạm dừng. Vui lòng kiểm tra Lịch coi thi ở mục tương ứng.</p>
+          </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800 }}>
+          <div className="tkb-table-wrap">
+            <table className="tkb-table">
               <thead>
                 <tr>
-                  <th style={{ border: "1px solid var(--outline-variant, #eee)", padding: "12px", background: "#f8fafc", width: 100 }}>Buổi</th>
-                  <th style={{ border: "1px solid var(--outline-variant, #eee)", padding: "12px", background: "#f8fafc", width: 100 }}>Tiết</th>
-                  {DAYS.map((day) => (
-                    <th key={day.value} style={{ border: "1px solid var(--outline-variant, #eee)", padding: "12px", background: "#f8fafc", fontWeight: 600 }}>
-                      {day.label}
+                  <th className="tkb-header-ca">Buổi</th>
+                  <th className="tkb-header-tiet">Tiết</th>
+                  {DAYS.map((day, idx) => (
+                    <th key={day.value}>
+                      <div>{day.label}</div>
+                      <div className="tkb-date">
+                        {weekDates[idx]?.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -306,19 +382,12 @@ export default function TeacherRegisterPhanCong() {
                       {showSessionCell && (
                         <td
                           rowSpan={5}
-                          style={{
-                            border: "1px solid var(--outline-variant, #eee)",
-                            textAlign: "center",
-                            fontWeight: 700,
-                            background: "#f1f5f9",
-                            color: "var(--primary, #2563eb)",
-                            fontSize: 14
-                          }}
+                          className={`tkb-ca-hoc ${pIndex === 0 ? "tkb-sang" : "tkb-chieu"}`}
                         >
                           {period.session}
                         </td>
                       )}
-                      <td style={{ border: "1px solid var(--outline-variant, #eee)", padding: "12px", textAlign: "center", background: "#fafafa", fontWeight: 500, fontSize: 13 }}>
+                      <td className="tkb-period">
                         {period.label}
                       </td>
                       {DAYS.map((day) => {
@@ -334,16 +403,16 @@ export default function TeacherRegisterPhanCong() {
                             rowSpan={entry ? entry.soTiet || 1 : 1}
                             onClick={() => handleCellClick(day.value, period.value)}
                             style={{
-                              border: "1px solid var(--outline-variant, #eee)",
+                              border: "1px solid #e5e7eb",
                               padding: entry ? "12px" : "16px",
                               textAlign: "center",
-                              background: entry ? (entry.isLocked ? "#eff6ff" : "#f1f5f9") : "transparent",
+                              background: entry ? (entry.isLocked ? "#eff6ff" : (pIndex < 5 ? "#fef8e7" : "#e0f2fe")) : "transparent",
                               cursor: "pointer",
                               transition: "all 0.2s ease",
                               verticalAlign: "middle"
                             }}
                             onMouseEnter={(e) => {
-                              if (!entry) e.currentTarget.style.background = "#f8fafc";
+                              if (!entry) e.currentTarget.style.background = "#f9fafb";
                             }}
                             onMouseLeave={(e) => {
                               if (!entry) e.currentTarget.style.background = "transparent";

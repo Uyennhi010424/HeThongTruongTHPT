@@ -19,10 +19,32 @@ public class ThoiKhoaBieuCrudService {
 
     private final ThoiKhoaBieuRepository tkbRepo;
     private final NamHocRepository namHocRepo;
+    private final com.hethongtruongthpt.repository.LichThiRepository lichThiRepo;
 
-    public ThoiKhoaBieuCrudService(ThoiKhoaBieuRepository tkbRepo, NamHocRepository namHocRepo) {
+    public ThoiKhoaBieuCrudService(ThoiKhoaBieuRepository tkbRepo, NamHocRepository namHocRepo, com.hethongtruongthpt.repository.LichThiRepository lichThiRepo) {
         this.tkbRepo = tkbRepo;
         this.namHocRepo = namHocRepo;
+        this.lichThiRepo = lichThiRepo;
+    }
+
+    public boolean isExamWeek(String namHoc, Integer tuan) {
+        if (namHoc == null || tuan == null) return false;
+        NamHoc year = namHocRepo.findByTenNamHoc(namHoc).orElse(null);
+        if (year != null) {
+            java.time.LocalDate schoolStart = year.getNgayBatDauHk1();
+            if (schoolStart == null) {
+                int startYear = Integer.parseInt(namHoc.split("-")[0]);
+                schoolStart = java.time.LocalDate.of(startYear, 9, 5);
+            }
+            int dow = schoolStart.getDayOfWeek().getValue();
+            java.time.LocalDate monday = schoolStart.minusDays(dow == 7 ? 6 : dow - 1);
+            java.time.LocalDate weekMonday = monday.plusDays((tuan - 1) * 7);
+            List<com.hethongtruongthpt.entity.LichThi> exams = lichThiRepo.findByNgayThiBetween(weekMonday, weekMonday.plusDays(6));
+            if (exams != null && !exams.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void validateTuanInHocKy(String namHoc, Integer hocKy, Integer tuan) {
@@ -76,8 +98,11 @@ public class ThoiKhoaBieuCrudService {
                 .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
                 .collect(java.util.stream.Collectors.toList());
 
+        boolean isExamWeek = isExamWeek(namHoc, tuan);
+
         // Nếu systemSlots trống (ví dụ tuần > 2 chưa sinh TKB tự động), fallback lấy từ tuần mẫu (mappedTuan 1 hoặc 2)
-        if (systemSlots.isEmpty() && !tuan.equals(mappedTuan)) {
+        // Tuy nhiên, nếu là tuần thi thì KHÔNG ĐƯỢC fallback để hiện TKB trống
+        if (systemSlots.isEmpty() && !tuan.equals(mappedTuan) && !isExamWeek) {
             List<ThoiKhoaBieu> fallbackSlots;
             if (lopId != null && namHoc != null && hocKy != null)
                 fallbackSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, mappedTuan);
@@ -160,15 +185,31 @@ public class ThoiKhoaBieuCrudService {
         ThoiKhoaBieu entry = getById(id);
         Integer lopId = entry.getLop().getId();
         int soTiet = entry.getSoTiet() != null ? entry.getSoTiet() : 1;
-        for (int i = 0; i < soTiet; i++) {
-            int t = tietBatDau + i;
-            if (t > 10) throw new ApiException("Tiết vượt quá phạm vi (1-10)");
-            List<ThoiKhoaBieu> existing = tkbRepo.findByLopIdAndThuAndTietBatDau(lopId, thu, t);
-            for (ThoiKhoaBieu e : existing) {
-                if (!e.getId().equals(id))
-                    throw new ApiException("Slot Thứ " + thu + " Tiết " + t + " đã bị chiếm bởi " + e.getMonHoc().getTenMon());
+        if (tietBatDau + soTiet - 1 > 10) {
+            throw new ApiException("Tiết vượt quá phạm vi (1-10)");
+        }
+
+        // Fetch all TKB items for this class in this specific week
+        List<ThoiKhoaBieu> existingList = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(
+            lopId, entry.getHocKy(), entry.getNamHoc(), entry.getTuan()
+        );
+
+        int newStart = tietBatDau;
+        int newEnd = tietBatDau + soTiet - 1;
+
+        for (ThoiKhoaBieu e : existingList) {
+            if (e.getId().equals(id)) continue;
+            if (e.getThu() != null && e.getThu().equals(thu)) {
+                int eStart = e.getTietBatDau() != null ? e.getTietBatDau() : 1;
+                int eSoTiet = e.getSoTiet() != null ? e.getSoTiet() : 1;
+                int eEnd = eStart + eSoTiet - 1;
+
+                if (Math.max(eStart, newStart) <= Math.min(eEnd, newEnd)) {
+                    throw new ApiException("Mục này chồng lấn với " + e.getMonHoc().getTenMon() + " (Thứ " + thu + " Tiết " + eStart + "-" + eEnd + ")");
+                }
             }
         }
+
         entry.setThu(thu);
         entry.setTietBatDau(tietBatDau);
         return tkbRepo.save(entry);
@@ -196,3 +237,4 @@ public class ThoiKhoaBieuCrudService {
         return result;
     }
 }
+

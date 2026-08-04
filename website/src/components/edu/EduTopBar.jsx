@@ -12,6 +12,7 @@ import {
 import { clearAuth, getRole } from "../../store/authStore.js";
 import { getCurrentUsernameFromToken } from "../../utils/teacherProfile.js";
 import { readCachedAvatar, writeCachedAvatar } from "../../utils/avatarCache.js";
+import CachedAvatar from "../common/CachedAvatar.jsx";
 import { getThongBao } from "../../api/thongbaoApi.js";
 import { formatDate } from "../../utils/helpers.js";
 import axiosClient from "../../api/axiosClient.js";
@@ -318,7 +319,7 @@ export default function EduTopBar({
               className="flex items-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
               title="Về trang tổng quan"
             >
-              <img src="/logo.png" alt="Logo Edu Manager" className="h-[56px] scale-110 w-auto object-contain drop-shadow-sm" />
+              <img src="/logo.png" alt="Logo Edu Manager" className="h-[72px] scale-110 w-auto object-contain drop-shadow-sm" />
             </Link>
           );
         })()}
@@ -390,14 +391,16 @@ export default function EduTopBar({
             onClick={() => setAccountOpen(!accountOpen)}
             aria-label="Tài khoản"
           >
-            <img
-              src={avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`}
-              alt="Avatar"
+            <CachedAvatar
+              username={currentUsername}
+              role={currentRole}
+              src={avatar}
+              fallback={(() => {
+                const parts = (userName || "U").trim().split(" ");
+                return parts[parts.length - 1].charAt(0).toUpperCase();
+              })()}
               className="h-[34px] w-[34px] rounded-full object-cover shadow-sm border border-slate-200 bg-white"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`;
-              }}
+              fallbackClassName="h-[34px] w-[34px] rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0"
             />
             <div className="hidden flex-col items-start md:flex">
               <span className="text-sm font-semibold text-slate-800 line-clamp-1">{userName}</span>
@@ -411,14 +414,16 @@ export default function EduTopBar({
             }`}
           >
             <div className="flex items-center gap-3 border-b border-slate-100 p-4">
-              <img
-                src={avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`}
-                alt="Avatar"
+              <CachedAvatar
+                username={currentUsername}
+                role={currentRole}
+                src={avatar}
+                fallback={(() => {
+                  const parts = (userName || "U").trim().split(" ");
+                  return parts[parts.length - 1].charAt(0).toUpperCase();
+                })()}
                 className="h-12 w-12 rounded-full object-cover shadow-sm border border-slate-200 bg-white"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName?.charAt(0) || "U")}&background=random`;
-                }}
+                fallbackClassName="h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 text-lg"
               />
               <div className="flex flex-col">
                 <span className="font-bold text-slate-800 line-clamp-1">{userName}</span>

@@ -123,7 +123,7 @@ export default function BackupPage({ isEmbedded = false }) {
     <div className={isEmbedded ? "" : "p-6 max-w-6xl mx-auto"}>
       {!isEmbedded && (
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">
             Sao lưu & Phục hồi
           </h1>
           <p className="text-gray-500 mt-1">
@@ -185,7 +185,7 @@ export default function BackupPage({ isEmbedded = false }) {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-blue-900">
             Danh sách bản sao lưu
           </h2>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -332,3 +332,4 @@ export default function BackupPage({ isEmbedded = false }) {
     </div>
   );
 }
+

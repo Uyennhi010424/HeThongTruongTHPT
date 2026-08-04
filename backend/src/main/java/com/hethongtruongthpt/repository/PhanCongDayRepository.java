@@ -13,5 +13,6 @@ public interface PhanCongDayRepository extends JpaRepository<PhanCongDay, Intege
     List<PhanCongDay> findByLopId(Integer lopId);
     List<PhanCongDay> findByGiaoVienId(Integer giaoVienId);
     java.util.Optional<PhanCongDay> findByGiaoVienIdAndMonHocIdAndLopIdAndHocKy(Integer giaoVienId, Integer monHocId, Integer lopId, Integer hocKy);
+    java.util.Optional<PhanCongDay> findByMonHocIdAndLopIdAndHocKy(Integer monHocId, Integer lopId, Integer hocKy);
     boolean existsByLopIdAndGiaoVienId(Integer lopId, Integer giaoVienId);
 }

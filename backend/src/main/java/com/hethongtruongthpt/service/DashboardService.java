@@ -27,6 +27,9 @@ public class DashboardService {
     private final MonHocRepository monHocRepository;
     private final DiemCalculationService diemCalculationService;
 
+    private final NamHocRepository namHocRepository;
+    private final ThoiKhoaBieuCrudService thoiKhoaBieuCrudService;
+
     public DashboardService(HocSinhService hocSinhService,
                             ThongBaoRepository thongBaoRepository,
                             ThoiKhoaBieuRepository thoiKhoaBieuRepository,
@@ -35,7 +38,9 @@ public class DashboardService {
                             HanhKiemRepository hanhKiemRepository,
                             DiemDanhService diemDanhService,
                             MonHocRepository monHocRepository,
-                            DiemCalculationService diemCalculationService) {
+                            DiemCalculationService diemCalculationService,
+                            NamHocRepository namHocRepository,
+                            ThoiKhoaBieuCrudService thoiKhoaBieuCrudService) {
         this.hocSinhService = hocSinhService;
         this.thongBaoRepository = thongBaoRepository;
         this.thoiKhoaBieuRepository = thoiKhoaBieuRepository;
@@ -45,10 +50,21 @@ public class DashboardService {
         this.diemDanhService = diemDanhService;
         this.monHocRepository = monHocRepository;
         this.diemCalculationService = diemCalculationService;
+        this.namHocRepository = namHocRepository;
+        this.thoiKhoaBieuCrudService = thoiKhoaBieuCrudService;
     }
 
     public DashboardDataDTO getStudentDashboard(String username) {
         HocSinh hocSinh = hocSinhService.getByUsername(username);
+        return buildDashboardForHocSinh(hocSinh);
+    }
+
+    public DashboardDataDTO getDashboardByHocSinhId(Integer hocSinhId) {
+        HocSinh hocSinh = hocSinhService.getById(hocSinhId);
+        return buildDashboardForHocSinh(hocSinh);
+    }
+
+    private DashboardDataDTO buildDashboardForHocSinh(HocSinh hocSinh) {
         if (hocSinh == null) {
             return null;
         }
@@ -64,6 +80,18 @@ public class DashboardService {
                 : (now.getYear() - 1) + "-" + now.getYear();
         int curHocKy = (curMonth >= 8 || curMonth <= 1) ? 1 : 2;
 
+        List<com.hethongtruongthpt.entity.NamHoc> activeNamHocs = namHocRepository.findByTrangThai("DANG_MO");
+        if (!activeNamHocs.isEmpty()) {
+            com.hethongtruongthpt.entity.NamHoc active = activeNamHocs.get(0);
+            curNamHoc = active.getTenNamHoc();
+            
+            if (active.getNgayBatDauHk2() != null && !now.isBefore(active.getNgayBatDauHk2())) {
+                curHocKy = 2;
+            } else if (active.getNgayBatDauHk1() != null && !now.isBefore(active.getNgayBatDauHk1())) {
+                curHocKy = 1;
+            }
+        }
+
         Integer lopId = hocSinh.getLop() != null ? hocSinh.getLop().getId() : null;
         Integer hocSinhId = hocSinh.getId();
 
@@ -77,16 +105,20 @@ public class DashboardService {
         // 2. Timetable
         List<ThoiKhoaBieu> timetable = new ArrayList<>();
         if (lopId != null) {
-            timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHoc(lopId, curHocKy, curNamHoc);
-            if (timetable.isEmpty()) {
-                timetable = thoiKhoaBieuRepository.findByLopId(lopId);
+            int currentWeek = 1;
+            if (!activeNamHocs.isEmpty()) {
+                currentWeek = com.hethongtruongthpt.util.SchoolWeekUtils.weekNumber(activeNamHocs.get(0), now);
             }
-            if (!timetable.isEmpty()) {
-                int maxTuan = timetable.stream().mapToInt(t -> t.getTuan() != null ? t.getTuan() : 0).max().orElse(0);
-                if (maxTuan > 0) {
-                    timetable = timetable.stream().filter(t -> t.getTuan() != null && t.getTuan() == maxTuan).collect(Collectors.toList());
-                }
+            
+            timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(lopId, curHocKy, curNamHoc, currentWeek);
+            
+            boolean isExamWeek = thoiKhoaBieuCrudService.isExamWeek(curNamHoc, currentWeek);
+            if (timetable.isEmpty() && !isExamWeek) {
+                int mappedTuan = (currentWeek % 2 != 0) ? 1 : 2;
+                timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(lopId, curHocKy, curNamHoc, mappedTuan);
+                for (ThoiKhoaBieu t : timetable) { t.setTuan(currentWeek); }
             }
+            dashboardData.setExamWeek(isExamWeek);
         }
         dashboardData.setTimetable(timetable);
 
@@ -131,8 +163,10 @@ public class DashboardService {
         List<Diem> rawScores = diemRepository.findByHocSinhId(hocSinhId);
         dashboardData.setScores(rawScores); // Keep raw scores if frontend needs it for detailed views
         
+        final String finalCurNamHoc = curNamHoc;
+        final int finalCurHocKy = curHocKy;
         List<Diem> semesterScores = rawScores.stream()
-                .filter(d -> curNamHoc.equals(d.getNamHoc()) && Integer.valueOf(curHocKy).equals(d.getHocKy()))
+                .filter(d -> finalCurNamHoc.equals(d.getNamHoc()) && Integer.valueOf(finalCurHocKy).equals(d.getHocKy()))
                 .collect(Collectors.toList());
 
         List<SubjectScoreDTO> subjectScores = new ArrayList<>();

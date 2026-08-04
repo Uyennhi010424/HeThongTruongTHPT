@@ -306,11 +306,8 @@ export default function ParentThongBao() {
   return (
     <div className="p-4 md:p-6 max-w-[1200px] mx-auto h-full flex flex-col">
       {/* Page header */}
-      <div className="mb-6 shrink-0">
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-            <Bell size={20} className="text-blue-600" />
-          </div>
+      <div className="mb-6 shrink-0 border-b border-slate-200 pb-4">
+        <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
           Hộp thư & Trao đổi
         </h2>
         <p className="text-slate-500 text-[14px] mt-2">
@@ -415,3 +412,4 @@ export default function ParentThongBao() {
     </div>
   );
 }
+

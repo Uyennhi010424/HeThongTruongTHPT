@@ -28,6 +28,8 @@ public interface ThoiKhoaBieuRepository extends JpaRepository<ThoiKhoaBieu, Inte
     List<ThoiKhoaBieu> findByLopIdAndTuan(Integer lopId, Integer tuan);
     @EntityGraph(attributePaths = {"monHoc", "giaoVien", "lop"})
     List<ThoiKhoaBieu> findByNamHocAndHocKyAndTuan(String namHoc, Integer hocKy, Integer tuan);
+    
+    void deleteByNamHocAndHocKyAndTuan(String namHoc, Integer hocKy, Integer tuan);
     @EntityGraph(attributePaths = {"monHoc", "giaoVien", "lop"})
     List<ThoiKhoaBieu> findByGiaoVienIdAndHocKyAndNamHocAndTuan(Integer giaoVienId, Integer hocKy, String namHoc, Integer tuan);
 
@@ -37,5 +39,4 @@ public interface ThoiKhoaBieuRepository extends JpaRepository<ThoiKhoaBieu, Inte
 
     // Delete by filter
     void deleteByNamHocAndHocKy(String namHoc, Integer hocKy);
-    void deleteByNamHocAndHocKyAndTuan(String namHoc, Integer hocKy, Integer tuan);
 }

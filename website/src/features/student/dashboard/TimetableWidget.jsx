@@ -6,15 +6,15 @@ const getDayLabel = (day) => {
   return `Thứ ${day}`;
 };
 
-const TimetableWidget = ({ timetable, isSummerBreak, todayDay, subjectColorMap, getSubjectName }) => {
+const TimetableWidget = ({ timetable, isSummerBreak, isExamWeek, todayDay, subjectColorMap, getSubjectName }) => {
   const todayLabel = `${getDayLabel(todayDay)}, ${new Date().getDate()}/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
 
   const todayTimetable = useMemo(() => {
-    if (isSummerBreak) return [];
+    if (isSummerBreak || isExamWeek) return [];
     return [...timetable]
       .filter((i) => i.thu === todayDay)
       .sort((a, b) => (a.tietBatDau || 0) - (b.tietBatDau || 0));
-  }, [timetable, todayDay, isSummerBreak]);
+  }, [timetable, todayDay, isSummerBreak, isExamWeek]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100 flex flex-col flex-1">
@@ -26,12 +26,13 @@ const TimetableWidget = ({ timetable, isSummerBreak, todayDay, subjectColorMap, 
       {todayTimetable.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center flex-1">
           <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
-            <CalendarDays size={28} className="text-slate-300" />
+            <CalendarDays size={28} className={isExamWeek ? "text-red-400" : "text-slate-300"} />
           </div>
-          <div className="text-slate-500 font-medium text-sm">
-            {isSummerBreak ? "Đang trong thời gian nghỉ hè!" : "Không có tiết học hôm nay"}
+          <div className={`font-medium text-sm ${isExamWeek ? 'text-red-500' : 'text-slate-500'}`}>
+            {isSummerBreak ? "Đang trong thời gian nghỉ hè!" : isExamWeek ? "Tuần này là Tuần Thi" : "Không có tiết học hôm nay"}
           </div>
-          {!isSummerBreak && <div className="text-slate-400 text-xs mt-1">Nghỉ ngơi thật tốt nhé!</div>}
+          {!isSummerBreak && !isExamWeek && <div className="text-slate-400 text-xs mt-1">Nghỉ ngơi thật tốt nhé!</div>}
+          {isExamWeek && <div className="text-red-400 text-xs mt-1">Lịch học tạm dừng. Chúc bạn thi tốt!</div>}
         </div>
       ) : (
         <div className="relative pl-3 border-l-2 border-slate-100 flex flex-col gap-6">
@@ -61,6 +62,11 @@ const TimetableWidget = ({ timetable, isSummerBreak, todayDay, subjectColorMap, 
                         GV. {t.giaoVien?.hoTen || "--"}
                       </span>
                     </div>
+                    {t.ghiChu && (
+                      <div className="mt-2 inline-block px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-semibold rounded truncate border border-amber-100">
+                        📝 {t.ghiChu}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

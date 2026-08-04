@@ -17,7 +17,7 @@ public class ThoiKhoaBieuGeneratorService {
     private static final Logger logger = LoggerFactory.getLogger(ThoiKhoaBieuGeneratorService.class);
 
     private static final Set<String> HEAVY_SUBJECTS = Set.of("toan", "ngu van", "tieng anh");
-    private static final Set<String> AFTERNOON_SUBJECTS = Set.of();
+    private static final Set<String> AFTERNOON_SUBJECTS = Set.of("the duc", "quoc phong", "gdqp", "the chat");
 
     private static final Map<String, Integer> SUBJECT_PERIODS = new LinkedHashMap<>();
     static {
@@ -599,8 +599,15 @@ public class ThoiKhoaBieuGeneratorService {
                 totalPeriods += getPeriodCount(pc.getMonHoc().getTenMon(), lop, toHopPeriodMap);
             }
 
-            List<PhanCongDay> morning = new ArrayList<>(allPcs);
+            List<PhanCongDay> morning = new ArrayList<>();
             List<PhanCongDay> afternoon = new ArrayList<>();
+            for (PhanCongDay pc : allPcs) {
+                if (isAfternoonSubject(pc.getMonHoc().getTenMon())) {
+                    afternoon.add(pc);
+                } else {
+                    morning.add(pc);
+                }
+            }
 
             Collections.shuffle(morning, rng); // Break identical schedules for subjects with same weight
             morning.sort((a, b) -> {

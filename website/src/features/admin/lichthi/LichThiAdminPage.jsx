@@ -6,6 +6,7 @@ import {
   createLichThi,
   updateLichThi,
   deleteLichThi,
+  autoGenerateLichThi
 } from "../../../api/lichthiApi.js";
 import { getLop } from "../../../api/lopApi.js";
 import { getMonHoc } from "../../../api/monhocApi.js";
@@ -48,12 +49,35 @@ export default function LichThiAdminPage() {
     giamThi1Id: "",
     giamThi2Id: "",
   });
+
+  const [autoModalOpen, setAutoModalOpen] = useState(false);
+  const [autoForm, setAutoForm] = useState({
+    namHoc: "",
+    hocKy: 2,
+    tuan: 27, 
+    loaiKiemTra: "GK"
+  });
+
+  // Sync autoForm with filter when modal opens
+  useEffect(() => {
+    if (autoModalOpen) {
+      const hk = filter.hocKy?.includes("II") ? 2 : 1;
+      setAutoForm(p => ({
+        ...p,
+        namHoc: filter.namHoc || namHocList[0] || "",
+        hocKy: hk,
+        tuan: hk === 1 ? 9 : 27
+      }));
+    }
+  }, [autoModalOpen]);
+
   const [lops, setLops] = useState([]);
   const [monHocs, setMonHocs] = useState([]);
   const [namHocList, setNamHocList] = useState([]);
   const [giaoViens, setGiaoViens] = useState([]);
   const [phanCongList, setPhanCongList] = useState([]);
   const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   const giamThiRef = useRef(null);
 
@@ -107,6 +131,9 @@ export default function LichThiAdminPage() {
     const handleClickOutside = (e) => {
       if (!e.target.closest('.action-dropdown-container')) {
         setOpenDropdownId(null);
+      }
+      if (!e.target.closest('.add-menu-container')) {
+        setShowAddMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -293,29 +320,49 @@ export default function LichThiAdminPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Lịch thi</h1>
-          <p className="text-slate-500 text-sm mt-1">Quản lý lịch thi theo năm học, học kỳ và khối lớp.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleExportPdf()}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors"
-          >
-            <Printer className="w-4 h-4" />
-            Xuất PDF
-          </button>
-          <button
-            onClick={() => openForm()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm lịch thi
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Lịch thi"
+        description="Quản lý lịch thi theo năm học, học kỳ và khối lớp."
+        actions={
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleExportPdf()}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              Xuất PDF
+            </button>
+            
+            <div className="relative add-menu-container">
+              <button
+                onClick={() => setShowAddMenu(!showAddMenu)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Tạo lịch thi
+              </button>
+              
+              {showAddMenu && (
+                <div className="absolute right-0 top-12 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 overflow-hidden">
+                  <button
+                    onClick={() => { setShowAddMenu(false); openForm(); }}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4 text-blue-500" /> Thêm thủ công
+                  </button>
+                  <button
+                    onClick={() => { setShowAddMenu(false); setAutoModalOpen(true); }}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4 text-emerald-500" /> Tạo tự động (Cả trường)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        }
+      />
 
       {/* Filter Card */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -720,7 +767,7 @@ export default function LichThiAdminPage() {
               </div>
             </div>
 
-            <div ref={giamThiRef} className="col-span-2 text-sm font-semibold text-slate-700 uppercase tracking-wider pb-2 border-b border-slate-100 mt-2">Giám thị</div>
+            <div className="col-span-2 text-sm font-semibold text-slate-700 uppercase tracking-wider pb-2 border-b border-slate-100 mt-2">Giám thị</div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Giám thị 1</label>
               <select
@@ -773,6 +820,119 @@ export default function LichThiAdminPage() {
         htmlContent={pdfHtmlContent}
         title="Xem trước Lịch thi"
       />
+
+      {/* Modal Tự động tạo lịch */}
+      <SimpleModal
+        open={autoModalOpen}
+        title="Tự động tạo lịch thi"
+        onClose={() => setAutoModalOpen(false)}
+      >
+        <form
+          className="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            
+            try {
+              await autoGenerateLichThi(autoForm);
+              notifySuccess("Đã tạo lịch thi tự động thành công!");
+              setAutoModalOpen(false);
+              
+              // Tự động chuyển bộ lọc sang học kỳ vừa tạo để thấy ngay lập tức
+              setFilter(prev => ({
+                ...prev,
+                namHoc: autoForm.namHoc,
+                hocKy: autoForm.hocKy === 1 ? "Học kỳ I" : "Học kỳ II"
+              }));
+
+              fetchData();
+            } catch (err) {
+              notifyError(err?.response?.data?.message || "Không thể tạo lịch thi tự động.");
+            }
+          }}
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Năm học <span className="text-red-500">*</span></label>
+              <select
+                value={autoForm.namHoc}
+                onChange={(e) => setAutoForm(p => ({ ...p, namHoc: e.target.value }))}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="">-- Chọn --</option>
+                {namHocList.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Học kỳ <span className="text-red-500">*</span></label>
+              <select
+                value={autoForm.hocKy}
+                onChange={(e) => {
+                  const hk = Number(e.target.value);
+                  setAutoForm(p => ({
+                    ...p,
+                    hocKy: hk,
+                    tuan: p.loaiKiemTra === "GK" ? (hk === 1 ? 9 : 27) : (hk === 1 ? 18 : 36)
+                  }));
+                }}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value={1}>Học kỳ I</option>
+                <option value={2}>Học kỳ II</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Kỳ thi <span className="text-red-500">*</span></label>
+              <select
+                value={autoForm.loaiKiemTra}
+                onChange={(e) => {
+                  const lkt = e.target.value;
+                  setAutoForm(p => ({
+                    ...p,
+                    loaiKiemTra: lkt,
+                    tuan: lkt === "GK" ? (p.hocKy === 1 ? 9 : 27) : (p.hocKy === 1 ? 18 : 36)
+                  }));
+                }}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="GK">Giữa kỳ</option>
+                <option value="CK">Cuối kỳ</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Tuần thi <span className="text-red-500">*</span></label>
+              <input
+                type="number"
+                min={1}
+                max={52}
+                value={autoForm.tuan}
+                onChange={(e) => setAutoForm(p => ({ ...p, tuan: Number(e.target.value) }))}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+          </div>
+          <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setAutoModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+              style={{ backgroundColor: "#10b981", color: "#ffffff" }}
+            >
+              Bắt đầu tạo
+            </button>
+          </div>
+        </form>
+      </SimpleModal>
+
     </div>
   );
 }

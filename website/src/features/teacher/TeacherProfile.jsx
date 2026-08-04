@@ -202,7 +202,7 @@ export default function TeacherProfile() {
         
         {/* Page Header */}
         <div className="mb-2">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Hồ sơ giáo viên</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Hồ sơ giáo viên</h1>
           <p className="mt-1.5 text-[15px] font-medium text-slate-500">Quản lý và cập nhật thông tin cá nhân.</p>
         </div>
 
@@ -225,7 +225,7 @@ export default function TeacherProfile() {
               </label>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-slate-900 m-0 tracking-tight">{teacher.hoTen || "Giáo viên"}</h2>
+              <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight m-0 tracking-tight">{teacher.hoTen || "Giáo viên"}</h2>
               <p className="text-[15px] text-slate-600 mt-1 font-medium flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">work</span>
                 Giáo viên {getTeacherSubjectLabel(teacher)}
@@ -365,3 +365,4 @@ export default function TeacherProfile() {
     </div>
   );
 }
+

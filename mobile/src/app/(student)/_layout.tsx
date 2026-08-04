@@ -71,6 +71,12 @@ export default function StudentLayout() {
             href: null,
           }}
         />
+        <Tabs.Screen
+          name="exam"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
     </View>
   );

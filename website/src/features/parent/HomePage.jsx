@@ -194,7 +194,7 @@ export default function HomePage() {
       {/* Banner */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Trang chủ phụ huynh</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Trang chủ phụ huynh</h1>
           <p className="text-sm text-slate-500 mt-1">Theo dõi kết quả học tập và các thông báo của nhà trường.</p>
         </div>
         <div>
@@ -248,7 +248,7 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
               {/* Cột trái (60%) */}
-              <div className="lg:col-span-7 space-y-6">
+              <div className="lg:col-span-7 flex flex-col gap-6">
                 
                 {/* Thông báo từ nhà trường */}
                 <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
@@ -281,7 +281,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Lịch thi sắp tới */}
-                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex-1 flex flex-col">
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-5">
                     <Calendar size={20} className="text-purple-500" />
                     Lịch thi sắp tới
@@ -320,7 +320,7 @@ export default function HomePage() {
               </div>
 
               {/* Cột phải (40%) */}
-              <div className="lg:col-span-5 space-y-6">
+              <div className="lg:col-span-5 flex flex-col gap-6">
                 
                 {/* Thông tin nhanh */}
                 <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
@@ -348,7 +348,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Liên hệ giáo viên */}
-                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100">
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex-1 flex flex-col">
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
                     <User size={20} className="text-emerald-500" />
                     Liên hệ giáo viên
@@ -422,3 +422,4 @@ export default function HomePage() {
     </div>
   );
 }
+

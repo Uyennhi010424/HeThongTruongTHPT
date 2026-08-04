@@ -1,0 +1,289 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronLeft, Bell, BellRing, Clock, User as UserIcon } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { useParentStore } from '../../store/useParentStore';
+import axiosClient from '../../api/axiosClient';
+
+interface ThongBao {
+  id: number;
+  tieuDe: string;
+  noiDung: string;
+  ngayTao?: string;
+  ngayDang?: string;
+  doiTuong?: string;
+  nguoiTao: {
+    hoTen: string;
+  };
+}
+
+export default function NotificationsScreen() {
+  const router = useRouter();
+  const [notifications, setNotifications] = useState<ThongBao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const fetchNotifications = async () => {
+    try {
+      setError(null);
+      const response = await axiosClient.get('/thongbao');
+      if (response.data && response.data.data) {
+        // Filter for parent notifications
+        const filtered = response.data.data.filter((item: ThongBao) => 
+          item.doiTuong === 'PHU_HUYNH' || item.doiTuong === 'ALL'
+        );
+        const data = filtered.sort((a: ThongBao, b: ThongBao) => {
+          return new Date(b.ngayTao || b.ngayDang || '').getTime() - new Date(a.ngayTao || a.ngayDang || '').getTime();
+        });
+        setNotifications(data);
+      }
+    } catch (err: any) {
+      console.error('Fetch notifications error:', err);
+      setError('Không thể tải thông báo. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications();
+  };
+
+  const formatDateTime = (dateString: string) => {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return `${time} ${date}`;
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'TOAN_TRUONG':
+        return <BellRing size={20} color="#3B82F6" />;
+      case 'GIAO_VIEN':
+      case 'CA_NHAN':
+      default:
+        return <Bell size={20} color="#10B981" />;
+    }
+  };
+
+  const getNotificationTypeLabel = (type: string) => {
+    switch (type) {
+      case 'TOAN_TRUONG': return 'Toàn trường';
+      case 'GIAO_VIEN': return 'Lớp học';
+      case 'CA_NHAN': return 'Cá nhân';
+      default: return 'Khác';
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ChevronLeft size={24} color="#0F172A" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Thông báo</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Đang tải...</Text>
+        </View>
+      ) : error ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: 'red' }}>{error}</Text>
+          <TouchableOpacity onPress={fetchNotifications} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#2563EB' }}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />
+          }
+        >
+        {notifications.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Bell size={48} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>Chưa có thông báo</Text>
+            <Text style={styles.emptyDesc}>Bạn không có thông báo nào vào lúc này.</Text>
+          </View>
+        ) : (
+          notifications.map((item: any) => {
+            const isExpanded = expandedId === item.id;
+            return (
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.card}
+                activeOpacity={0.7}
+                onPress={() => setExpandedId(isExpanded ? null : item.id)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.typeBadge}>
+                    {getNotificationIcon(item.doiTuong)}
+                    <Text style={styles.typeText}>{getNotificationTypeLabel(item.doiTuong)}</Text>
+                  </View>
+                  <View style={styles.timeContainer}>
+                    <Clock size={14} color="#94A3B8" />
+                    <Text style={styles.timeText}>{formatDateTime(item.ngayTao || item.ngayDang)}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.title}>{item.tieuDe}</Text>
+                
+                <Text 
+                  style={styles.content} 
+                  numberOfLines={isExpanded ? undefined : 2}
+                >
+                  {item.noiDung}
+                </Text>
+                
+                {!isExpanded && (
+                  <Text style={{ color: '#2563EB', fontSize: 13, marginBottom: 12 }}>Xem thêm</Text>
+                )}
+
+                <View style={styles.footer}>
+                  <View style={styles.senderContainer}>
+                    <UserIcon size={16} color="#64748B" />
+                    <Text style={styles.senderText}>{item.nguoiTao?.hoTen || 'Hệ thống'}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  backBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    marginTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#64748B',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyDesc: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  typeText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginLeft: 4,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  content: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+  },
+  senderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  senderText: {
+    fontSize: 13,
+    color: '#64748B',
+    marginLeft: 6,
+    fontWeight: '500',
+  }
+});

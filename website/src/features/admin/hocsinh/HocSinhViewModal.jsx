@@ -18,7 +18,7 @@ export default function HocSinhViewModal({ hooks }) {
               {viewingStudent.hoTen ? viewingStudent.hoTen.charAt(0).toUpperCase() : "H"}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-900">{viewingStudent.hoTen}</h3>
+              <h3 className="text-xl font-bold text-blue-900">{viewingStudent.hoTen}</h3>
               <p className="text-sm font-medium text-slate-500">
                 Khối {viewingStudent.lopHoc?.khoi || viewingStudent.lop?.khoi || "--"} • Lớp {viewingStudent.lopHoc?.tenLop || viewingStudent.lop?.tenLop || "--"}
               </p>
@@ -59,7 +59,7 @@ export default function HocSinhViewModal({ hooks }) {
           </div>
 
           <div className="pt-4 mt-2 border-t border-slate-100">
-            <h4 className="text-sm font-bold text-slate-900 mb-3">Thông tin phụ huynh</h4>
+            <h4 className="text-sm font-bold text-blue-900 mb-3">Thông tin phụ huynh</h4>
             {viewingStudent.phuHuynh || viewingStudent.phuHuynhId ? (
               <div className="grid grid-cols-2 gap-4">
                 <div>

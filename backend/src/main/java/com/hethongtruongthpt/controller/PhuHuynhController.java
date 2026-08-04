@@ -13,8 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.hethongtruongthpt.dto.hocsinh.HocSinhResponseDTO;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/phuhuynh")
@@ -43,8 +46,9 @@ public class PhuHuynhController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
     @GetMapping("/{id}/hocsinh")
-    public ResponseEntity<ApiResponse<List<HocSinh>>> getStudentsByParent(@PathVariable Integer id) {
+    public ResponseEntity<ApiResponse<List<HocSinhResponseDTO>>> getStudentsByParent(@PathVariable Integer id) {
         // IDOR protection: chỉ phụ huynh xem được con mình, hoặc ADMIN xem được tất cả
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         boolean isAdmin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
@@ -63,7 +67,11 @@ public class PhuHuynhController {
             }
         }
 
-        return ResponseEntity.ok(ApiResponse.ok(phuHuynhService.getStudentsByPhuHuynhId(id)));
+        List<HocSinhResponseDTO> dtos = phuHuynhService.getStudentsByPhuHuynhId(id).stream()
+                .map(HocSinhResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.ok(dtos));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

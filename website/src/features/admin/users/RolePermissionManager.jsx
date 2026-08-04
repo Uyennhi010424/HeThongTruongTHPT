@@ -111,7 +111,7 @@ export default function RolePermissionManager() {
         <div className="p-5 flex items-center justify-between border-b border-slate-100">
           <div>
             <div className="flex items-center gap-3">
-              <h3 className="text-lg font-bold text-slate-900">Quyền truy cập:</h3>
+              <h3 className="text-lg font-bold text-blue-900">Quyền truy cập:</h3>
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}

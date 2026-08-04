@@ -244,7 +244,7 @@ export default function MonHocList() {
       {/* Header & Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Danh mục môn học</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Danh mục môn học</h1>
           <p className="mt-1 text-sm font-medium text-slate-500">
             Quản trị viên theo dõi và cập nhật thông tin môn học.
           </p>
@@ -294,7 +294,7 @@ export default function MonHocList() {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-4">
                        <Search className="w-8 h-8 text-slate-300" />
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900">Không tìm thấy môn học</h3>
+                    <h3 className="text-sm font-bold text-blue-900">Không tìm thấy môn học</h3>
                     <p className="text-sm text-slate-500 mt-1">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
                   </td>
                 </tr>

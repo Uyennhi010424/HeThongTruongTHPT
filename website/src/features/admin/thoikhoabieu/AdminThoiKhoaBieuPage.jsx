@@ -8,6 +8,7 @@ import {
   moveThoiKhoaBieu,
   swapThoiKhoaBieu
 } from "../../../api/thoikhoabieuApi.js";
+import { checkExamWeek } from "../../../api/lichthiApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import {
   getAllNghi,
@@ -42,6 +43,7 @@ export default function AdminThoiKhoaBieuPage() {
 
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfHtmlContent, setPdfHtmlContent] = useState("");
+  const [isExamWeek, setIsExamWeek] = useState(false);
 
   const selectedYear = useMemo(() => {
     return namHocs.find(y => y.id.toString() === selectedYearId);
@@ -193,6 +195,14 @@ export default function AdminThoiKhoaBieuPage() {
         tuan: selectedTuan
       });
       setTimetable(response?.data?.data || []);
+      
+      // Use message from backend or fallback to checkExamWeek API
+      if (response?.data?.message === "TUAN_THI") {
+        setIsExamWeek(true);
+      } else {
+        const examWeekRes = await checkExamWeek(selectedYear.tenNamHoc, selectedTuan);
+        setIsExamWeek(examWeekRes?.data?.data === true);
+      }
     } catch (err) {
       console.error("Fetch timetable error:", err);
       setError("Không thể tải thời khóa biểu.");
@@ -499,15 +509,6 @@ export default function AdminThoiKhoaBieuPage() {
   const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   const findSlot = (thu, tiet, lopId) => {
-    const dayDiff = Number(thu) - 2;
-    const targetDate = new Date(monday);
-    targetDate.setDate(monday.getDate() + dayDiff);
-    const m = targetDate.getMonth() + 1;
-    const d = targetDate.getDate();
-    if (m === 9 && d >= 1 && d <= 4) {
-      return null;
-    }
-
     return timetable.find(
       (item) =>
         item.thu === thu &&
@@ -540,12 +541,12 @@ export default function AdminThoiKhoaBieuPage() {
   const relativeWeek = selectedTuan;
 
   return (
-    <div className="flex-grow p-6 space-y-6 flex flex-col bg-[#F8FAFC]">
+    <div className="flex-grow space-y-6 flex flex-col bg-[#F8FAFC]">
 
       {/* ─── TITLE & ACTIONS HEADER ─── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-blue-900">Thời khóa biểu</h2>
+          <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight">Thời khóa biểu</h2>
           <p className="text-xs text-gray-500 mt-1 font-medium">
             Năm học: {selectedYear?.tenNamHoc || "—"} | Học kỳ: {selectedHocKy === "1" ? "I" : "II"} | Bảng tổng hợp theo lớp.
           </p>
@@ -713,86 +714,100 @@ export default function AdminThoiKhoaBieuPage() {
         </div>
 
         {/* Scrollable Table View */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[70vh] flex-1 rounded-2xl border border-gray-150/80 shadow-xs">
-          <table className="w-full text-left border-collapse table-fixed min-w-[1400px]">
-            <thead>
-              <tr className="bg-slate-50 border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider sticky top-0 z-30 shadow-xs">
-                <th className="px-4 py-4 w-[100px] bg-slate-50 sticky left-0 z-40 border-r border-gray-150 text-center font-bold text-slate-600 text-xs">Thứ</th>
-                <th className="px-4 py-4 w-[90px] border-r border-gray-150 text-center sticky left-[100px] z-40 bg-slate-50 font-bold text-slate-600 text-xs">Tiết</th>
-                {lops.map((lop) => (
-                  <th key={lop.id} className="px-5 py-4 w-[220px] border-r border-gray-150 text-center">
-                    <div className="font-black text-blue-900 text-sm uppercase tracking-wider">{lop.tenLop}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-150/70 text-xs">
-              {DAYS.map((thu) => {
-                const activePeriods = PERIODS.filter(p => {
-                  if (buoiFilter === "SANG") return p <= 5;
-                  if (buoiFilter === "CHIEU") return p > 5;
-                  return true;
-                });
+        {isExamWeek ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-gray-150/80 shadow-xs">
+            <span className="material-symbols-outlined text-[64px] text-blue-500 mb-4 animate-bounce">
+              event_available
+            </span>
+            <h2 className="text-4xl font-black text-blue-900 uppercase tracking-widest text-center">
+              TUẦN THI
+            </h2>
+            <p className="mt-3 text-sm text-gray-500 font-medium text-center max-w-md">
+              Học sinh được nghỉ học các môn văn hóa trong tuần này. Vui lòng xem lịch thi chi tiết tại phân hệ Lịch Thi.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh] flex-1 rounded-2xl border border-gray-150/80 shadow-xs">
+            <table className="w-full text-left border-collapse table-fixed min-w-[1400px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider sticky top-0 z-30 shadow-xs">
+                  <th className="px-4 py-4 w-[100px] bg-slate-50 sticky left-0 z-40 border-r border-gray-150 text-center font-bold text-slate-600 text-xs">Thứ</th>
+                  <th className="px-4 py-4 w-[90px] border-r border-gray-150 text-center sticky left-[100px] z-40 bg-slate-50 font-bold text-slate-600 text-xs">Tiết</th>
+                  {lops.map((lop) => (
+                    <th key={lop.id} className="px-5 py-4 w-[220px] border-r border-gray-150 text-center">
+                      <div className="font-black text-blue-900 text-sm uppercase tracking-wider">{lop.tenLop}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-150/70 text-xs">
+                {DAYS.map((thu) => {
+                  const activePeriods = PERIODS.filter(p => {
+                    if (buoiFilter === "SANG") return p <= 5;
+                    if (buoiFilter === "CHIEU") return p > 5;
+                    return true;
+                  });
 
-                return activePeriods.map((tiet, pIdx) => {
-                  return (
-                    <tr key={`${thu}-${tiet}`} className="hover:bg-slate-50/20 transition-colors">
-                      {/* Gộp Thứ */}
-                      {pIdx === 0 && (
-                        <td
-                          rowSpan={activePeriods.length}
-                          className="font-black text-blue-900 text-sm bg-slate-50 border-r border-gray-150 text-center sticky left-0 z-20 border-b border-gray-150 align-middle px-3 shadow-xs"
-                        >
-                          <div className="text-blue-900">Thứ {thu}</div>
-                          <div className="text-[11px] text-blue-700/60 font-bold mt-1.5">{formatDateForDay(thu)}</div>
-                        </td>
-                      )}
-
-                      {/* Tiết học */}
-                      <td className="px-2.5 py-2 border-r border-gray-150 font-extrabold text-center text-gray-500 bg-slate-50 sticky left-[100px] z-20 border-b border-gray-150">
-                        <div className="text-xs font-black text-blue-900">{tiet}</div>
-                        {tiet === 1 && <div className="text-[8px] text-blue-600 font-extrabold mt-0.5 uppercase tracking-wider">Sáng</div>}
-                        {tiet === 6 && <div className="text-[8px] text-orange-600 font-extrabold mt-0.5 uppercase tracking-wider">Chiều</div>}
-                      </td>
-
-                      {/* Lớp học */}
-                      {lops.map((lop) => {
-                        const slot = findSlot(thu, tiet, lop.id);
-                        return (
+                  return activePeriods.map((tiet, pIdx) => {
+                    return (
+                      <tr key={`${thu}-${tiet}`} className="hover:bg-slate-50/20 transition-colors">
+                        {/* Gộp Thứ */}
+                        {pIdx === 0 && (
                           <td
-                            key={lop.id}
-                            className={`p-1.5 border-r border-gray-150 align-middle border-b border-gray-150 ${draggedSlot && (draggedSlot.lop?.id === lop.id || draggedSlot.lopHoc?.id === lop.id) ? "bg-blue-50/30" : ""}`}
-                            onDragOver={handleDragOver}
-                            onDrop={(e) => handleDrop(e, thu, tiet, lop.id, slot)}
+                            rowSpan={activePeriods.length}
+                            className="font-black text-blue-900 text-sm bg-slate-50 border-r border-gray-150 text-center sticky left-0 z-20 border-b border-gray-150 align-middle px-3 shadow-xs"
                           >
-                            {slot ? (
-                              <div 
-                                className={`p-2 rounded-xl border flex flex-col justify-center gap-0.5 h-full shadow-xs transition-all hover:scale-[1.01] hover:shadow-sm cursor-grab active:cursor-grabbing ${getSubjectColor(slot.monHoc?.tenMon)} ${slot.isLocked ? "ring-2 ring-blue-400" : ""}`}
-                                draggable={true}
-                                onDragStart={(e) => handleDragStart(e, slot)}
-                              >
-                                <span className="font-black text-blue-955 text-xs leading-snug">{slot.monHoc?.tenMon}</span>
-                                <span className="text-[10px] opacity-90 font-bold text-slate-600 flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[12px] opacity-75">person</span>
-                                  {slot.giaoVien?.hoTen || "Chưa phân"}
-                                </span>
-                                {slot.isLocked && (
-                                  <span className="text-[9px] font-bold text-blue-600 mt-0.5 bg-white/60 rounded px-1 self-start">Giáo viên ĐK</span>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="w-full text-center text-xs text-gray-300 italic py-2.5">—</div>
-                            )}
+                            <div className="text-blue-900">Thứ {thu}</div>
+                            <div className="text-[11px] text-blue-700/60 font-bold mt-1.5">{formatDateForDay(thu)}</div>
                           </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                });
-              })}
-            </tbody>
-          </table>
-        </div>
+                        )}
+
+                        {/* Tiết học */}
+                        <td className="px-2.5 py-2 border-r border-gray-150 font-extrabold text-center text-gray-500 bg-slate-50 sticky left-[100px] z-20 border-b border-gray-150">
+                          <div className="text-xs font-black text-blue-900">{tiet}</div>
+                          {tiet === 1 && <div className="text-[8px] text-blue-600 font-extrabold mt-0.5 uppercase tracking-wider">Sáng</div>}
+                          {tiet === 6 && <div className="text-[8px] text-orange-600 font-extrabold mt-0.5 uppercase tracking-wider">Chiều</div>}
+                        </td>
+
+                        {/* Lớp học */}
+                        {lops.map((lop) => {
+                          const slot = findSlot(thu, tiet, lop.id);
+                          return (
+                            <td
+                              key={lop.id}
+                              className={`p-1.5 border-r border-gray-150 align-middle border-b border-gray-150 ${draggedSlot && (draggedSlot.lop?.id === lop.id || draggedSlot.lopHoc?.id === lop.id) ? "bg-blue-50/30" : ""}`}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, thu, tiet, lop.id, slot)}
+                            >
+                              {slot ? (
+                                <div 
+                                  className={`p-2 rounded-xl border flex flex-col justify-center gap-0.5 h-full shadow-xs transition-all hover:scale-[1.01] hover:shadow-sm cursor-grab active:cursor-grabbing ${getSubjectColor(slot.monHoc?.tenMon)} ${slot.isLocked ? "ring-2 ring-blue-400" : ""}`}
+                                  draggable={true}
+                                  onDragStart={(e) => handleDragStart(e, slot)}
+                                >
+                                  <span className="font-black text-blue-955 text-xs leading-snug">{slot.monHoc?.tenMon}</span>
+                                  <span className="text-[10px] opacity-90 font-bold text-slate-600 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px] opacity-75">person</span>
+                                    {slot.giaoVien?.hoTen || "Chưa phân"}
+                                  </span>
+                                  {slot.isLocked && (
+                                    <span className="text-[9px] font-bold text-blue-600 mt-0.5 bg-white/60 rounded px-1 self-start">Giáo viên ĐK</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="w-full text-center text-xs text-gray-300 italic py-2.5">—</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  });
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ─── MODAL QUẢN LÝ NGHỈ DẠY & DẠY THAY ─── */}
@@ -1093,3 +1108,4 @@ export default function AdminThoiKhoaBieuPage() {
     </div>
   );
 }
+

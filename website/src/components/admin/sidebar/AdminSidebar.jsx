@@ -80,7 +80,7 @@ export default function AdminSidebar({ isMobileOpen, onMobileClose, onPanelState
               <img 
                 src={themeLogo} 
                 alt="Logo Edu Manager" 
-                className={`w-auto object-contain transition-all duration-250 brightness-0 invert opacity-90 drop-shadow-md ${isExpanded || isMobileOpen ? 'h-[64px]' : 'h-10 object-left overflow-hidden w-10'}`} 
+                className={`w-auto object-contain transition-all duration-250 brightness-0 invert opacity-95 drop-shadow-md ${isExpanded || isMobileOpen ? 'h-[78px]' : 'h-[56px] object-left overflow-hidden w-[56px]'}`} 
                 style={(!isExpanded && !isMobileOpen) ? { objectPosition: 'left' } : {}}
               />
             </div>

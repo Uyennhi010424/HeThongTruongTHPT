@@ -71,6 +71,9 @@ public class HocSinh {
     @Column(name = "trang_thai")
     private Integer trangThai = 1;
 
+    @Column(name = "truong_chuyen_den", length = 200)
+    private String truongChuyenDen;
+
     @Transient
     private Integer phuHuynhId; // populated at service layer when available
 
@@ -252,5 +255,13 @@ public class HocSinh {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getTruongChuyenDen() {
+        return truongChuyenDen;
+    }
+
+    public void setTruongChuyenDen(String truongChuyenDen) {
+        this.truongChuyenDen = truongChuyenDen;
     }
 }

@@ -1,44 +1,52 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { useParentStore } from '../../store/useParentStore';
+
+const formatConduct = (val: string) => {
+  if (val === 'TOT') return 'Tốt';
+  if (val === 'KHA') return 'Khá';
+  if (val === 'TRUNG_BINH') return 'Trung bình';
+  if (val === 'YEU') return 'Yếu';
+  return val;
+};
 
 export default function ParentConduct() {
-  const records = [
-    { id: 1, date: '15/10/2024', type: 'Chuyên cần', content: 'Nghỉ học không phép', teacher: 'Lê Thị B' },
-    { id: 2, date: '10/10/2024', type: 'Kỷ luật', content: 'Nói chuyện trong giờ học Toán', teacher: 'Nguyễn Văn A' },
-  ];
+  const { dashboardData, selectedChild } = useParentStore();
+
+  if (!selectedChild || !dashboardData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={{ marginTop: 12, color: '#64748b' }}>Đang tải dữ liệu...</Text>
+      </View>
+    );
+  }
+
+  const conducts = dashboardData.conducts || [];
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.list}>
-        {records.map((record) => (
-          <View key={record.id} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.dateText}>{record.date}</Text>
-              <Text style={[styles.typeBadge, record.type === 'Kỷ luật' ? styles.typeDiscipline : styles.typeAttendance]}>
-                {record.type}
-              </Text>
-            </View>
-            <View style={styles.cardBody}>
-              <Text style={styles.contentText}>{record.content}</Text>
-              <Text style={styles.teacherText}>Giáo viên ghi nhận: {record.teacher}</Text>
-            </View>
-            
-            {/* Phản hồi */}
-            <View style={styles.feedbackSection}>
-              <Text style={styles.feedbackLabel}>Phản hồi cho giáo viên:</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nhập nội dung phản hồi..."
-                  placeholderTextColor="#94a3b8"
-                />
-                <TouchableOpacity style={styles.sendBtn}>
-                  <Text style={styles.sendBtnText}>Gửi</Text>
-                </TouchableOpacity>
+        {conducts.length === 0 ? (
+          <Text style={{ textAlign: 'center', color: '#64748b', marginTop: 20 }}>Chưa có đánh giá hạnh kiểm.</Text>
+        ) : (
+          conducts.map((record: any) => (
+            <View key={record.id} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.dateText}>
+                  {record.ngayDanhGia ? new Date(record.ngayDanhGia).toLocaleDateString('vi-VN') : `Học kỳ ${record.hocKy || ''}`}
+                </Text>
+                <Text style={[styles.typeBadge, record.xepLoai === 'YEU' || record.xepLoai === 'TRUNG_BINH' ? styles.typeDiscipline : styles.typeAttendance]}>
+                  {formatConduct(record.xepLoai)}
+                </Text>
+              </View>
+              <View style={styles.cardBody}>
+                <Text style={styles.contentText}>{record.nhanXet || 'Không có nhận xét'}</Text>
+                {record.giaoVien && <Text style={styles.teacherText}>Giáo viên đánh giá: {record.giaoVien.hoTen}</Text>}
               </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
     </View>
   );

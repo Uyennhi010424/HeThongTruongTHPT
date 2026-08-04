@@ -101,17 +101,24 @@ export default function ScoreFollow() {
 
   return (
     <div className="page users-page student-page">
-      <section className="student-hero card">
-        <div className="student-hero-copy">
-          <div className="student-hero-kicker">EduManager Pro</div>
-          <h2 className="student-hero-title">Theo dõi điểm</h2>
-          <p className="student-hero-subtitle">Xem kết quả học tập và hạnh kiểm của con em.</p>
+      <div className="mb-6 shrink-0 border-b border-slate-200 pb-4">
+        <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
+          Kết quả học tập
+        </h2>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-slate-500 text-[14px]">
+            Theo dõi điểm số và đánh giá hạnh kiểm của con.
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold border border-blue-100">
+              {loading ? "..." : stats.totalScores} bài điểm
+            </div>
+            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold border border-blue-100">
+              {loading ? "..." : stats.totalConducts} đánh giá
+            </div>
+          </div>
         </div>
-        <div className="student-hero-metrics">
-          <div className="student-hero-chip">{loading ? "..." : stats.totalScores} bài điểm</div>
-          <div className="student-hero-chip">{loading ? "..." : stats.totalConducts} đánh giá</div>
-        </div>
-      </section>
+      </div>
 
       <StudentSelector students={students} selectedIndex={selectedIndex} onSelect={selectStudent} />
 

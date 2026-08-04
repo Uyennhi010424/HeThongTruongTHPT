@@ -352,7 +352,7 @@ export default function PhuHuynhList() {
     <div className="min-h-screen bg-[#F8FAFC] pb-12 font-sans text-slate-900">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Quản lý phụ huynh</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Quản lý phụ huynh</h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">Danh sách và thông tin liên hệ của phụ huynh học sinh.</p>
         </div>
 
@@ -379,7 +379,7 @@ export default function PhuHuynhList() {
             {filterOpen && (
               <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                  <h3 className="text-sm font-bold text-slate-800">Lọc phụ huynh</h3>
+                  <h3 className="text-sm font-bold text-blue-900">Lọc phụ huynh</h3>
                 </div>
                 <div className="p-4 space-y-4">
                   <div className="space-y-1.5">
@@ -705,7 +705,7 @@ export default function PhuHuynhList() {
               </div>
               <div className="pt-1 w-full">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">{detailParent.hoTen}</h3>
+                  <h3 className="text-xl font-bold text-blue-900 tracking-tight">{detailParent.hoTen}</h3>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
                     detailParent.isSmSActive 
                       ? "bg-blue-50 text-blue-700 border-blue-200" 
@@ -737,7 +737,7 @@ export default function PhuHuynhList() {
             </div>
 
             <div>
-              <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-100 pb-3">Học sinh liên quan</h4>
+              <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider mb-4 border-b border-slate-100 pb-3">Học sinh liên quan</h4>
               
               {detailLoading ? (
                 <div className="flex items-center justify-center p-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">

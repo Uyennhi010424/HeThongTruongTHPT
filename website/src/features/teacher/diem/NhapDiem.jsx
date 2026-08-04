@@ -727,7 +727,7 @@ export default function NhapDiem() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-slate-200">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+            <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
               Bảng nhập điểm theo môn
               {selectedClassObj && (
                 <span className="text-sm font-semibold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md border border-slate-200 flex items-center gap-1.5">
@@ -898,3 +898,4 @@ export default function NhapDiem() {
     </div>
   );
 }
+

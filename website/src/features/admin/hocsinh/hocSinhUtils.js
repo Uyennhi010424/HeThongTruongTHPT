@@ -75,6 +75,7 @@ export const getGenderLabel = (value) => {
 };
 
 export const getStatusLabel = (status) => {
+  if (Number(status) === 3) return "Chuyển trường";
   if (Number(status) === 2) return "Đã tốt nghiệp";
   if (Number(status) === 1) return "Đang học";
   return "Ngừng học";
@@ -198,6 +199,7 @@ export const formatPhoneDisplay = (value) => {
 
 export const parseStatus = (value) => {
   const normalized = normalizeStrict(value);
+  if (["3", "chuyentruong", "transfer"].includes(normalized)) return 3;
   if (["1", "danghoc", "active"].includes(normalized)) return 1;
   if (["2", "datotnghiep", "graduated"].includes(normalized)) return 2;
   if (["0", "ngunghoc", "inactive"].includes(normalized)) return 0;

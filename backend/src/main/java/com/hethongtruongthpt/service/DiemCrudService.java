@@ -250,6 +250,9 @@ public class DiemCrudService {
 
             if (incoming.getId() != null && existingMapById.containsKey(incoming.getId())) {
                 Diem existing = existingMapById.get(incoming.getId());
+                if (incoming.getVersion() != existing.getVersion()) {
+                    throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Diem.class, existing.getId());
+                }
                 existing.setGiaTriDiem(incoming.getGiaTriDiem());
                 existing.setNhanXet(incoming.getNhanXet());
                 if (incoming.getGhiChu() != null) existing.setGhiChu(incoming.getGhiChu());
@@ -261,6 +264,9 @@ public class DiemCrudService {
                 String k = buildKey(incoming);
                 Diem existing = existingMapByKey.get(k);
                 if (existing != null) {
+                    if (incoming.getVersion() != existing.getVersion()) {
+                        throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Diem.class, existing.getId());
+                    }
                     existing.setGiaTriDiem(incoming.getGiaTriDiem());
                     existing.setNhanXet(incoming.getNhanXet());
                     if (incoming.getGhiChu() != null) existing.setGhiChu(incoming.getGhiChu());

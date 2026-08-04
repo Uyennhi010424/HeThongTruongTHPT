@@ -533,7 +533,7 @@ export default function PhanCongPage() {
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={() => setDrawerOpen(false)} />
           <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col transform transition-transform duration-300 border-l border-slate-200">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
-              <h2 className="text-lg font-bold text-slate-800">Chi tiết phân công</h2>
+              <h2 className="text-lg font-bold text-blue-900">Chi tiết phân công</h2>
               <button onClick={() => setDrawerOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -708,7 +708,7 @@ export default function PhanCongPage() {
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4 mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Xóa phân công</h3>
+            <h3 className="text-lg font-bold text-blue-900 text-center mb-2">Xóa phân công</h3>
             <p className="text-sm text-slate-500 text-center mb-6">
               Bạn có chắc chắn muốn xóa phân công của <strong>{deleteModal.item?.gv}</strong> dạy môn <strong>{deleteModal.item?.mon}</strong> lớp <strong>{deleteModal.item?.lop}</strong>? Hành động này không thể hoàn tác.
             </p>
@@ -740,7 +740,7 @@ export default function PhanCongPage() {
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4 mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Xóa tất cả phân công</h3>
+            <h3 className="text-lg font-bold text-blue-900 text-center mb-2">Xóa tất cả phân công</h3>
             <p className="text-sm text-slate-500 text-center mb-6">
               Bạn có chắc chắn muốn xóa <strong>tất cả {filteredAssignments.length} phân công</strong>
               {filter.namHoc ? ` năm ${filter.namHoc}` : ""}

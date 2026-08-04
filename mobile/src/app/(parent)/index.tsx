@@ -1,27 +1,67 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useParentStore } from '../../store/useParentStore';
+import { useRouter } from 'expo-router';
+
+const formatConduct = (val: string) => {
+  if (val === 'TOT') return 'Tốt';
+  if (val === 'KHA') return 'Khá';
+  if (val === 'TRUNG_BINH') return 'Trung bình';
+  if (val === 'YEU') return 'Yếu';
+  return val;
+};
 
 export default function ParentDashboard() {
   const { signOut } = useAuthStore();
+  const { selectedChild, dashboardData } = useParentStore();
+  const router = useRouter();
+
+  if (!selectedChild || !dashboardData) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={{ marginTop: 12, color: '#64748b' }}>Đang tải dữ liệu...</Text>
+      </View>
+    );
+  }
+
+  // Calculate stats
+  const gpa = dashboardData.gpa ?? '--';
+  const latestConduct = dashboardData.conducts && dashboardData.conducts.length > 0
+    ? formatConduct(dashboardData.conducts[dashboardData.conducts.length - 1].xepLoai)
+    : '--';
+  const attendance = dashboardData.attendanceStats;
+  const absentDays = attendance ? (attendance.vangPhep || 0) + (attendance.vangKhongPhep || 0) : 0;
+
+  // Filter timetable for today
+  const today = new Date().getDay(); // 0 is Sunday
+  const todayThu = today === 0 ? 8 : today + 1;
+  const todaySchedule = dashboardData.timetable?.filter((t: any) => t.thu === todayThu).sort((a: any, b: any) => a.tietBatDau - b.tietBatDau) || [];
+
+  const getDayName = (thu: number) => {
+    if (thu === 8) return "Chủ nhật";
+    return `Thứ ${thu}`;
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
       {/* Profile & Logout */}
       <View style={styles.header}>
         <View style={styles.childInfo}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>A</Text>
+            <Text style={styles.avatarText}>{selectedChild.hoTen?.charAt(0) || 'A'}</Text>
           </View>
           <View>
-            <Text style={styles.childName}>Học sinh: Nguyễn Văn A</Text>
-            <Text style={styles.childClass}>Lớp 10A1 - GVCN: Lê Thị B</Text>
+            <Text style={styles.childName}>{selectedChild.hoTen}</Text>
+            <Text style={styles.childClass}>
+              Lớp {selectedChild.lop?.tenLop || 'Chưa phân lớp'} 
+              {selectedChild.lop?.gvcn ? ` - GVCN: ${selectedChild.lop.gvcn.hoTen}` : ''}
+            </Text>
           </View>
         </View>
-        <TouchableOpacity onPress={signOut} style={styles.logoutBtn}>
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-        </TouchableOpacity>
       </View>
 
       {/* Tình hình học tập */}
@@ -29,15 +69,15 @@ export default function ParentDashboard() {
         <Text style={styles.sectionTitle}>Tổng quan học tập</Text>
         <View style={styles.overviewGrid}>
           <View style={styles.overviewCard}>
-            <Text style={styles.overviewValue}>8.6</Text>
+            <Text style={styles.overviewValue}>{gpa}</Text>
             <Text style={styles.overviewLabel}>Điểm TB</Text>
           </View>
           <View style={styles.overviewCard}>
-            <Text style={[styles.overviewValue, { color: '#f59e0b' }]}>Tốt</Text>
+            <Text style={[styles.overviewValue, { color: '#f59e0b' }]}>{latestConduct}</Text>
             <Text style={styles.overviewLabel}>Hạnh kiểm</Text>
           </View>
           <View style={styles.overviewCard}>
-            <Text style={[styles.overviewValue, { color: '#ef4444' }]}>2</Text>
+            <Text style={[styles.overviewValue, { color: '#ef4444' }]}>{absentDays}</Text>
             <Text style={styles.overviewLabel}>Ngày nghỉ</Text>
           </View>
         </View>
@@ -45,32 +85,38 @@ export default function ParentDashboard() {
 
       {/* Lịch học hôm nay */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lịch học hôm nay</Text>
+        <Text style={styles.sectionTitle}>Lịch học hôm nay ({getDayName(todayThu)})</Text>
         <View style={styles.card}>
-          <View style={styles.scheduleItem}>
-            <View style={styles.timeBlock}>
-              <Text style={styles.timeText}>07:00</Text>
-              <Text style={styles.periodText}>Tiết 1</Text>
-            </View>
-            <View style={styles.scheduleInfo}>
-              <Text style={styles.subjectText}>Toán Học</Text>
-              <Text style={styles.teacherText}>GV: Nguyễn Văn A</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.scheduleItem}>
-            <View style={styles.timeBlock}>
-              <Text style={styles.timeText}>07:50</Text>
-              <Text style={styles.periodText}>Tiết 2</Text>
-            </View>
-            <View style={styles.scheduleInfo}>
-              <Text style={styles.subjectText}>Ngữ Văn</Text>
-              <Text style={styles.teacherText}>GV: Trần Thị B</Text>
-            </View>
-          </View>
+          {todaySchedule.length === 0 ? (
+             <Text style={{ textAlign: 'center', color: '#64748b', padding: 10 }}>Không có lịch học hôm nay.</Text>
+          ) : (
+            todaySchedule.map((item: any, index: number) => (
+              <React.Fragment key={item.id}>
+                <View style={styles.scheduleItem}>
+                  <View style={styles.timeBlock}>
+                    <Text style={styles.periodText}>Tiết {item.tietBatDau}</Text>
+                    {item.soTiet > 1 && <Text style={{fontSize: 10, color: '#94a3b8'}}>(Đến tiết {item.tietBatDau + item.soTiet - 1})</Text>}
+                  </View>
+                  <View style={styles.scheduleInfo}>
+                    <Text style={styles.subjectText}>{item.monHoc?.tenMon || 'Sinh hoạt'}</Text>
+                    {item.giaoVien && <Text style={styles.teacherText}>GV: {item.giaoVien.hoTen}</Text>}
+                  </View>
+                </View>
+                {index < todaySchedule.length - 1 && <View style={styles.divider} />}
+              </React.Fragment>
+            ))
+          )}
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+      {/* Chat FAB */}
+      <TouchableOpacity 
+        style={styles.chatFab}
+        onPress={() => router.push('/(parent)/chat')}
+      >
+        <Ionicons name="chatbubble-ellipses" size={24} color="#ffffff" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -81,6 +127,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    paddingBottom: 80, // Extra padding for FAB
   },
   header: {
     flexDirection: 'row',
@@ -123,11 +170,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     marginTop: 2,
-  },
-  logoutBtn: {
-    padding: 8,
-    backgroundColor: '#fee2e2',
-    borderRadius: 12,
   },
   section: {
     marginBottom: 24,
@@ -214,5 +256,21 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f1f5f9',
     marginVertical: 12,
+  },
+  chatFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2563eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
 });

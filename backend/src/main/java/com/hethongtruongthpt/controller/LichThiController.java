@@ -2,6 +2,7 @@ package com.hethongtruongthpt.controller;
 
 import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.entity.LichThi;
+import com.hethongtruongthpt.dto.AutoGenerateExamRequest;
 import com.hethongtruongthpt.service.LichThiService;
 import com.hethongtruongthpt.service.LichThiPdfService;
 import jakarta.validation.Valid;
@@ -47,6 +48,13 @@ public class LichThiController {
 		return ResponseEntity.ok(ApiResponse.ok(lichThiService.getByLopId(lopId)));
 	}
 
+	@GetMapping("/action/check-exam-week")
+	public ResponseEntity<ApiResponse<Boolean>> checkExamWeek(
+			@RequestParam String namHoc,
+			@RequestParam Integer tuan) {
+		return ResponseEntity.ok(ApiResponse.ok(lichThiService.isExamWeek(namHoc, tuan)));
+	}
+
 	@GetMapping("/{id}")
 	public ResponseEntity<ApiResponse<LichThi>> getById(@PathVariable Integer id) {
 		return ResponseEntity.ok(ApiResponse.ok(lichThiService.getById(id)));
@@ -60,6 +68,13 @@ public class LichThiController {
 	@PutMapping("/{id}")
 	public ResponseEntity<ApiResponse<LichThi>> update(@PathVariable Integer id, @Valid @RequestBody LichThi lichThi) {
 		return ResponseEntity.ok(ApiResponse.ok(lichThiService.update(id, lichThi)));
+	}
+
+	@PostMapping("/auto-generate")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<ApiResponse<String>> autoGenerate(@RequestBody AutoGenerateExamRequest request) {
+		lichThiService.autoGenerate(request);
+		return ResponseEntity.ok(ApiResponse.ok("Tạo lịch thi tự động thành công", null));
 	}
 
 	@DeleteMapping("/{id}")

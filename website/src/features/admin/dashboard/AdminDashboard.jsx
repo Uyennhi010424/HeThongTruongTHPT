@@ -342,7 +342,7 @@ export default function AdminDashboard() {
       {/* 2. Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-2">
             <TypewriterText text={`Chào mừng trở lại, ${adminName}`} />
           </h1>
           <p className="text-slate-500 mt-1 font-medium">Cập nhật dữ liệu mới nhất của trường hôm nay</p>
@@ -375,7 +375,7 @@ export default function AdminDashboard() {
                       {card.isLoading ? (
                         <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${bgColors[card.color].split(' ')[1]}`}></div>
                       ) : (
-                        <h4 className="text-2xl font-bold text-slate-900"><CountUp end={card.value} isNumber={!isNaN(Number(card.value))} decimals={card.label === "Điểm trung bình" && !isNaN(Number(card.value)) ? 2 : 0} /></h4>
+                        <h4 className="text-2xl font-extrabold text-blue-900 tracking-tight"><CountUp end={card.value} isNumber={!isNaN(Number(card.value))} decimals={card.label === "Điểm trung bình" && !isNaN(Number(card.value)) ? 2 : 0} /></h4>
                       )}
                     </div>
                   </div>
@@ -396,7 +396,7 @@ export default function AdminDashboard() {
         {/* Bar Chart (70%) */}
         <div className="lg:w-[70%] h-[420px] rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-900">Điểm trung bình theo khối (Năm học hiện tại)</h3>
+            <h3 className="text-lg font-bold text-blue-900">Điểm trung bình theo khối (Năm học hiện tại)</h3>
           </div>
           <div className="flex-1 w-full relative">
             {chartLoading ? (
@@ -427,7 +427,7 @@ export default function AdminDashboard() {
         {/* Pie Chart (30%) */}
         <div className="lg:w-[30%] h-[420px] rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-900">Xếp loại học lực (Cả năm)</h3>
+            <h3 className="text-lg font-bold text-blue-900">Xếp loại học lực (Cả năm)</h3>
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center relative">
@@ -494,7 +494,7 @@ export default function AdminDashboard() {
         {/* Card 1: Lớp học gần đây */}
         <div className="rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col h-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Lớp học gần đây</h3>
+            <h3 className="text-lg font-bold text-blue-900">Lớp học gần đây</h3>
             <Link to="/admin/lop" className="text-[#2563eb] text-sm font-bold hover:underline">Xem tất cả</Link>
           </div>
           <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
@@ -511,7 +511,7 @@ export default function AdminDashboard() {
         {/* Card 2: Thông báo mới */}
         <div className="rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col h-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Thông báo mới</h3>
+            <h3 className="text-lg font-bold text-blue-900">Thông báo mới</h3>
             <button className="text-[#2563eb] text-sm font-bold hover:underline">Thêm</button>
           </div>
           <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
@@ -537,7 +537,7 @@ export default function AdminDashboard() {
         {/* Card 3: Giáo viên mới */}
         <div className="rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col h-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Giáo viên mới</h3>
+            <h3 className="text-lg font-bold text-blue-900">Giáo viên mới</h3>
             <Link to="/admin/giaovien" className="text-[#2563eb] text-sm font-bold hover:underline">Quản lý</Link>
           </div>
           <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
@@ -614,3 +614,4 @@ function RecentClassesList({ classes = [], siSoByLopId = {}, homeroomByClassId =
     </>
   );
 }
+

@@ -509,4 +509,42 @@ public class HocSinhService {
             }
         }
     }
+
+    @Transactional
+    public HocSinh transferClass(Integer id, Integer newLopId) {
+        HocSinh hs = hocSinhRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh"));
+        Integer oldLopId = hs.getLop() != null ? hs.getLop().getId() : null;
+        LopHoc newLop = lopHocRepository.findById(newLopId).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học"));
+        
+        if (hs.getLop() != null && !hs.getLop().getKhoi().equals(newLop.getKhoi())) {
+            throw new ApiException("Chỉ được phép chuyển sang lớp thuộc cùng khối " + hs.getLop().getKhoi());
+        }
+        
+        hs.setLop(newLop);
+        HocSinh updated = hocSinhRepository.save(hs);
+        
+        if (oldLopId != null) refreshSiSo(oldLopId);
+        refreshSiSo(newLopId);
+        
+        return updated;
+    }
+
+    @Transactional
+    public HocSinh transferSchool(Integer id, String truongMoi) {
+        HocSinh hs = hocSinhRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh"));
+        Integer oldLopId = hs.getLop() != null ? hs.getLop().getId() : null;
+        
+        hs.setTrangThai(3);
+        hs.setTruongChuyenDen(truongMoi);
+        
+        if (hs.getUser() != null) {
+            hs.getUser().setIsActive(false);
+            userRepository.save(hs.getUser());
+        }
+        
+        HocSinh updated = hocSinhRepository.save(hs);
+        if (oldLopId != null) refreshSiSo(oldLopId);
+        
+        return updated;
+    }
 }

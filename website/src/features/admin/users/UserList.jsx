@@ -220,7 +220,7 @@ const UserDetailDrawer = ({ user, activeTab: initialTab, onClose }) => {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-white">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Chi tiết tài khoản</h2>
+            <h2 className="text-xl font-bold text-blue-900">Chi tiết tài khoản</h2>
             <p className="text-sm text-slate-500 mt-1">{user.username}</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
@@ -255,7 +255,7 @@ const UserDetailDrawer = ({ user, activeTab: initialTab, onClose }) => {
                   {user.username.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">{user.username}</h3>
+                  <h3 className="text-lg font-bold text-blue-900">{user.username}</h3>
                   <p className="text-sm text-slate-500">{user.email}</p>
                 </div>
               </div>
@@ -516,7 +516,7 @@ export default function UserList() {
       {/* Header & Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Quản lý tài khoản</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Quản lý tài khoản</h1>
           <p className="mt-1 text-sm font-medium text-slate-500">
             Quản trị viên quản lý danh sách tài khoản và phân quyền hệ thống.
           </p>
@@ -579,7 +579,7 @@ export default function UserList() {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-4">
                        <Search className="w-8 h-8 text-slate-300" />
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900">Không tìm thấy tài khoản</h3>
+                    <h3 className="text-sm font-bold text-blue-900">Không tìm thấy tài khoản</h3>
                     <p className="text-sm text-slate-500 mt-1">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
                   </td>
                 </tr>
@@ -719,3 +719,4 @@ export default function UserList() {
     </div>
   );
 }
+

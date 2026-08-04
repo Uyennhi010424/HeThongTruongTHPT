@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getThoiKhoaBieu } from "../../api/thoikhoabieuApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { formatDate, getDayLabel } from "../../utils/helpers.js";
+import { formatDate, getDayLabel, getCurrentSemesterWeek } from "../../utils/helpers.js";
 import { getLichThi, getLichThiByLop } from "../../api/lichthiApi.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
@@ -11,20 +11,13 @@ export default function TimetableFollow() {
   const [timetable, setTimetable] = useState([]);
   const [exams, setExams] = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
+  const [isExamWeek, setIsExamWeek] = useState(false);
   const [dataError, setDataError] = useState("");
   const [selectedTuan, setSelectedTuan] = useState(1);
+  // Lưu thông tin năm học / học kỳ từ database để dùng khi chuyển tuần
+  const [yearInfo, setYearInfo] = useState({ tenNamHoc: "", hocKy: 1, activeYearObj: null });
 
-  const getDefaultTuan = (ngayBatDauHk1) => {
-    if (!ngayBatDauHk1) return 1;
-    const schoolStart = new Date(ngayBatDauHk1 + "T00:00:00");
-    const dayOfWeek = schoolStart.getDay();
-    const monday = new Date(schoolStart);
-    monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    const now = new Date();
-    const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return 1;
-    return Math.max(1, Math.floor(diffDays / 7) + 1);
-  };
+  const isInitialLoad = useRef(true);
 
   useEffect(() => {
     if (!currentStudent) return;
@@ -37,26 +30,49 @@ export default function TimetableFollow() {
 
         const lopId = currentStudent?.lop?.id;
 
-        let ngayBatDauHk1 = null;
+        // Lấy thông tin năm học từ database thay vì tính theo tháng hệ thống
+        let curNamHoc = "";
+        let curHocKy = 1;
+        let activeYearObj = null;
         try {
           const namHocRes = await getNamHoc();
           const years = namHocRes?.data?.data || [];
-          const currentYear = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1];
-          ngayBatDauHk1 = currentYear?.ngayBatDauHk1 || null;
+          activeYearObj = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1] || null;
+          if (activeYearObj) {
+            curNamHoc = activeYearObj.tenNamHoc || "";
+            // Xác định học kỳ hiện tại bằng ngày bắt đầu HK2 từ database
+            if (activeYearObj.ngayBatDauHk2) {
+              const today = new Date().toISOString().slice(0, 10);
+              if (today >= activeYearObj.ngayBatDauHk2) curHocKy = 2;
+            }
+          }
         } catch { /* ignore */ }
 
-        setSelectedTuan(getDefaultTuan(ngayBatDauHk1));
+        // Tính tuần hiện tại từ ngayBatDauHk1 trong database
+        const currentTuan = getCurrentSemesterWeek(activeYearObj);
 
+        // Đánh dấu đang load lần đầu để useEffect tuần không trigger trùng lặp
+        isInitialLoad.current = true;
+        setYearInfo({ tenNamHoc: curNamHoc, hocKy: curHocKy, activeYearObj });
+        setSelectedTuan(currentTuan);
+
+        // Lấy TKB với đầy đủ filter: lopId + namHoc + hocKy + tuan (chỉ lấy đúng tuần hiện tại)
         const [tkbRes, examRes] = await Promise.all([
-          lopId ? getThoiKhoaBieu({ lopId }) : getThoiKhoaBieu(),
+          lopId
+            ? getThoiKhoaBieu({ lopId, namHoc: curNamHoc, hocKy: curHocKy, tuan: currentTuan })
+            : getThoiKhoaBieu(),
           lopId ? getLichThiByLop(lopId) : getLichThi()
         ]);
         if (!active) return;
         setTimetable(tkbRes?.data?.data || []);
+        setIsExamWeek(tkbRes?.data?.message === "TUAN_THI");
         setExams(examRes?.data?.data || []);
+        // Hoàn thành load lần đầu
+        isInitialLoad.current = false;
       } catch {
         if (!active) return;
         setDataError("Không thể tải lịch học hoặc lịch thi.");
+        isInitialLoad.current = false;
       } finally {
         if (active) setDataLoading(false);
       }
@@ -66,12 +82,40 @@ export default function TimetableFollow() {
     return () => { active = false; };
   }, [currentStudent?.id]);
 
+  // Khi phụ huynh chuyển sang tuần khác, refetch TKB từ server với tuan mới
+  // Bỏ qua lần trigger đầu tiên khi mới load (isInitialLoad.current = true)
+  useEffect(() => {
+    if (!yearInfo.tenNamHoc || !currentStudent?.lop?.id) return;
+    if (isInitialLoad.current) return;
+    let active = true;
+    const lopId = currentStudent.lop.id;
+    const refetchByWeek = async () => {
+      try {
+        setDataLoading(true);
+        const res = await getThoiKhoaBieu({
+          lopId,
+          namHoc: yearInfo.tenNamHoc,
+          hocKy: yearInfo.hocKy,
+          tuan: selectedTuan
+        });
+        if (!active) return;
+        setTimetable(res?.data?.data || []);
+        setIsExamWeek(res?.data?.message === "TUAN_THI");
+      } catch { /* ignore */ } finally {
+        if (active) setDataLoading(false);
+      }
+    };
+    refetchByWeek();
+    return () => { active = false; };
+  }, [selectedTuan, yearInfo.tenNamHoc, yearInfo.hocKy, currentStudent?.lop?.id]);
+
   const loading = studentsLoading || dataLoading;
   const error = studentsError || dataError;
 
+  // Server đã lọc theo tuan nên không cần lọc client-side theo tuan nữa
   const filteredTimetable = useMemo(() => {
-    return timetable.filter((item) => Number(item?.tuan) === selectedTuan);
-  }, [timetable, selectedTuan]);
+    return timetable;
+  }, [timetable]);
 
   const stats = useMemo(() => {
     const totalLessons = filteredTimetable.length;
@@ -81,17 +125,24 @@ export default function TimetableFollow() {
 
   return (
     <div className="page users-page student-page">
-      <section className="student-hero card">
-        <div className="student-hero-copy">
-          <div className="student-hero-kicker">EduManager Pro</div>
-          <h2 className="student-hero-title">Thời khóa biểu</h2>
-          <p className="student-hero-subtitle">Xem lịch học và lịch thi của con em.</p>
+      <div className="mb-6 shrink-0 border-b border-slate-200 pb-4">
+        <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
+          Thời khóa biểu
+        </h2>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-slate-500 text-[14px]">
+            Xem lịch học và lịch thi của con em.
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold border border-blue-100">
+              {loading ? "..." : stats.totalLessons} tiết học
+            </div>
+            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold border border-blue-100">
+              {loading ? "..." : stats.totalExams} lịch thi
+            </div>
+          </div>
         </div>
-        <div className="student-hero-metrics">
-          <div className="student-hero-chip">{loading ? "..." : stats.totalLessons} tiết học</div>
-          <div className="student-hero-chip">{loading ? "..." : stats.totalExams} lịch thi</div>
-        </div>
-      </section>
+      </div>
 
       <StudentSelector students={students} selectedIndex={selectedIndex} onSelect={selectStudent} />
 
@@ -124,16 +175,24 @@ export default function TimetableFollow() {
             Tuần sau
           </button>
         </div>
-        <div className="table-grid">
-          <div className="table-row table-head">
-            <div>STT</div>
-            <div>Thứ</div>
-            <div>Tiết bắt đầu</div>
-            <div>Số tiết</div>
-            <div>Ghi chú</div>
+        {isExamWeek ? (
+          <div style={{ padding: "40px", textAlign: "center", background: "#fef2f2", borderRadius: 8, margin: 16 }}>
+            <h3 style={{ color: "#ef4444", fontSize: 20, margin: 0 }}>TUẦN NÀY LÀ TUẦN THI</h3>
+            <p style={{ color: "#7f1d1d", marginTop: 8 }}>Vui lòng kiểm tra mục Lịch thi bên dưới để biết chi tiết.</p>
           </div>
-          {loading
-            ? Array.from({ length: 4 }).map((_, index) => (
+        ) : !loading && filteredTimetable.length === 0 ? (
+          <div className="table-empty">Chưa có lịch học.</div>
+        ) : (
+          <div className="table-grid">
+            <div className="table-row table-head">
+              <div>STT</div>
+              <div>Thứ</div>
+              <div>Tiết bắt đầu</div>
+              <div>Số tiết</div>
+              <div>Ghi chú</div>
+            </div>
+            {loading ? (
+              Array.from({ length: 4 }).map((_, index) => (
                 <div className="table-row" key={`skeleton-${index}`}>
                   <div className="skeleton" />
                   <div className="skeleton" />
@@ -142,7 +201,8 @@ export default function TimetableFollow() {
                   <div className="skeleton" />
                 </div>
               ))
-            : filteredTimetable.map((item, index) => (
+            ) : (
+              filteredTimetable.map((item, index) => (
                 <div className="table-row" key={item.id}>
                   <div className="table-id">{index + 1}</div>
                   <div className="table-title">{getDayLabel(item.thu)}</div>
@@ -150,8 +210,10 @@ export default function TimetableFollow() {
                   <div className="table-title">{item.soTiet ?? "--"}</div>
                   <div className="table-meta">{item.ghiChu || ""}</div>
                 </div>
-              ))}
-        </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="card users-table student-card">
@@ -162,37 +224,38 @@ export default function TimetableFollow() {
           </div>
           <div className="panel-pill">{exams.length} lịch thi</div>
         </div>
-        {!error && !loading && exams.length === 0 && (
+        {!error && !loading && exams.length === 0 ? (
           <div className="table-empty">Chưa có lịch thi.</div>
-        )}
-        <div className="table-grid">
-          <div className="table-row table-head">
-            <div>STT</div>
-            <div>Ngày thi</div>
-            <div>Giờ bắt đầu</div>
-            <div>Thời gian (phút)</div>
-            <div>Phòng thi</div>
+        ) : (
+          <div className="table-grid">
+            <div className="table-row table-head">
+              <div>STT</div>
+              <div>Ngày thi</div>
+              <div>Giờ bắt đầu</div>
+              <div>Thời gian (phút)</div>
+              <div>Phòng thi</div>
+            </div>
+            {loading
+              ? Array.from({ length: 3 }).map((_, index) => (
+                  <div className="table-row" key={`skeleton-${index}`}>
+                    <div className="skeleton" />
+                    <div className="skeleton" />
+                    <div className="skeleton" />
+                    <div className="skeleton" />
+                    <div className="skeleton" />
+                  </div>
+                ))
+              : exams.map((item, index) => (
+                  <div className="table-row" key={item.id}>
+                    <div className="table-id">{index + 1}</div>
+                    <div className="table-title">{formatDate(item.ngayThi) || "--"}</div>
+                    <div className="table-title">{item.gioBatDau || "--"}</div>
+                    <div className="table-title">{item.thoiGianLamBai ?? "--"}</div>
+                    <div className="table-title">{item.phongThi || "--"}</div>
+                  </div>
+                ))}
           </div>
-          {loading
-            ? Array.from({ length: 3 }).map((_, index) => (
-                <div className="table-row" key={`skeleton-${index}`}>
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                </div>
-              ))
-            : exams.map((item, index) => (
-                <div className="table-row" key={item.id}>
-                  <div className="table-id">{index + 1}</div>
-                  <div className="table-title">{formatDate(item.ngayThi) || "--"}</div>
-                  <div className="table-title">{item.gioBatDau || "--"}</div>
-                  <div className="table-title">{item.thoiGianLamBai ?? "--"}</div>
-                  <div className="table-title">{item.phongThi || "--"}</div>
-                </div>
-              ))}
-        </div>
+        )}
       </div>
     </div>
   );

@@ -6,6 +6,9 @@ import HocSinhFormModal from "./HocSinhFormModal.jsx";
 import HocSinhExcelImportModal from "./HocSinhExcelImportModal.jsx";
 import HocSinhViewModal from "./HocSinhViewModal.jsx";
 
+import HocSinhTransferClassModal from "./HocSinhTransferClassModal.jsx";
+import HocSinhTransferSchoolModal from "./HocSinhTransferSchoolModal.jsx";
+
 export default function HocSinhList() {
   const hooks = useHocSinhList();
   
@@ -13,7 +16,7 @@ export default function HocSinhList() {
     <div className="min-h-screen bg-[#F8FAFC] pb-12 font-sans text-slate-900">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Danh mục học sinh</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Danh mục học sinh</h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">Quản lý thông tin, lớp học và trạng thái học sinh.</p>
         </div>
 
@@ -78,6 +81,9 @@ export default function HocSinhList() {
       <HocSinhFormModal hooks={hooks} />
       <HocSinhExcelImportModal hooks={hooks} />
       <HocSinhViewModal hooks={hooks} />
+      <HocSinhTransferClassModal hooks={hooks} />
+      <HocSinhTransferSchoolModal hooks={hooks} />
     </div>
   );
 }
+

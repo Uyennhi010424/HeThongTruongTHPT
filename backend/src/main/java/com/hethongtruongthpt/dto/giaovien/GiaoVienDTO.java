@@ -16,6 +16,7 @@ public class GiaoVienDTO {
     private String username;
     private Boolean isGvcn;
     private String tenLopChuNhiem;
+    private Integer lopChuNhiemId;
     private String anhDaiDien;
 
     public Integer getId() {
@@ -128,5 +129,13 @@ public class GiaoVienDTO {
 
     public void setAnhDaiDien(String anhDaiDien) {
         this.anhDaiDien = anhDaiDien;
+    }
+
+    public Integer getLopChuNhiemId() {
+        return lopChuNhiemId;
+    }
+
+    public void setLopChuNhiemId(Integer lopChuNhiemId) {
+        this.lopChuNhiemId = lopChuNhiemId;
     }
 }

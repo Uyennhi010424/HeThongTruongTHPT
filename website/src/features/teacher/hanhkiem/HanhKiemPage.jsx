@@ -237,7 +237,7 @@ export default function HanhKiemPage() {
           {/* Header & Filters */}
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 16, paddingBottom: 16, borderBottom: "1px solid #e5e7eb" }}>
             <div>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0f172a", margin: 0 }}>Đánh giá hạnh kiểm</h1>
+              <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", letterSpacing: "-0.025em", margin: 0 }}>Đánh giá hạnh kiểm</h1>
               <p style={{ color: "#64748b", margin: "4px 0 0 0", fontSize: 14 }}>
                 Chọn lớp để hiển thị danh sách học sinh và đánh giá
                 {lastSavedAt ? ` · Cập nhật lúc ${lastSavedAt}` : ""}
@@ -397,3 +397,4 @@ export default function HanhKiemPage() {
     </div>
   );
 }
+

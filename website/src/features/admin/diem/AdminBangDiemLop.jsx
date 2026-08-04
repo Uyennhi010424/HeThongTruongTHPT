@@ -289,7 +289,7 @@ export default function AdminBangDiemLop() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">
+            <h1 className="text-xl font-bold text-blue-900">
               Bảng điểm lớp {classInfo?.tenLop || ""}
             </h1>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
@@ -473,7 +473,7 @@ const tdC = () => ({
   padding: "9px 12px",
   textAlign: "center",
   whiteSpace: "nowrap",
-  color: "#1e293b",
+  color: "#1e3a8a",
   fontSize: 14,
 });
 
@@ -481,6 +481,6 @@ const tdL = () => ({
   padding: "9px 12px",
   textAlign: "left",
   whiteSpace: "nowrap",
-  color: "#1e293b",
+  color: "#1e3a8a",
   fontSize: 14,
 });

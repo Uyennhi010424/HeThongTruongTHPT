@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface GiaoVienRepository extends JpaRepository<GiaoVien, Integer> {
     Optional<GiaoVien> findByMaGiaoVien(String maGiaoVien);
     Optional<GiaoVien> findByUserId(Integer userId);
+    Optional<GiaoVien> findByUserUsername(String username);
 }

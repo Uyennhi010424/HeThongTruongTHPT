@@ -16,6 +16,7 @@ public interface LichThiRepository extends JpaRepository<LichThi, Integer> {
     List<LichThi> findByLopIdAndHocKyAndNamHoc(Integer lopId, Integer hocKy, String namHoc);
     List<LichThi> findByLopId(Integer lopId);
     List<LichThi> findByNgayThiBetween(LocalDate startDate, LocalDate endDate);
+    void deleteByNgayThiBetween(LocalDate startDate, LocalDate endDate);
     List<LichThi> findByLoaiKiemTra(String loaiKiemTra);
 
     // Kiểm tra trùng lịch thi: cùng lớp, cùng môn, cùng loại kiểm tra, cùng học kỳ

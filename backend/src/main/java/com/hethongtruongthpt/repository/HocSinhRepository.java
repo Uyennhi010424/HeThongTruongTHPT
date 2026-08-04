@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface HocSinhRepository extends JpaRepository<HocSinh, Integer> {
     Optional<HocSinh> findByMaHocSinh(String maHocSinh);
+    Optional<HocSinh> findByUserUsername(String username);
     @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l LEFT JOIN FETCH l.gvcn g WHERE h.user.id = :userId")
     Optional<HocSinh> findByUserId(@Param("userId") Integer userId);
     Optional<HocSinh> findByEmailIgnoreCase(String email);

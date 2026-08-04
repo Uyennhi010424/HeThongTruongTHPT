@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import {
   createHocSinh,
   deleteHocSinh,
   getHocSinh,
-  updateHocSinh
+  updateHocSinh,
+  transferClass,
+  transferSchool
 } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
 import { createPhuHuynh, getPhuHuynh, updatePhuHuynh } from "../../../api/phuhuynhApi.js";
@@ -184,6 +186,9 @@ export function useHocSinhList() {
   const [formError, setFormError] = useState("");
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingStudent, setViewingStudent] = useState(null);
+  const [transferClassModalOpen, setTransferClassModalOpen] = useState(false);
+  const [transferSchoolModalOpen, setTransferSchoolModalOpen] = useState(false);
+  const [transferringStudent, setTransferringStudent] = useState(null);
 
   const ensureStudentUserAccount = async (student, fallbackFullName = "") => {
     const candidate =
@@ -258,7 +263,7 @@ export function useHocSinhList() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [refreshToggle]);
 
   const stats = useMemo(() => {
     const total = students.length;
@@ -276,7 +281,7 @@ export function useHocSinhList() {
             .some((field) => field.toLowerCase().includes(lower))
         : true;
 
-      const studentGrade = String(student?.lopHoc?.khoi || "");
+      const studentGrade = String(student?.lopHoc?.khoi || student?.lop?.khoi || "");
       const studentClassId = String(student?.lopHoc?.id || student?.lop?.id || "");
 
       const matchGrade = gradeFilter === "all" ? true : studentGrade === gradeFilter;
@@ -440,13 +445,52 @@ export function useHocSinhList() {
     })();
   };
 
+  const submitTransferClass = async (lopId) => {
+    if (!transferringStudent) return;
+    try {
+      await transferClass(transferringStudent.id, lopId);
+      
+      const newLop = classes.find(c => String(c.id) === String(lopId));
+      if (newLop) {
+        setStudents(prev => prev.map(s => s.id === transferringStudent.id ? { ...s, lop: newLop, lopHoc: newLop } : s));
+      }
+
+      notifySuccess("Chuyển lớp thành công!");
+      setTransferClassModalOpen(false);
+      setTransferringStudent(null);
+      // Optional: handleRefresh(); // Skip refresh to avoid loading skeleton flash
+    } catch (err) {
+      notifyError("Lỗi khi chuyển lớp: " + extractBackendError(err));
+    }
+  };
+
+  const submitTransferSchool = async (truongMoi) => {
+    if (!transferringStudent) return;
+    if (!truongMoi?.trim()) {
+      notifyError("Vui lòng nhập tên trường chuyển đến");
+      return;
+    }
+    try {
+      await transferSchool(transferringStudent.id, truongMoi);
+      
+      setStudents(prev => prev.map(s => s.id === transferringStudent.id ? { ...s, trangThai: 3, truongChuyenDen: truongMoi } : s));
+
+      notifySuccess("Chuyển trường thành công!");
+      setTransferSchoolModalOpen(false);
+      setTransferringStudent(null);
+      // Optional: handleRefresh();
+    } catch (err) {
+      notifyError("Lỗi khi chuyển trường: " + extractBackendError(err));
+    }
+  };
+
   const handleDelete = async (student) => {
     if (!(await confirm(`Xóa học sinh ${student.hoTen}?`))) return;
     try {
       await deleteHocSinh(student.id);
-      setStudents((prev) => prev.filter((item) => item.id !== student.id));
-      setError("");
-      setSuccessMessage("Xóa học sinh thành công.");
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, trangThai: 0 } : s));
+      notifySuccess("Đã cập nhật trạng thái ngừng học");
+      // Optional: handleRefresh();
     } catch (err) {
       setError("Không thể xóa học sinh.");
       setSuccessMessage("");
@@ -659,6 +703,56 @@ export function useHocSinhList() {
     const worksheet = XLSX.utils.json_to_sheet(templateRows, {
       header: EXCEL_TEMPLATE_COLUMNS
     });
+
+    // Style the header row (row 1)
+    for (let i = 0; i < EXCEL_TEMPLATE_COLUMNS.length; i++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: i });
+      if (!worksheet[cellAddress]) continue;
+      worksheet[cellAddress].s = {
+        fill: {
+          fgColor: { rgb: "4F81BD" } // Màu nền xanh biển
+        },
+        font: {
+          name: "Arial",
+          sz: 11,
+          color: { rgb: "FFFFFF" }, // Chữ trắng
+          bold: true
+        },
+        alignment: {
+          vertical: "center",
+          horizontal: "center",
+          wrapText: true
+        },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      };
+    }
+
+    // Căn chỉnh độ rộng cột cho đẹp
+    worksheet["!cols"] = [
+      { wch: 25 }, // Họ tên
+      { wch: 15 }, // Ngày sinh
+      { wch: 10 }, // Giới tính
+      { wch: 10 }, // Lớp
+      { wch: 15 }, // Số điện thoại
+      { wch: 35 }, // Địa chỉ
+      { wch: 15 }, // Năm nhập học
+      { wch: 20 }, // Mã BHYT
+      { wch: 10 }, // Dân tộc
+      { wch: 10 }, // Tôn giáo
+      { wch: 15 }, // Diện chính sách
+      { wch: 15 }, // Trạng thái
+      { wch: 25 }, // Phụ huynh - Họ tên
+      { wch: 15 }, // Phụ huynh - SĐT
+      { wch: 30 }, // Phụ huynh - Email
+      { wch: 20 }, // Phụ huynh - Nghề nghiệp
+      { wch: 20 }  // ID phụ huynh
+    ];
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "HocSinh");
     XLSX.writeFile(workbook, "mau_nhap_hoc_sinh_viet_hoa.xlsx");
@@ -1105,6 +1199,9 @@ export function useHocSinhList() {
     formError, setFormError,
     viewModalOpen, setViewModalOpen,
     viewingStudent, setViewingStudent,
+    transferClassModalOpen, setTransferClassModalOpen,
+    transferSchoolModalOpen, setTransferSchoolModalOpen,
+    transferringStudent, setTransferringStudent,
     filteredStudents,
     classesByGrade,
     filteredClasses,
@@ -1115,6 +1212,8 @@ export function useHocSinhList() {
     handleDelete,
     handleSubmit,
     handleDownloadTemplate,
-    handleExcelUpload
+    handleExcelUpload,
+    submitTransferClass,
+    submitTransferSchool
   };
 }

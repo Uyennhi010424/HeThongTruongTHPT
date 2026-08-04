@@ -21,6 +21,8 @@ public class DashboardDataDTO {
     private Map<String, Object> attendanceStats;
     private List<SubjectScoreDTO> subjectScores;
     private Double gpa;
+    private Integer baiKiemTraCount;
+    private boolean examWeek;
 
     public static class SubjectScoreDTO {
         private Integer monHocId;
@@ -178,5 +180,21 @@ public class DashboardDataDTO {
 
     public void setGpa(Double gpa) {
         this.gpa = gpa;
+    }
+
+    public Integer getBaiKiemTraCount() {
+        return baiKiemTraCount;
+    }
+
+    public void setBaiKiemTraCount(Integer baiKiemTraCount) {
+        this.baiKiemTraCount = baiKiemTraCount;
+    }
+
+    public boolean isExamWeek() {
+        return examWeek;
+    }
+
+    public void setExamWeek(boolean examWeek) {
+        this.examWeek = examWeek;
     }
 }

@@ -58,7 +58,7 @@ export default function ChangePassword() {
     <div className="w-full h-full flex flex-col font-sans p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-6 shrink-0">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+        <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">
           Đổi mật khẩu
         </h1>
         <p className="mt-1.5 text-sm font-medium text-slate-500">
@@ -145,3 +145,4 @@ export default function ChangePassword() {
     </div>
   );
 }
+

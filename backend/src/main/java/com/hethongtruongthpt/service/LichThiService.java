@@ -4,6 +4,16 @@ import com.hethongtruongthpt.entity.LichThi;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.LichThiRepository;
+import com.hethongtruongthpt.dto.AutoGenerateExamRequest;
+import com.hethongtruongthpt.entity.LopHoc;
+import com.hethongtruongthpt.entity.MonHoc;
+import com.hethongtruongthpt.entity.NamHoc;
+import com.hethongtruongthpt.repository.LopHocRepository;
+import com.hethongtruongthpt.repository.MonHocRepository;
+import com.hethongtruongthpt.repository.NamHocRepository;
+import com.hethongtruongthpt.repository.ThoiKhoaBieuRepository;
+import com.hethongtruongthpt.repository.GiaoVienRepository;
+import com.hethongtruongthpt.entity.GiaoVien;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -11,16 +21,34 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class LichThiService {
     private final LichThiRepository lichThiRepository;
+    private final LopHocRepository lopHocRepository;
+    private final MonHocRepository monHocRepository;
+    private final ThoiKhoaBieuRepository thoiKhoaBieuRepository;
+    private final NamHocRepository namHocRepository;
+    private final GiaoVienRepository giaoVienRepository;
 
-    public LichThiService(LichThiRepository lichThiRepository) {
+    public LichThiService(LichThiRepository lichThiRepository,
+                          LopHocRepository lopHocRepository,
+                          MonHocRepository monHocRepository,
+                          ThoiKhoaBieuRepository thoiKhoaBieuRepository,
+                          NamHocRepository namHocRepository,
+                          GiaoVienRepository giaoVienRepository) {
         this.lichThiRepository = lichThiRepository;
+        this.lopHocRepository = lopHocRepository;
+        this.monHocRepository = monHocRepository;
+        this.thoiKhoaBieuRepository = thoiKhoaBieuRepository;
+        this.namHocRepository = namHocRepository;
+        this.giaoVienRepository = giaoVienRepository;
     }
 
     public List<LichThi> getAll() {
@@ -64,6 +92,93 @@ public class LichThiService {
         checkRoomConflict(lichThi, id);
         lichThi.setId(id);
         return lichThiRepository.save(lichThi);
+    }
+
+    @Transactional
+    public void autoGenerate(AutoGenerateExamRequest request) {
+        String namHocStr = request.getNamHoc();
+        Integer hocKy = request.getHocKy();
+        Integer tuan = request.getTuan();
+        String loaiKiemTra = request.getLoaiKiemTra();
+
+        // Xóa sạch thời khóa biểu học của tuần này
+        thoiKhoaBieuRepository.deleteByNamHocAndHocKyAndTuan(namHocStr, hocKy, tuan);
+
+        // Tính ngày bắt đầu của tuần thi
+        NamHoc nh = namHocRepository.findByTenNamHoc(namHocStr)
+                .orElseThrow(() -> new ApiException("Không tìm thấy năm học"));
+
+        LocalDate schoolStart = nh.getNgayBatDauHk1();
+        if (schoolStart == null) {
+            int startYear = Integer.parseInt(namHocStr.split("-")[0]);
+            schoolStart = LocalDate.of(startYear, 9, 5);
+        }
+        int dow = schoolStart.getDayOfWeek().getValue();
+        LocalDate monday = schoolStart.minusDays(dow == 7 ? 6 : dow - 1);
+        LocalDate weekMonday = monday.plusDays((tuan - 1) * 7);
+
+        // Xóa sạch lịch thi cũ của tuần này
+        lichThiRepository.deleteByNgayThiBetween(weekMonday, weekMonday.plusDays(6));
+
+        List<LopHoc> allLop = lopHocRepository.findAll();
+        List<MonHoc> allMon = monHocRepository.findAll();
+        
+        List<GiaoVien> allGv = giaoVienRepository.findAll();
+        if (allGv.size() > 1) {
+            Collections.shuffle(allGv);
+        }
+        int gvIdx = 0;
+
+        // Render lịch thi: Khối thi chung môn trong ngày, 2 môn/ngày
+        for (int khoi = 10; khoi <= 12; khoi++) {
+            List<MonHoc> monHocKhoi = new ArrayList<>();
+            for (MonHoc m : allMon) {
+                if (m.getKhoiApDung() != null && m.getKhoiApDung().contains(String.valueOf(khoi))) {
+                    monHocKhoi.add(m);
+                }
+            }
+            Collections.shuffle(monHocKhoi);
+
+            int monIdx = 0;
+            for (int dayOffset = 0; dayOffset < 6; dayOffset++) { // Thứ 2 -> Thứ 7
+                LocalDate ngayThi = weekMonday.plusDays(dayOffset);
+
+                List<MonHoc> subjectForDay = new ArrayList<>();
+                if (monIdx < monHocKhoi.size()) subjectForDay.add(monHocKhoi.get(monIdx++));
+                if (monIdx < monHocKhoi.size()) subjectForDay.add(monHocKhoi.get(monIdx++));
+
+                if (subjectForDay.isEmpty()) continue;
+
+                for (LopHoc lop : allLop) {
+                    if (lop.getKhoi() == khoi) {
+                        for (int i = 0; i < subjectForDay.size(); i++) {
+                            LichThi lt = new LichThi();
+                            lt.setLop(lop);
+                            lt.setMonHoc(subjectForDay.get(i));
+                            lt.setLoaiKiemTra(loaiKiemTra);
+                            lt.setNgayThi(ngayThi);
+                            lt.setGioBatDau(i == 0 ? LocalTime.of(7, 30) : LocalTime.of(9, 30));
+                            lt.setThoiGianLamBai(45);
+                            lt.setPhongThi(lop.getTenLop()); // Phòng = Tên lớp
+                            lt.setHocKy(hocKy);
+                            lt.setNamHoc(namHocStr);
+                            
+                            if (allGv.size() > 1) {
+                                GiaoVien gt1 = allGv.get(gvIdx++ % allGv.size());
+                                GiaoVien gt2 = allGv.get(gvIdx++ % allGv.size());
+                                if (gt1.getId().equals(gt2.getId())) {
+                                    gt2 = allGv.get(gvIdx++ % allGv.size());
+                                }
+                                lt.setGiamThi1(gt1);
+                                lt.setGiamThi2(gt2);
+                            }
+
+                            lichThiRepository.save(lt);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public void delete(Integer id) {
@@ -158,5 +273,25 @@ public class LichThiService {
                 && lichThi.getGiamThi1().getId().equals(lichThi.getGiamThi2().getId())) {
             throw new ApiException("Giám thị 1 và Giám thị 2 không được trùng nhau");
         }
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public boolean isExamWeek(String namHocStr, Integer tuan) {
+        if (namHocStr == null || tuan == null) return false;
+        
+        com.hethongtruongthpt.entity.NamHoc nh = namHocRepository.findByTenNamHoc(namHocStr).orElse(null);
+        if (nh == null) return false;
+
+        java.time.LocalDate schoolStart = nh.getNgayBatDauHk1();
+        if (schoolStart == null) {
+            int startYear = Integer.parseInt(namHocStr.split("-")[0]);
+            schoolStart = java.time.LocalDate.of(startYear, 9, 5);
+        }
+        int dow = schoolStart.getDayOfWeek().getValue();
+        java.time.LocalDate monday = schoolStart.minusDays(dow == 7 ? 6 : dow - 1);
+        java.time.LocalDate weekMonday = monday.plusDays((tuan - 1) * 7);
+
+        java.util.List<LichThi> exams = lichThiRepository.findByNgayThiBetween(weekMonday, weekMonday.plusDays(6));
+        return exams != null && !exams.isEmpty();
     }
 }

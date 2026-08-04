@@ -124,7 +124,7 @@ export default function LopChuNhiem() {
 
       {/* Thông tin lớp */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingBottom: 16, borderBottom: "1px solid #e2e8f0" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: "#0f172a" }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", letterSpacing: "-0.025em" }}>
           {homeroomClass ? `Lớp ${homeroomClass.tenLop}` : "Lớp chủ nhiệm"}
         </div>
         <div style={{ fontSize: 14, color: "#64748b" }}>
@@ -309,3 +309,4 @@ export default function LopChuNhiem() {
     </div>
   );
 }
+

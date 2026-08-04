@@ -86,7 +86,7 @@ const NoticesWidget = ({ unreadNotices, attendanceRate, dtb }) => {
               </RadialBarChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-2xl font-bold text-slate-800">{attendanceRate}%</span>
+              <span className="text-2xl font-extrabold text-blue-900 tracking-tight">{attendanceRate}%</span>
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Chuyên cần</span>
             </div>
           </div>
@@ -109,3 +109,4 @@ const NoticesWidget = ({ unreadNotices, attendanceRate, dtb }) => {
 };
 
 export default NoticesWidget;
+

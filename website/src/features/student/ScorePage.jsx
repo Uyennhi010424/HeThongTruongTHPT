@@ -379,7 +379,7 @@ export default function ScorePage() {
   return (
     <div className="w-full min-h-screen bg-[#F8FAFC] pb-12">
       <div className="bg-white border-b border-slate-200 pt-8 pb-6 px-6 md:px-12">
-        <h2 className="text-2xl font-bold text-slate-800 mb-1">Bảng điểm</h2>
+        <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight mb-1">Bảng điểm</h2>
         <p className="text-sm font-medium text-slate-500">Tra cứu kết quả học tập chi tiết.</p>
       </div>
 
@@ -588,3 +588,4 @@ export default function ScorePage() {
     </div>
   );
 }
+

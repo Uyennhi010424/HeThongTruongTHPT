@@ -1,4 +1,4 @@
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, ArrowRightLeft, School } from "lucide-react";
 import { formatDate, formatPhoneDisplay, getGenderLabel } from "./hocSinhUtils.js";
 import Pagination from "../../../components/common/Pagination.jsx";
 
@@ -6,7 +6,8 @@ export default function HocSinhTable({ hooks }) {
   const {
     loading, error, successMessage, pagedStudents, 
     page, pageSize, setPageSize, totalPages, filteredStudents,
-    setPage, openEdit, handleDelete, setViewingStudent, setViewModalOpen
+    setPage, openEdit, handleDelete, setViewingStudent, setViewModalOpen,
+    setTransferClassModalOpen, setTransferSchoolModalOpen, setTransferringStudent
   } = hooks;
 
   return (
@@ -100,6 +101,11 @@ export default function HocSinhTable({ hooks }) {
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         Đang học
                       </span>
+                    ) : student.trangThai === 3 ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200" title={student.truongChuyenDen ? `Chuyển đến: ${student.truongChuyenDen}` : ""}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        Chuyển trường
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
@@ -109,6 +115,26 @@ export default function HocSinhTable({ hooks }) {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-1 transition-opacity">
+                      <button
+                        onClick={() => {
+                          setTransferringStudent(student);
+                          setTransferClassModalOpen(true);
+                        }}
+                        className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        title="Chuyển lớp"
+                      >
+                        <ArrowRightLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTransferringStudent(student);
+                          setTransferSchoolModalOpen(true);
+                        }}
+                        className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        title="Chuyển trường"
+                      >
+                        <School className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => openEdit(student)}
                         className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"

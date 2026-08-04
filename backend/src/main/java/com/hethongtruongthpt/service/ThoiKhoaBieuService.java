@@ -36,6 +36,10 @@ public class ThoiKhoaBieuService {
         return crudService.getById(id);
     }
 
+    public boolean isExamWeek(String namHoc, Integer tuan) {
+        return crudService.isExamWeek(namHoc, tuan);
+    }
+
     @CacheEvict(value = "thoiKhoaBieu", allEntries = true)
     public ThoiKhoaBieu create(ThoiKhoaBieu entity) {
         return crudService.create(entity);

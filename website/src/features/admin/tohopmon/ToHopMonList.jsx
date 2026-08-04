@@ -93,7 +93,7 @@ const SubjectDetailDrawer = ({ item, onClose }) => {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50 shrink-0">
-            <h2 className="text-lg font-bold text-slate-900">Chi tiết tổ hợp môn</h2>
+            <h2 className="text-lg font-bold text-blue-900">Chi tiết tổ hợp môn</h2>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
               <X className="w-5 h-5" />
             </button>
@@ -127,7 +127,7 @@ const SubjectDetailDrawer = ({ item, onClose }) => {
 
             {/* Danh sách môn học */}
             <div>
-              <div className="text-sm font-medium text-slate-500 mb-3">Danh sách môn tự chọn</div>
+              <div className="text-sm font-bold text-slate-700 mb-3">Danh sách môn tự chọn</div>
               <div className="flex flex-wrap gap-2">
                  {(item.tenMonHocs || []).map((ten, index) => (
                    <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-[13px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
@@ -412,7 +412,7 @@ export default function ToHopMonList() {
       {/* Header & Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tổ hợp môn tự chọn</h1>
+          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Tổ hợp môn tự chọn</h1>
           <p className="mt-1 text-sm font-medium text-slate-500">
             Quản lý cấu hình các tổ hợp môn sử dụng trong nhà trường.
           </p>
@@ -441,7 +441,7 @@ export default function ToHopMonList() {
           <div className="text-center py-12 text-sm text-slate-500">Đang tải dữ liệu...</div>
         ) : filteredList.length === 0 ? (
           <div className="text-center py-16">
-            <h3 className="text-sm font-bold text-slate-900">Không tìm thấy tổ hợp</h3>
+            <h3 className="text-sm font-bold text-blue-900">Không tìm thấy tổ hợp</h3>
             <p className="text-sm text-slate-500 mt-1">Thử thay đổi từ khóa tìm kiếm.</p>
           </div>
         ) : (
@@ -449,7 +449,7 @@ export default function ToHopMonList() {
             {groupedByBan.map(([ban, items]) => (
               <div key={ban}>
                 <div className="flex items-center gap-3 mb-3">
-                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider px-1">{ban}</h2>
+                  <h2 className="text-sm font-bold text-blue-900 uppercase tracking-wider px-1">{ban}</h2>
                   <div className="flex-1 h-px bg-slate-200"></div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -457,7 +457,7 @@ export default function ToHopMonList() {
                     <div key={item.id} className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 flex flex-col group relative">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-bold text-[11px] rounded border border-blue-100">{item.maToHop}</span>
-                        <h3 className="text-sm font-bold text-slate-900 truncate flex-1">{item.tenToHop}</h3>
+                        <h3 className="text-sm font-bold text-blue-900 truncate flex-1">{item.tenToHop}</h3>
                         <ActionDropdown item={item} onAction={handleAction} />
                       </div>
                       
