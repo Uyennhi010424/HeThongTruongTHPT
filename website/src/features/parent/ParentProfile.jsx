@@ -116,14 +116,34 @@ export default function ParentProfile() {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã học sinh</label>
+                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium" value={currentStudent.maHocSinh || "--"} disabled />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
-                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={currentStudent.hoTen || "--"} disabled />
+                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium" value={currentStudent.hoTen || "--"} disabled />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Lớp</label>
                   <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={currentStudent.lop?.tenLop || "Chưa xếp lớp"} disabled />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
+                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={currentStudent.ngaySinh ? currentStudent.ngaySinh.split('-').reverse().join('/') : "--"} disabled />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
+                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={currentStudent.gioiTinh || "--"} disabled />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dân tộc / Tôn giáo</label>
+                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={`${currentStudent.danToc || "--"} / ${currentStudent.tonGiao || "--"}`} disabled />
+                </div>
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
+                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={currentStudent.diaChi || "--"} disabled />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Năm nhập học</label>

@@ -2,6 +2,7 @@ package com.hethongtruongthpt.dto.hocsinh;
 
 import com.hethongtruongthpt.entity.HocSinh;
 import com.hethongtruongthpt.entity.LopHoc;
+import com.hethongtruongthpt.dto.lophoc.LopHocDTO;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -11,7 +12,7 @@ public class HocSinhResponseDTO {
     private String hoTen;
     private LocalDate ngaySinh;
     private String gioiTinh;
-    private LopHoc lop;
+    private LopHocDTO lop;
     private String diaChi;
     private Integer namNhapHoc;
     private String sdt;
@@ -34,13 +35,34 @@ public class HocSinhResponseDTO {
         dto.setHoTen(hs.getHoTen());
         dto.setNgaySinh(hs.getNgaySinh());
         dto.setGioiTinh(hs.getGioiTinh());
-        dto.setLop(hs.getLop());
+        
+        if (hs.getLop() != null) {
+            LopHocDTO lopDto = new LopHocDTO();
+            lopDto.setId(hs.getLop().getId());
+            lopDto.setTenLop(hs.getLop().getTenLop());
+            lopDto.setKhoi(hs.getLop().getKhoi());
+            lopDto.setNamHoc(hs.getLop().getNamHoc());
+            lopDto.setSiSo(hs.getLop().getSiSo());
+            lopDto.setPhongHoc(hs.getLop().getPhongHoc());
+            
+            if (hs.getLop().getGvcn() != null) {
+                com.hethongtruongthpt.dto.giaovien.GiaoVienDTO gvDto = new com.hethongtruongthpt.dto.giaovien.GiaoVienDTO();
+                gvDto.setId(hs.getLop().getGvcn().getId());
+                gvDto.setHoTen(hs.getLop().getGvcn().getHoTen());
+                gvDto.setEmail(hs.getLop().getGvcn().getEmail());
+                gvDto.setSdt(hs.getLop().getGvcn().getSoDienThoai());
+                lopDto.setGvcn(gvDto);
+            }
+            
+            dto.setLop(lopDto);
+        }
+        
         dto.setDiaChi(hs.getDiaChi());
         dto.setNamNhapHoc(hs.getNamNhapHoc());
         dto.setSdt(hs.getSdt());
         dto.setEmail(hs.getEmail());
-        dto.setDanToc(hs.getDanToc());
-        dto.setTonGiao(hs.getTonGiao());
+        dto.setDanToc(hs.getDanToc() != null ? hs.getDanToc().getTenDanToc() : null);
+        dto.setTonGiao(hs.getTonGiao() != null ? hs.getTonGiao().getTenTonGiao() : null);
         dto.setMaBhyt(hs.getMaBhyt());
         dto.setDienChinhSach(hs.getDienChinhSach());
         dto.setTrangThai(hs.getTrangThai());
@@ -61,8 +83,8 @@ public class HocSinhResponseDTO {
     public void setNgaySinh(LocalDate ngaySinh) { this.ngaySinh = ngaySinh; }
     public String getGioiTinh() { return gioiTinh; }
     public void setGioiTinh(String gioiTinh) { this.gioiTinh = gioiTinh; }
-    public LopHoc getLop() { return lop; }
-    public void setLop(LopHoc lop) { this.lop = lop; }
+    public LopHocDTO getLop() { return lop; }
+    public void setLop(LopHocDTO lop) { this.lop = lop; }
     public String getDiaChi() { return diaChi; }
     public void setDiaChi(String diaChi) { this.diaChi = diaChi; }
     public Integer getNamNhapHoc() { return namNhapHoc; }

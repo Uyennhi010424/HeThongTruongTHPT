@@ -37,9 +37,11 @@ public class LopHoc {
     @JoinColumn(name = "gvcn_id")
     private GiaoVien gvcn; // Giáo viên chủ nhiệm
 
-    @Column(name = "to_hop_id")
-    private Integer toHopId; // Tổ hợp môn tự chọn (ID)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "to_hop_id")
+    private ToHopMon toHop; // Tổ hợp môn tự chọn (ID)
 
+    @Max(value = 45, message = "Sĩ số lớp không được vượt quá 45")
     @Column(name = "si_so", nullable = false)
     private Integer siSo = 0;
 
@@ -112,11 +114,17 @@ public class LopHoc {
     }
 
     public Integer getToHopId() {
-        return toHopId;
+        return toHop != null ? toHop.getId() : null;
     }
 
     public void setToHopId(Integer toHopId) {
-        this.toHopId = toHopId;
+        if (toHopId == null) {
+            this.toHop = null;
+        } else {
+            ToHopMon th = new ToHopMon();
+            th.setId(toHopId);
+            this.toHop = th;
+        }
     }
 
     public Boolean getIsDeleted() {

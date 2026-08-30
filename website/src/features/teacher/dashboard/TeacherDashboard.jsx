@@ -19,12 +19,12 @@ import {
   getHomeroomAssignment,
   getTeacherSubjectLabel
 } from "../../../utils/teacherProfile.js";
-import { formatDate, getCurrentSemesterWeek } from "../../../utils/helpers.js";
+import { formatDate, getDayLabel, getCurrentSemesterWeek, getWeekDates } from "../../../utils/helpers.js";
 import { normalizeVietnameseDisplay } from "../../../utils/normalizeText.js";
 
 const nfc = normalizeVietnameseDisplay;
 
-const getDayLabel = (value) => {
+const getDayLabelCustom = (value) => {
   switch (value) {
     case 2: return "Thứ 2";
     case 3: return "Thứ 3";
@@ -64,8 +64,7 @@ const getNoticeTargetLabel = (value) => {
 const getInitials = (name) => {
   if (!name) return "GV";
   const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  return parts[parts.length - 1].charAt(0).toUpperCase();
 };
 
 export default function TeacherDashboard() {
@@ -75,15 +74,9 @@ export default function TeacherDashboard() {
   const [yearInfo, setYearInfo] = useState({ tenNamHoc: "", hocKy: 1 });
   const [namHocList, setNamHocList] = useState([]);
 
-  const getWeekDates = (tuan) => {
+  const getTeacherWeekDates = (tuan) => {
     const year = namHocList.find((y) => y.tenNamHoc === yearInfo.tenNamHoc);
-    const schoolStart = year?.ngayBatDauHk1
-      ? new Date(year.ngayBatDauHk1 + "T00:00:00")
-      : new Date(new Date().getFullYear(), 8, 5);
-    const dayOfWeek = schoolStart.getDay();
-    const monday = new Date(schoolStart);
-    monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    monday.setDate(monday.getDate() + (tuan - 1) * 7);
+    const { monday } = getWeekDates(tuan, year);
     const dates = [];
     for (let i = 0; i < 6; i++) {
       const d = new Date(monday);
@@ -93,7 +86,7 @@ export default function TeacherDashboard() {
     return dates;
   };
 
-  const weekDates = getWeekDates(selectedTuan);
+  const weekDates = getTeacherWeekDates(selectedTuan);
   const weekLabel = `${weekDates[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} – ${weekDates[5].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
 
   const isToday = (date) => {

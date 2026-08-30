@@ -84,23 +84,29 @@ public class DiemAuditLogDTO {
     public static class GiaoVienInfo {
         private Integer id;
         private String hoTen;
+        private String tenDangNhap;
         public GiaoVienInfo() {}
-        public GiaoVienInfo(Integer id, String hoTen) { this.id = id; this.hoTen = hoTen; }
+        public GiaoVienInfo(Integer id, String hoTen, String tenDangNhap) { this.id = id; this.hoTen = hoTen; this.tenDangNhap = tenDangNhap; }
         public Integer getId() { return id; }
         public void setId(Integer id) { this.id = id; }
         public String getHoTen() { return hoTen; }
         public void setHoTen(String hoTen) { this.hoTen = hoTen; }
+        public String getTenDangNhap() { return tenDangNhap; }
+        public void setTenDangNhap(String tenDangNhap) { this.tenDangNhap = tenDangNhap; }
     }
 
     public static class HocSinhInfo {
         private Integer id;
         private String hoTen;
+        private String tenDangNhap;
         public HocSinhInfo() {}
-        public HocSinhInfo(Integer id, String hoTen) { this.id = id; this.hoTen = hoTen; }
+        public HocSinhInfo(Integer id, String hoTen, String tenDangNhap) { this.id = id; this.hoTen = hoTen; this.tenDangNhap = tenDangNhap; }
         public Integer getId() { return id; }
         public void setId(Integer id) { this.id = id; }
         public String getHoTen() { return hoTen; }
         public void setHoTen(String hoTen) { this.hoTen = hoTen; }
+        public String getTenDangNhap() { return tenDangNhap; }
+        public void setTenDangNhap(String tenDangNhap) { this.tenDangNhap = tenDangNhap; }
     }
 
     public static class MonHocInfo {

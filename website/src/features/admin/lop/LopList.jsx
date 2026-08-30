@@ -498,8 +498,25 @@ export default function LopList() {
     }
     const [start, end] = parts.map(Number);
     const nextYear = `${start + 1}-${end + 1}`;
+    const confirmMessage = (
+      <div className="text-left space-y-3 w-full mt-2">
+        <p className="text-slate-800 text-[15px]">Bạn có chắc chắn muốn kết thúc năm học <strong>{currentYear}</strong> và đưa toàn bộ học sinh lên lớp cho năm học <strong>{nextYear}</strong> không?</p>
+        <div className="bg-amber-50 text-amber-900 p-3 rounded-xl text-sm border border-amber-200">
+          <p className="font-bold mb-2 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Lưu ý quan trọng:
+          </p>
+          <ul className="list-disc pl-5 space-y-1.5 font-medium">
+            <li>Khối 12 sẽ được xét <strong>Tốt nghiệp</strong>.</li>
+            <li>Khối 10, 11 sẽ tự động <strong>lên lớp tiếp theo</strong>.</li>
+            <li>Giáo viên chủ nhiệm sẽ được luân chuyển theo lớp mới (nếu có).</li>
+            <li>Cần thiết lập danh sách năm học {nextYear} trong hệ thống trước.</li>
+          </ul>
+        </div>
+      </div>
+    );
     
-    if (window.confirm(`Bạn có chắc chắn muốn kết thúc năm học ${currentYear} và đưa toàn bộ học sinh lên lớp cho năm học ${nextYear} không?\n\nLưu ý:\n- Khối 12 sẽ Tốt nghiệp.\n- Khối 10, 11 sẽ tự động lên lớp tiếp theo.\n- Giáo viên chủ nhiệm sẽ được luân chuyển theo lớp mới (nếu có).\n- Cần thiết lập danh sách năm học ${nextYear} trong hệ thống trước (nếu có chức năng quản lý năm học).`)) {
+    if (await confirm(confirmMessage, "Xác nhận kết thúc năm học")) {
       try {
         setLoading(true);
         const res = await promoteStudents({ currentNamHoc: currentYear, nextNamHoc: nextYear });
@@ -660,11 +677,11 @@ export default function LopList() {
       </div>
 
       {/* Main Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[500px]">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col min-h-[500px]">
         {error ? (
           <div className="p-8 text-center text-red-500">{error}</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-visible">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -727,7 +744,7 @@ export default function LopList() {
                             Hoạt động
                           </span>
                         </td>
-                        <td className="px-6 py-4 border-l border-slate-100 relative bg-slate-50/30">
+                        <td className="px-6 py-4 border-l border-slate-100 bg-slate-50/30">
                           <div className="transition-opacity flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                             <ActionDropdown 
                               item={item} 

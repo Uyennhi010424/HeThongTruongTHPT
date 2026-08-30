@@ -4,6 +4,7 @@ import { login, forgotPassword } from "../../api/authApi";
 import { setAuth } from "../../store/authStore";
 import Captcha from "../../components/common/Captcha.jsx";
 import { Lock, User, Eye, EyeOff, School } from "lucide-react";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
 
 const roleRoutes = {
   ADMIN: "/admin/dashboard",
@@ -38,6 +39,8 @@ export default function LoginPage() {
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [forgotUsername, setForgotUsername] = useState("");
   const [forgotMessage, setForgotMessage] = useState("");
+
+  const { themeLogo, themeFooter } = useTheme();
 
   const handleCaptchaGenerate = useCallback((text) => {
     setCaptchaText(text);
@@ -130,7 +133,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const res = await login({ username: u, password: p });
+      const res = await login({ username: u, password: p, device: "web" });
       const data = res?.data?.data || {};
       const token = data.token || "";
       const refreshToken = data.refreshToken || "";
@@ -179,27 +182,27 @@ export default function LoginPage() {
 
   return (
     <div className="h-screen w-full flex flex-col md:flex-row font-sans bg-white overflow-hidden">
-      
+
       {/* Left Side - Banner (60%) */}
       <div className="hidden md:flex md:w-[60%] relative flex-col justify-center overflow-hidden bg-[#1E40AF] h-full">
         {/* Background Image without blur */}
         <div className="absolute inset-0 overflow-hidden">
-          <div 
+          <div
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: "url('/login-bg.jpg')" }}
           ></div>
         </div>
-        
+
         {/* Subtle blue overlay to ensure clarity without muddying the image */}
         <div className="absolute inset-0 bg-[#0B2A6F]/20 mix-blend-multiply"></div>
-        
+
         <style>
           {`@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');`}
         </style>
 
         {/* Content inside Beautiful Glass Panel */}
         <div className="relative z-10 ml-[10%] w-full max-w-[80%]">
-          <div 
+          <div
             className="rounded-[28px] shadow-2xl border border-white/10"
             style={{
               backgroundColor: "rgba(17, 24, 39, 0.55)",
@@ -209,22 +212,22 @@ export default function LoginPage() {
             }}
           >
             <div className="mb-8">
-              <img src="/logo.png" alt="Logo" className="h-24 w-auto object-contain brightness-0 invert drop-shadow-md opacity-90" />
+              <img src={themeLogo} alt="Logo" className="h-32 w-auto object-contain brightness-0 invert drop-shadow-md opacity-90" />
             </div>
-            <h2 
+            <h2
               className="text-sm font-bold tracking-[0.2em] text-gray-300 uppercase mb-4"
               style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}
             >
               HỆ THỐNG QUẢN LÝ
             </h2>
-            <h1 
-              className="text-4xl lg:text-5xl font-bold leading-[1.2] text-white mb-5 tracking-tight drop-shadow-lg whitespace-nowrap" 
+            <h1
+              className="text-4xl lg:text-5xl font-bold leading-[1.2] text-white mb-5 tracking-tight drop-shadow-lg whitespace-nowrap"
               style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}
             >
               Điểm học sinh THPT
             </h1>
-            <p 
-              className="text-gray-200 text-lg font-medium leading-relaxed" 
+            <p
+              className="text-gray-200 text-lg font-medium leading-relaxed"
               style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}
             >
               Nền tảng quản lý giáo dục hiện đại.
@@ -233,25 +236,25 @@ export default function LoginPage() {
         </div>
       </div>
 
-        {/* Right Side - Form (40%) */}
+      {/* Right Side - Form (40%) */}
       <div className="w-full md:w-[40%] flex items-center justify-center px-8 sm:px-12 lg:px-16 bg-white relative z-10 h-full">
         <div className="w-full max-w-[420px] py-4">
-          
+
           {/* Header */}
           <div className="mb-6 text-center">
-            <img src="/logo.png" alt="Logo Edu Manager" className="h-24 w-auto object-contain mx-auto mb-4" />
+            <img src={themeLogo} alt="Logo Edu Manager" className="h-32 w-auto object-contain mx-auto mb-4" />
             <h2 className="text-[28px] font-bold text-gray-900 mb-1 tracking-tight">Đăng nhập hệ thống</h2>
             <p className="text-gray-500 text-[15px]">Vui lòng đăng nhập để tiếp tục.</p>
           </div>
-          
+
           <hr className="border-gray-100 mb-6" />
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            
+
             {/* Username */}
             <div className="space-y-1.5">
               <label htmlFor="login-user" className="block text-sm font-semibold text-gray-700">
-                Tên đăng nhập
+                Email đăng nhập
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -262,7 +265,7 @@ export default function LoginPage() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Mã nhân viên hoặc email"
+                  placeholder="Nhập email"
                   autoComplete="username"
                   autoFocus
                   disabled={passwordLocked}
@@ -319,10 +322,10 @@ export default function LoginPage() {
                   className="block w-full sm:w-1/2 px-4 h-[52px] bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/20 focus:border-[#2563EB] transition-all disabled:opacity-50 text-base text-center tracking-widest font-semibold"
                 />
                 <div className="w-full sm:w-1/2 h-[52px]">
-                   <Captcha
-                     onGenerate={handleCaptchaGenerate}
-                     disabled={captchaLocked || passwordLocked}
-                   />
+                  <Captcha
+                    onGenerate={handleCaptchaGenerate}
+                    disabled={captchaLocked || passwordLocked}
+                  />
                 </div>
               </div>
               {captchaError && <p className="text-red-500 text-sm mt-1 font-medium">{captchaError}</p>}
@@ -349,13 +352,13 @@ export default function LoginPage() {
                 }}
                 className="text-sm font-semibold text-[#1D4ED8] hover:text-[#1e3a8a] transition-colors focus:outline-none"
               >
-                Quên mật khẩu?
+
               </button>
             </div>
 
             {/* Errors & Locks */}
             {error && <div className="p-3.5 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium">{error}</div>}
-            
+
             {passwordLocked && passwordLockCountdown > 0 && (
               <div className="p-3.5 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium text-center">
                 Khóa {formatCountdown(passwordLockCountdown)}
@@ -379,9 +382,14 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
+
+          {/* Footer */}
+          <div className="mt-8 text-center text-sm font-medium text-gray-400">
+            {themeFooter}
+          </div>
         </div>
       </div>
-      
+
       {/* Forgot Password Modal */}
       {forgotModalOpen && (
         <ForgotPasswordModal
@@ -423,14 +431,14 @@ function ForgotPasswordModal({ onClose, username, setUsername }) {
 
   return (
     <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div 
+      <div
         className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-bold text-gray-900">Cấp lại mật khẩu</h3>
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full p-1 transition-colors"
             onClick={onClose}
           >
@@ -439,13 +447,13 @@ function ForgotPasswordModal({ onClose, username, setUsername }) {
             </svg>
           </button>
         </div>
-        
+
         <form onSubmit={handleSend}>
           <div className="px-6 py-5">
             <p className="text-sm text-gray-500 mb-5 leading-relaxed">
               Nhập tên đăng nhập để hệ thống gửi đường link xác thực đổi mật khẩu mới qua Email đã liên kết.
             </p>
-            
+
             <div className="space-y-1.5">
               <label className="block text-sm font-semibold text-gray-700">Tên đăng nhập</label>
               <input
@@ -457,21 +465,21 @@ function ForgotPasswordModal({ onClose, username, setUsername }) {
                 required
               />
             </div>
-            
+
             {error && <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm font-medium">{error}</div>}
             {success && <div className="mt-3 p-3 bg-green-50 border border-green-100 rounded-lg text-green-700 text-sm font-medium">{success}</div>}
           </div>
-          
+
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               onClick={onClose}
             >
               Hủy
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
               className="px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-70 flex items-center justify-center min-w-[140px] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >

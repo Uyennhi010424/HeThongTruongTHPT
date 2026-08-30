@@ -15,12 +15,12 @@ public interface DiemGuiLogRepository extends JpaRepository<DiemGuiLog, Long> {
      * Kiểm tra một điểm đã được gửi trong kỳ này chưa.
      * Dùng để chống gửi trùng (idempotency check).
      */
-    boolean existsByDiemIdAndKyGui(Integer diemId, String kyGui);
+    boolean existsByDiem_IdAndKyGui(Integer diemId, String kyGui);
 
     /**
      * Lấy tập hợp tất cả diem_id đã được gửi trong kỳ này.
      * Dùng để lọc một lần thay vì check từng bản ghi riêng lẻ.
      */
-    @Query("SELECT d.diemId FROM DiemGuiLog d WHERE d.kyGui = :kyGui")
+    @Query("SELECT d.diem.id FROM DiemGuiLog d WHERE d.kyGui = :kyGui")
     Set<Integer> findSentDiemIdsByKyGui(@Param("kyGui") String kyGui);
 }

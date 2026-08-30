@@ -89,11 +89,19 @@ public class DonXinNghiService {
         LocalDate start = request.getNgayBatDau();
         LocalDate end = request.getNgayKetThuc();
 
-        boolean inHk1 = (!start.isBefore(activeYear.getNgayBatDauHk1()) && !end.isAfter(activeYear.getNgayKetThucHk1()));
-        boolean inHk2 = (!start.isBefore(activeYear.getNgayBatDauHk2()) && !end.isAfter(activeYear.getNgayKetThucHk2()));
+        // Chỉ validate trong phạm vi học kỳ khi năm học đã cấu hình đủ các mốc ngày
+        boolean hkConfigured = activeYear.getNgayBatDauHk1() != null
+                && activeYear.getNgayKetThucHk1() != null
+                && activeYear.getNgayBatDauHk2() != null
+                && activeYear.getNgayKetThucHk2() != null;
 
-        if (!inHk1 && !inHk2) {
-            throw new ApiException("Thời gian xin nghỉ phải nằm gọn trong học kỳ 1 hoặc học kỳ 2. Không được xin nghỉ vào dịp hè hoặc ngoài thời gian học.");
+        if (hkConfigured) {
+            boolean inHk1 = (!start.isBefore(activeYear.getNgayBatDauHk1()) && !end.isAfter(activeYear.getNgayKetThucHk1()));
+            boolean inHk2 = (!start.isBefore(activeYear.getNgayBatDauHk2()) && !end.isAfter(activeYear.getNgayKetThucHk2()));
+
+            if (!inHk1 && !inHk2) {
+                throw new ApiException("Thời gian xin nghỉ phải nằm trong học kỳ 1 (" + activeYear.getNgayBatDauHk1() + " - " + activeYear.getNgayKetThucHk1() + ") hoặc học kỳ 2 (" + activeYear.getNgayBatDauHk2() + " - " + activeYear.getNgayKetThucHk2() + ").");
+            }
         }
 
         DonXinNghi don = new DonXinNghi();

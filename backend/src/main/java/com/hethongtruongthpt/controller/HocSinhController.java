@@ -123,6 +123,52 @@ public class HocSinhController {
 		}
 	}
 
+	@PreAuthorize("hasRole('HOC_SINH')")
+	@GetMapping("/me/thoikhoabieu")
+	public ResponseEntity<ApiResponse<List<com.hethongtruongthpt.entity.ThoiKhoaBieu>>> getTimetable(
+			@RequestParam(value = "date", required = false) String dateStr) {
+		try {
+			String username = SecurityContextHolder.getContext().getAuthentication().getName();
+			if (username == null || username.equals("anonymousUser")) {
+				return ResponseEntity.ok(ApiResponse.ok(null));
+			}
+			java.time.LocalDate date = dateStr != null && !dateStr.isEmpty() 
+					? java.time.LocalDate.parse(dateStr) 
+					: java.time.LocalDate.now();
+			return ResponseEntity.ok(ApiResponse.ok(dashboardService.getTimetableForStudent(username, date)));
+		} catch (Exception ex) {
+			log.error("Lỗi khi lấy timetable data: ", ex);
+			return ResponseEntity.ok(ApiResponse.ok(null));
+		}
+	}
+
+	@PreAuthorize("hasRole('HOC_SINH')")
+	@GetMapping("/me/lich-su-hoc-tap")
+	public ResponseEntity<ApiResponse<Object>> getMyStudyHistory() {
+		try {
+			String username = SecurityContextHolder.getContext().getAuthentication().getName();
+			if (username == null || username.equals("anonymousUser")) {
+				return ResponseEntity.ok(ApiResponse.ok(null));
+			}
+			HocSinh hs = hocSinhService.getByUsername(username);
+			return ResponseEntity.ok(ApiResponse.ok(hocSinhService.getLichSuHocTap(hs.getId())));
+		} catch (Exception ex) {
+			log.error("Lỗi khi lấy lịch sử học tập data: ", ex);
+			return ResponseEntity.ok(ApiResponse.ok(null));
+		}
+	}
+
+	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'PHU_HUYNH')")
+	@GetMapping("/{id:\\d+}/lich-su-hoc-tap")
+	public ResponseEntity<ApiResponse<Object>> getStudyHistoryById(@PathVariable("id") Integer id) {
+		try {
+			return ResponseEntity.ok(ApiResponse.ok(hocSinhService.getLichSuHocTap(id)));
+		} catch (Exception ex) {
+			log.error("Lỗi khi lấy lịch sử học tập cho học sinh " + id + ": ", ex);
+			return ResponseEntity.ok(ApiResponse.ok(null));
+		}
+	}
+
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'PHU_HUYNH', 'HOC_SINH')")
 	@GetMapping("/{id:\\d+}/dashboard")
 	public ResponseEntity<ApiResponse<com.hethongtruongthpt.dto.hocsinh.DashboardDataDTO>> getDashboardById(@PathVariable("id") Integer id) {

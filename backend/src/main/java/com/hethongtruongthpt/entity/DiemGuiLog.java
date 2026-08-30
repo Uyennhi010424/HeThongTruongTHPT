@@ -24,20 +24,24 @@ public class DiemGuiLog {
     private Long id;
 
     /** ID bản ghi điểm đã gửi */
-    @Column(name = "diem_id", nullable = false)
-    private Integer diemId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "diem_id", nullable = false)
+    private Diem diem;
 
     /** ID học sinh */
-    @Column(name = "hoc_sinh_id", nullable = false)
-    private Integer hocSinhId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hoc_sinh_id", nullable = false)
+    private HocSinh hocSinh;
 
     /** ID phụ huynh đã nhận tin nhắn */
-    @Column(name = "phu_huynh_id", nullable = false)
-    private Integer phuHuynhId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "phu_huynh_id", nullable = false)
+    private PhuHuynh phuHuynh;
 
     /** ID ThongBao được tạo ra cho lần gửi này (nullable vì có thể ghi log trước khi lưu ThongBao) */
-    @Column(name = "thong_bao_id")
-    private Integer thongBaoId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "thong_bao_id")
+    private ThongBao thongBao;
 
     /** Thời điểm gửi thực tế */
     @Column(name = "ngay_gui", nullable = false)
@@ -63,17 +67,29 @@ public class DiemGuiLog {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Integer getDiemId() { return diemId; }
-    public void setDiemId(Integer diemId) { this.diemId = diemId; }
+    public Integer getDiemId() { return diem != null ? diem.getId() : null; }
+    public void setDiemId(Integer diemId) { 
+        if (diemId == null) { this.diem = null; return; }
+        Diem d = new Diem(); d.setId(diemId); this.diem = d; 
+    }
 
-    public Integer getHocSinhId() { return hocSinhId; }
-    public void setHocSinhId(Integer hocSinhId) { this.hocSinhId = hocSinhId; }
+    public Integer getHocSinhId() { return hocSinh != null ? hocSinh.getId() : null; }
+    public void setHocSinhId(Integer hocSinhId) { 
+        if (hocSinhId == null) { this.hocSinh = null; return; }
+        HocSinh h = new HocSinh(); h.setId(hocSinhId); this.hocSinh = h; 
+    }
 
-    public Integer getPhuHuynhId() { return phuHuynhId; }
-    public void setPhuHuynhId(Integer phuHuynhId) { this.phuHuynhId = phuHuynhId; }
+    public Integer getPhuHuynhId() { return phuHuynh != null ? phuHuynh.getId() : null; }
+    public void setPhuHuynhId(Integer phuHuynhId) { 
+        if (phuHuynhId == null) { this.phuHuynh = null; return; }
+        PhuHuynh p = new PhuHuynh(); p.setId(phuHuynhId); this.phuHuynh = p; 
+    }
 
-    public Integer getThongBaoId() { return thongBaoId; }
-    public void setThongBaoId(Integer thongBaoId) { this.thongBaoId = thongBaoId; }
+    public Integer getThongBaoId() { return thongBao != null ? thongBao.getId() : null; }
+    public void setThongBaoId(Integer thongBaoId) { 
+        if (thongBaoId == null) { this.thongBao = null; return; }
+        ThongBao t = new ThongBao(); t.setId(thongBaoId); this.thongBao = t; 
+    }
 
     public LocalDateTime getNgayGui() { return ngayGui; }
     public void setNgayGui(LocalDateTime ngayGui) { this.ngayGui = ngayGui; }

@@ -96,6 +96,56 @@ export default function HomePage() {
     }
   }, [namHocList, selectedNamHoc]);
 
+  const dynamicSubjectScores = useMemo(() => {
+    if (!data?.scores || !data?.subjects || !selectedNamHoc || !selectedHK) return data?.subjectScores || [];
+    
+    const hkStr = String(selectedHK);
+    const filteredScores = data.scores.filter(s => 
+      s.namHoc === selectedNamHoc && String(s.hocKy) === hkStr
+    );
+    
+    return data.subjects.map(subj => {
+      const subjScores = filteredScores.filter(s => s.monHoc?.id === subj.id);
+      if (subjScores.length === 0) return { monHocId: subj.id, avgScore: null };
+      
+      if (subj.nhomDanhGia === "NHAN_XET" || subj.nhomDanhGia === "nhan_xet") {
+        return { monHocId: subj.id, avgScore: null };
+      }
+      
+      const txScores = subjScores.filter(s => {
+        const l = (s.loaiDiem || "").toUpperCase();
+        return l === "TX" && s.giaTriDiem != null;
+      });
+      const gkScore = subjScores.find(s => {
+        const l = (s.loaiDiem || "").toUpperCase();
+        return l === "GK" && s.giaTriDiem != null;
+      });
+      const ckScore = subjScores.find(s => {
+        const l = (s.loaiDiem || "").toUpperCase();
+        return l === "CK" && s.giaTriDiem != null;
+      });
+      
+      let txAvg = -1;
+      if (txScores.length > 0) {
+        const sum = txScores.reduce((acc, s) => acc + Number(s.giaTriDiem), 0);
+        txAvg = sum / txScores.length;
+      }
+      
+      let ws = 0;
+      let wt = 0;
+      if (txAvg !== -1) { ws += txAvg * 1; wt += 1; }
+      if (gkScore != null) { ws += Number(gkScore.giaTriDiem) * 2; wt += 2; }
+      if (ckScore != null) { ws += Number(ckScore.giaTriDiem) * 3; wt += 3; }
+      
+      let avgScore = null;
+      if (wt > 0) {
+        avgScore = Math.round((ws / wt) * 100) / 100;
+      }
+      
+      return { monHocId: subj.id, avgScore };
+    });
+  }, [data?.scores, data?.subjects, selectedNamHoc, selectedHK, data?.subjectScores]);
+
   const hanhKiemRaw = useMemo(() => {
     if (!data?.conducts?.length) return null;
     const hkStr = String(selectedHK);
@@ -181,7 +231,7 @@ export default function HomePage() {
             hkColor={hkColor}
           />
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <button
               onClick={() => navigate("/student/score")}
               className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col items-center justify-center gap-3 group"
@@ -209,19 +259,10 @@ export default function HomePage() {
               </div>
               <span className="text-sm font-semibold text-slate-700">Lịch thi</span>
             </button>
-            <button
-              onClick={() => navigate("/student/diemdanh")}
-              className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col items-center justify-center gap-3 group"
-            >
-              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <CheckCircle size={24} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700">Điểm danh</span>
-            </button>
           </div>
 
           <ScoreChartWidget
-            subjectScores={data?.subjectScores || []}
+            subjectScores={dynamicSubjectScores}
             subjectMap={subjectMap}
             subjectColorMap={subjectColorMap}
             namHocList={namHocList}

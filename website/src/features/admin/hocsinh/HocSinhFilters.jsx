@@ -12,11 +12,10 @@ export default function HocSinhFilters({ hooks }) {
     <div className="relative" ref={filterMenuRef}>
       <button
         onClick={() => setFilterMenuOpen(!filterMenuOpen)}
-        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
-          filterMenuOpen || gradeFilter !== "all" || classFilter !== "all"
-            ? "bg-blue-50 border-blue-200 text-blue-700"
-            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
-        }`}
+        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${filterMenuOpen || gradeFilter !== "all" || classFilter !== "all"
+          ? "bg-blue-50 border-blue-200 text-blue-700"
+          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+          }`}
       >
         <Filter className="w-4 h-4" />
         <span>Bộ lọc</span>

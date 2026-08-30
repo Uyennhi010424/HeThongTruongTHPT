@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
+import { TextInput,
+
   View,
   Text,
   StyleSheet,
@@ -15,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FileText, Clock, CheckCircle, XCircle, AlertCircle, ChevronRight, BookOpen, X, Eye } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { getStudentExams, getExamResult, BaiKiemTra, BaiLamResult } from '../../api/examApi';
+import { getStudentExams, getExamResult, startExam, getExamDetail, submitExam, checkExamSession, BaiKiemTra, BaiLamResult, ExamDetail } from '../../api/examApi';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   CHUA_LAM: {
@@ -78,6 +79,14 @@ export default function ExamScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Exam taking states
+  const [isTakingExam, setIsTakingExam] = useState(false);
+  const [currentExam, setCurrentExam] = useState<ExamDetail | null>(null);
+  const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null);
+  const sessionTokenRef = React.useRef<string | null>(null);
+  const [answers, setAnswers] = useState<Record<number, any>>({});
+  const [timeLeft, setTimeLeft] = useState(0);
+
   // Result details states
   const [resultModalVisible, setResultModalVisible] = useState(false);
   const [examResult, setExamResult] = useState<BaiLamResult | null>(null);
@@ -113,21 +122,148 @@ export default function ExamScreen() {
       handleViewResult(exam.id);
       return;
     }
+    
+    const now = new Date().getTime();
+    const start = exam.thoiGianBatDau ? new Date(exam.thoiGianBatDau).getTime() : 0;
+    const end = exam.thoiGianKetThuc ? new Date(exam.thoiGianKetThuc).getTime() : Infinity;
+    
+    if (start && now < start) {
+      Alert.alert('Thông báo', 'Chưa đến giờ làm bài!');
+      return;
+    }
+    if (end && now > end) {
+      Alert.alert('Thông báo', 'Bài kiểm tra đã kết thúc!');
+      return;
+    }
 
     Alert.alert(
       exam.tieuDe,
-      `Môn: ${exam.tenMonHoc || '--'}\nThời gian: ${exam.thoiGianLamBai} phút\n\nBạn có muốn làm bài không?`,
+      `Môn: ${exam.tenMonHoc || '--'}\nThời gian: ${exam.thoiGianLamBai} phút\n\nBạn đã sẵn sàng? Thời gian sẽ bắt đầu tính ngay khi bạn vào.`,
       [
         { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Làm bài',
-          onPress: () => {
-            Alert.alert('Thông báo', 'Chức năng làm bài trực tiếp đang được phát triển. Vui lòng sử dụng phiên bản web.');
-          },
+          text: 'Bắt đầu',
+          onPress: () => handleStart(exam),
         },
       ]
     );
   };
+
+  const handleStart = async (exam: BaiKiemTra) => {
+    try {
+      setIsLoading(true);
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      sessionTokenRef.current = token;
+      
+      const res = await startExam(exam.id, token);
+      if (res?.success) {
+        setCurrentAttemptId(res.data.id);
+        const detailRes = await getExamDetail(exam.id);
+        if (detailRes) {
+          setCurrentExam(detailRes);
+          setAnswers({});
+          setIsTakingExam(true);
+          setTimeLeft(detailRes.thoiGianLamBai * 60);
+        } else {
+          Alert.alert('Lỗi', 'Không thể lấy thông tin chi tiết bài làm');
+        }
+      } else {
+         Alert.alert('Lỗi', res?.message || 'Không thể bắt đầu làm bài');
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Lỗi khi bắt đầu làm bài');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (isAuto = false) => {
+    if (!currentAttemptId || !currentExam) return;
+    
+    const submitCall = async () => {
+      try {
+        setIsLoading(true);
+        const payload = Object.keys(answers).map(cauHoiId => {
+          const qId = parseInt(cauHoiId);
+          const question = currentExam.cauHois.find(q => q.id === qId);
+          
+          if (question?.loaiCauHoi === 'TU_LUAN') {
+            return {
+              cauHoiId: qId,
+              cauTraLoiTuLuan: answers[qId]
+            };
+          }
+          
+          return {
+            cauHoiId: qId,
+            dapAnId: answers[qId]
+          };
+        });
+        
+        const res = await submitExam(currentAttemptId, payload);
+        if (res?.success) {
+          if (isAuto) {
+             Alert.alert('Thông báo', 'Hết giờ hoặc vi phạm! Bài thi của bạn đã được nộp tự động.');
+          } else {
+             Alert.alert('Thành công', 'Nộp bài thành công!');
+          }
+          setIsTakingExam(false);
+          setCurrentAttemptId(null);
+          setCurrentExam(null);
+          fetchExams();
+        }
+      } catch (err: any) {
+        Alert.alert('Lỗi', err?.response?.data?.message || 'Lỗi khi nộp bài');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (!isAuto) {
+      Alert.alert('Xác nhận', 'Bạn có chắc chắn muốn nộp bài?', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Nộp bài', onPress: submitCall }
+      ]);
+    } else {
+      await submitCall();
+    }
+  };
+
+  useEffect(() => {
+    let timer: any;
+    let sessionCheckTimer: any;
+    
+    if (isTakingExam && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+      
+      sessionCheckTimer = setInterval(async () => {
+        if (!currentAttemptId || !sessionTokenRef.current) return;
+        try {
+          const isValid = await checkExamSession(currentAttemptId, sessionTokenRef.current);
+          if (!isValid) {
+             clearInterval(timer);
+             clearInterval(sessionCheckTimer);
+             setIsTakingExam(false);
+             Alert.alert('Cảnh báo', 'Có thiết bị khác đang làm bài kiểm tra này. Bạn đã bị thoát ra.');
+             fetchExams();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 5000);
+      
+    } else if (isTakingExam && timeLeft <= 0) {
+      handleSubmit(true);
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+      if (sessionCheckTimer) clearInterval(sessionCheckTimer);
+    };
+  }, [isTakingExam, timeLeft, currentAttemptId]);
+
 
   const handleViewResult = async (examId: number) => {
     try {
@@ -146,6 +282,74 @@ export default function ExamScreen() {
       setIsLoadingResult(false);
     }
   };
+
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  if (isTakingExam && currentExam) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.examTakingHeader}>
+          <Text style={styles.examTakingTitle} numberOfLines={1}>{currentExam.tieuDe}</Text>
+          <View style={styles.timerBadge}>
+            <Clock size={16} color="#DC2626" />
+            <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.examTakingContent} showsVerticalScrollIndicator={false}>
+          {currentExam.cauHois?.length > 0 ? (
+            currentExam.cauHois.map((q, idx) => (
+              <View key={q.id} style={styles.questionContainer}>
+                <Text style={styles.questionTitle}>Câu {idx + 1} ({q.diem}đ): {q.noiDung}</Text>
+                
+                {q.loaiCauHoi === 'TRAC_NGHIEM' ? (
+                  <View style={styles.optionsContainer}>
+                    {q.dapAns?.map((da, i) => {
+                      const isSelected = answers[q.id] === da.id;
+                      return (
+                        <TouchableOpacity
+                          key={da.id}
+                          style={[styles.optionItem, isSelected && styles.optionItemSelected]}
+                          onPress={() => setAnswers(prev => ({ ...prev, [q.id]: da.id }))}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                            {String.fromCharCode(65 + i)}. {da.noiDung}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={styles.textInputContainer}>
+                    <TextInput
+                      style={styles.textInput}
+                      multiline={true}
+                      numberOfLines={4}
+                      placeholder="Nhập câu trả lời tự luận..."
+                      value={answers[q.id] || ''}
+                      onChangeText={(text) => setAnswers(prev => ({ ...prev, [q.id]: text }))}
+                    />
+                  </View>
+                )}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptyDetailText}>Chưa có câu hỏi nào.</Text>
+          )}
+
+          <TouchableOpacity style={styles.submitBtn} onPress={() => handleSubmit(false)}>
+            <Text style={styles.submitBtnText}>Nộp bài</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -785,5 +989,108 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 20,
   },
-});
 
+  examTakingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  examTakingTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginRight: 10,
+  },
+  timerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  timerText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#DC2626',
+    marginLeft: 4,
+  },
+  examTakingContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  questionContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  questionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  optionsContainer: {
+    gap: 8,
+  },
+  optionItem: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  optionItemSelected: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  optionTextSelected: {
+    color: '#1D4ED8',
+    fontWeight: '500',
+  },
+  textInputContainer: {
+    marginTop: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    fontSize: 14,
+    color: '#111827',
+    textAlignVertical: 'top',
+    minHeight: 100,
+  },
+  submitBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

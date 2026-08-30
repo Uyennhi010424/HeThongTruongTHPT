@@ -5,7 +5,9 @@ import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import { updateTkbNote } from "../../../api/thoikhoabieuApi.js";
-import { getLimitedSemesterWeeks } from "../../../utils/helpers.js";
+import { getLimitedSemesterWeeks, mapTimeToPeriod } from "../../../utils/helpers.js";
+import { getCurrentGiaoVien } from "../../../api/giaovienApi.js";
+import { getLichThi } from "../../../api/lichthiApi.js";
 
 const DAYS = [
   { value: 2, label: "Thứ Hai" },
@@ -102,13 +104,54 @@ export default function TeacherRegisterPhanCong() {
   const fetchData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const params = { namHoc, hocKy, tuan };
-      const [resTkb, resClasses] = await Promise.all([
-        axiosClient.get("/giaoviendangky/thoikhoabieu", { params, skipCache: true }),
-        axiosClient.get("/giaoviendangky/lop-cua-toi", { params: { namHoc, hocKy }, skipCache: true })
-      ]);
-      const serverSlots = resTkb?.data?.data || [];
-      setIsExamWeek(resTkb?.data?.message === "TUAN_THI");
+        const params = { namHoc, hocKy, tuan };
+        const [resTkb, resClasses, resExams, meRes] = await Promise.all([
+          axiosClient.get("/giaoviendangky/thoikhoabieu", { params, skipCache: true }),
+          axiosClient.get("/giaoviendangky/lop-cua-toi", { params: { namHoc, hocKy }, skipCache: true }),
+          getLichThi({ namHoc, hocKy }),
+          getCurrentGiaoVien().catch(() => null)
+        ]);
+        const serverSlots = resTkb?.data?.data || [];
+        const allLichThi = resExams?.data?.data || [];
+        const teacher = meRes?.data?.data || null;
+
+        // Lấy ngày đầu tuần / cuối tuần để filter lịch thi
+        const startYear = parseInt(namHoc.split("-")[0]);
+        const schoolStart = new Date(startYear, 8, 5); 
+        const dow = schoolStart.getDay();
+        const monday = new Date(schoolStart);
+        monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+        monday.setDate(monday.getDate() + (tuan - 1) * 7);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+
+        allLichThi.forEach(exam => {
+          if (!exam.ngayThi) return;
+          const d = new Date(exam.ngayThi + "T00:00:00");
+          if (d >= monday && d <= sunday) {
+             const isGiamThi = teacher && (Number(exam.giamThi1Id ?? exam.giamThi1?.id) === Number(teacher.id) || Number(exam.giamThi2Id ?? exam.giamThi2?.id) === Number(teacher.id));
+             const isChuNhiem = teacher?.lopChuNhiem && Number(exam.lopId) === Number(teacher.lopChuNhiem.id);
+             
+             if (isGiamThi || isChuNhiem) {
+               const examDow = d.getDay();
+               const thu = examDow === 0 ? 8 : examDow + 1;
+               const period = mapTimeToPeriod(exam.gioBatDau);
+               
+               serverSlots.push({
+                 id: 'ex-' + exam.id,
+                 thu: thu,
+                 tietBatDau: period,
+                 soTiet: 1,
+                 tenMon: "[THI] " + (exam.monHoc?.tenMon || ""),
+                 tenLop: exam.phongThi ? `Phòng: ${exam.phongThi}` : "Lịch thi",
+                 isExam: true,
+                 isLocked: true // Make it un-editable
+               });
+             }
+          }
+        });
+
+        setIsExamWeek(resTkb?.data?.message === "TUAN_THI");
       if (silent) {
         setTimetable((prev) => {
           const merged = [...serverSlots];
@@ -175,6 +218,7 @@ export default function TeacherRegisterPhanCong() {
   const handleCellClick = (day, period) => {
     const entry = findTkbEntry(day, period);
     if (entry) {
+      if (entry.isExam) return; // Khong lam gi khi click vao lich thi
       if (entry.isLocked) {
         setEditingEntry(entry);
         setNoteText(entry.ghiChu || "");
@@ -352,11 +396,6 @@ export default function TeacherRegisterPhanCong() {
 
         {loading ? (
           <div style={{ padding: "40px 0", textAlign: "center", color: "#888" }}>Đang tải lịch dạy...</div>
-        ) : isExamWeek ? (
-          <div style={{ padding: "80px 0", textAlign: "center", background: "#fef2f2", borderRadius: 12, border: "2px dashed #fca5a5", marginTop: 20 }}>
-            <h2 style={{ color: "#ef4444", margin: 0, fontSize: 24, fontWeight: 700 }}>TUẦN NÀY LÀ TUẦN THI</h2>
-            <p style={{ color: "#7f1d1d", marginTop: 8, fontSize: 16 }}>Thời khóa biểu học tập sẽ tạm dừng. Vui lòng kiểm tra Lịch coi thi ở mục tương ứng.</p>
-          </div>
         ) : (
           <div className="tkb-table-wrap">
             <table className="tkb-table">
@@ -400,14 +439,15 @@ export default function TeacherRegisterPhanCong() {
                         return (
                           <td
                             key={day.value}
+                            className={`tkb-cell tkb-interactive ${isStart ? 'tkb-start' : ''}`}
                             rowSpan={entry ? entry.soTiet || 1 : 1}
                             onClick={() => handleCellClick(day.value, period.value)}
                             style={{
-                              border: "1px solid #e5e7eb",
+                              border: entry?.isExam ? "1px solid #fca5a5" : "1px solid #e5e7eb",
                               padding: entry ? "12px" : "16px",
                               textAlign: "center",
-                              background: entry ? (entry.isLocked ? "#eff6ff" : (pIndex < 5 ? "#fef8e7" : "#e0f2fe")) : "transparent",
-                              cursor: "pointer",
+                              background: entry ? (entry.isExam ? "#fef2f2" : (entry.isLocked ? "#eff6ff" : (pIndex < 5 ? "#fef8e7" : "#e0f2fe"))) : "transparent",
+                              cursor: entry?.isExam ? "default" : "pointer",
                               transition: "all 0.2s ease",
                               verticalAlign: "middle"
                             }}
@@ -420,13 +460,17 @@ export default function TeacherRegisterPhanCong() {
                           >
                             {entry ? (
                               <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
-                                <div style={{ fontWeight: 700, color: entry.isLocked ? "#1e40af" : "#475569" }}>
-                                  Lớp {entry.lop?.tenLop}
+                                <div style={{ fontWeight: 700, color: entry.isExam ? "#b91c1c" : (entry.isLocked ? "#1e40af" : "#475569") }}>
+                                  {entry.isExam ? entry.tenLop : `Lớp ${entry.lop?.tenLop || ""}`}
                                 </div>
-                                <div style={{ fontSize: 13, color: entry.isLocked ? "#2563eb" : "#64748b" }}>
-                                  Môn: {entry.monHoc?.tenMon}
+                                <div style={{ fontSize: 13, color: entry.isExam ? "#b91c1c" : (entry.isLocked ? "#2563eb" : "#64748b"), fontWeight: entry.isExam ? "bold" : "normal" }}>
+                                  {entry.isExam ? entry.tenMon : `Môn: ${entry.monHoc?.tenMon || ""}`}
                                 </div>
-                                {entry.isLocked ? (
+                                {entry.isExam ? (
+                                  <span style={{ display: "inline-block", background: "#fca5a5", color: "#7f1d1d", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, marginTop: 4 }}>
+                                    Lịch thi
+                                  </span>
+                                ) : entry.isLocked ? (
                                   <span style={{ display: "inline-block", background: "#dbeafe", color: "#1e40af", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, marginTop: 4 }}>
                                     Tự đăng ký
                                   </span>
@@ -435,7 +479,7 @@ export default function TeacherRegisterPhanCong() {
                                     Hệ thống xếp
                                   </span>
                                 )}
-                                {entry.ghiChu && (
+                                {entry.ghiChu && !entry.isExam && (
                                   <div style={{ marginTop: 4, padding: "2px 6px", borderRadius: 4, backgroundColor: "#fef3c7", color: "#d97706", fontSize: 11, fontWeight: 600, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     📝 {entry.ghiChu}
                                   </div>

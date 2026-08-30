@@ -11,8 +11,6 @@ import org.hibernate.annotations.SQLRestriction;
     @UniqueConstraint(name = "uq_tkb_gv_tiet_thu", columnNames = {"giao_vien_id", "tiet_bat_dau", "thu", "tuan", "nam_hoc", "hoc_ky"}),
     @UniqueConstraint(name = "uq_tkb_phong_tiet_thu", columnNames = {"phong_hoc", "tiet_bat_dau", "thu", "tuan", "nam_hoc", "hoc_ky"})
 })
-@SQLDelete(sql = "UPDATE thoi_khoa_bieu SET is_deleted = true WHERE id = ?")
-@SQLRestriction("is_deleted = false")
 public class ThoiKhoaBieu {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -5,6 +5,7 @@ import Pagination from "../../../components/common/Pagination.jsx";
 import { getAuditLogs } from "../../../api/auditLogApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
+import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -30,12 +31,14 @@ function getActionMeta(action) {
 }
 
 function initials(name = "") {
-  return name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase() || "?";
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1].charAt(0).toUpperCase() || "?";
 }
 
-function Avatar({ name, color = "bg-blue-600" }) {
+function Avatar({ name, color = "bg-primary" }) {
   return (
-    <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${color} text-[11px] font-bold text-white`}>
+    <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${color} text-[11px] font-bold text-white border ${color.replace('bg-', 'border-')}`}>
       {initials(name)}
     </div>
   );
@@ -353,19 +356,19 @@ export default function AuditLogPage({ isEmbedded = false, logType = "all" }) {
                             {logType === "login" ? (
                               log.giaoVien?.hoTen ? (
                                 <div className="flex items-center gap-2">
-                                  <Avatar name={log.giaoVien.hoTen} color="bg-blue-500" />
+                                  <CachedAvatar username={log.giaoVien.tenDangNhap} role="ADMIN" className="h-8 w-8 rounded-full object-cover" fallback={<Avatar name={log.giaoVien.hoTen} color="bg-primary" />} />
                                   <span className="font-medium text-slate-700">{log.giaoVien.hoTen}</span>
                                 </div>
                               ) : log.hocSinh?.hoTen ? (
                                 <div className="flex items-center gap-2">
-                                  <Avatar name={log.hocSinh.hoTen} color="bg-violet-500" />
+                                  <CachedAvatar username={log.hocSinh.tenDangNhap} role="HOC_SINH" className="h-8 w-8 rounded-full object-cover" fallback={<Avatar name={log.hocSinh.hoTen} color="bg-primary" />} />
                                   <span className="font-medium text-slate-700">{log.hocSinh.hoTen}</span>
                                 </div>
                               ) : <span className="text-slate-300">—</span>
                             ) : (
                               log.giaoVien?.hoTen ? (
                                 <div className="flex items-center gap-2">
-                                  <Avatar name={log.giaoVien.hoTen} color="bg-blue-500" />
+                                  <CachedAvatar username={log.giaoVien.tenDangNhap} role="ADMIN" className="h-8 w-8 rounded-full object-cover" fallback={<Avatar name={log.giaoVien.hoTen} color="bg-primary" />} />
                                   <span className="font-medium text-slate-700">{log.giaoVien.hoTen}</span>
                                 </div>
                               ) : <span className="text-slate-300">—</span>
@@ -375,7 +378,7 @@ export default function AuditLogPage({ isEmbedded = false, logType = "all" }) {
                             <td className="px-5 py-3.5">
                               {log.hocSinh?.hoTen ? (
                                 <div className="flex items-center gap-2">
-                                  <Avatar name={log.hocSinh.hoTen} color="bg-violet-500" />
+                                  <CachedAvatar username={log.hocSinh.tenDangNhap} role="HOC_SINH" className="h-8 w-8 rounded-full object-cover" fallback={<Avatar name={log.hocSinh.hoTen} color="bg-primary" />} />
                                   <span className="font-medium text-slate-700">{log.hocSinh.hoTen}</span>
                                 </div>
                               ) : <span className="text-slate-300">—</span>}

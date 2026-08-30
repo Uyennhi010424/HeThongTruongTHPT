@@ -16,6 +16,8 @@ import CachedAvatar from "../common/CachedAvatar.jsx";
 import { getThongBao } from "../../api/thongbaoApi.js";
 import { formatDate } from "../../utils/helpers.js";
 import axiosClient from "../../api/axiosClient.js";
+import { webSocketService } from "../../utils/websocket.js";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
 
 export default function EduTopBar({
   searchPlaceholder = "Tìm kiếm...",
@@ -41,6 +43,7 @@ export default function EduTopBar({
   const groupRefsMap = useRef({});
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { themeLogo } = useTheme();
 
   // Fetch fresh avatar from DB on mount (syncs changes from mobile)
   useEffect(() => {
@@ -49,10 +52,16 @@ export default function EduTopBar({
     const fetchFreshAvatar = async () => {
       try {
         let freshAvatar = null;
-        if (role === "HOCSINH" || role === "HOC_SINH") {
-          const res = await axiosClient.get("/hocsinh/me", { skipCache: true });
-          freshAvatar = res?.data?.data?.anhDaiDien || null;
-        }
+          if (role === "HOCSINH" || role === "HOC_SINH") {
+            const res = await axiosClient.get("/hocsinh/me", { skipCache: true });
+            freshAvatar = res?.data?.data?.anhDaiDien || null;
+          } else if (role === "GIAOVIEN" || role === "GIAO_VIEN") {
+            const res = await axiosClient.get("/giaovien/me", { skipCache: true });
+            freshAvatar = res?.data?.data?.anhDaiDien || null;
+          } else if (role === "ADMIN") {
+            const res = await axiosClient.get("/users/me", { skipCache: true });
+            freshAvatar = res?.data?.data?.anhDaiDien || null;
+          }
         if (freshAvatar) {
           writeCachedAvatar({ avatar: freshAvatar, username: currentUsername, role: currentRole });
           setAvatar(freshAvatar);
@@ -120,11 +129,14 @@ export default function EduTopBar({
     };
   }, [currentUsername, currentRole, openGroup]);
 
-  // Fetch notifications
+  // Fetch notifications & WebSocket
   useEffect(() => {
     let active = true;
-    getThongBao()
-      .then((res) => {
+    let userId = null;
+
+    const fetchNotices = async () => {
+      try {
+        const res = await getThongBao();
         if (!active) return;
         const all = res?.data?.data || [];
         const role = getRole();
@@ -135,16 +147,49 @@ export default function EduTopBar({
               const creatorUsername = item.nguoiTao?.username;
               return creatorRole !== "ADMIN" && creatorRole !== "VAN_THU" && creatorUsername !== currentUsername;
             }
-            if (role === "GIAOVIEN") return item.doiTuong === "GIAO_VIEN" || item.doiTuong === "ALL";
-            if (role === "HOCSINH") return item.doiTuong === "HOC_SINH" || item.doiTuong === "ALL";
-            if (role === "PHUHUYNH") return item.doiTuong === "PHU_HUYNH" || item.doiTuong === "ALL";
+            if (role === "GIAOVIEN" || role === "GIAO_VIEN") return ["GIAO_VIEN", "ALL", "CA_NHAN", "REPLY", "PHU_HUYNH"].includes(item.doiTuong);
+            if (role === "HOCSINH" || role === "HOC_SINH") return ["HOC_SINH", "ALL", "CA_NHAN", "REPLY"].includes(item.doiTuong);
+            if (role === "PHUHUYNH" || role === "PHU_HUYNH") return ["PHU_HUYNH", "ALL", "CA_NHAN", "REPLY", "GIAO_VIEN"].includes(item.doiTuong);
             return true;
           })
           .sort((a, b) => new Date(b.ngayDang) - new Date(a.ngayDang));
         if (active) setNotices(filtered.slice(0, 8));
-      })
-      .catch(() => {});
-    return () => { active = false; };
+      } catch {}
+    };
+
+    const setupWebSocket = async () => {
+      try {
+        const userRes = await axiosClient.get("/users/me");
+        if (active && userRes.data?.data) {
+          userId = userRes.data.data.id;
+          webSocketService.connect(() => {
+            if (userId) {
+              webSocketService.subscribe(`/topic/user/${userId}`, (newNotice) => {
+                setNotices(prev => {
+                  if (prev.find(n => n.id === newNotice.id)) return prev;
+                  return [newNotice, ...prev].slice(0, 8);
+                });
+              });
+            }
+            webSocketService.subscribe('/topic/notifications', (newNotice) => {
+                setNotices(prev => {
+                  if (prev.find(n => n.id === newNotice.id)) return prev;
+                  return [newNotice, ...prev].slice(0, 8);
+                });
+            });
+          });
+        }
+      } catch {}
+    };
+
+    fetchNotices();
+    setupWebSocket();
+
+    return () => { 
+      active = false;
+      if (userId) webSocketService.unsubscribe(`/topic/user/${userId}`);
+      webSocketService.unsubscribe('/topic/notifications');
+    };
   }, [currentRole, currentUsername]);
 
   // Close notification dropdown on click outside
@@ -192,9 +237,41 @@ export default function EduTopBar({
     width: window.innerWidth >= 1024 ? `calc(100% - ${sidebarWidth}px)` : '100%'
   } : {};
 
+  // Track read notice IDs via localStorage
+  const [readIds, setReadIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('eduReadNoticeIds') || '[]'); } catch { return []; }
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const newReadIds = JSON.parse(localStorage.getItem('eduReadNoticeIds') || '[]');
+        setReadIds(newReadIds);
+      } catch (e) {}
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const unreadNoticeCount = notices.filter(n => !readIds.includes(n.id)).length;
+
+  const handleOpenNoti = () => {
+    setNotiOpen(!notiOpen);
+  };
+
+  const handleNoticeClick = (noticeId) => {
+    setNotiOpen(false);
+    if (!readIds.includes(noticeId)) {
+      const newReadIds = [...readIds, noticeId];
+      setReadIds(newReadIds);
+      try { localStorage.setItem('eduReadNoticeIds', JSON.stringify(newReadIds)); } catch {}
+    }
+    navigate(`${resolveBasePath()}/thongbao`);
+  };
+
   return (
     <header
-      className={`fixed top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6 transition-all duration-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${sidebarWidth === undefined ? (!navLinks ? (isOpen ? "lg:left-[250px] lg:w-[calc(100%-250px)]" : "lg:left-[80px] lg:w-[calc(100%-80px)]") : "lg:left-0 lg:w-full") : ""}`}
+      className={`fixed top-0 z-40 flex h-16 w-full items-center justify-between border-b border-primary bg-primary px-4 lg:px-6 transition-all duration-300 shadow-md ${sidebarWidth === undefined ? (!navLinks ? (isOpen ? "lg:left-[250px] lg:w-[calc(100%-250px)]" : "lg:left-[80px] lg:w-[calc(100%-80px)]") : "lg:left-0 lg:w-full") : ""}`}
       style={dynamicStyle}
     >
       {/* LEFT SECTION: Hamburger (for Sidebar) or Nav Links (for Header Nav) */}
@@ -203,11 +280,11 @@ export default function EduTopBar({
         {!navLinks && (
           <button
             type="button"
-            className="group flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white transition-all duration-300 ease-out hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="group flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-transparent transition-all duration-300 ease-out hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
             aria-label={isOpen ? "Đóng menu" : "Mở menu"}
             onClick={onToggle}
           >
-            <Menu className={`w-5 h-5 text-slate-700 transition-transform duration-300 group-hover:scale-110 ${!isOpen ? "rotate-90" : ""}`} />
+            <Menu className={`w-5 h-5 text-white transition-transform duration-300 group-hover:scale-110 ${!isOpen ? "rotate-90" : ""}`} />
           </button>
         )}
 
@@ -215,11 +292,11 @@ export default function EduTopBar({
         {navLinks && (
           <button
             type="button"
-            className="lg:hidden group flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white transition-all duration-300 ease-out hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="lg:hidden group flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-transparent transition-all duration-300 ease-out hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
             aria-label="Mở menu"
             onClick={onToggle}
           >
-            <Menu className="w-5 h-5 text-slate-700 transition-transform duration-300 group-hover:scale-110" />
+            <Menu className="w-5 h-5 text-white transition-transform duration-300 group-hover:scale-110" />
           </button>
         )}
 
@@ -236,8 +313,8 @@ export default function EduTopBar({
                     to={item.path}
                     className={`flex items-center gap-2 px-4 py-2 rounded-[10px] text-[15px] font-medium whitespace-nowrap transition-colors duration-200 ${
                       isActive
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-600 bg-transparent hover:bg-slate-100"
+                        ? "bg-white/20 text-white shadow-sm"
+                        : "text-white/80 bg-transparent hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <span>{item.label}</span>
@@ -259,8 +336,8 @@ export default function EduTopBar({
                       onClick={() => setOpenGroup(isDropdownOpen ? null : item.group)}
                       className={`flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[15px] font-medium whitespace-nowrap transition-colors duration-200 ${
                         hasActiveChild
-                          ? "text-blue-600"
-                          : "text-slate-600 bg-transparent hover:bg-slate-100"
+                          ? "bg-white/20 text-white"
+                          : "text-white/80 bg-transparent hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       <span>{item.group}</span>
@@ -313,13 +390,13 @@ export default function EduTopBar({
               onClick={(e) => {
                 if (pathname === targetPath) {
                   e.preventDefault();
-                  window.location.reload();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
               }}
               className="flex items-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
               title="Về trang tổng quan"
             >
-              <img src="/logo.png" alt="Logo Edu Manager" className="h-[72px] scale-110 w-auto object-contain drop-shadow-sm" />
+              <img src={themeLogo} alt="Logo Edu Manager" className="h-[72px] scale-110 w-auto object-contain drop-shadow-sm brightness-0 invert" />
             </Link>
           );
         })()}
@@ -342,19 +419,18 @@ export default function EduTopBar({
           />
         </form>
 
-        {/* Notifications */}
+
         <div className="relative shrink-0" ref={notiRef}>
           <button
             type="button"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors duration-200 hover:bg-slate-100 focus:outline-none"
-            onClick={() => setNotiOpen(!notiOpen)}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors duration-200 hover:bg-white/10 hover:text-white focus:outline-none"
+            onClick={handleOpenNoti}
             aria-label="Thông báo"
           >
             <Bell size={20} className={`transition-transform duration-300 ${notiOpen ? "rotate-[15deg]" : ""}`} />
-            {notices.length > 0 && (
-              <span className="absolute top-2 right-2 flex h-2 w-2">
-                <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            {unreadNoticeCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none border-2 border-white">
+                {unreadNoticeCount > 9 ? "9+" : unreadNoticeCount}
               </span>
             )}
           </button>
@@ -373,7 +449,7 @@ export default function EduTopBar({
                 <div className="p-6 text-center text-sm text-slate-500 font-medium">Không có thông báo mới</div>
               ) : (
                 notices.map((n) => (
-                  <div key={n.id} onClick={() => { setNotiOpen(false); navigate(`${resolveBasePath()}/thongbao`); }} className="flex flex-col gap-1 px-3 py-2.5 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                  <div key={n.id} onClick={() => handleNoticeClick(n.id)} className={`flex flex-col gap-1 px-3 py-2.5 rounded-xl transition-colors cursor-pointer border ${!readIds.includes(n.id) ? 'bg-blue-50/50 border-blue-100 hover:bg-blue-50' : 'hover:bg-slate-50 border-transparent hover:border-slate-100'}`}>
                     <span className="text-sm font-semibold text-slate-800 line-clamp-2">{n.tieuDe}</span>
                     <span className="text-xs text-slate-500 font-medium">{formatDate(n.ngayDang)}</span>
                   </div>
@@ -387,7 +463,7 @@ export default function EduTopBar({
         <div className="relative shrink-0" ref={accountRef}>
           <button
             type="button"
-            className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors duration-200 hover:bg-slate-50 border border-transparent hover:border-slate-200 focus:outline-none"
+            className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors duration-200 hover:bg-white/10 border border-transparent focus:outline-none"
             onClick={() => setAccountOpen(!accountOpen)}
             aria-label="Tài khoản"
           >
@@ -400,11 +476,11 @@ export default function EduTopBar({
                 return parts[parts.length - 1].charAt(0).toUpperCase();
               })()}
               className="h-[34px] w-[34px] rounded-full object-cover shadow-sm border border-slate-200 bg-white"
-              fallbackClassName="h-[34px] w-[34px] rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0"
+              fallbackClassName="h-[34px] w-[34px] rounded-full bg-white border border-transparent flex items-center justify-center text-primary font-bold shrink-0"
             />
             <div className="hidden flex-col items-start md:flex">
-              <span className="text-sm font-semibold text-slate-800 line-clamp-1">{userName}</span>
-              <span className="text-xs font-medium text-slate-500">{userRole}</span>
+              <span className="text-sm font-semibold text-white line-clamp-1">{userName}</span>
+              <span className="text-xs font-medium text-white/80">{userRole}</span>
             </div>
           </button>
 
@@ -423,7 +499,7 @@ export default function EduTopBar({
                   return parts[parts.length - 1].charAt(0).toUpperCase();
                 })()}
                 className="h-12 w-12 rounded-full object-cover shadow-sm border border-slate-200 bg-white"
-                fallbackClassName="h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 text-lg"
+                fallbackClassName="h-12 w-12 rounded-full bg-primary border border-primary flex items-center justify-center text-white font-bold shrink-0 text-lg"
               />
               <div className="flex flex-col">
                 <span className="font-bold text-slate-800 line-clamp-1">{userName}</span>

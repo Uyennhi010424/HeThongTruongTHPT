@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getThongBao, getThread, replyThongBao } from "../../api/thongbaoApi.js";
 import { notifySuccess, notifyError } from "../../utils/notify.js";
+import BaoCongThongBaoUI from "../../components/common/BaoCongThongBaoUI.jsx";
 
 const formatDateTime = (value) => {
   if (!value) return "";
@@ -12,16 +13,6 @@ const formatDateTime = (value) => {
   });
 };
 
-const getTargetLabel = (value) => {
-  switch (value) {
-    case "HOC_SINH": return "Học sinh";
-    case "ALL": return "Toàn trường";
-    case "GIAO_VIEN": return "Giáo viên";
-    case "PHU_HUYNH": return "Phụ huynh";
-    case "REPLY": return "Phản hồi";
-    default: return value || "Khác";
-  }
-};
 
 const getSenderLabel = (role) => {
   switch (role) {
@@ -166,29 +157,10 @@ export default function StudentThongBao() {
 
   return (
     <div className="student-page">
-      <section className="student-hero card">
-        <div className="student-hero-copy">
-          <div className="student-hero-kicker">EduManager Pro</div>
-          <h2 className="student-hero-title">Thông báo</h2>
-          <p className="student-hero-subtitle">Thông báo từ nhà trường dành cho học sinh.</p>
-        </div>
-        <div className="student-hero-metrics">
-          <div className="student-hero-chip">{loading ? "..." : notices.length} thông báo</div>
-        </div>
-      </section>
 
-      <div className="card users-toolbar">
-        <div className="users-actions">
-          <div className="dash-search users-search">
-            <span className="dot" />
-            <input
-              placeholder="Tìm kiếm thông báo..."
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
+
+
+
 
       {error && <div className="card table-empty">{error}</div>}
       {!error && !loading && filteredNotices.length === 0 && (
@@ -196,38 +168,10 @@ export default function StudentThongBao() {
       )}
 
       {!error && filteredNotices.length > 0 && (
-        <div className="card users-table">
-          <div className="table-header">
-            <div>
-              <div className="panel-title">Danh sách thông báo</div>
-              <div className="panel-subtitle">Click vào thông báo để xem chi tiết và phản hồi</div>
-            </div>
-            <div className="panel-pill">{filteredNotices.length} thông báo</div>
-          </div>
-          <div className="notice-list">
-            {filteredNotices.map((item) => (
-              <div
-                key={item.id}
-                className="notice-item"
-                style={{ cursor: "pointer" }}
-                onClick={() => setSelectedNotice(item)}
-              >
-                <div className="notice-top">
-                  <span className="notice-tag">{getTargetLabel(item.doiTuong)}</span>
-                  <span className="notice-date">{formatDateTime(item.ngayDang)}</span>
-                </div>
-                <div className="notice-title">{item.tieuDe}</div>
-                <div className="notice-content" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 600 }}>
-                  {item.noiDung}
-                </div>
-                <div style={{ marginTop: 6, fontSize: 12, color: "#3b82f6", display: "flex", alignItems: "center", gap: 4 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>reply</span>
-                  Nhấn để xem & phản hồi
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <BaoCongThongBaoUI 
+          notices={filteredNotices}
+          onNoticeClick={(notice) => setSelectedNotice(notice)}
+        />
       )}
 
       {selectedNotice && (

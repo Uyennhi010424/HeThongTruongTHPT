@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import com.hethongtruongthpt.repository.LichSuHocTapRepository;
+import com.hethongtruongthpt.entity.LichSuHocTap;
 import java.util.stream.Collectors;
 import java.time.Year;
 
@@ -46,6 +48,7 @@ public class HocSinhService {
     private final LopHocRepository lopHocRepository;
     private final UserRepository userRepository;
     private final PhuHuynhHocSinhRepository phuHuynhHocSinhRepository;
+    private final LichSuHocTapRepository lichSuHocTapRepository;
     private final PasswordEncoder passwordEncoder;
     private final DefaultAccountPasswordPolicy passwordPolicy;
     private final TransactionTemplate transactionTemplate;
@@ -56,6 +59,7 @@ public class HocSinhService {
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             PhuHuynhHocSinhRepository phuHuynhHocSinhRepository,
+            LichSuHocTapRepository lichSuHocTapRepository,
             DefaultAccountPasswordPolicy passwordPolicy,
             TransactionTemplate transactionTemplate) {
         this.hocSinhRepository = hocSinhRepository;
@@ -63,8 +67,13 @@ public class HocSinhService {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.phuHuynhHocSinhRepository = phuHuynhHocSinhRepository;
+        this.lichSuHocTapRepository = lichSuHocTapRepository;
         this.passwordPolicy = passwordPolicy;
         this.transactionTemplate = transactionTemplate;
+    }
+
+    public List<LichSuHocTap> getLichSuHocTap(Integer hocSinhId) {
+        return lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinhId);
     }
 
     public HocSinh getByUsername(String username) {
@@ -304,6 +313,9 @@ public class HocSinhService {
         if (hocSinh.getNamNhapHoc() != null) existing.setNamNhapHoc(hocSinh.getNamNhapHoc());
         if (hocSinh.getAnhDaiDien() != null) existing.setAnhDaiDien(hocSinh.getAnhDaiDien());
         
+        existing.setMaBhyt(hocSinh.getMaBhyt());
+        existing.setDienChinhSach(hocSinh.getDienChinhSach());
+        
         validateStudentRules(existing, existing.getLop());
         
         HocSinh saved = hocSinhRepository.save(existing);
@@ -312,6 +324,21 @@ public class HocSinhService {
         Integer newLopId = saved.getLop() != null ? saved.getLop().getId() : null;
         if (oldLopId != null) refreshSiSo(oldLopId);
         if (newLopId != null && !newLopId.equals(oldLopId)) refreshSiSo(newLopId);
+
+        // Lưu vết chuyển lớp
+        if (oldLopId != null && newLopId != null && !newLopId.equals(oldLopId)) {
+            LopHoc oldLop = lopHocRepository.findById(oldLopId).orElse(null);
+            if (oldLop != null) {
+                LichSuHocTap ls = new LichSuHocTap();
+                ls.setHocSinh(saved);
+                ls.setLopHoc(oldLop); // Lưu vết lớp cũ
+                ls.setNamHoc(oldLop.getNamHoc());
+                LopHoc newLop = lopHocRepository.findById(newLopId).orElse(null);
+                String newLopName = (newLop != null) ? newLop.getTenLop() : "lớp khác";
+                ls.setKetQua("Từ " + oldLop.getTenLop() + " sang " + newLopName);
+                lichSuHocTapRepository.save(ls);
+            }
+        }
 
         return getById(saved.getId());
     }
@@ -514,6 +541,7 @@ public class HocSinhService {
     public HocSinh transferClass(Integer id, Integer newLopId) {
         HocSinh hs = hocSinhRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh"));
         Integer oldLopId = hs.getLop() != null ? hs.getLop().getId() : null;
+        LopHoc oldLop = hs.getLop();
         LopHoc newLop = lopHocRepository.findById(newLopId).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học"));
         
         if (hs.getLop() != null && !hs.getLop().getKhoi().equals(newLop.getKhoi())) {
@@ -523,7 +551,19 @@ public class HocSinhService {
         hs.setLop(newLop);
         HocSinh updated = hocSinhRepository.save(hs);
         
-        if (oldLopId != null) refreshSiSo(oldLopId);
+        if (oldLopId != null) {
+            refreshSiSo(oldLopId);
+            
+            // Lưu vết chuyển lớp
+            if (oldLop != null && !newLopId.equals(oldLopId)) {
+                LichSuHocTap ls = new LichSuHocTap();
+                ls.setHocSinh(updated);
+                ls.setLopHoc(oldLop); // Lưu vết lớp cũ
+                ls.setNamHoc(oldLop.getNamHoc());
+                ls.setKetQua("Từ " + oldLop.getTenLop() + " sang " + newLop.getTenLop());
+                lichSuHocTapRepository.save(ls);
+            }
+        }
         refreshSiSo(newLopId);
         
         return updated;
@@ -543,7 +583,18 @@ public class HocSinhService {
         }
         
         HocSinh updated = hocSinhRepository.save(hs);
-        if (oldLopId != null) refreshSiSo(oldLopId);
+        if (oldLopId != null) {
+            refreshSiSo(oldLopId);
+            LopHoc oldLop = lopHocRepository.findById(oldLopId).orElse(null);
+            if (oldLop != null) {
+                LichSuHocTap ls = new LichSuHocTap();
+                ls.setHocSinh(updated);
+                ls.setLopHoc(oldLop); // Lưu vết lớp cũ
+                ls.setNamHoc(oldLop.getNamHoc());
+                ls.setKetQua("Chuyển sang " + truongMoi);
+                lichSuHocTapRepository.save(ls);
+            }
+        }
         
         return updated;
     }

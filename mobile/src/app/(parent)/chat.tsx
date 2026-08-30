@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Vibration, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Send } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useParentStore } from '../../store/useParentStore';
 import axiosClient from '../../api/axiosClient';
+import { webSocketService } from '../../api/websocket';
 
 interface Message {
   id: number;
@@ -16,6 +17,7 @@ interface Message {
     hoTen: string;
   };
   parentId?: number;
+  senderRole?: string;
 }
 
 export default function ChatScreen() {
@@ -34,7 +36,7 @@ export default function ChatScreen() {
         setMessages(res.data.data);
       }
     } catch (error) {
-      console.error("Failed to fetch messages:", error);
+      console.log("Failed to fetch messages:", error);
     } finally {
       setLoading(false);
     }
@@ -42,6 +44,30 @@ export default function ChatScreen() {
 
   useEffect(() => {
     fetchMessages();
+
+    // Kết nối WebSocket và nhận tin nhắn real-time
+    webSocketService.connect(() => {
+      if (selectedChild) {
+        webSocketService.subscribe(`/topic/chat/${selectedChild.id}`, (newMessage: Message) => {
+          setMessages(prev => {
+            const exists = prev.some(m => m.id === newMessage.id);
+            if (!exists) {
+              if (newMessage.senderRole && newMessage.senderRole !== 'PHU_HUYNH') {
+                // Remove Alert.alert and vibration when inside the chat
+              }
+              return [...prev, newMessage];
+            }
+            return prev;
+          });
+        });
+      }
+    });
+
+    return () => {
+      if (selectedChild) {
+        webSocketService.unsubscribe(`/topic/chat/${selectedChild.id}`);
+      }
+    };
   }, [selectedChild]);
 
   const handleSend = async () => {
@@ -59,7 +85,6 @@ export default function ChatScreen() {
           noiDung: textToSend,
           doiTuong: 'CA_NHAN',
           hocSinh: { id: selectedChild.id },
-          recipientId: gvcnId,
           senderRole: 'PHU_HUYNH'
         };
         const res = await axiosClient.post('/thongbao', payload);
@@ -71,15 +96,23 @@ export default function ChatScreen() {
         const rootId = messages[0].parentId || messages[0].id;
         const payload = {
           noiDung: textToSend,
-          senderRole: 'PHU_HUYNH'
+          senderRole: 'PHU_HUYNH',
+          hocSinh: { id: selectedChild.id },
+          doiTuong: 'CA_NHAN'
         };
         const res = await axiosClient.post(`/thongbao/reply/${rootId}`, payload);
         if (res.data?.success) {
-          setMessages(prev => [...prev, res.data.data]);
+          // let WebSocket handle adding the message to avoid duplicate keys, 
+          // but we also check if it exists just in case
+          setMessages(prev => {
+            if (prev.some(m => m.id === res.data.data.id)) return prev;
+            return [...prev, res.data.data];
+          });
         }
       }
     } catch (error) {
-      console.error("Failed to send message:", error);
+      console.log("Failed to send message:", error);
+      Alert.alert("Lỗi", "Không thể gửi tin nhắn");
     }
   };
 
@@ -121,7 +154,12 @@ export default function ChatScreen() {
              <Text style={{ textAlign: 'center', marginTop: 20, color: '#64748B' }}>Chưa có tin nhắn nào. Gửi tin nhắn đầu tiên cho GVCN!</Text>
           ) : (
             messages.map(msg => {
-              const isMe = msg.nguoiTao?.id === userData?.id;
+              // Cải thiện logic isMe: check id nếu có, nếu không thì fallback qua senderRole. 
+              // Phụ huynh sẽ thấy tin nhắn của mình (hoặc người nhà) bên phải, GV bên trái.
+              const isMe = (msg.nguoiTao && msg.nguoiTao.id === userData?.id) 
+                            || msg.senderRole === userData?.role 
+                            || msg.senderRole === 'PHU_HUYNH';
+
               return (
                 <View key={msg.id} style={[styles.messageWrapper, isMe ? styles.messageWrapperMe : styles.messageWrapperThem]}>
                   <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleThem]}>

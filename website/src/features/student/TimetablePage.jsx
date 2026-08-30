@@ -4,7 +4,7 @@ import { getThoiKhoaBieu } from "../../api/thoikhoabieuApi.js";
 import { getLichThiByLop, checkExamWeek } from "../../api/lichthiApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { formatDateShort, getDayLabel, getCurrentSemesterWeek } from "../../utils/helpers.js";
+import { formatDateShort, getDayLabel, getCurrentSemesterWeek, getWeekDates, mapTimeToPeriod } from "../../utils/helpers.js";
 import MaterialIcon from "../../components/edu/MaterialIcon.jsx";
 
 const WEEK_DAYS = [2, 3, 4, 5, 6, 7, 8];
@@ -194,6 +194,7 @@ export default function TimetablePage() {
         
         if (res?.data?.message === "TUAN_THI") {
           setIsExamWeek(true);
+          setFilterType(prev => prev === "lessons" ? "all" : prev);
         } else {
           try {
             const examWeekRes = await checkExamWeek(yearInfo.tenNamHoc, selectedTuan);
@@ -234,8 +235,26 @@ export default function TimetablePage() {
         map.set(key, entries);
       }
     });
+
+    if (exams && exams.length > 0) {
+      const sunday = addDays(weekStart, 6);
+      exams.forEach((exam) => {
+        if (!exam.ngayThi) return;
+        const d = new Date(exam.ngayThi + "T00:00:00");
+        if (d >= weekStart && d <= sunday) {
+          const dow = d.getDay();
+          const thu = dow === 0 ? 8 : dow + 1;
+          const period = mapTimeToPeriod(exam.gioBatDau);
+          const key = `${thu}-${period}`;
+          const entries = map.get(key) || [];
+          entries.push({ ...exam, isExam: true });
+          map.set(key, entries);
+        }
+      });
+    }
+
     return map;
-  }, [timetable, selectedTuan, yearInfo.tenNamHoc]);
+  }, [timetable, exams, selectedTuan, yearInfo.tenNamHoc]);
 
   const getCellEntries = (day, period) => scheduleMap.get(`${day}-${period}`) || [];
 
@@ -262,7 +281,7 @@ export default function TimetablePage() {
 
   /* ── Exams grouped by day-of-week for selected week ── */
   const examsByDay = useMemo(() => {
-    const { monday } = getWeekDates(selectedTuan);
+    const { monday } = getWeekDates(selectedTuan, yearInfo.activeYearObj || yearInfo);
     const sunday = addDays(monday, 6);
     const map = {};
     exams.forEach((exam) => {
@@ -276,7 +295,7 @@ export default function TimetablePage() {
       }
     });
     return map;
-  }, [exams, selectedTuan, yearInfo.tenNamHoc]);
+  }, [exams, selectedTuan, yearInfo.activeYearObj]);
 
   /* ── Stats ── */
   const stats = useMemo(() => {
@@ -286,19 +305,9 @@ export default function TimetablePage() {
     return { totalLessons, uniqueDays, weekExamCount };
   }, [timetable, examsByDay]);
 
-  /* ── Date helpers ── */
-  function getWeekDates(tuan) {
-    if (!yearInfo.tenNamHoc) return { monday: new Date() };
-    const startYear = parseInt(yearInfo.tenNamHoc.split("-")[0]);
-    const schoolStart = new Date(startYear, 8, 5);
-    const dow = schoolStart.getDay();
-    const monday = new Date(schoolStart);
-    monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
-    monday.setDate(monday.getDate() + (tuan - 1) * 7);
-    return { monday };
-  }
 
-  const selectedWeekStart = getWeekDates(selectedTuan).monday;
+
+  const selectedWeekStart = getWeekDates(selectedTuan, yearInfo.activeYearObj || yearInfo).monday;
 
   const weekRangeText = useMemo(() => {
     const monday = selectedWeekStart;
@@ -317,11 +326,10 @@ export default function TimetablePage() {
 
   const isCurrentWeek = useMemo(() => {
     const now = new Date();
-    const { monday } = getWeekDates(selectedTuan);
-    const sunday = addDays(monday, 6);
+    const { monday, sunday } = getWeekDates(selectedTuan, yearInfo.activeYearObj || yearInfo);
     now.setHours(0, 0, 0, 0);
     return now >= monday && now <= sunday;
-  }, [selectedTuan, yearInfo.tenNamHoc]);
+  }, [selectedTuan, yearInfo.activeYearObj]);
 
   const todayDateStr = `${String(displayedDate.getDate()).padStart(2, "0")}/${String(displayedDate.getMonth() + 1).padStart(2, "0")}/${displayedDate.getFullYear()}`;
 
@@ -371,27 +379,44 @@ export default function TimetablePage() {
         <td className="tkb-period">{period}</td>
         {scheduleDays.map((day) => {
           const isToday = day === todayThu && isCurrentWeek;
-          const cellLessons = showLessons ? getCellEntries(day, period) : [];
+          const entries = getCellEntries(day, period);
+          const cellLessons = entries.filter(item => 
+            (item.isExam && showExams) || (!item.isExam && showLessons)
+          );
           return (
             <td
               key={day}
               className={isToday ? "tkb-today-col" : ""}
             >
 
-              {cellLessons.map((item, li) => (
-                <div
-                  className={`tkb-entry ${period <= 5 ? "tkb-entry-sang" : "tkb-entry-chieu"}`}
-                  key={`${item.id || li}-p${period}`}
-                >
-                  <div className="tkb-subject">{getSubjectLabel(item)}</div>
-                  <div className="tkb-class">{getClassLabel(item)}</div>
-                  {item.ghiChu && (
-                    <div style={{ marginTop: "4px", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#fef3c7", color: "#d97706", fontSize: "0.75rem", fontWeight: 600, display: "inline-block" }}>
-                      📝 {item.ghiChu}
+              {cellLessons.map((item, li) => {
+                if (item.isExam) {
+                  return (
+                    <div className="tkb-entry tkb-entry-exam" key={`ex-${item.id}-${li}`} style={{ marginBottom: "8px", borderLeftColor: "#b91c1c", backgroundColor: "#fef2f2" }}>
+                      <div className="tkb-subject" style={{ color: "#b91c1c", fontWeight: 700 }}>
+                        {item.monHoc?.tenMon || "--"} <span className="tkb-exam-type">({item.loaiKiemTra || "KT"})</span>
+                      </div>
+                      <div className="tkb-class" style={{ color: "#991b1b" }}>
+                        {item.gioBatDau || "--"} · P.{item.phongThi || "--"}
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                }
+                return (
+                  <div
+                    className={`tkb-entry ${period <= 5 ? "tkb-entry-sang" : "tkb-entry-chieu"}`}
+                    key={`${item.id || li}-p${period}`}
+                  >
+                    <div className="tkb-subject">{getSubjectLabel(item)}</div>
+                    <div className="tkb-class">{getClassLabel(item)}</div>
+                    {item.ghiChu && (
+                      <div style={{ marginTop: "4px", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#fef3c7", color: "#d97706", fontSize: "0.75rem", fontWeight: 600, display: "inline-block" }}>
+                        📝 {item.ghiChu}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {!cellLessons.length && (
                 <div className="tkb-empty">&nbsp;</div>
               )}
@@ -501,100 +526,48 @@ export default function TimetablePage() {
           return null;
         })()}
 
-        {/* Bảng TKB */}
-        {isExamWeek ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-gray-150/80 shadow-xs" style={{ minHeight: '400px' }}>
-            <span className="material-symbols-outlined text-blue-500 mb-4 animate-bounce" style={{ fontSize: '64px' }}>
-              event_available
-            </span>
-            <h2 className="text-4xl font-black text-blue-900 uppercase tracking-widest text-center" style={{ fontSize: '32px', fontWeight: 900, color: '#1e3a8a', letterSpacing: '0.1em' }}>
-              TUẦN THI
-            </h2>
-            <p className="mt-3 text-sm text-gray-500 font-medium text-center max-w-md" style={{ marginTop: '12px', color: '#6b7280', maxWidth: '28rem', textAlign: 'center' }}>
-              Học sinh được nghỉ học các môn văn hóa trong tuần này. Vui lòng xem lịch thi chi tiết tại phân hệ Lịch Thi hoặc chọn Lọc "Lịch thi".
-            </p>
-          </div>
-        ) : (
-          <div className="tkb-table-wrap">
-            <table className="tkb-table">
-              <thead>
-                <tr>
-                  <th className="tkb-header-ca" rowSpan={2}>Ca học</th>
-                  <th className="tkb-header-tiet" rowSpan={2}>Tiết</th>
-                  {scheduleDays.map((day) => {
-                    const isToday = day === todayThu && isCurrentWeek;
-                    const d = getDateByDay(day);
-                    return (
-                      <th
-                        key={day}
-                        className={isToday ? "tkb-today-header" : ""}
-                      >
-                        <div>{getDayLabel(day)}</div>
-                        <div className="tkb-date">
-                          {d.getDate()}/{d.getMonth() + 1}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={2 + scheduleDays.length}
-                      className="tkb-loading"
+        <div className="tkb-table-wrap">
+          <table className="tkb-table">
+            <thead>
+              <tr>
+                <th className="tkb-header-ca" rowSpan={2}>Ca học</th>
+                <th className="tkb-header-tiet" rowSpan={2}>Tiết</th>
+                {scheduleDays.map((day) => {
+                  const isToday = day === todayThu && isCurrentWeek;
+                  const d = getDateByDay(day);
+                  return (
+                    <th
+                      key={day}
+                      className={isToday ? "tkb-today-header" : ""}
                     >
-                      Đang tải dữ liệu...
-                    </td>
-                  </tr>
-                ) : (
-                  <>
-                    {/* Row riêng cho Lịch thi */}
-                    {showExams && Object.keys(examsByDay).length > 0 && (
-                      <tr className="tkb-exams-row">
-                        <td
-                          colSpan={2}
-                          className="tkb-ca-hoc tkb-sang"
-                          style={{ backgroundColor: "#fef2f2", color: "#b91c1c", fontWeight: 700 }}
-                        >
-                          Lịch thi
-                        </td>
-                        {scheduleDays.map((day) => {
-                          const isToday = day === todayThu && isCurrentWeek;
-                          const cellExams = examsByDay[day] || [];
-                          return (
-                            <td
-                              key={day}
-                              className={isToday ? "tkb-today-col" : ""}
-                              style={{ verticalAlign: "top", backgroundColor: cellExams.length > 0 ? "#fef2f2" : "transparent" }}
-                            >
-                              {cellExams.map((exam, ei) => (
-                                <div className="tkb-entry tkb-entry-exam" key={`ex-${exam.id}-${ei}`} style={{ marginBottom: "8px", borderLeftColor: "#b91c1c" }}>
-                                  <div className="tkb-subject">
-                                    {exam.monHoc?.tenMon || "--"}{" "}
-                                    <span className="tkb-exam-type">({exam.loaiKiemTra || "KT"})</span>
-                                  </div>
-                                  <div className="tkb-class">
-                                    {exam.gioBatDau || "--"} · P.{exam.phongThi || "--"}
-                                  </div>
-                                </div>
-                              ))}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    )}
-
-                    {/* Lịch học chính thức */}
-                    {renderSessionRows([1, 2, 3, 4, 5], "tkb-sang")}
-                    {renderSessionRows([6, 7, 8, 9, 10], "tkb-chieu")}
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                      <div>{getDayLabel(day)}</div>
+                      <div className="tkb-date">
+                        {d.getDate()}/{d.getMonth() + 1}
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={2 + scheduleDays.length}
+                    className="tkb-loading"
+                  >
+                    Đang tải dữ liệu...
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {(showLessons || showExams) && renderSessionRows([1, 2, 3, 4, 5], "tkb-sang")}
+                  {(showLessons || showExams) && renderSessionRows([6, 7, 8, 9, 10], "tkb-chieu")}
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Legend */}
         <div className="tkb-legend">

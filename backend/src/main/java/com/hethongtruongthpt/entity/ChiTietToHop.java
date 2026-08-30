@@ -13,11 +13,11 @@ public class ChiTietToHop {
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "to_hop_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @JoinColumn(name = "to_hop_id")
     private ToHopMon toHopMon;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mon_hoc_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @JoinColumn(name = "mon_hoc_id")
     private MonHoc monHoc;
 
     @Column(name = "so_tiet")

@@ -2,6 +2,8 @@ package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.entity.LichThi;
 import com.hethongtruongthpt.repository.LichThiRepository;
+import com.hethongtruongthpt.repository.AdminConfigRepository;
+import com.hethongtruongthpt.entity.AdminConfig;
 import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.*;
 import org.springframework.stereotype.Service;
@@ -13,9 +15,17 @@ import java.util.List;
 @Service
 public class LichThiPdfService {
     private final LichThiRepository lichThiRepository;
+    private final AdminConfigRepository adminConfigRepository;
 
-    public LichThiPdfService(LichThiRepository lichThiRepository) {
+    public LichThiPdfService(LichThiRepository lichThiRepository, AdminConfigRepository adminConfigRepository) {
         this.lichThiRepository = lichThiRepository;
+        this.adminConfigRepository = adminConfigRepository;
+    }
+
+    private String getSchoolName() {
+        return adminConfigRepository.findByConfigKey("system_name")
+                .map(AdminConfig::getConfigValue)
+                .orElse("TRƯỜNG THPT");
     }
 
     public byte[] generatePdf(String namHoc, Integer hocKy) throws Exception {
@@ -37,6 +47,13 @@ public class LichThiPdfService {
         PdfWriter.getInstance(document, out);
 
         document.open();
+
+        // School Name
+        Font schoolFont = new Font(Font.FontFamily.TIMES_ROMAN, 12, Font.BOLD);
+        Paragraph schoolName = new Paragraph(getSchoolName().toUpperCase(), schoolFont);
+        schoolName.setAlignment(Element.ALIGN_LEFT);
+        schoolName.setSpacingAfter(10);
+        document.add(schoolName);
 
         // Title
         Font titleFont = new Font(Font.FontFamily.TIMES_ROMAN, 18, Font.BOLD);

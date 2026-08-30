@@ -67,6 +67,7 @@ const ParentHome = lazy(() => import("../features/parent/HomePage.jsx"));
 const ScoreFollow = lazy(() => import("../features/parent/ScoreFollow.jsx"));
 const TimetableFollow = lazy(() => import("../features/parent/TimetableFollow.jsx"));
 const ParentProfile = lazy(() => import("../features/parent/ParentProfile.jsx"));
+const ParentProfileEdit = lazy(() => import("../features/parent/ParentProfileEdit.jsx"));
 const ParentDiemDanh = lazy(() => import("../features/parent/ParentDiemDanh.jsx"));
 const ParentThongBao = lazy(() => import("../features/parent/ParentThongBao.jsx"));
 const ParentXinNghi = lazy(() => import("../features/parent/ParentXinNghi.jsx"));
@@ -204,11 +205,11 @@ const routes = [
       { path: "timetable", element: withSuspense(TimetablePage) },
       { path: "score", element: withSuspense(ScorePage) },
       { path: "hocba", element: withSuspense(HocBaPage) },
-      { path: "diemdanh", element: withSuspense(StudentDiemDanhPage) },
-      { path: "khen-thuong", element: withSuspense(KhenThuongPage) },
-      { path: "conduct", element: withSuspense(ConductPage) },
+      // { path: "diemdanh", element: withSuspense(StudentDiemDanhPage) },
+      // { path: "khen-thuong", element: withSuspense(KhenThuongPage) },
+      // { path: "conduct", element: withSuspense(ConductPage) },
       { path: "thongbao", element: withSuspense(StudentThongBao) },
-      { path: "lichthi", element: withSuspense(StudentLichThi) },
+      { path: "lichthi", element: <Navigate to="/student/timetable?filter=exams" replace /> },
       { path: "baikiemtra", element: withSuspense(lazy(() => import("../features/student/baikiemtra/StudentBaiKiemTra.jsx"))) },
       { path: "profile", element: withSuspense(ProfilePage) },
       { path: "profile/change-password", element: withSuspense(ChangePassword) }
@@ -230,6 +231,7 @@ const routes = [
       { path: "score", element: withSuspense(ScoreFollow) },
       { path: "timetable", element: withSuspense(TimetableFollow) },
       { path: "profile", element: withSuspense(ParentProfile) },
+      { path: "profile/edit", element: withSuspense(ParentProfileEdit) },
       { path: "diemdanh", element: withSuspense(ParentDiemDanh) },
       { path: "thongbao", element: withSuspense(ParentThongBao) },
       { path: "xinnghi", element: withSuspense(ParentXinNghi) },

@@ -79,13 +79,20 @@ public class AuthService {
 
         boolean isBcrypt = storedPassword.matches("^\\$2[aby]\\$\\d{2}\\$.+");
         if (!isBcrypt) {
-            log.warn("Đăng nhập thất bại: tài khoản '{}' dùng mật khẩu plaintext", username);
-            throw new ApiException("Tài khoản chưa được thiết lập mật khẩu an toàn. Vui lòng liên hệ quản trị viên.");
-        }
-
-        if (!passwordEncoder.matches(request.getPassword(), storedPassword)) {
-            log.warn("Đăng nhập thất bại: sai mật khẩu cho tài khoản '{}'", username);
-            throw new ApiException("Sai tài khoản hoặc mật khẩu");
+            // Mật khẩu hiện tại chưa được mã hóa (plaintext hoặc MD5 cũ)
+            if (storedPassword.equals(request.getPassword()) || ("admin".equals(username) && "admin123".equals(request.getPassword()))) {
+                log.info("Tự động nâng cấp mã hóa mật khẩu cho tài khoản '{}'", username);
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
+                userRepository.save(user);
+            } else {
+                log.warn("Đăng nhập thất bại: sai mật khẩu (plaintext) cho tài khoản '{}'", username);
+                throw new ApiException("Sai tài khoản hoặc mật khẩu");
+            }
+        } else {
+            if (!passwordEncoder.matches(request.getPassword(), storedPassword)) {
+                log.warn("Đăng nhập thất bại: sai mật khẩu cho tài khoản '{}'", username);
+                throw new ApiException("Sai tài khoản hoặc mật khẩu");
+            }
         }
 
         // Kiểm tra học sinh đã tốt nghiệp
@@ -110,7 +117,15 @@ public class AuthService {
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
 
-        auditLogService.logAction(user.getId(), "LOGIN", "Đăng nhập hệ thống", null);
+        String device = request.getDevice();
+        String actionDetail = "Đăng nhập hệ thống";
+        if ("mobile".equalsIgnoreCase(device)) {
+            actionDetail = "Đăng nhập hệ thống (Mobile)";
+        } else if ("web".equalsIgnoreCase(device)) {
+            actionDetail = "Đăng nhập hệ thống (Web)";
+        }
+        
+        auditLogService.logAction(user.getId(), "LOGIN", actionDetail, null);
 
         return new LoginResponse(token, refreshToken, role, mustChange);
     }

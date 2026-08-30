@@ -175,7 +175,11 @@ public class StatisticsService {
 
     private long countSchoolDays(LocalDate from, LocalDate to) {
         if (from == null || to == null || from.isAfter(to)) return 0;
-        return lichNamHocRepository.countNgayHocBetween(from, to);
+        long days = lichNamHocRepository.countNgayHocBetween(from, to);
+        if (days == 0) {
+            return java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1;
+        }
+        return days;
     }
 
     public AttendanceStatistics getAttendanceStats(String namHoc, LocalDate from, LocalDate to) {

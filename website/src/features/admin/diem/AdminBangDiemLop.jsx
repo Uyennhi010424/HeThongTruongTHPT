@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getClassScoreboard } from "../../../api/diemApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
-import { ArrowLeft, Download, RefreshCw } from "lucide-react";
+import { tinhHocLucLop } from "../../../api/hocbaApi.js";
+import { ArrowLeft, Download, RefreshCw, Calculator, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
+import { notifySuccess, notifyError } from "../../../utils/notify.js";
 
 /* ── Hàm format ─────────────────────────────────────────── */
 const fmt = (score) => {
@@ -195,6 +197,31 @@ export default function AdminBangDiemLop() {
   const [classInfo, setClassInfo] = useState(null);
   const [subjects, setSubjects] = useState([]);
   const [students, setStudents] = useState([]);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  const handleCalculateHocBa = async () => {
+    const selectedNh = namHocList.find(nh => nh.tenNamHoc === namHoc);
+    if (!selectedNh) {
+      notifyError("Vui lòng chọn năm học hợp lệ");
+      return;
+    }
+    if (!lopId) {
+      notifyError("Không tìm thấy thông tin lớp học");
+      return;
+    }
+    
+    setIsCalculating(true);
+    try {
+      await tinhHocLucLop({ lopId: Number(lopId), namHocId: selectedNh.id });
+      notifySuccess("Tổng kết điểm cuối năm và tạo học bạ thành công!");
+      fetchScoreboard();
+    } catch (err) {
+      console.error("Lỗi khi tổng kết điểm:", err);
+      notifyError("Có lỗi xảy ra khi tổng kết điểm");
+    } finally {
+      setIsCalculating(false);
+    }
+  };
 
   // Load danh sách năm học lần đầu tiên
   useEffect(() => {
@@ -325,6 +352,18 @@ export default function AdminBangDiemLop() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-500" : ""}`} />
             Làm mới
+          </button>
+          <button
+            onClick={handleCalculateHocBa}
+            disabled={isCalculating || students.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isCalculating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Calculator className="w-4 h-4" />
+            )}
+            Tổng kết cuối năm
           </button>
           <button
             onClick={() => exportExcel(classInfo, namHoc, hocKy, subjects, students)}

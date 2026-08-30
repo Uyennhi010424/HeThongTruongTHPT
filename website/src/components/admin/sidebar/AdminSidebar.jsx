@@ -76,12 +76,12 @@ export default function AdminSidebar({ isMobileOpen, onMobileClose, onPanelState
             if (window.innerWidth >= 1024) onDesktopExpandedChange(true); 
             navigate(`${basePath}/dashboard`); 
           }}>
-            <div className="flex-shrink-0 flex items-center w-full">
+            <div className="flex-shrink-0 flex items-center justify-center w-full">
               <img 
                 src={themeLogo} 
                 alt="Logo Edu Manager" 
-                className={`w-auto object-contain transition-all duration-250 brightness-0 invert opacity-95 drop-shadow-md ${isExpanded || isMobileOpen ? 'h-[78px]' : 'h-[56px] object-left overflow-hidden w-[56px]'}`} 
-                style={(!isExpanded && !isMobileOpen) ? { objectPosition: 'left' } : {}}
+                className={`w-auto object-contain transition-all duration-250 drop-shadow-sm brightness-0 invert opacity-95 ${isExpanded || isMobileOpen ? 'h-[90px]' : 'h-[56px] w-[56px]'}`}
+                style={(!isExpanded && !isMobileOpen) ? { objectPosition: 'center' } : {}}
               />
             </div>
           </div>

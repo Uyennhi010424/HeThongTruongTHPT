@@ -1,6 +1,8 @@
 package com.hethongtruongthpt.controller;
 
 import com.hethongtruongthpt.common.ApiResponse;
+import com.hethongtruongthpt.dto.response.ThoiKhoaBieuResponse;
+import com.hethongtruongthpt.dto.response.TkbDayThayResponse;
 import com.hethongtruongthpt.entity.ThoiKhoaBieu;
 import com.hethongtruongthpt.entity.TkbDayThay;
 import com.hethongtruongthpt.service.GiaoVienDangKyService;
@@ -39,12 +41,14 @@ public class GiaoVienDangKyController {
     }
 
     @GetMapping("/thoikhoabieu")
-    public ResponseEntity<ApiResponse<List<ThoiKhoaBieu>>> getThoiKhoaBieu(
+    public ResponseEntity<ApiResponse<List<ThoiKhoaBieuResponse>>> getThoiKhoaBieu(
             @RequestParam String namHoc,
             @RequestParam Integer hocKy,
             @RequestParam Integer tuan) {
         boolean isExamWeek = service.isExamWeek(namHoc, tuan);
-        return ResponseEntity.ok(ApiResponse.ok(isExamWeek ? "TUAN_THI" : "OK", service.getThoiKhoaBieu(namHoc, hocKy, tuan)));
+        List<ThoiKhoaBieuResponse> res = service.getThoiKhoaBieu(namHoc, hocKy, tuan).stream()
+                .map(ThoiKhoaBieuResponse::fromEntity).collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(ApiResponse.ok(isExamWeek ? "TUAN_THI" : "OK", res));
     }
 
     @GetMapping("/lop-cua-toi")
@@ -55,8 +59,8 @@ public class GiaoVienDangKyController {
     }
 
     @PostMapping("/thoikhoabieu/dangky")
-    public ResponseEntity<ApiResponse<ThoiKhoaBieu>> dangKyLichDay(@RequestBody Map<String, Object> body) {
-        return ResponseEntity.ok(ApiResponse.ok("Đăng ký tiết dạy thành công", service.dangKyLichDay(body)));
+    public ResponseEntity<ApiResponse<ThoiKhoaBieuResponse>> dangKyLichDay(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Đăng ký tiết dạy thành công", ThoiKhoaBieuResponse.fromEntity(service.dangKyLichDay(body))));
     }
 
     @DeleteMapping("/thoikhoabieu/{id}")
@@ -75,10 +79,10 @@ public class GiaoVienDangKyController {
     }
 
     @PostMapping("/day-thay/dangky")
-    public ResponseEntity<ApiResponse<TkbDayThay>> dangKyDayThay(
+    public ResponseEntity<ApiResponse<TkbDayThayResponse>> dangKyDayThay(
             @RequestParam Integer tkbId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate ngay) {
-        return ResponseEntity.ok(ApiResponse.ok("Đăng ký dạy thay thành công", service.dangKyDayThay(tkbId, ngay)));
+        return ResponseEntity.ok(ApiResponse.ok("Đăng ký dạy thay thành công", TkbDayThayResponse.fromEntity(service.dangKyDayThay(tkbId, ngay))));
     }
 
     @DeleteMapping("/day-thay/{id}")
@@ -88,26 +92,28 @@ public class GiaoVienDangKyController {
     }
 
     @GetMapping("/day-thay/cua-toi")
-    public ResponseEntity<ApiResponse<List<TkbDayThay>>> getLichDayThayCuaToi(
+    public ResponseEntity<ApiResponse<List<TkbDayThayResponse>>> getLichDayThayCuaToi(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate ngay,
             @RequestParam(required = false) String namHoc) {
-        return ResponseEntity.ok(ApiResponse.ok(service.getLichDayThayCuaToi(ngay, namHoc)));
+        List<TkbDayThayResponse> res = service.getLichDayThayCuaToi(ngay, namHoc).stream()
+                .map(TkbDayThayResponse::fromEntity).collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(ApiResponse.ok(res));
     }
 
     @PostMapping("/thoikhoabieu/doi-lich")
-    public ResponseEntity<ApiResponse<ThoiKhoaBieu>> doiLichDay(
+    public ResponseEntity<ApiResponse<ThoiKhoaBieuResponse>> doiLichDay(
             @RequestParam Integer sourceId,
             @RequestParam(required = false) Integer targetThu,
             @RequestParam(required = false) Integer targetTiet,
             @RequestParam(required = false) Integer targetId) {
-        return ResponseEntity.ok(ApiResponse.ok("Đổi lịch dạy thành công", service.doiLichDay(sourceId, targetThu, targetTiet, targetId)));
+        return ResponseEntity.ok(ApiResponse.ok("Đổi lịch dạy thành công", ThoiKhoaBieuResponse.fromEntity(service.doiLichDay(sourceId, targetThu, targetTiet, targetId))));
     }
 
     @PutMapping("/thoikhoabieu/{id}/note")
-    public ResponseEntity<ApiResponse<ThoiKhoaBieu>> updateGhiChu(
+    public ResponseEntity<ApiResponse<ThoiKhoaBieuResponse>> updateGhiChu(
             @PathVariable Integer id,
             @RequestBody Map<String, String> body) {
         String ghiChu = body.get("ghiChu");
-        return ResponseEntity.ok(ApiResponse.ok(service.updateGhiChu(id, ghiChu)));
+        return ResponseEntity.ok(ApiResponse.ok(ThoiKhoaBieuResponse.fromEntity(service.updateGhiChu(id, ghiChu))));
     }
 }

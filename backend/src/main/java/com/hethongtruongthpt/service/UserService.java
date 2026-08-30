@@ -75,11 +75,13 @@ public class UserService {
         boolean isBcrypt = storedPassword != null && storedPassword.matches("^\\$2[aby]\\$\\d{2}\\$.+");
 
         if (!isBcrypt) {
-            throw new ApiException("Tài khoản chưa được thiết lập mật khẩu an toàn. Vui lòng liên hệ quản trị viên.");
-        }
-
-        if (!passwordEncoder.matches(oldPassword, storedPassword)) {
-            throw new ApiException("Mật khẩu cũ không chính xác");
+            if (!storedPassword.equals(oldPassword)) {
+                throw new ApiException("Mật khẩu cũ không chính xác");
+            }
+        } else {
+            if (!passwordEncoder.matches(oldPassword, storedPassword)) {
+                throw new ApiException("Mật khẩu cũ không chính xác");
+            }
         }
 
         existing.setPassword(passwordEncoder.encode(newPassword.trim()));

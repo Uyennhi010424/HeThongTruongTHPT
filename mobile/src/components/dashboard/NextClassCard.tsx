@@ -97,7 +97,7 @@ export const NextClassCard: React.FC<NextClassCardProps> = ({ timetable }) => {
         <View style={styles.nextClassHeader}>
           <View style={styles.subjectTag}>
             <Book size={14} color="#2563EB" />
-            <Text style={styles.subjectText}>{classData.monHoc?.tenMonHoc || 'Môn học'}</Text>
+            <Text style={styles.subjectText}>{classData.monHoc?.tenMon || classData.monHoc?.tenMonHoc || 'Môn học'}</Text>
           </View>
           <Text style={styles.tietText}>Tiết {classData.tietBatDau}</Text>
         </View>
@@ -115,6 +115,13 @@ export const NextClassCard: React.FC<NextClassCardProps> = ({ timetable }) => {
             <Text style={styles.nextClassDetailText}>Phòng {classData.phongHoc || 'Chưa xếp'}</Text>
           </View>
         </View>
+        {classData.ghiChu ? (
+          <View style={{ marginTop: 12, flexDirection: 'row' }}>
+            <Text style={{ fontSize: 13, color: '#D97706', backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, overflow: 'hidden', fontWeight: '500' }}>
+              📌 {classData.ghiChu}
+            </Text>
+          </View>
+        ) : null}
       </TouchableOpacity>
     );
   };

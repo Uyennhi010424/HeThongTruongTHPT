@@ -5,6 +5,7 @@ import HocSinhFilters from "./HocSinhFilters.jsx";
 import HocSinhFormModal from "./HocSinhFormModal.jsx";
 import HocSinhExcelImportModal from "./HocSinhExcelImportModal.jsx";
 import HocSinhViewModal from "./HocSinhViewModal.jsx";
+import HocSinhExportModal from "./HocSinhExportModal.jsx";
 
 import HocSinhTransferClassModal from "./HocSinhTransferClassModal.jsx";
 import HocSinhTransferSchoolModal from "./HocSinhTransferSchoolModal.jsx";
@@ -32,7 +33,7 @@ export default function HocSinhList() {
           </button>
 
           <button 
-            onClick={hooks.handleExportExcel}
+            onClick={() => hooks.setExportModalOpen(true)}
             className="inline-flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-600 border border-slate-200 hover:border-emerald-200 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors duration-200"
           >
             <Download className="w-4 h-4" />
@@ -80,6 +81,7 @@ export default function HocSinhList() {
       <HocSinhTable hooks={hooks} />
       <HocSinhFormModal hooks={hooks} />
       <HocSinhExcelImportModal hooks={hooks} />
+      <HocSinhExportModal hooks={hooks} />
       <HocSinhViewModal hooks={hooks} />
       <HocSinhTransferClassModal hooks={hooks} />
       <HocSinhTransferSchoolModal hooks={hooks} />

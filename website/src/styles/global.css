@@ -2640,6 +2640,7 @@ a {
   font-weight: 700;
   letter-spacing: 0.02em;
   flex-shrink: 0;
+  object-fit: cover;
 }
 
 .teacher-strip-info {

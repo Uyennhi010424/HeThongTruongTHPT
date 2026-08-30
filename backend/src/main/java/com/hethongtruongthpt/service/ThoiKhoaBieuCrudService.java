@@ -124,10 +124,26 @@ public class ThoiKhoaBieuCrudService {
         all.addAll(systemSlots);
         all.addAll(teacherSlots);
 
+        List<ThoiKhoaBieu> result = new java.util.ArrayList<>();
         for (ThoiKhoaBieu tkb : all) {
-            tkb.setTuan(tuan);
+            ThoiKhoaBieu clone = new ThoiKhoaBieu();
+            clone.setId(tkb.getId());
+            clone.setLop(tkb.getLop());
+            clone.setMonHoc(tkb.getMonHoc());
+            clone.setGiaoVien(tkb.getGiaoVien());
+            clone.setThu(tkb.getThu());
+            clone.setTietBatDau(tkb.getTietBatDau());
+            clone.setSoTiet(tkb.getSoTiet());
+            clone.setPhongHoc(tkb.getPhongHoc());
+            clone.setHocKy(tkb.getHocKy());
+            clone.setNamHoc(tkb.getNamHoc());
+            clone.setIsLocked(tkb.getIsLocked());
+            clone.setGhiChu(tkb.getGhiChu());
+            clone.setIsDeleted(tkb.getIsDeleted());
+            clone.setTuan(tuan);
+            result.add(clone);
         }
-        return all;
+        return result;
     }
 
     @Transactional(readOnly = true)

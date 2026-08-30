@@ -1,6 +1,7 @@
 import { Edit, Trash2, ArrowRightLeft, School } from "lucide-react";
 import { formatDate, formatPhoneDisplay, getGenderLabel } from "./hocSinhUtils.js";
 import Pagination from "../../../components/common/Pagination.jsx";
+import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
 
 export default function HocSinhTable({ hooks }) {
   const {
@@ -59,7 +60,8 @@ export default function HocSinhTable({ hooks }) {
                 </td>
               </tr>
             ) : (
-              pagedStudents.map((student, idx) => (
+              pagedStudents.map((student, idx) => {
+                return (
                 <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-4 text-sm font-semibold text-slate-400">
                     {(page - 1) * pageSize + idx + 1}
@@ -72,9 +74,14 @@ export default function HocSinhTable({ hooks }) {
                         setViewModalOpen(true);
                       }}
                     >
-                      <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold group-hover:bg-indigo-100 transition-colors">
-                        {student.hoTen ? student.hoTen.charAt(0).toUpperCase() : "H"}
-                      </div>
+                      <CachedAvatar
+                        username={student.maHocSinh}
+                        role="student"
+                        src={student.anhDaiDien}
+                        fallback={student.hoTen ? student.hoTen.charAt(0).toUpperCase() : "H"}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-indigo-100"
+                        fallbackClassName="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold group-hover:bg-indigo-100 transition-colors"
+                      />
                       <div>
                         <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{student.hoTen}</div>
                         <div className="text-xs text-slate-500 font-medium mt-0.5">
@@ -152,7 +159,8 @@ export default function HocSinhTable({ hooks }) {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

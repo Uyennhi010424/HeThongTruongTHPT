@@ -46,6 +46,17 @@ public class PhuHuynhController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponse<PhuHuynh>> updateCurrentParent(@Valid @RequestBody PhuHuynh phuHuynh) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        PhuHuynh currentUser = phuHuynhService.getByUsername(username);
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Không tìm thấy phụ huynh"));
+        }
+        return ResponseEntity.ok(ApiResponse.ok(phuHuynhService.update(currentUser.getId(), phuHuynh)));
+    }
+
+    @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
     @GetMapping("/{id}/hocsinh")
     public ResponseEntity<ApiResponse<List<HocSinhResponseDTO>>> getStudentsByParent(@PathVariable Integer id) {

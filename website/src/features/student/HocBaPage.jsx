@@ -121,13 +121,17 @@ export default function HocBaPage() {
     for (const s of semesterScores) {
       const mid = s.monHocId || s.monHoc?.id;
       if (!mid) continue;
+      
+      const val = s.giaTriDiem ?? s.giaTri;
+      if (val == null || val === "") continue;
+
       if (!map[mid]) map[mid] = { monHocId: mid, tx: [], gk: [], ck: [] };
       if (s.loaiDiem === "TX" || s.loaiDiem === "15p" || s.loaiDiem === "15'")
-        map[mid].tx.push(Number(s.giaTriDiem));
+        map[mid].tx.push(Number(val));
       else if (s.loaiDiem === "GK" || s.loaiDiem === "1t")
-        map[mid].gk.push(Number(s.giaTriDiem));
+        map[mid].gk.push(Number(val));
       else if (s.loaiDiem === "CK" || s.loaiDiem === "thi")
-        map[mid].ck.push(Number(s.giaTriDiem));
+        map[mid].ck.push(Number(val));
     }
 
     const averages = Object.values(map).map((item) => {
@@ -158,6 +162,13 @@ export default function HocBaPage() {
   const dtbHK1 = useMemo(() => calculateSemesterDtb(1), [diemList, selectedNamHoc]);
   const dtbHK2 = useMemo(() => calculateSemesterDtb(2), [diemList, selectedNamHoc]);
 
+  const dtbCaNam = useMemo(() => {
+    if (dtbHK1 === null && dtbHK2 === null) return null;
+    if (dtbHK2 === null) return dtbHK1;
+    if (dtbHK1 === null) return dtbHK2;
+    return (dtbHK1 + dtbHK2 * 2) / 3;
+  }, [dtbHK1, dtbHK2]);
+
   const hk1HanhKiemObj = useMemo(() => {
     return hanhKiemList.find(h => (h.namHoc === selectedNamHoc || h.namHoc?.tenNamHoc === selectedNamHoc) && h.hocKy === 1);
   }, [hanhKiemList, selectedNamHoc]);
@@ -166,9 +177,9 @@ export default function HocBaPage() {
     return hanhKiemList.find(h => (h.namHoc === selectedNamHoc || h.namHoc?.tenNamHoc === selectedNamHoc) && h.hocKy === 2);
   }, [hanhKiemList, selectedNamHoc]);
 
-  const displayDtbCaNam = latestHocBa?.diemTBCaNam ?? "--";
-  const displayHocLucCaNam = getHocLucLabel(latestHocBa?.hocLuc);
-  const displayHanhKiemCaNam = getHanhKiemLabel(latestHocBa?.hanhKiem);
+  const displayDtbCaNam = latestHocBa?.diemTBCaNam ?? (dtbCaNam !== null ? dtbCaNam.toFixed(1) : "--");
+  const displayHocLucCaNam = getHocLucLabel(latestHocBa?.hocLuc || calculateHocLuc(dtbCaNam));
+  const displayHanhKiemCaNam = getHanhKiemLabel(latestHocBa?.hanhKiem || hk2HanhKiemObj?.xepLoai || hk1HanhKiemObj?.xepLoai);
 
   const displayHocLucHK1 = getHocLucLabel(calculateHocLuc(dtbHK1));
   const displayHanhKiemHK1 = getHanhKiemLabel(hk1HanhKiemObj?.xepLoai);

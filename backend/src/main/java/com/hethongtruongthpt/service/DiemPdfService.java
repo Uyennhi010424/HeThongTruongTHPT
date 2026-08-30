@@ -8,6 +8,8 @@ import com.hethongtruongthpt.repository.DiemRepository;
 import com.hethongtruongthpt.repository.HocSinhRepository;
 import com.hethongtruongthpt.repository.LopHocRepository;
 import com.hethongtruongthpt.repository.MonHocRepository;
+import com.hethongtruongthpt.repository.AdminConfigRepository;
+import com.hethongtruongthpt.entity.AdminConfig;
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Document;
 import com.itextpdf.text.Element;
@@ -32,13 +34,17 @@ public class DiemPdfService {
     private static final List<String> nhanXetSubjects = Arrays.asList(
             "Giáo dục thể chất",
             "Hoạt động trải nghiệm, hướng nghiệp",
-            "Nội dung giáo dục địa phương"
+            "Nội dung giáo dục địa phương",
+            "Giáo dục quốc phòng - An ninh",
+            "Âm nhạc",
+            "Mỹ thuật"
     );
 
     private final LopHocRepository lopHocRepository;
     private final MonHocRepository monHocRepository;
     private final HocSinhRepository hocSinhRepository;
     private final DiemRepository diemRepository;
+    private final AdminConfigRepository adminConfigRepository;
 
 
     private com.itextpdf.text.pdf.BaseFont getBaseFont() {
@@ -56,11 +62,19 @@ public class DiemPdfService {
     public DiemPdfService(LopHocRepository lopHocRepository,
                           MonHocRepository monHocRepository,
                           HocSinhRepository hocSinhRepository,
-                          DiemRepository diemRepository) {
+                          DiemRepository diemRepository,
+                          AdminConfigRepository adminConfigRepository) {
         this.lopHocRepository = lopHocRepository;
         this.monHocRepository = monHocRepository;
         this.hocSinhRepository = hocSinhRepository;
         this.diemRepository = diemRepository;
+        this.adminConfigRepository = adminConfigRepository;
+    }
+
+    private String getSchoolName() {
+        return adminConfigRepository.findByConfigKey("system_name")
+                .map(AdminConfig::getConfigValue)
+                .orElse("TRƯỜNG THPT");
     }
 
     public byte[] generateBangDiemLopPdf(Integer lopId, Integer monHocId,
@@ -99,6 +113,11 @@ public class DiemPdfService {
         document.open();
 
         // School name header
+        Font schoolFont = new Font(getBaseFont(), 12, Font.BOLD);
+        Paragraph schoolName = new Paragraph(getSchoolName().toUpperCase(), schoolFont);
+        schoolName.setAlignment(Element.ALIGN_LEFT);
+        schoolName.setSpacingAfter(10);
+        document.add(schoolName);
 
         // Title
         Font titleFont = new Font(getBaseFont(), 16, Font.BOLD);
@@ -199,7 +218,7 @@ public class DiemPdfService {
             addCell(table, String.valueOf(stt), dataFont, rowBg, Element.ALIGN_CENTER);
             addCell(table, hs.getMaHocSinh() != null ? hs.getMaHocSinh() : "", dataFont, rowBg, Element.ALIGN_CENTER);
             addCell(table, hs.getHoTen() != null ? hs.getHoTen() : "", dataFont, rowBg, Element.ALIGN_LEFT);
-            if (nhanXetSubjects.contains(monHoc.getTenMon())) {
+            if (nhanXetSubjects.contains(monHoc.getTenMon()) || "NHAN_XET".equals(monHoc.getNhomDanhGia())) {
                 addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
                 addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
                 addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
@@ -270,6 +289,13 @@ public class DiemPdfService {
         PdfWriter.getInstance(document, out);
         document.open();
 
+        // School Name
+        Font schoolFont = new Font(getBaseFont(), 12, Font.BOLD);
+        Paragraph schoolName = new Paragraph(getSchoolName().toUpperCase(), schoolFont);
+        schoolName.setAlignment(Element.ALIGN_LEFT);
+        schoolName.setSpacingAfter(10);
+        document.add(schoolName);
+
         Font titleFont = new Font(getBaseFont(), 16, Font.BOLD);
         Paragraph title = new Paragraph("KẾT QUẢ HỌC TẬP", titleFont);
         title.setAlignment(Element.ALIGN_CENTER);
@@ -305,8 +331,8 @@ public class DiemPdfService {
         int stt = 0;
         List<MonHoc> monHocs = diemByMonHoc.keySet().stream()
                 .sorted((m1, m2) -> {
-                    boolean isNx1 = nhanXetSubjects.contains(m1.getTenMon());
-                    boolean isNx2 = nhanXetSubjects.contains(m2.getTenMon());
+                    boolean isNx1 = nhanXetSubjects.contains(m1.getTenMon()) || "NHAN_XET".equals(m1.getNhomDanhGia());
+                    boolean isNx2 = nhanXetSubjects.contains(m2.getTenMon()) || "NHAN_XET".equals(m2.getNhomDanhGia());
                     if (isNx1 && !isNx2) return 1;
                     if (!isNx1 && isNx2) return -1;
                     return m1.getTenMon().compareTo(m2.getTenMon());
@@ -346,7 +372,7 @@ public class DiemPdfService {
             BaseColor rowBg = (stt % 2 == 0) ? evenRowBg : BaseColor.WHITE;
             addCell(table, String.valueOf(stt), dataFont, rowBg, Element.ALIGN_CENTER);
             addCell(table, monHoc.getTenMon(), dataFont, rowBg, Element.ALIGN_LEFT);
-            if (nhanXetSubjects.contains(monHoc.getTenMon())) {
+            if (nhanXetSubjects.contains(monHoc.getTenMon()) || "NHAN_XET".equals(monHoc.getNhomDanhGia())) {
                 addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
                 addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);
                 addCell(table, "Đạt", dataFont, rowBg, Element.ALIGN_CENTER);

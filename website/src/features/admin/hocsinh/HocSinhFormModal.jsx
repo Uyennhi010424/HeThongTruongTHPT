@@ -104,13 +104,22 @@ export default function HocSinhFormModal({ hooks }) {
         </label>
         <label className="form-field">
           <span>Tôn giáo</span>
-          <input
+          <select
             value={form.tonGiao}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, tonGiao: event.target.value }))
             }
-            placeholder="vd: Không, Phật giáo..."
-          />
+          >
+            <option value="">-- Chọn tôn giáo --</option>
+            <option value="Không">Không</option>
+            <option value="Phật giáo">Phật giáo</option>
+            <option value="Công giáo">Công giáo</option>
+            <option value="Cao Đài">Cao Đài</option>
+            <option value="Hòa Hảo">Hòa Hảo</option>
+            <option value="Tin Lành">Tin Lành</option>
+            <option value="Hồi giáo">Hồi giáo</option>
+            <option value="Khác">Khác</option>
+          </select>
         </label>
         <label className="form-field">
           <span>Số điện thoại</span>

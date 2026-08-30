@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Edit, Trash2 } from "lucide-react";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
+import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import {
@@ -90,6 +91,7 @@ export default function GiaoVienList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const { confirm } = useConfirm();
   const { searchQuery: keyword, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -256,7 +258,7 @@ export default function GiaoVienList() {
   };
 
   const handleDelete = async (teacher) => {
-    if (!window.confirm(`Xóa giáo viên ${teacher.hoTen}?`)) return;
+    if (!(await confirm(`Xóa giáo viên ${teacher.hoTen}?`))) return;
     try {
       await deleteGiaoVien(teacher.id);
       setTeachers((prev) => prev.filter((item) => item.id !== teacher.id));

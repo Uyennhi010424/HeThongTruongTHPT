@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { User, KeyRound, LogOut, X } from 'lucide-react-native';
 import { HeaderSection } from '../../components/dashboard/HeaderSection';
 import { QuickFunctions } from '../../components/dashboard/QuickFunctions';
 import { NextClassCard } from '../../components/dashboard/NextClassCard';
-import { UtilitiesGrid } from '../../components/dashboard/UtilitiesGrid';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -14,8 +15,22 @@ export default function StudentDashboard() {
   const { data, isLoading, isRefreshing, error, fetchData, refreshData } = useDashboardStore();
   const { signOut, userData } = useAuthStore();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadCount = data?.notices?.length || 0; // Tạm thời dùng số lượng thông báo
+  useFocusEffect(
+    useCallback(() => {
+      const updateUnreadCount = async () => {
+        try {
+          const stored = await AsyncStorage.getItem('readNotices');
+          const readIds = stored ? JSON.parse(stored) : [];
+          const notices = data?.notices || [];
+          const unread = notices.filter(n => !readIds.includes(n.id)).length;
+          setUnreadCount(unread);
+        } catch (e) {}
+      };
+      updateUnreadCount();
+    }, [data?.notices])
+  );
 
   useEffect(() => {
     fetchData();
@@ -89,7 +104,6 @@ export default function StudentDashboard() {
       >
         <QuickFunctions data={data} />
         <NextClassCard timetable={data?.timetable || []} />
-        <UtilitiesGrid />
       </ScrollView>
 
       {/* Menu Drawer */}

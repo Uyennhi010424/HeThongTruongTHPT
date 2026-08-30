@@ -100,7 +100,7 @@ export default function AdminHeader({
             className="flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-surface-variant transition-colors group"
             onClick={() => setAccountOpen((current) => !current)}
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white overflow-hidden shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary border border-primary text-white overflow-hidden shadow-sm">
               {avatar ? (
                 <img src={avatar} alt="avatar" className="h-full w-full object-cover" onError={() => setAvatar(null)} />
               ) : (

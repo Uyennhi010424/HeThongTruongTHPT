@@ -139,9 +139,26 @@ export default function ReportPage() {
             if (active) setStatsConduct(res?.data?.data || null);
           }).catch(err => console.error("Conduct error:", err)),
 
-          statisticsApi.getAttendance({ namHoc: selectedYear }).then(res => {
-            if (active) setStatsAttendance(res?.data?.data || null);
-          }).catch(err => console.error("Attendance error:", err)),
+          (() => {
+            const currentYearObj = years.find((y) => y.tenNamHoc === selectedYear);
+            let fromDate = null;
+            let toDate = null;
+            if (currentYearObj) {
+              if (selectedHocKy === "1") {
+                fromDate = currentYearObj.ngayBatDauHk1;
+                toDate = currentYearObj.ngayKetThucHk1;
+              } else if (selectedHocKy === "2") {
+                fromDate = currentYearObj.ngayBatDauHk2;
+                toDate = currentYearObj.ngayKetThucHk2;
+              }
+            }
+            const params = { namHoc: selectedYear };
+            if (fromDate) params.from = fromDate;
+            if (toDate) params.to = toDate;
+            return statisticsApi.getAttendance(params).then(res => {
+              if (active) setStatsAttendance(res?.data?.data || null);
+            });
+          })().catch(err => console.error("Attendance error:", err)),
 
           getDiemDistribution({
             namHoc: selectedYear,

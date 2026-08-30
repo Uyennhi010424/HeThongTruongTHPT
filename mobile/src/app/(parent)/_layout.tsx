@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Tabs, usePathname, useRouter } from 'expo-router';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Tabs, usePathname, useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
@@ -12,8 +13,24 @@ export default function ParentLayout() {
   const { userData } = useAuthStore();
   const { children, selectedChild, setChildren, setSelectedChild, dashboardData, setDashboardData } = useParentStore();
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
+
+  useFocusEffect(
+    useCallback(() => {
+      const updateUnreadCount = async () => {
+        try {
+          const stored = await AsyncStorage.getItem('readNotices');
+          const readIds = stored ? JSON.parse(stored) : [];
+          const notices = dashboardData?.notices || [];
+          const unread = notices.filter((n: any) => !readIds.includes(n.id)).length;
+          setUnreadCount(unread);
+        } catch (e) {}
+      };
+      updateUnreadCount();
+    }, [dashboardData?.notices])
+  );
 
   useEffect(() => {
     const fetchChildren = async () => {
@@ -28,7 +45,7 @@ export default function ParentLayout() {
           }
         }
       } catch (error) {
-        console.error("Failed to fetch children", error);
+        console.log("Failed to fetch children", error);
       } finally {
         setLoading(false);
       }
@@ -45,7 +62,7 @@ export default function ParentLayout() {
             setDashboardData(res.data.data);
           }
         } catch (error) {
-          console.error("Failed to fetch dashboard", error);
+          console.log("Failed to fetch dashboard", error);
         }
       }
     };
@@ -94,7 +111,6 @@ export default function ParentLayout() {
             />
           ),
           headerLeft: () => {
-            const unreadCount = dashboardData?.notices?.length || 0;
             return (
               <TouchableOpacity 
                 style={{ marginLeft: 16, position: 'relative' }}

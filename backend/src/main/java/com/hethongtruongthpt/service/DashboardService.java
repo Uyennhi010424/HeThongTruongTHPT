@@ -64,6 +64,46 @@ public class DashboardService {
         return buildDashboardForHocSinh(hocSinh);
     }
 
+    public List<ThoiKhoaBieu> getTimetableForStudent(String username, LocalDate date) {
+        HocSinh hocSinh = hocSinhService.getByUsername(username);
+        return getTimetableForHocSinh(hocSinh, date);
+    }
+
+    private List<ThoiKhoaBieu> getTimetableForHocSinh(HocSinh hocSinh, LocalDate targetDate) {
+        if (hocSinh == null || hocSinh.getLop() == null) {
+            return new ArrayList<>();
+        }
+
+        int curMonth = targetDate.getMonthValue();
+        String curNamHoc = curMonth >= 8
+                ? targetDate.getYear() + "-" + (targetDate.getYear() + 1)
+                : (targetDate.getYear() - 1) + "-" + targetDate.getYear();
+        int curHocKy = (curMonth >= 8 || curMonth <= 1) ? 1 : 2;
+
+        List<com.hethongtruongthpt.entity.NamHoc> activeNamHocs = namHocRepository.findByTrangThai("DANG_MO");
+        int currentWeek = 1;
+        if (!activeNamHocs.isEmpty()) {
+            com.hethongtruongthpt.entity.NamHoc active = activeNamHocs.get(0);
+            curNamHoc = active.getTenNamHoc();
+
+            if (active.getNgayBatDauHk2() != null && !targetDate.isBefore(active.getNgayBatDauHk2())) {
+                curHocKy = 2;
+            } else if (active.getNgayBatDauHk1() != null && !targetDate.isBefore(active.getNgayBatDauHk1())) {
+                curHocKy = 1;
+            }
+            currentWeek = com.hethongtruongthpt.util.SchoolWeekUtils.weekNumber(active, targetDate);
+        }
+
+        List<ThoiKhoaBieu> timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(hocSinh.getLop().getId(), curHocKy, curNamHoc, currentWeek);
+        boolean isExamWeek = thoiKhoaBieuCrudService.isExamWeek(curNamHoc, currentWeek);
+        if (timetable.isEmpty() && !isExamWeek) {
+            int mappedTuan = (currentWeek % 2 != 0) ? 1 : 2;
+            timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(hocSinh.getLop().getId(), curHocKy, curNamHoc, mappedTuan);
+            for (ThoiKhoaBieu t : timetable) { t.setTuan(currentWeek); }
+        }
+        return timetable;
+    }
+
     private DashboardDataDTO buildDashboardForHocSinh(HocSinh hocSinh) {
         if (hocSinh == null) {
             return null;
@@ -105,19 +145,13 @@ public class DashboardService {
         // 2. Timetable
         List<ThoiKhoaBieu> timetable = new ArrayList<>();
         if (lopId != null) {
+            timetable = getTimetableForHocSinh(hocSinh, now);
+            
             int currentWeek = 1;
             if (!activeNamHocs.isEmpty()) {
                 currentWeek = com.hethongtruongthpt.util.SchoolWeekUtils.weekNumber(activeNamHocs.get(0), now);
             }
-            
-            timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(lopId, curHocKy, curNamHoc, currentWeek);
-            
             boolean isExamWeek = thoiKhoaBieuCrudService.isExamWeek(curNamHoc, currentWeek);
-            if (timetable.isEmpty() && !isExamWeek) {
-                int mappedTuan = (currentWeek % 2 != 0) ? 1 : 2;
-                timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(lopId, curHocKy, curNamHoc, mappedTuan);
-                for (ThoiKhoaBieu t : timetable) { t.setTuan(currentWeek); }
-            }
             dashboardData.setExamWeek(isExamWeek);
         }
         dashboardData.setTimetable(timetable);

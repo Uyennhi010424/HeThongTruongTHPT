@@ -17,7 +17,6 @@ public class AuthController {
 	private final AuthService authService;
 	private final RateLimitConfig rateLimitConfig;
 	private final com.hethongtruongthpt.service.EmailResetPasswordService emailResetPasswordService;
-
 	public AuthController(AuthService authService, RateLimitConfig rateLimitConfig, 
 			com.hethongtruongthpt.service.EmailResetPasswordService emailResetPasswordService) {
 		this.authService = authService;

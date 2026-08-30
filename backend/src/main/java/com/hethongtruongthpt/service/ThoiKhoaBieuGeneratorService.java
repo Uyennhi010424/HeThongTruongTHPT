@@ -16,7 +16,7 @@ public class ThoiKhoaBieuGeneratorService {
 
     private static final Logger logger = LoggerFactory.getLogger(ThoiKhoaBieuGeneratorService.class);
 
-    private static final Set<String> HEAVY_SUBJECTS = Set.of("toan", "ngu van", "tieng anh");
+    private static final Set<String> HEAVY_SUBJECTS = Set.of("toan", "ngu van");
     private static final Set<String> AFTERNOON_SUBJECTS = Set.of("the duc", "quoc phong", "gdqp", "the chat");
 
     private static final Map<String, Integer> SUBJECT_PERIODS = new LinkedHashMap<>();
@@ -111,8 +111,7 @@ public class ThoiKhoaBieuGeneratorService {
                     String tenMon = p.getMonHoc().getTenMon();
                     int periods = getPeriodCount(tenMon, lop);
                     if (isAfternoonSubject(tenMon)) {
-                        if (periods >= 2) allTasks.add(new ScheduleTask(lop, p, 2, true));
-                        for (int i = periods / 2 * 2; i < periods; i++)
+                        for (int i = 0; i < periods; i++)
                             allTasks.add(new ScheduleTask(lop, p, 1, true));
                     } else if (isHeavy(tenMon)) {
                         for (int i = 0; i < periods / 2; i++) allTasks.add(new ScheduleTask(lop, p, 2, false));
@@ -209,7 +208,7 @@ public class ThoiKhoaBieuGeneratorService {
                     if (task.afternoon) {
                         int maxAfternoonTiet = (task.count >= 2) ? 9 : 10;
                         for (int day : dayOrder) {
-                            if (day == 2 || day == 7) continue;
+
                             if (placed) break;
                             if (task.count >= 2 && countSubjectOnDay(neighborSlots, monHocId, day) > 0) continue;
                             if (task.count == 1 && countSubjectOnDay(neighborSlots, monHocId, day) >= 2) continue;
@@ -569,16 +568,28 @@ public class ThoiKhoaBieuGeneratorService {
             GiaoVien gvcn = gvcnMap.get(lopId);
             classSlots.get(lopId).add("2:1");
             classSlots.get(lopId).add("7:5");
-            if (gvcn != null) {
-                int gvcnId = gvcn.getId();
-                gvSlots.computeIfAbsent(gvcnId, k -> new HashSet<>()).add("2:1");
-                gvSlots.get(gvcnId).add("7:5");
+            
+            GiaoVien gvcnShdc = gvcn;
+            if (gvcn != null && gvSlots.computeIfAbsent(gvcn.getId(), k -> new HashSet<>()).contains("2:1")) {
+                gvcnShdc = null;
             }
+            if (gvcnShdc != null) {
+                gvSlots.get(gvcn.getId()).add("2:1");
+            }
+            
+            GiaoVien gvcnShl = gvcn;
+            if (gvcn != null && gvSlots.computeIfAbsent(gvcn.getId(), k -> new HashSet<>()).contains("7:5")) {
+                gvcnShl = null;
+            }
+            if (gvcnShl != null) {
+                gvSlots.get(gvcn.getId()).add("7:5");
+            }
+            
             classDayLoad.merge(lopId + ":2", 1, Integer::sum);
             classDayLoad.merge(lopId + ":7", 1, Integer::sum);
-            result.add(createTkb(lop, gvcn != null ? createPhanCong(gvcn, shdcMon) : null,
+            result.add(createTkb(lop, createPhanCong(gvcnShdc, shdcMon),
                     2, 1, 1, namHoc, hocKy, tuan, classRoomMap));
-            result.add(createTkb(lop, gvcn != null ? createPhanCong(gvcn, shlMon) : null,
+            result.add(createTkb(lop, createPhanCong(gvcnShl, shlMon),
                     7, 5, 1, namHoc, hocKy, tuan, classRoomMap));
         }
 
@@ -631,9 +642,37 @@ public class ThoiKhoaBieuGeneratorService {
                 }
             }
             int totalNeeded = totalMorningPeriods + 2;
+            int[] targets = new int[8];
+            List<Integer> dayList = new ArrayList<>(Arrays.asList(2, 3, 4, 5, 6, 7));
+            Collections.shuffle(dayList, rng);
+            int base = totalNeeded / 6;
+            int extra = totalNeeded % 6;
+            for (int d : dayList) targets[d] = base;
+            for (int i = 0; i < extra; i++) targets[dayList.get(i)]++;
+
+            boolean changed = true;
+            while (changed) {
+                changed = false;
+                for (int day = 2; day <= 7; day++) {
+                    int maxCap = 5;
+                    if (targets[day] > maxCap) {
+                        int excess = targets[day] - maxCap;
+                        targets[day] = maxCap;
+                        for (int e = 0; e < excess; e++) {
+                            for (int otherDay : dayList) {
+                                int otherMax = 5;
+                                if (targets[otherDay] < otherMax) {
+                                    targets[otherDay]++;
+                                    break;
+                                }
+                            }
+                        }
+                        changed = true;
+                    }
+                }
+            }
             for (int day = 2; day <= 7; day++) {
-                int target = getClassDayTargetLoad(lopId, day, totalNeeded);
-                classDayTargetLoadMap.put(lopId + ":" + day, target);
+                classDayTargetLoadMap.put(lopId + ":" + day, targets[day]);
             }
         }
 
@@ -828,68 +867,18 @@ public class ThoiKhoaBieuGeneratorService {
                 }
                 int left     = Math.max(0, periods - lockedPeriods);
 
-                if (periods >= 2) {
-                    List<Integer> sortedDays = buildFillFirstDayOrder(lopId, rng, classDayLoad, classDayTargetLoadMap);
-                    for (int day : sortedDays) {
-                        if (day == 2 || day == 7) continue;
-                        if (left < 2) break;
-                        if (!isMorningDayFull(lopId, day, classDayLoad, classDayTargetLoadMap)) {
-                            int t1 = getNextCompactDoubleStartDaySlots(clsSlots, lopId, day, (day == 7) ? 4 : 5);
-                            if (t1 != -1 && tryPlaceMorningSlot(lop, pc, day, t1, 2, gvId, monHocId, false,
-                                    namHoc, hocKy, tuan, gvSlots, clsSlots, nbSlots, classDayLoad, heavyDayMap,
-                                    classRoomMap, result, classDayTargetLoadMap, gvBanSet)) {
-                                left -= 2;
-                            }
-                        }
-                    }
-                    while (left >= 2) {
-                        boolean placedAfternoon = false;
-                        for (int day : sortedDays) {
-                            if (day == 2 || day == 7) continue;
-                            if (gvId != null && teacherExceedsDailyLimit(gvSlots, gvId, day, 4)) continue;
-                            int t = getNextCompactAfternoonDoubleStartDaySlots(clsSlots, day, 10);
-                            if (t == -1) continue;
-                            String sk1 = day + ":" + t, sk2 = day + ":" + (t + 1);
-                            boolean gvOk = true;
-                            if (gvId != null) {
-                                gvOk = !gvSlots.getOrDefault(gvId, Set.of()).contains(sk1)
-                                    && !gvSlots.getOrDefault(gvId, Set.of()).contains(sk2)
-                                    && !isTeacherBusy(gvId, day, t, gvBanSet)
-                                    && !isTeacherBusy(gvId, day, t + 1, gvBanSet);
-                            }
-                            boolean clsOk = !clsSlots.contains(sk1) && !clsSlots.contains(sk2);
-                            boolean r5ok  = !wouldCreate3Consecutive(nbSlots, monHocId, day, t)
-                                         && !wouldCreate3Consecutive(nbSlots, monHocId, day, t + 1)
-                                         && countSubjectOnDay(nbSlots, monHocId, day) == 0;
-                            if (gvOk && clsOk && r5ok) {
-                                if (gvId != null) {
-                                    gvSlots.computeIfAbsent(gvId, k -> new HashSet<>()).add(sk1);
-                                    gvSlots.get(gvId).add(sk2);
-                                }
-                                clsSlots.add(sk1); clsSlots.add(sk2);
-                                nbSlots.add(monHocId + ":" + day + ":" + t);
-                                nbSlots.add(monHocId + ":" + day + ":" + (t + 1));
-                                afternoonDayUsed.merge(day, 2, Integer::sum);
-                                result.add(createTkb(lop, pc, day, t, 2, namHoc, hocKy, tuan, classRoomMap));
-                                left -= 2; 
-                                placedAfternoon = true;
-                                break;
-                            }
-                        }
-                        if (!placedAfternoon) break;
-                    }
-                }
+
 
                 for (int i = 0; i < left; i++) {
                     boolean placed = false;
                     List<Integer> sortedDays = buildFillFirstDayOrder(lopId, rng, classDayLoad, classDayTargetLoadMap);
                     for (int day : sortedDays) {
-                        if (day == 2 || day == 7) continue;
-                        if (!isMorningDayFull(lopId, day, classDayLoad, classDayTargetLoadMap)) {
+                        int maxT = 5;
+                        if (classDayLoad.getOrDefault(lopId + ":" + day, 0) < maxT) {
                             int t = getNextCompactMorningSlotDaySlots(clsSlots, lopId, day, (day == 7) ? 4 : 5);
                             if (t != -1 && tryPlaceMorningSlot(lop, pc, day, t, 1, gvId, monHocId, false,
                                     namHoc, hocKy, tuan, gvSlots, clsSlots, nbSlots, classDayLoad, heavyDayMap,
-                                    classRoomMap, result, classDayTargetLoadMap, gvBanSet)) {
+                                    classRoomMap, result, classDayTargetLoadMap, gvBanSet, true)) {
                                 placed = true;
                                 break;
                             }
@@ -897,7 +886,7 @@ public class ThoiKhoaBieuGeneratorService {
                     }
                     if (!placed) {
                         for (int day : sortedDays) {
-                            if (day == 2 || day == 7) continue;
+
                             if (gvId != null && teacherExceedsDailyLimit(gvSlots, gvId, day, 5)) continue;
                             int t = getNextCompactAfternoonSlotDaySlots(clsSlots, day, 10);
                             if (t == -1) continue;
@@ -990,7 +979,8 @@ public class ThoiKhoaBieuGeneratorService {
                     List<Integer> dayOrder = buildMorningDayOrder(lopId, tuan, rng, classDayLoad, heavyDayMap, heavy, classDayTargetLoadMap);
                     for (int day : dayOrder) {
                         if (placed) break;
-                        int maxMorning = classDayTargetLoadMap.getOrDefault(lopId + ":" + day, 5);
+                        int maxMorning = 5;
+                        if (classDayLoad.getOrDefault(lopId + ":" + day, 0) >= maxMorning) continue;
                         int t = getNextCompactMorningSlotDaySlots(clsSlots, lopId, day, maxMorning);
                         if (t != -1) {
                             String sk = day + ":" + t;
@@ -1013,7 +1003,7 @@ public class ThoiKhoaBieuGeneratorService {
                     }
                     if (!placed) {
                         for (int day : dayOrder) {
-                            if (day == 2 || day == 7) continue;
+
                             if (placed) break;
                             int t = getNextCompactAfternoonSlotDaySlots(clsSlots, day, 10);
                             if (t != -1) {
@@ -1315,15 +1305,7 @@ public class ThoiKhoaBieuGeneratorService {
         boolean aFull = la >= ta;
         boolean bFull = lb >= tb;
 
-        boolean aSpecial = (a == 2 || a == 7) && !aFull;
-        boolean bSpecial = (b == 2 || b == 7) && !bFull;
-        if (aSpecial != bSpecial) {
-            return aSpecial ? -1 : 1;
-        }
-
         if (aFull != bFull) return aFull ? 1 : -1;
-        if (a == 7 && b != 7 && !bFull) return 1;
-        if (b == 7 && a != 7 && !aFull) return -1;
         return Integer.compare(lb, la);
     }
 
@@ -1331,26 +1313,7 @@ public class ThoiKhoaBieuGeneratorService {
         return buildMorningDayOrder(lopId, 1, rng, classDayLoad, Map.of(), false, classDayTargetLoadMap);
     }
 
-    private int getClassDayTargetLoad(int lopId, int day, int totalNeeded) {
-        if (day == 2) {
-            return 5;
-        }
-        if (day == 7) {
-            return 4;
-        }
-        int remaining = totalNeeded - 9;
-        if (remaining <= 16) {
-            return 4;
-        } else if (remaining == 17) {
-            return (day == 3) ? 5 : 4;
-        } else if (remaining == 18) {
-            return (day == 3 || day == 4) ? 5 : 4;
-        } else if (remaining == 19) {
-            return (day == 3 || day == 4 || day == 5) ? 5 : 4;
-        } else {
-            return 5;
-        }
-    }
+
 
     private boolean isMorningDayFull(int lopId, int day, Map<String, Integer> classDayLoad, Map<String, Integer> classDayTargetLoadMap) {
         return classDayLoad.getOrDefault(lopId + ":" + day, 0) >= classDayTargetLoadMap.getOrDefault(lopId + ":" + day, 5);
@@ -1366,9 +1329,9 @@ public class ThoiKhoaBieuGeneratorService {
                                         Map<Integer, String> classRoomMap,
                                         List<ThoiKhoaBieu> result,
                                         Map<String, Integer> classDayTargetLoadMap,
-                                        Set<String> gvBanSet) {
+                                        Set<String> gvBanSet, boolean ignoreTargetLoad) {
         int lopId = lop.getId();
-        if (isMorningDayFull(lopId, day, classDayLoad, classDayTargetLoadMap)) return false;
+        if (!ignoreTargetLoad && isMorningDayFull(lopId, day, classDayLoad, classDayTargetLoadMap)) return false;
         int maxTiet = (day == 7) ? 4 : 5;
         if (tiet + soTiet - 1 > maxTiet) return false;
         if (countSubjectOnDay(nbSlots, monHocId, day) + soTiet > 2) return false;
@@ -1445,6 +1408,12 @@ public class ThoiKhoaBieuGeneratorService {
     }
 
     private int getFirstEmptyAfternoonSlot(Set<String> classSlots, int lopId, int day, int maxTiet) {
+        int morningMax = (day == 7) ? 4 : 5;
+        for (int t = 1; t <= morningMax; t++) {
+            if (!taken(classSlots, lopId, day, t) && !isReserved(lopId, day, t)) {
+                return t;
+            }
+        }
         for (int t = 6; t <= maxTiet; t++) {
             if (!taken(classSlots, lopId, day, t)) {
                 return t;

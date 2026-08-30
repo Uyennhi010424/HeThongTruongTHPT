@@ -126,28 +126,166 @@ export function useHocSinhList() {
   const [refreshToggle, setRefreshToggle] = useState(false);
   const handleRefresh = () => setRefreshToggle(prev => !prev);
 
-  const handleExportExcel = () => {
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  const executeExportExcel = (type, classId) => {
     if (!students || students.length === 0) {
       notifyError("Không có dữ liệu để xuất");
       return;
     }
-    const data = students.map((s, index) => ({
-      "STT": index + 1,
-      "Họ và tên": s.hoTen || "",
-      "Lớp": s.lopHoc?.tenLop || s.lop?.tenLop || "",
-      "Khối": s.lopHoc?.khoi || s.lop?.khoi || "",
-      "Giới tính": (s.gioiTinh === "NU" || s.gioiTinh === "false" || s.gioiTinh === false) ? "Nữ" : "Nam",
-      "Ngày sinh": s.ngaySinh || "",
-      "Số điện thoại": s.sdt || "",
-      "Email": s.email || "",
-      "Năm nhập học": s.namNhapHoc || "",
-      "Trạng thái": s.trangThai === 1 ? "Đang học" : "Ngừng học",
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    
+    // Style configurations
+    const headerStyle = {
+      fill: { fgColor: { rgb: "4F81BD" } },
+      font: { name: "Arial", sz: 11, color: { rgb: "FFFFFF" }, bold: true },
+      alignment: { vertical: "center", horizontal: "center", wrapText: true },
+      border: {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+      }
+    };
+    
+    const dataStyle = {
+      font: { name: "Arial", sz: 11 },
+      alignment: { vertical: "center", horizontal: "left" },
+      border: {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+      }
+    };
+
+    const centerDataStyle = { ...dataStyle, alignment: { vertical: "center", horizontal: "center" } };
+
+    const generateSheetForStudents = (studentList, sheetTitle, classNameStr) => {
+      // Row 1: TRƯỜNG THPT
+      // Row 2: DANH SÁCH HỌC SINH
+      // Row 3: Lớp: ...
+      // Row 4: Header
+      const wsData = [
+        ["TRƯỜNG THPT"],
+        ["DANH SÁCH HỌC SINH"],
+        [`Lớp: ${classNameStr || "Tất cả"}`],
+        ["STT", "Họ và tên", "Lớp", "Khối", "Giới tính", "Ngày sinh", "Số điện thoại", "Email", "Năm nhập học", "Trạng thái"]
+      ];
+
+      studentList.forEach((s, i) => {
+        wsData.push([
+          i + 1,
+          s.hoTen || "",
+          s.lopHoc?.tenLop || s.lop?.tenLop || "",
+          s.lopHoc?.khoi || s.lop?.khoi || "",
+          (s.gioiTinh === "NU" || s.gioiTinh === "false" || s.gioiTinh === false) ? "Nữ" : "Nam",
+          s.ngaySinh || "",
+          s.sdt || "",
+          s.email || "",
+          s.namNhapHoc || "",
+          s.trangThai === 1 ? "Đang học" : "Ngừng học"
+        ]);
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Merge cells
+      worksheet["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } }
+      ];
+
+      // Styling
+      worksheet["A1"].s = { font: { name: "Arial", sz: 12, bold: true }, alignment: { horizontal: "left" } };
+      worksheet["A2"].s = { font: { name: "Arial", sz: 16, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
+      worksheet["A3"].s = { font: { name: "Arial", sz: 11, italic: true }, alignment: { horizontal: "center" } };
+
+      const range = XLSX.utils.decode_range(worksheet["!ref"]);
+      for (let R = 3; R <= range.e.r; ++R) {
+        for (let C = 0; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!worksheet[cellAddress]) worksheet[cellAddress] = { t: "s", v: "" };
+          
+          if (R === 3) {
+            worksheet[cellAddress].s = headerStyle;
+          } else {
+            // center align STT, Khối, Giới tính, Ngày sinh, SĐT, Năm, Trạng thái
+            if ([0, 3, 4, 5, 6, 8, 9].includes(C)) {
+              worksheet[cellAddress].s = centerDataStyle;
+            } else {
+              worksheet[cellAddress].s = dataStyle;
+            }
+          }
+        }
+      }
+
+      worksheet["!cols"] = [
+        { wch: 5 }, // STT
+        { wch: 25 }, // Ho ten
+        { wch: 10 }, // Lop
+        { wch: 8 },  // Khoi
+        { wch: 10 }, // Gioi tinh
+        { wch: 15 }, // Ngay sinh
+        { wch: 15 }, // SDT
+        { wch: 25 }, // Email
+        { wch: 15 }, // Nam
+        { wch: 15 }  // Trang thai
+      ];
+
+      return worksheet;
+    };
+
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "DanhSachHocSinh");
-    XLSX.writeFile(workbook, "DanhSachHocSinh.xlsx");
+
+    if (type === "CLASS") {
+      if (!classId) {
+        notifyError("Vui lòng chọn lớp");
+        return;
+      }
+      const selectedClass = classes.find(c => String(c.id) === String(classId));
+      if (!selectedClass) {
+        notifyError("Lớp không tồn tại");
+        return;
+      }
+      const classStudents = students.filter(s => String(s.lopHoc?.id || s.lop?.id) === String(classId));
+      if (classStudents.length === 0) {
+        notifyError("Lớp này chưa có học sinh");
+        return;
+      }
+      const sortedStudents = [...classStudents].sort(compareClassThenGivenName);
+      const ws = generateSheetForStudents(sortedStudents, selectedClass.tenLop, selectedClass.tenLop);
+      XLSX.utils.book_append_sheet(workbook, ws, selectedClass.tenLop);
+      XLSX.writeFile(workbook, `DanhSachHocSinh_${selectedClass.tenLop}.xlsx`);
+
+    } else if (type === "ALL") {
+      // Group by class
+      const classGroups = {};
+      students.forEach(s => {
+        const cId = s.lopHoc?.id || s.lop?.id || "unknown";
+        const cName = s.lopHoc?.tenLop || s.lop?.tenLop || "Chưa có lớp";
+        if (!classGroups[cId]) {
+          classGroups[cId] = { name: cName, students: [] };
+        }
+        classGroups[cId].students.push(s);
+      });
+
+      // Sort class names nicely
+      const sortedGroups = Object.values(classGroups).sort((a, b) => a.name.localeCompare(b.name, "vi", { numeric: true }));
+
+      sortedGroups.forEach(group => {
+        group.students.sort(compareClassThenGivenName);
+        // Valid sheet name max 31 chars
+        const sheetName = group.name.substring(0, 31).replace(/[\\/?*[\]]/g, "_");
+        const ws = generateSheetForStudents(group.students, sheetName, group.name);
+        XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+      });
+
+      XLSX.writeFile(workbook, `DanhSachHocSinh_TatCa.xlsx`);
+    }
+    
     notifySuccess("Xuất Excel thành công");
+    setExportModalOpen(false);
   };
 
   useEffect(() => {
@@ -1184,7 +1322,6 @@ export function useHocSinhList() {
     addMenuRef,
     refreshToggle, setRefreshToggle,
     handleRefresh,
-    handleExportExcel,
     parents, setParents,
     loading, setLoading,
     error, setError,
@@ -1214,6 +1351,9 @@ export function useHocSinhList() {
     handleDownloadTemplate,
     handleExcelUpload,
     submitTransferClass,
-    submitTransferSchool
+    submitTransferSchool,
+    exportModalOpen,
+    setExportModalOpen,
+    executeExportExcel
   };
 }

@@ -16,7 +16,15 @@ public class DatabaseFixer {
                 jdbcTemplate.execute("ALTER TABLE thong_bao MODIFY nguoi_tao_id INT NULL");
                 System.out.println("[DatabaseFixer] Đã sửa cột thong_bao.nguoi_tao_id thành NULL thành công.");
             } catch (Exception e) {
-                System.out.println("[DatabaseFixer] Không thể sửa cột thong_bao.nguoi_tao_id (có thể đã được sửa hoặc không có quyền): " + e.getMessage());
+                System.out.println("[DatabaseFixer] Không thể sửa cột thong_bao.nguoi_tao_id: " + e.getMessage());
+            }
+
+            try {
+                // Sửa cột giao_vien_id trong thoi_khoa_bieu cho phép NULL 
+                jdbcTemplate.execute("ALTER TABLE thoi_khoa_bieu MODIFY giao_vien_id INT NULL");
+                System.out.println("[DatabaseFixer] Đã sửa cột thoi_khoa_bieu.giao_vien_id thành NULL thành công.");
+            } catch (Exception e) {
+                System.out.println("[DatabaseFixer] Không thể sửa cột thoi_khoa_bieu.giao_vien_id: " + e.getMessage());
             }
 
             try {

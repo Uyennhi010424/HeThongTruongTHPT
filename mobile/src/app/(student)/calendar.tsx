@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, BookOpen, Calendar as CalendarIcon, ChevronDown, Check } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useDashboardStore } from '../../store/useDashboardStore';
+import { getTimetableByDate } from '../../api/studentDashboardApi';
 
 const DAYS = [
   { id: 2, name: 'Thứ 2' },
@@ -15,12 +16,15 @@ const DAYS = [
   { id: 8, name: 'CN' },
 ];
 
-const getTietTimeStr = (tiet: number) => {
+const getTietTimeStr = (tietBatDau: number, soTiet: number = 1) => {
   const times: Record<number, string> = {
     1: '07:00 - 07:45', 2: '07:50 - 08:35', 3: '08:50 - 09:35', 4: '09:40 - 10:25', 5: '10:30 - 11:15',
     6: '13:00 - 13:45', 7: '13:50 - 14:35', 8: '14:50 - 15:35', 9: '15:40 - 16:25', 10: '16:30 - 17:15'
   };
-  return times[tiet] || '00:00 - 00:00';
+  const startStr = times[tietBatDau]?.split(' - ')[0] || '00:00';
+  const endTiet = tietBatDau + soTiet - 1;
+  const endStr = times[endTiet]?.split(' - ')[1] || '00:00';
+  return `${startStr} - ${endStr}`;
 };
 
 export default function CalendarScreen() {
@@ -32,6 +36,18 @@ export default function CalendarScreen() {
   const [viewMode, setViewMode] = useState<'Ngày' | 'Tuần' | 'Tháng'>('Ngày');
   const [showPicker, setShowPicker] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
+  const [timetable, setTimetable] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      // Offset by timezone to get correct local date string YYYY-MM-DD
+      const localDate = new Date(currentDate.getTime() - (currentDate.getTimezoneOffset() * 60000));
+      const dateStr = localDate.toISOString().split('T')[0];
+      const result = await getTimetableByDate(dateStr);
+      setTimetable(result);
+    };
+    fetchTimetable();
+  }, [currentDate]);
 
   useEffect(() => {
     // Automatically select the current day based on system date
@@ -88,12 +104,14 @@ export default function CalendarScreen() {
   const renderClassItem = (item: any, index: number) => (
     <View key={index} style={styles.classCard}>
       <View style={styles.classTimeCol}>
-        <Text style={styles.tietText}>Tiết {item.tietBatDau}</Text>
-        <Text style={styles.timeText}>{getTietTimeStr(item.tietBatDau)}</Text>
+        <Text style={styles.tietText}>
+          Tiết {item.tietBatDau}{item.soTiet > 1 ? ` - ${item.tietBatDau + item.soTiet - 1}` : ''}
+        </Text>
+        <Text style={styles.timeText}>{getTietTimeStr(item.tietBatDau, item.soTiet || 1)}</Text>
       </View>
       <View style={styles.divider} />
       <View style={styles.classInfoCol}>
-        <Text style={styles.subjectName}>{item.monHoc?.tenMon}</Text>
+        <Text style={styles.subjectName}>{item.monHoc?.tenMon || item.monHoc?.tenMonHoc}</Text>
         <View style={styles.detailRow}>
           <User size={16} color="#64748B" />
           <Text style={styles.detailText}>GV: {item.giaoVien?.hoTen}</Text>
@@ -110,11 +128,10 @@ export default function CalendarScreen() {
   );
 
   const renderNgàyView = () => {
-    const isSummerBreak = currentDate.getMonth() >= 5 && currentDate.getMonth() <= 7;
     const isExamWeek = data?.examWeek === true;
-    const todayClasses = (isSummerBreak || isExamWeek)
+    const todayClasses = isExamWeek
       ? []
-      : data?.timetable
+      : timetable
         ?.filter((item: any) => item.thu === selectedDay)
         .sort((a: any, b: any) => a.tietBatDau - b.tietBatDau) || [];
 
@@ -124,33 +141,32 @@ export default function CalendarScreen() {
       <View style={styles.emptyContainer}>
         <BookOpen size={48} color={isExamWeek ? '#FCA5A5' : '#CBD5E1'} style={{ marginBottom: 16 }} />
         <Text style={[styles.emptyText, isExamWeek && { color: '#EF4444' }]}>
-          {isSummerBreak ? 'Nghỉ hè!' : isExamWeek ? 'Tuần Thi!' : 'Trống lịch!'}
+          {isExamWeek ? 'Tuần Thi!' : 'Trống lịch!'}
         </Text>
         <Text style={styles.emptySubtext}>
-          {isSummerBreak ? 'Đang trong thời gian nghỉ hè, không có lịch học.' : isExamWeek ? 'Tuần này là tuần thi. Lịch học tạm dừng. Chúc bạn thi tốt!' : 'Không có lịch học nào trong ngày này.'}
+          {isExamWeek ? 'Tuần này là tuần thi. Lịch học tạm dừng. Chúc bạn thi tốt!' : 'Không có lịch học nào trong ngày này.'}
         </Text>
       </View>
     );
   };
 
   const renderTuầnView = () => {
-    const isSummerBreak = currentDate.getMonth() >= 5 && currentDate.getMonth() <= 7;
     const isExamWeek = data?.examWeek === true;
-    if (isSummerBreak || isExamWeek || !data?.timetable || data.timetable.length === 0) {
+    if (isExamWeek || !timetable || timetable.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <BookOpen size={48} color={isExamWeek ? '#FCA5A5' : '#CBD5E1'} style={{ marginBottom: 16 }} />
           <Text style={[styles.emptyText, isExamWeek && { color: '#EF4444' }]}>
-            {isSummerBreak ? 'Nghỉ hè!' : isExamWeek ? 'Tuần Thi!' : 'Tuần trống!'}
+            {isExamWeek ? 'Tuần Thi!' : 'Tuần trống!'}
           </Text>
           <Text style={styles.emptySubtext}>
-            {isSummerBreak ? 'Đang trong thời gian nghỉ hè, không có lịch học.' : isExamWeek ? 'Tuần này là tuần thi. Lịch học tạm dừng. Chúc bạn thi tốt!' : 'Không có lịch học nào trong tuần này.'}
+            {isExamWeek ? 'Tuần này là tuần thi. Lịch học tạm dừng. Chúc bạn thi tốt!' : 'Không có lịch học nào trong tuần này.'}
           </Text>
         </View>
       );
     }
     return DAYS.map((day) => {
-      const dayClasses = data?.timetable
+      const dayClasses = timetable
         ?.filter((item: any) => item.thu === day.id)
         .sort((a: any, b: any) => a.tietBatDau - b.tietBatDau) || [];
       if (dayClasses.length === 0) return null;

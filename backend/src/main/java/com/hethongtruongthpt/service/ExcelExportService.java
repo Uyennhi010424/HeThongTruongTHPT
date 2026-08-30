@@ -7,6 +7,8 @@ import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.repository.DiemRepository;
 import com.hethongtruongthpt.repository.HocSinhRepository;
 import com.hethongtruongthpt.repository.LopHocRepository;
+import com.hethongtruongthpt.repository.AdminConfigRepository;
+import com.hethongtruongthpt.entity.AdminConfig;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.*;
@@ -31,13 +33,22 @@ public class ExcelExportService {
     private final HocSinhRepository hocSinhRepository;
     private final LopHocRepository lopHocRepository;
     private final DiemRepository diemRepository;
+    private final AdminConfigRepository adminConfigRepository;
 
     public ExcelExportService(HocSinhRepository hocSinhRepository,
                               LopHocRepository lopHocRepository,
-                              DiemRepository diemRepository) {
+                              DiemRepository diemRepository,
+                              AdminConfigRepository adminConfigRepository) {
         this.hocSinhRepository = hocSinhRepository;
         this.lopHocRepository = lopHocRepository;
         this.diemRepository = diemRepository;
+        this.adminConfigRepository = adminConfigRepository;
+    }
+
+    private String getSchoolName() {
+        return adminConfigRepository.findByConfigKey("system_name")
+                .map(AdminConfig::getConfigValue)
+                .orElse("TRƯỜNG THPT");
     }
 
     /**
@@ -91,17 +102,23 @@ public class ExcelExportService {
             CellStyle dataStyle = createDataStyle(workbook);
             CellStyle centerStyle = createCenterDataStyle(workbook);
 
+            // -- School Name row --
+            Row schoolRow = sheet.createRow(0);
+            Cell schoolCell = schoolRow.createCell(0);
+            schoolCell.setCellValue(getSchoolName().toUpperCase());
+            CellStyle schoolStyle = workbook.createCellStyle();
+            Font schoolFont = workbook.createFont();
+            schoolFont.setBold(true);
+            schoolFont.setFontHeightInPoints((short) 12);
+            schoolStyle.setFont(schoolFont);
+            schoolStyle.setAlignment(HorizontalAlignment.LEFT);
+            schoolCell.setCellStyle(schoolStyle);
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 5));
+
             // -- Title row --
-            Row titleRow = sheet.createRow(0);
+            Row titleRow = sheet.createRow(1);
             Cell titleCell = titleRow.createCell(0);
             String titleText = "DANH SÁCH HỌC SINH";
-            if (lopId != null) {
-                hocSinhList.stream().findFirst().ifPresent(h -> {
-                    if (h.getLop() != null) {
-                        // will be set below
-                    }
-                });
-            }
             titleCell.setCellValue(titleText);
             CellStyle titleStyle = workbook.createCellStyle();
             Font titleFont = workbook.createFont();
@@ -110,11 +127,11 @@ public class ExcelExportService {
             titleStyle.setFont(titleFont);
             titleStyle.setAlignment(HorizontalAlignment.CENTER);
             titleCell.setCellStyle(titleStyle);
-            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 5));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 5));
 
             // -- Header row --
             String[] headers = {"STT", "Mã học sinh", "Họ và tên", "Ngày sinh", "Giới tính", "Lớp"};
-            Row headerRow = sheet.createRow(1);
+            Row headerRow = sheet.createRow(2);
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
@@ -122,7 +139,7 @@ public class ExcelExportService {
             }
 
             // -- Data rows --
-            int rowNum = 2;
+            int rowNum = 3;
             int stt = 1;
             for (HocSinh hs : hocSinhList) {
                 Row row = sheet.createRow(rowNum++);
@@ -232,8 +249,21 @@ public class ExcelExportService {
             CellStyle centerStyle = createCenterDataStyle(workbook);
             CellStyle numberStyle = createNumberDataStyle(workbook);
 
+            // -- School Name row --
+            Row schoolRow = sheet.createRow(0);
+            Cell schoolCell = schoolRow.createCell(0);
+            schoolCell.setCellValue(getSchoolName().toUpperCase());
+            CellStyle schoolStyle = workbook.createCellStyle();
+            Font schoolFont = workbook.createFont();
+            schoolFont.setBold(true);
+            schoolFont.setFontHeightInPoints((short) 12);
+            schoolStyle.setFont(schoolFont);
+            schoolStyle.setAlignment(HorizontalAlignment.LEFT);
+            schoolCell.setCellStyle(schoolStyle);
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, totalCols - 1));
+
             // -- Title row --
-            Row titleRow = sheet.createRow(0);
+            Row titleRow = sheet.createRow(1);
             Cell titleCell = titleRow.createCell(0);
             titleCell.setCellValue("BẢNG ĐIỂM");
             CellStyle titleStyle = workbook.createCellStyle();
@@ -243,10 +273,10 @@ public class ExcelExportService {
             titleStyle.setFont(titleFont);
             titleStyle.setAlignment(HorizontalAlignment.CENTER);
             titleCell.setCellStyle(titleStyle);
-            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, totalCols - 1));
+            sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, totalCols - 1));
 
             // -- Info row --
-            Row infoRow = sheet.createRow(1);
+            Row infoRow = sheet.createRow(2);
             CellStyle infoStyle = workbook.createCellStyle();
             Font infoFont = workbook.createFont();
             infoFont.setItalic(true);
@@ -260,13 +290,14 @@ public class ExcelExportService {
                     .flatMap(h -> diemMap.get(h.getId()).stream().findFirst())
                     .map(d -> d.getMonHoc().getTenMon())
                     .orElse("N/A");
-            infoCell.setCellValue("Lớp: " + tenLop + "  |  Môn: " + tenMon
-                    + "  |  Học kỳ: " + hocKy + "  |  Năm học: " + namHoc);
+            String infoText = "Lớp: " + tenLop + "  |  Môn: " + tenMon
+                    + "  |  Học kỳ: " + hocKy + "  |  Năm học: " + namHoc;
+            infoCell.setCellValue(infoText);
             infoCell.setCellStyle(infoStyle);
-            sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, totalCols - 1));
+            sheet.addMergedRegion(new CellRangeAddress(2, 2, 0, totalCols - 1));
 
             // -- Header row --
-            Row headerRow = sheet.createRow(2);
+            Row headerRow = sheet.createRow(3);
             int colIdx = 0;
             setHeaderCell(headerRow, colIdx++, "STT", headerStyle);
             setHeaderCell(headerRow, colIdx++, "Mã học sinh", headerStyle);
@@ -279,7 +310,7 @@ public class ExcelExportService {
             setHeaderCell(headerRow, colIdx++, "TB", headerStyle);
 
             // -- Data rows --
-            int rowNum = 3;
+            int rowNum = 4;
             int stt = 1;
             for (HocSinh hs : hocSinhList) {
                 Row row = sheet.createRow(rowNum++);

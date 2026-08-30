@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../api/axiosClient';
 import { useParentStore } from '../../store/useParentStore';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function ParentLeaveScreen() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -11,13 +12,19 @@ export default function ParentLeaveScreen() {
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
-  const [formData, setFormData] = useState({ ngayBatDau: '', ngayKetThuc: '', lyDo: '' });
+  const [leaveType, setLeaveType] = useState<'single' | 'multiple'>('single');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [lyDo, setLyDo] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (selectedChild?.id) {
       fetchRequests();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChild?.id]);
 
   const fetchRequests = async () => {
@@ -28,32 +35,57 @@ export default function ParentLeaveScreen() {
         setRequests(res.data.data.filter((r: any) => r.hocSinhId === selectedChild?.id));
       }
     } catch (error) {
-      console.error('Lỗi lấy đơn xin nghỉ:', error);
+      console.log('Lỗi lấy đơn xin nghỉ:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách đơn xin nghỉ.');
     } finally {
       setLoading(false);
     }
   };
 
+  const formatYMD = (d: Date | null) => {
+    if (!d) return '';
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0];
+  };
+
+  const formatDateDisplay = (d: Date | null) => d ? formatYMD(d).split('-').reverse().join('/') : 'Chọn ngày...';
+
   const handleCreateRequest = async () => {
-    if (!formData.ngayBatDau || !formData.ngayKetThuc || !formData.lyDo) {
-      Alert.alert("Lỗi", "Vui lòng nhập đủ thông tin (Ngày định dạng YYYY-MM-DD)");
+    const ngayBatDau = formatYMD(startDate);
+    const ngayKetThuc = leaveType === 'single' ? ngayBatDau : formatYMD(endDate);
+    
+    if (!ngayBatDau || !ngayKetThuc || !lyDo) {
+      Alert.alert("Lỗi", "Vui lòng nhập đủ thông tin ngày và lý do");
+      return;
+    }
+    if (leaveType === 'multiple' && startDate && endDate && startDate > endDate) {
+      Alert.alert("Lỗi", "Ngày kết thúc phải sau ngày bắt đầu");
       return;
     }
     try {
       setSubmitting(true);
       await api.post('/don-xin-nghi', {
-        ...formData,
+        ngayBatDau,
+        ngayKetThuc,
+        lyDo,
         hocSinhId: selectedChild?.id
       });
       Alert.alert("Thành công", "Đã tạo đơn xin nghỉ");
       setModalVisible(false);
-      setFormData({ ngayBatDau: '', ngayKetThuc: '', lyDo: '' });
       fetchRequests();
     } catch (error: any) {
       Alert.alert("Lỗi", error.response?.data?.message || "Không thể tạo đơn");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openModal = () => {
+    setLeaveType('single');
+    setStartDate(null);
+    setEndDate(null);
+    setLyDo('');
+    setModalVisible(true);
   };
 
   const handleDelete = (id: number) => {
@@ -66,7 +98,7 @@ export default function ParentLeaveScreen() {
             try {
               await api.delete(`/don-xin-nghi/${id}`);
               fetchRequests();
-            } catch (e) {
+            } catch {
               Alert.alert("Lỗi", "Không thể hủy đơn");
             }
           } 
@@ -129,7 +161,7 @@ export default function ParentLeaveScreen() {
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity style={styles.fab} onPress={openModal}>
         <Ionicons name="add" size={24} color="#fff" />
       </TouchableOpacity>
 
@@ -142,25 +174,49 @@ export default function ParentLeaveScreen() {
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
+
+            <View style={styles.typeSelector}>
+              <TouchableOpacity 
+                style={[styles.typeBtn, leaveType === 'single' && styles.typeBtnActive]} 
+                onPress={() => setLeaveType('single')}
+              >
+                <Text style={[styles.typeBtnText, leaveType === 'single' && styles.typeBtnTextActive]}>1 Ngày</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.typeBtn, leaveType === 'multiple' && styles.typeBtnActive]} 
+                onPress={() => setLeaveType('multiple')}
+              >
+                <Text style={[styles.typeBtnText, leaveType === 'multiple' && styles.typeBtnTextActive]}>Nhiều ngày</Text>
+              </TouchableOpacity>
+            </View>
             
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Từ ngày (YYYY-MM-DD)</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="2026-05-20"
-                value={formData.ngayBatDau}
-                onChangeText={(t) => setFormData({...formData, ngayBatDau: t})}
-              />
-            </View>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Đến ngày (YYYY-MM-DD)</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="2026-05-20"
-                value={formData.ngayKetThuc}
-                onChangeText={(t) => setFormData({...formData, ngayKetThuc: t})}
-              />
-            </View>
+            {leaveType === 'single' ? (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Ngày nghỉ</Text>
+                <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowStartPicker(true)}>
+                  <Ionicons name="calendar-outline" size={20} color="#64748b" style={{ marginRight: 8 }} />
+                  <Text style={[styles.dateText, !startDate && { color: '#94a3b8' }]}>{formatDateDisplay(startDate)}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.label}>Từ ngày</Text>
+                  <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowStartPicker(true)}>
+                    <Ionicons name="calendar-outline" size={20} color="#64748b" style={{ marginRight: 4 }} />
+                    <Text style={[styles.dateText, !startDate && { color: '#94a3b8' }]}>{formatDateDisplay(startDate)}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <Text style={styles.label}>Đến ngày</Text>
+                  <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowEndPicker(true)}>
+                    <Ionicons name="calendar-outline" size={20} color="#64748b" style={{ marginRight: 4 }} />
+                    <Text style={[styles.dateText, !endDate && { color: '#94a3b8' }]}>{formatDateDisplay(endDate)}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             <View style={styles.formGroup}>
               <Text style={styles.label}>Lý do nghỉ</Text>
               <TextInput 
@@ -168,8 +224,8 @@ export default function ParentLeaveScreen() {
                 placeholder="Nhập lý do..."
                 multiline
                 numberOfLines={4}
-                value={formData.lyDo}
-                onChangeText={(t) => setFormData({...formData, lyDo: t})}
+                value={lyDo}
+                onChangeText={setLyDo}
               />
             </View>
 
@@ -180,20 +236,52 @@ export default function ParentLeaveScreen() {
                 <Text style={styles.submitBtnText}>Gửi đơn</Text>
               )}
             </TouchableOpacity>
+
+            {/* iOS Pickers - Rendered absolute inside main modal to avoid double-modal crash */}
+            {showStartPicker && Platform.OS === "ios" && (
+              <Pressable style={styles.iosAbsoluteOverlay} onPress={() => setShowStartPicker(false)}>
+                <View style={styles.pickerSheet}>
+                  <View style={styles.pickerHeader}>
+                    <Text style={styles.pickerTitle}>Chọn ngày</Text>
+                    <TouchableOpacity onPress={() => setShowStartPicker(false)}><Text style={styles.pickerDone}>Xong</Text></TouchableOpacity>
+                  </View>
+                  <DateTimePicker value={startDate || new Date()} mode="date" display="spinner" minimumDate={new Date()} onChange={(_, d) => { if (d) setStartDate(d); }} />
+                </View>
+              </Pressable>
+            )}
+
+            {showEndPicker && Platform.OS === "ios" && (
+              <Pressable style={styles.iosAbsoluteOverlay} onPress={() => setShowEndPicker(false)}>
+                <View style={styles.pickerSheet}>
+                  <View style={styles.pickerHeader}>
+                    <Text style={styles.pickerTitle}>Đến ngày</Text>
+                    <TouchableOpacity onPress={() => setShowEndPicker(false)}><Text style={styles.pickerDone}>Xong</Text></TouchableOpacity>
+                  </View>
+                  <DateTimePicker value={endDate || new Date()} mode="date" display="spinner" minimumDate={startDate || new Date()} onChange={(_, d) => { if (d) setEndDate(d); }} />
+                </View>
+              </Pressable>
+            )}
+
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Date Pickers Android */}
+      {showStartPicker && Platform.OS === "android" && (
+        <DateTimePicker value={startDate || new Date()} mode="date" display="default" minimumDate={new Date()}
+          onChange={(_, d) => { setShowStartPicker(false); if (d) setStartDate(d); }} />
+      )}
+      {showEndPicker && Platform.OS === "android" && (
+        <DateTimePicker value={endDate || new Date()} mode="date" display="default" minimumDate={startDate || new Date()}
+          onChange={(_, d) => { setShowEndPicker(false); if (d) setEndDate(d); }} />
+      )}
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  childSelector: { flexDirection: 'row', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  childBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', marginRight: 8 },
-  childBtnActive: { backgroundColor: '#2563eb' },
-  childBtnText: { color: '#64748b', fontWeight: 'bold' },
-  childBtnTextActive: { color: '#fff' },
   listContent: { padding: 16 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -219,10 +307,26 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b' },
+  
+  typeSelector: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 16 },
+  typeBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+  typeBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  typeBtnText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  typeBtnTextActive: { color: '#2563eb' },
+  
   formGroup: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: 'bold', color: '#475569', marginBottom: 8 },
+  datePickerBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#f8fafc' },
+  dateText: { fontSize: 15, color: '#1e293b' },
   input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: '#1e293b' },
   textArea: { height: 100, textAlignVertical: 'top' },
   submitBtn: { backgroundColor: '#2563eb', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  
+  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  iosAbsoluteOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', borderRadius: 24, overflow: 'hidden' },
+  pickerSheet: { backgroundColor: '#fff', paddingBottom: 20 },
+  pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  pickerTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a' },
+  pickerDone: { fontSize: 16, fontWeight: 'bold', color: '#2563eb' },
 });

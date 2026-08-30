@@ -333,7 +333,7 @@ export const EXCEL_FIELD_ALIASES = {
 
 export const REQUIRED_EXCEL_FIELDS = ["hoTen", "lop"];
 
-export const DEFAULT_ACCOUNT_PASSWORD = "123456";
+export const DEFAULT_ACCOUNT_PASSWORD = "Abc1234@";
 
 export const formatDate = (value) => {
   if (!value) return "";

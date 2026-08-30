@@ -5,6 +5,7 @@ import { ChevronLeft, Bell, BellRing, Clock, User as UserIcon } from 'lucide-rea
 import { useRouter } from 'expo-router';
 import { useParentStore } from '../../store/useParentStore';
 import axiosClient from '../../api/axiosClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ThongBao {
   id: number;
@@ -25,6 +26,26 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [readIds, setReadIds] = useState<number[]>([]);
+
+  const fetchReadIds = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('readNotices');
+      if (stored) {
+        setReadIds(JSON.parse(stored));
+      }
+    } catch (e) {}
+  };
+
+  const markAsRead = async (id: number) => {
+    if (!readIds.includes(id)) {
+      const newIds = [...readIds, id];
+      setReadIds(newIds);
+      try {
+        await AsyncStorage.setItem('readNotices', JSON.stringify(newIds));
+      } catch (e) {}
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -41,7 +62,7 @@ export default function NotificationsScreen() {
         setNotifications(data);
       }
     } catch (err: any) {
-      console.error('Fetch notifications error:', err);
+      console.log('Fetch notifications error:', err);
       setError('Không thể tải thông báo. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
@@ -50,6 +71,7 @@ export default function NotificationsScreen() {
   };
 
   useEffect(() => {
+    fetchReadIds();
     fetchNotifications();
   }, []);
 
@@ -64,6 +86,15 @@ export default function NotificationsScreen() {
     const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     return `${time} ${date}`;
+  };
+
+  const getSenderName = (item: any) => {
+    if (item.senderRole === 'GIAO_VIEN') return 'Giáo viên';
+    if (item.senderRole === 'PHU_HUYNH') {
+      if (item.hocSinh?.hoTen) return `Phụ huynh em ${item.hocSinh.hoTen}`;
+      return 'Phụ huynh';
+    }
+    return 'Hệ thống';
   };
 
   const getNotificationIcon = (type: string) => {
@@ -127,9 +158,12 @@ export default function NotificationsScreen() {
             return (
               <TouchableOpacity 
                 key={item.id} 
-                style={styles.card}
+                style={[styles.card, !readIds.includes(item.id) && { borderLeftWidth: 3, borderLeftColor: '#2563EB', backgroundColor: '#F8FAFC' }]}
                 activeOpacity={0.7}
-                onPress={() => setExpandedId(isExpanded ? null : item.id)}
+                onPress={() => {
+                  setExpandedId(isExpanded ? null : item.id);
+                  markAsRead(item.id);
+                }}
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.typeBadge}>
@@ -158,7 +192,7 @@ export default function NotificationsScreen() {
                 <View style={styles.footer}>
                   <View style={styles.senderContainer}>
                     <UserIcon size={16} color="#64748B" />
-                    <Text style={styles.senderText}>{item.nguoiTao?.hoTen || 'Hệ thống'}</Text>
+                    <Text style={styles.senderText}>{getSenderName(item)}</Text>
                   </View>
                 </View>
               </TouchableOpacity>

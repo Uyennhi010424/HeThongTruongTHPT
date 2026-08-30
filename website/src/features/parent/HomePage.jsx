@@ -367,7 +367,7 @@ export default function HomePage() {
                           </div>
                           <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Phone size={14} className="text-slate-400" />
-                            {gvcn.soDienThoai || "--"}
+                            {gvcn.sdt || "--"}
                           </div>
                         </div>
                       </div>
@@ -376,7 +376,7 @@ export default function HomePage() {
                         <button onClick={() => navigate('/parent/thongbao')} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
                           <MessageSquare size={16} /> Gửi tin nhắn
                         </button>
-                        {gvcn.soDienThoai && (
+                        {gvcn.sdt && (
                           <button className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
                             <Phone size={16} /> Gọi điện
                           </button>

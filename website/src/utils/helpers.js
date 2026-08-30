@@ -92,9 +92,8 @@ export const getLimitedSemesterWeeks = (selectedYear, hocKy = null) => {
     }
   }
   
-  const targetMaxWeek = Math.min(36, currentWeek + 2);
-  const hk1Max = Math.min(18, targetMaxWeek);
-  const hk2Max = Math.min(36, targetMaxWeek);
+  const hk1Max = 18;
+  const hk2Max = 36;
 
   const startWeek = (hocKy == 2) ? 19 : 1;
   const endWeek = (hocKy == 1) ? hk1Max : hk2Max;
@@ -132,4 +131,48 @@ export const getCurrentSemesterWeek = (selectedYear) => {
     }
   }
   return Math.min(36, currentWeek);
+};
+
+export const getWeekDates = (tuan, selectedYear = null) => {
+  let schoolStart;
+  if (selectedYear?.ngayBatDauHk1) {
+    schoolStart = new Date(selectedYear.ngayBatDauHk1 + "T00:00:00");
+  } else if (typeof selectedYear === "string") {
+    const startYear = parseInt(selectedYear.split("-")[0]);
+    schoolStart = new Date(startYear, 8, 5);
+  } else if (selectedYear?.tenNamHoc) {
+    const startYear = parseInt(selectedYear.tenNamHoc.split("-")[0]);
+    schoolStart = new Date(startYear, 8, 5);
+  } else {
+    const currentYear = new Date().getFullYear();
+    schoolStart = new Date(currentYear, 8, 5);
+  }
+
+  const dow = schoolStart.getDay();
+  const monday = new Date(schoolStart);
+  monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+  monday.setDate(monday.getDate() + (tuan - 1) * 7);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  return { monday, sunday };
+};
+
+export const mapTimeToPeriod = (timeStr) => {
+  if (!timeStr) return 1;
+  const [h, m] = timeStr.split(':').map(Number);
+  const totalMins = h * 60 + m;
+  
+  if (totalMins < 8 * 60) return 1;
+  if (totalMins < 9 * 60) return 2;
+  if (totalMins < 10 * 60) return 3;
+  if (totalMins < 11 * 60) return 4;
+  if (totalMins <= 12 * 60) return 5;
+  
+  if (totalMins < 14 * 60) return 6;
+  if (totalMins < 15 * 60) return 7;
+  if (totalMins < 16 * 60) return 8;
+  if (totalMins < 17 * 60) return 9;
+  return 10;
 };

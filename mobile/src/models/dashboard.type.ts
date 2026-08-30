@@ -34,13 +34,15 @@ export interface TimetableEntry {
   soTiet: number;
   monHoc: {
     id: number;
-    tenMonHoc: string;
+    tenMon: string;       // ✅ field đúng từ backend (MonHoc.tenMon)
+    tenMonHoc?: string;   // alias cũ, keep lại để không break
   } | null;
   phongHoc: string;
   giaoVien: {
     id: number;
     hoTen: string;
   } | null;
+  ghiChu?: string | null;
 }
 
 export interface ConductRecord {

@@ -1,6 +1,7 @@
 package com.hethongtruongthpt.controller;
 
 import com.hethongtruongthpt.common.ApiResponse;
+import com.hethongtruongthpt.dto.response.ThoiKhoaBieuResponse;
 import com.hethongtruongthpt.entity.ThoiKhoaBieu;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.service.ThoiKhoaBieuGeneratorService;
@@ -25,25 +26,27 @@ public class ThoiKhoaBieuController {
 
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
 	@GetMapping
-	public ResponseEntity<ApiResponse<List<ThoiKhoaBieu>>> getAll(
+	public ResponseEntity<ApiResponse<List<ThoiKhoaBieuResponse>>> getAll(
 			@RequestParam(required = false) Integer lopId,
 			@RequestParam(required = false) String namHoc,
 			@RequestParam(required = false) Integer hocKy,
 			@RequestParam(required = false) Integer tuan) {
 		boolean isExamWeek = thoiKhoaBieuService.isExamWeek(namHoc, tuan);
-		return ResponseEntity.ok(ApiResponse.ok(isExamWeek ? "TUAN_THI" : "OK", thoiKhoaBieuService.getByFilter(lopId, namHoc, hocKy, tuan)));
+		List<ThoiKhoaBieuResponse> res = thoiKhoaBieuService.getByFilter(lopId, namHoc, hocKy, tuan).stream()
+				.map(ThoiKhoaBieuResponse::fromEntity).collect(java.util.stream.Collectors.toList());
+		return ResponseEntity.ok(ApiResponse.ok(isExamWeek ? "TUAN_THI" : "OK", res));
 	}
 
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<ThoiKhoaBieu>> getById(@PathVariable Integer id) {
-		return ResponseEntity.ok(ApiResponse.ok(thoiKhoaBieuService.getById(id)));
+	public ResponseEntity<ApiResponse<ThoiKhoaBieuResponse>> getById(@PathVariable Integer id) {
+		return ResponseEntity.ok(ApiResponse.ok(ThoiKhoaBieuResponse.fromEntity(thoiKhoaBieuService.getById(id))));
 	}
 
 	@PreAuthorize("hasRole('ADMIN')")
 	@PostMapping
-	public ResponseEntity<ApiResponse<ThoiKhoaBieu>> create(@Valid @RequestBody ThoiKhoaBieu thoiKhoaBieu) {
-		return ResponseEntity.ok(ApiResponse.ok(thoiKhoaBieuService.create(thoiKhoaBieu)));
+	public ResponseEntity<ApiResponse<ThoiKhoaBieuResponse>> create(@Valid @RequestBody ThoiKhoaBieu thoiKhoaBieu) {
+		return ResponseEntity.ok(ApiResponse.ok(ThoiKhoaBieuResponse.fromEntity(thoiKhoaBieuService.create(thoiKhoaBieu))));
 	}
 
 	@PreAuthorize("hasRole('ADMIN')")
@@ -55,13 +58,15 @@ public class ThoiKhoaBieuController {
 		try {
 			ThoiKhoaBieuGeneratorService.GenerateResult result = thoiKhoaBieuService.generateScheduleForWeek(namHoc, hocKy, tuan);
 			Map<String, Object> body = new HashMap<>();
-			body.put("data", result.getCreated());
+			body.put("data", result.getCreated().stream().map(ThoiKhoaBieuResponse::fromEntity).collect(java.util.stream.Collectors.toList()));
 			body.put("warnings", result.getWarnings());
 			body.put("conflicts", result.getConflicts());
 			return ResponseEntity.ok(ApiResponse.ok(body));
 		} catch (ApiException e) {
+			e.printStackTrace();
 			return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
 		} catch (Exception e) {
+			e.printStackTrace();
 			return ResponseEntity.badRequest().body(ApiResponse.error("Lỗi tạo TKB: " + e.getMessage()));
 		}
 	}
@@ -75,7 +80,7 @@ public class ThoiKhoaBieuController {
 		try {
 			ThoiKhoaBieuGeneratorService.GenerateResult result = thoiKhoaBieuService.generateSchedule(namHoc, hocKy, soTuan);
 			Map<String, Object> body = new HashMap<>();
-			body.put("data", result.getCreated());
+			body.put("data", result.getCreated().stream().map(ThoiKhoaBieuResponse::fromEntity).collect(java.util.stream.Collectors.toList()));
 			body.put("warnings", result.getWarnings());
 			body.put("conflicts", result.getConflicts());
 			return ResponseEntity.ok(ApiResponse.ok(body));
@@ -95,7 +100,7 @@ public class ThoiKhoaBieuController {
 		try {
 			ThoiKhoaBieuGeneratorService.GenerateResult result = thoiKhoaBieuService.shuffleSchedule(namHoc, hocKy, tuan);
 			Map<String, Object> body = new HashMap<>();
-			body.put("data", result.getCreated());
+			body.put("data", result.getCreated().stream().map(ThoiKhoaBieuResponse::fromEntity).collect(java.util.stream.Collectors.toList()));
 			body.put("warnings", result.getWarnings());
 			body.put("conflicts", result.getConflicts());
 			return ResponseEntity.ok(ApiResponse.ok(body));
@@ -108,8 +113,8 @@ public class ThoiKhoaBieuController {
 
 	@PreAuthorize("hasRole('ADMIN')")
 	@PutMapping("/{id}")
-	public ResponseEntity<ApiResponse<ThoiKhoaBieu>> update(@PathVariable Integer id, @Valid @RequestBody ThoiKhoaBieu thoiKhoaBieu) {
-		return ResponseEntity.ok(ApiResponse.ok(thoiKhoaBieuService.update(id, thoiKhoaBieu)));
+	public ResponseEntity<ApiResponse<ThoiKhoaBieuResponse>> update(@PathVariable Integer id, @Valid @RequestBody ThoiKhoaBieu thoiKhoaBieu) {
+		return ResponseEntity.ok(ApiResponse.ok(ThoiKhoaBieuResponse.fromEntity(thoiKhoaBieuService.update(id, thoiKhoaBieu))));
 	}
 
 	@PreAuthorize("hasRole('ADMIN')")
@@ -125,13 +130,13 @@ public class ThoiKhoaBieuController {
 	 */
 	@PreAuthorize("hasRole('ADMIN')")
 	@PutMapping("/{id}/move")
-	public ResponseEntity<ApiResponse<ThoiKhoaBieu>> moveEntry(
+	public ResponseEntity<ApiResponse<ThoiKhoaBieuResponse>> moveEntry(
 			@PathVariable Integer id,
 			@RequestParam Integer thu,
 			@RequestParam Integer tietBatDau) {
 		try {
 			ThoiKhoaBieu updated = thoiKhoaBieuService.moveEntry(id, thu, tietBatDau);
-			return ResponseEntity.ok(ApiResponse.ok(updated));
+			return ResponseEntity.ok(ApiResponse.ok(ThoiKhoaBieuResponse.fromEntity(updated)));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(ApiResponse.error("Lỗi di chuyển TKB: " + e.getMessage()));
 		}
@@ -143,12 +148,14 @@ public class ThoiKhoaBieuController {
 	 */
 	@PreAuthorize("hasRole('ADMIN')")
 	@PostMapping("/swap")
-	public ResponseEntity<ApiResponse<Map<String, ThoiKhoaBieu>>> swapEntries(
+	public ResponseEntity<ApiResponse<Map<String, ThoiKhoaBieuResponse>>> swapEntries(
 			@RequestParam Integer id1,
 			@RequestParam Integer id2) {
 		try {
 			Map<String, ThoiKhoaBieu> result = thoiKhoaBieuService.swapEntries(id1, id2);
-			return ResponseEntity.ok(ApiResponse.ok(result));
+			Map<String, ThoiKhoaBieuResponse> mappedResult = new HashMap<>();
+			result.forEach((k, v) -> mappedResult.put(k, ThoiKhoaBieuResponse.fromEntity(v)));
+			return ResponseEntity.ok(ApiResponse.ok(mappedResult));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(ApiResponse.error("Lỗi hoán đổi TKB: " + e.getMessage()));
 		}

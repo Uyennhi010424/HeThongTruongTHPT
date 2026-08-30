@@ -25,13 +25,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   signIn: async (token: string, data: UserData, rememberMe: boolean = true) => {
-    if (rememberMe) {
-      await SecureStore.setItemAsync('userToken', token);
-      await SecureStore.setItemAsync('userData', JSON.stringify(data));
-    } else {
-      await SecureStore.deleteItemAsync('userToken');
-      await SecureStore.deleteItemAsync('userData');
-    }
+    // Luôn lưu token vào SecureStore để dùng được sau khi app reload
+    // rememberMe chỉ kiểm soát việc lưu credentials (username/password) để auto-fill
+    await SecureStore.setItemAsync('userToken', token);
+    await SecureStore.setItemAsync('userData', JSON.stringify(data));
     set({ userToken: token, userData: data });
   },
 
@@ -50,7 +47,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
     } catch (e) {
-      console.error('Failed to restore token', e);
+      console.log('Failed to restore token', e);
     }
     set({ userToken: null, userData: null, isLoading: false });
   },

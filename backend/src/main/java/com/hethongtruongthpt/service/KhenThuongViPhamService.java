@@ -4,11 +4,13 @@ import com.hethongtruongthpt.dto.khenthuong.KhenThuongRequest;
 import com.hethongtruongthpt.dto.vipham.ViPhamRequest;
 import com.hethongtruongthpt.entity.HocSinh;
 import com.hethongtruongthpt.entity.KhenThuong;
+import com.hethongtruongthpt.entity.ThongBao;
 import com.hethongtruongthpt.entity.ViPham;
 import com.hethongtruongthpt.enums.MucDoViPhamEnum;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.HocSinhRepository;
 import com.hethongtruongthpt.repository.KhenThuongRepository;
+import com.hethongtruongthpt.repository.ThongBaoRepository;
 import com.hethongtruongthpt.repository.ViPhamRepository;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -36,13 +38,28 @@ public class KhenThuongViPhamService {
     private final KhenThuongRepository khenThuongRepository;
     private final ViPhamRepository viPhamRepository;
     private final HocSinhRepository hocSinhRepository;
+    private final ThongBaoRepository thongBaoRepository;
 
     public KhenThuongViPhamService(KhenThuongRepository khenThuongRepository,
                                    ViPhamRepository viPhamRepository,
-                                   HocSinhRepository hocSinhRepository) {
+                                   HocSinhRepository hocSinhRepository,
+                                   ThongBaoRepository thongBaoRepository) {
         this.khenThuongRepository = khenThuongRepository;
         this.viPhamRepository = viPhamRepository;
         this.hocSinhRepository = hocSinhRepository;
+        this.thongBaoRepository = thongBaoRepository;
+    }
+
+    private void createNotification(HocSinh hocSinh, String tieuDe, String noiDung) {
+        ThongBao tb = new ThongBao();
+        tb.setTieuDe(tieuDe);
+        tb.setNoiDung(noiDung);
+        tb.setLoai("HOC_SINH");
+        tb.setHocSinh(hocSinh);
+        if (hocSinh.getUser() != null) {
+            tb.setRecipientId(hocSinh.getUser().getId());
+        }
+        thongBaoRepository.save(tb);
     }
 
     // ==================== Khen Thuong ====================
@@ -58,7 +75,9 @@ public class KhenThuongViPhamService {
         khenThuong.setNoiDung(request.getNoiDung());
         khenThuong.setNgayKhen(request.getNgayKhen());
 
-        return khenThuongRepository.save(khenThuong);
+        KhenThuong saved = khenThuongRepository.save(khenThuong);
+        createNotification(hocSinh, "Bạn có khen thưởng mới", request.getNoiDung());
+        return saved;
     }
 
     @Transactional
@@ -100,7 +119,9 @@ public class KhenThuongViPhamService {
         viPham.setMucDo(request.getMucDo());
         viPham.setNgayViPham(request.getNgayViPham());
 
-        return viPhamRepository.save(viPham);
+        ViPham saved = viPhamRepository.save(viPham);
+        createNotification(hocSinh, "Thông báo vi phạm", request.getNoiDung() + " (Mức độ: " + request.getMucDo() + ")");
+        return saved;
     }
 
     @Transactional
@@ -173,6 +194,7 @@ public class KhenThuongViPhamService {
                     khenThuong.setNoiDung(noiDung);
                     khenThuong.setNgayKhen(ngayKhen);
                     khenThuongRepository.save(khenThuong);
+                    createNotification(hocSinhOpt.get(), "Bạn có khen thưởng mới", noiDung);
                     result.setSuccessCount(result.getSuccessCount() + 1);
 
                 } catch (Exception e) {
@@ -245,6 +267,7 @@ public class KhenThuongViPhamService {
                     viPham.setMucDo(mucDo);
                     viPham.setNgayViPham(ngayViPham);
                     viPhamRepository.save(viPham);
+                    createNotification(hocSinhOpt.get(), "Thông báo vi phạm", noiDung + " (Mức độ: " + mucDo + ")");
                     result.setSuccessCount(result.getSuccessCount() + 1);
 
                 } catch (Exception e) {

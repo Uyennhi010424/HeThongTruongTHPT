@@ -11,3 +11,4 @@ export const searchHocSinh = (params = {}) =>
   axiosClient.get("/hocsinh", { params, skipCache: true });
 export const transferClass = (id, lopId) => axiosClient.post(`/hocsinh/${id}/chuyen-lop`, null, { params: { lopId } });
 export const transferSchool = (id, truongMoi) => axiosClient.post(`/hocsinh/${id}/chuyen-truong`, null, { params: { truongMoi } });
+export const getHocSinhLichSuHocTap = (id) => axiosClient.get(`/hocsinh/${id}/lich-su-hoc-tap`);

@@ -71,7 +71,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const response = await axiosClient.post('/auth/login', { username, password });
+      const response = await axiosClient.post('/auth/login', { username, password, device: "mobile" });
       if (response.data && response.data.data) {
         const { token, role } = response.data.data;
         if (role === 'HOC_SINH' || role === 'PHU_HUYNH') {

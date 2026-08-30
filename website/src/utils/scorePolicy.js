@@ -11,10 +11,13 @@ export const COMMENT_ONLY_SUBJECTS = [
   "am nhac",
   "noi dung giao duc dia phuong",
   "hoat dong trai nghiem",
-  "huong nghiep"
+  "huong nghiep",
+  "gdqp",
+  "giao duc quoc phong",
+  "an ninh"
 ];
 
-export const TX2_SUBJECTS = ["gdqp-an", "gdqp an", "giao duc quoc phong", "an ninh"];
+export const TX2_SUBJECTS = [];
 export const TX4_SUBJECTS = ["toan", "ngu van", "tieng anh"];
 export const TX3_SUBJECTS = [
   "vat li",

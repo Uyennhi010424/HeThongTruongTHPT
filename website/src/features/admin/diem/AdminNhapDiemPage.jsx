@@ -9,7 +9,7 @@ import DiemProgressTable from "./DiemProgressTable.jsx";
 
 export default function AdminNhapDiemPage() {
   const currentSemester = 1;
-  const [namHoc, setNamHoc] = useState("2024-2025");
+  const [namHoc, setNamHoc] = useState("2025-2026"); // Default to 2025-2026 since we have sample data there
   const [hocKy, setHocKy] = useState(currentSemester);
   const [sendHocKy, setSendHocKy] = useState(currentSemester);
   const [progressData, setProgressData] = useState([]);

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { getWeekDates } from "../../utils/helpers.js";
 
 /**
  * WeekPicker - chọn tuần theo calendar
@@ -17,19 +18,8 @@ export default function WeekPicker({ value, onChange, namHoc, hocKy, availableWe
   // Tính ngày bắt đầu năm học
   const startYear = namHoc ? parseInt(namHoc.split("-")[0]) : new Date().getFullYear();
 
-  const getWeekDates = (tuan) => {
-    const schoolStart = ngayBatDauHk1
-      ? new Date(ngayBatDauHk1 + "T00:00:00")
-      : new Date(startYear, 8, 5); // fallback 5/9
-    // Tìm Thứ 2 của tuần chứa ngày khai giảng
-    const dayOfWeek = schoolStart.getDay();
-    const monday = new Date(schoolStart);
-    monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    // Thêm (tuan - 1) * 7 ngày để đến tuần cần tìm
-    monday.setDate(monday.getDate() + (tuan - 1) * 7);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    return { monday, sunday };
+  const getWeekDatesLocal = (tuan) => {
+    return getWeekDates(tuan, { ngayBatDauHk1, tenNamHoc: namHoc });
   };
 
   const formatShort = (d) => `${d.getDate()}/${d.getMonth() + 1}`;
@@ -69,7 +59,7 @@ export default function WeekPicker({ value, onChange, namHoc, hocKy, availableWe
     const groups = {};
     const weekList = selectableWeeks ?? Array.from({ length: totalWeeks }, (_, i) => i + 1);
     for (const t of weekList) {
-      const { monday } = getWeekDates(t);
+      const { monday } = getWeekDatesLocal(t);
       const monthKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}`;
       const monthLabel = monday.toLocaleDateString("vi-VN", { month: "long", year: "numeric" });
       if (!groups[monthKey]) groups[monthKey] = { label: monthLabel, weeks: [] };
@@ -87,7 +77,7 @@ export default function WeekPicker({ value, onChange, namHoc, hocKy, availableWe
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const { monday: selectedMonday, sunday: selectedSunday } = getWeekDates(value);
+  const { monday: selectedMonday, sunday: selectedSunday } = getWeekDatesLocal(value);
 
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
@@ -150,7 +140,7 @@ export default function WeekPicker({ value, onChange, namHoc, hocKy, availableWe
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
                 {group.weeks.map((t) => {
-                  const { monday, sunday } = getWeekDates(t);
+                  const { monday, sunday } = getWeekDatesLocal(t);
                   const hasData = availableWeeks.includes(t);
                   const isSelected = t === value;
                   const isCurrent = t === currentTuan;

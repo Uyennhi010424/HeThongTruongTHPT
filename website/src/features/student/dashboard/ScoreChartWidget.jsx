@@ -15,6 +15,21 @@ import {
 
 const EXCLUDED_SUBJECTS = ["chào cờ", "sinh hoạt lớp", "hướng nghiệp", "ngoài giờ lên lớp", "giáo dục thể chất", "giáo dục quốc phòng"];
 
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.1)] border border-slate-100">
+        <p className="font-semibold text-slate-800 mb-1">{label}</p>
+        <p className="text-sm font-medium text-blue-600">
+          Điểm trung bình: <span className="font-bold">{payload[0].value}</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+
 const ScoreChartWidget = ({ 
   subjectScores, 
   subjectMap, 
@@ -92,12 +107,8 @@ const ScoreChartWidget = ({
               />
               <YAxis domain={[0, 10]} ticks={[0, 2, 4, 6, 8, 10]} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={{
-                  borderRadius: "12px",
-                  border: "none",
-                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-                }}
-                itemStyle={{ color: "#1e293b", fontWeight: 600 }}
+                content={<CustomTooltip />}
+                cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
               />
               <Bar dataKey="avg" barSize={24} radius={[6, 6, 0, 0]} animationDuration={1000}>
                 {chartData.map((entry, index) => (

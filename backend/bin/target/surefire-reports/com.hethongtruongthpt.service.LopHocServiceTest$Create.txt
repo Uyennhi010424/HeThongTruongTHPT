@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.hethongtruongthpt.service.LopHocServiceTest$Create
--------------------------------------------------------------------------------
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s -- in com.hethongtruongthpt.service.LopHocServiceTest$Create

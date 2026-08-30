@@ -67,8 +67,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!initialLoaded) return;
-    updateThemeState(configs.theme_mode, configs.theme_color, configs.theme_logo, configs.theme_favicon, configs.system_name);
-  }, [configs.theme_mode, configs.theme_color, configs.theme_logo, configs.theme_favicon, configs.system_name, initialLoaded]);
+    updateThemeState(configs.theme_mode, configs.theme_color, configs.theme_logo, configs.theme_favicon, configs.system_name, configs.theme_footer);
+  }, [configs.theme_mode, configs.theme_color, configs.theme_logo, configs.theme_favicon, configs.system_name, configs.theme_footer, initialLoaded]);
 
   const handleSaveAll = async (silent = false) => {
     setSaving(true);
@@ -81,14 +81,6 @@ export default function SettingsPage() {
       setSaving(false);
     }
   };
-
-  useEffect(() => {
-    if (!initialLoaded) return;
-    const timer = setTimeout(() => {
-      handleSaveAll(true);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [configs, initialLoaded]);
 
   if (loading) {
     return (
@@ -106,6 +98,18 @@ export default function SettingsPage() {
       <PageHeader
         title="Cài đặt hệ thống"
         description="Quản lý giao diện và nhật ký hoạt động hệ thống."
+        actions={
+          tab === "interface" && (
+            <button
+              onClick={() => handleSaveAll(false)}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              <MaterialIcon name="save" className="text-xl" />
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          )
+        }
       />
 
       {/* HORIZONTAL TABS */}
@@ -148,7 +152,7 @@ function InterfaceTab({ configs, updateConfig }) {
   return (
     <div className="grid grid-cols-1 gap-lg xl:grid-cols-3 max-w-full">
       <ConfigCard title="Định dạng website" icon="web">
-        <Field label="Tên hệ thống" value={configs.system_name} onChange={(e) => updateConfig("system_name", e.target.value)} />
+        <Field label="Tên trường" value={configs.system_name} onChange={(e) => updateConfig("system_name", e.target.value)} />
         <Field label="Tiêu đề Website (Title)" value={configs.website_title} onChange={(e) => updateConfig("website_title", e.target.value)} />
         <Field label="Footer" value={configs.theme_footer} onChange={(e) => updateConfig("theme_footer", e.target.value)} />
       </ConfigCard>

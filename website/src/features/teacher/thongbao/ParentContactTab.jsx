@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { getChuNhiemByGiaoVien } from "../../../api/chunhiemApi.js";
 import { searchHocSinh } from "../../../api/hocsinhApi.js";
 import { getParentsForStudent } from "../../../api/phuhuynhHocSinhApi.js";
-import { createThongBao, getConversationByHocSinh } from "../../../api/thongbaoApi.js";
+import { createThongBao, getConversationByHocSinh, replyThongBao } from "../../../api/thongbaoApi.js";
 import { getLopById } from "../../../api/lopApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
 import { webSocketService } from "../../../utils/websocket.js";
@@ -44,9 +44,10 @@ function StudentChatDrawer({ student, onClose, onRefresh, teacher }) {
     setLoadingHistory(true);
     fetchConversation();
 
+    let subId = null;
     if (student?.id) {
       webSocketService.connect(() => {
-        webSocketService.subscribe(`/topic/chat/${student.id}`, (newMsg) => {
+        subId = webSocketService.subscribe(`/topic/chat/${student.id}`, (newMsg) => {
           setConversation(prev => {
             if (prev.find(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
@@ -54,7 +55,7 @@ function StudentChatDrawer({ student, onClose, onRefresh, teacher }) {
         });
       });
       return () => {
-        webSocketService.unsubscribe(`/topic/chat/${student.id}`);
+        if (subId) webSocketService.unsubscribe(`/topic/chat/${student.id}`, subId);
       };
     }
   }, [fetchConversation, student?.id]);
@@ -78,13 +79,30 @@ function StudentChatDrawer({ student, onClose, onRefresh, teacher }) {
     if (!replyText.trim()) return;
     setSending(true);
     try {
-      await createThongBao({
-        tieuDe: `[SLL] ${title}`,
-        noiDung: replyText.trim(),
-        doiTuong: "PHU_HUYNH",
-        hocSinh: { id: student.id },
-        senderRole: "GIAO_VIEN"
-      });
+      if (conversation.length > 0) {
+        // Reply to existing thread
+        const rootId = conversation[0].parentId || conversation[0].id;
+        await replyThongBao(rootId, {
+          noiDung: replyText.trim(),
+          doiTuong: "PHU_HUYNH",
+          hocSinh: { id: student.id },
+          senderRole: "GIAO_VIEN"
+        });
+      } else {
+        // Start a new thread
+        let parentId = null;
+        if (student.phuHuynh && student.phuHuynh.length > 0 && student.phuHuynh[0].userId) {
+          parentId = student.phuHuynh[0].userId;
+        }
+        await createThongBao({
+          tieuDe: `[SLL] ${title}`,
+          noiDung: replyText.trim(),
+          doiTuong: "PHU_HUYNH",
+          hocSinh: { id: student.id },
+          recipientId: parentId,
+          senderRole: "GIAO_VIEN"
+        });
+      }
       notifySuccess("Đã gửi tin nhắn cho phụ huynh!");
       setReplyText("");
       setTitle("Trao đổi phụ huynh");
@@ -129,15 +147,6 @@ function StudentChatDrawer({ student, onClose, onRefresh, teacher }) {
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-
-        {/* Templates */}
-        <div className="p-3 bg-white border-b border-gray-100 flex gap-2 overflow-x-auto custom-scrollbar">
-          <button onClick={() => applyTemplate("Khen thưởng", `Chào phụ huynh,\n${danhXung} xin thông báo em ${student.hoTen} hôm nay có biểu hiện rất tốt trong giờ học...`)} className="shrink-0 px-3 py-1.5 bg-green-50 text-green-700 text-[11px] font-bold rounded-full border border-green-200 hover:bg-green-100">🎉 Khen thưởng</button>
-          <button onClick={() => applyTemplate("Nhắc nhở học tập", `Chào phụ huynh,\n${danhXung} xin thông báo em ${student.hoTen} dạo này lơ là bài tập về nhà...`)} className="shrink-0 px-3 py-1.5 bg-orange-50 text-orange-700 text-[11px] font-bold rounded-full border border-orange-200 hover:bg-orange-100">⚠️ Nhắc nhở</button>
-          <button onClick={() => applyTemplate("Báo nghỉ học", `Chào phụ huynh,\nHôm nay em ${student.hoTen} vắng mặt không phép...`)} className="shrink-0 px-3 py-1.5 bg-red-50 text-red-700 text-[11px] font-bold rounded-full border border-red-200 hover:bg-red-100">🚨 Báo vắng</button>
-          <button onClick={() => applyTemplate("Kết quả học tập", `Chào phụ huynh,\nĐây là kết quả điểm kiểm tra gần nhất của em ${student.hoTen}...`)} className="shrink-0 px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-full border border-blue-200 hover:bg-blue-100">📈 Báo điểm</button>
-        </div>
-
         {/* Chat History */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           {loadingHistory ? (

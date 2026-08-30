@@ -42,10 +42,10 @@ export default function ParentScores() {
       const subjectScores = allScores.filter((s: any) => s.monHoc?.id === subject.id && s.hocKy === filter);
       const isEval = subjectScores.some((s: any) => s.nhanXet === 'DAT' || s.nhanXet === 'CHUA_DAT');
       return { ...subject, subjectScores, isEval };
-    }).filter(s => s.subjectScores.length > 0);
+    }).filter((s: any) => s.subjectScores.length > 0);
 
     // Sort: Graded first, Evaluated bottom
-    enrichedSubjects.sort((a, b) => (a.isEval === b.isEval ? 0 : a.isEval ? 1 : -1));
+    enrichedSubjects.sort((a: any, b: any) => (a.isEval === b.isEval ? 0 : a.isEval ? 1 : -1));
 
     if (enrichedSubjects.length === 0) {
       return <Text style={{ textAlign: 'center', color: '#64748b', marginTop: 20 }}>Chưa có điểm.</Text>;
@@ -110,10 +110,10 @@ export default function ParentScores() {
       const subjectScores = allScores.filter((s: any) => s.monHoc?.id === subject.id);
       const isEval = subjectScores.some((s: any) => s.nhanXet === 'DAT' || s.nhanXet === 'CHUA_DAT');
       return { ...subject, subjectScores, isEval };
-    }).filter(s => s.subjectScores.length > 0);
+    }).filter((s: any) => s.subjectScores.length > 0);
 
     // Sort: Graded first, Evaluated bottom
-    enrichedSubjects.sort((a, b) => (a.isEval === b.isEval ? 0 : a.isEval ? 1 : -1));
+    enrichedSubjects.sort((a: any, b: any) => (a.isEval === b.isEval ? 0 : a.isEval ? 1 : -1));
 
     if (enrichedSubjects.length === 0) {
       return <Text style={{ textAlign: 'center', color: '#64748b', marginTop: 20 }}>Chưa có điểm.</Text>;

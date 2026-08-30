@@ -3,12 +3,19 @@ package com.hethongtruongthpt.service;
 import com.hethongtruongthpt.entity.ChuNhiem;
 import com.hethongtruongthpt.entity.ChuNhiemId;
 import com.hethongtruongthpt.entity.HocSinh;
+import com.hethongtruongthpt.entity.LichSuHocTap;
 import com.hethongtruongthpt.entity.LopHoc;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.ChuNhiemRepository;
+import com.hethongtruongthpt.repository.GiaoVienRepository;
 import com.hethongtruongthpt.repository.HocSinhRepository;
+import com.hethongtruongthpt.repository.LichSuHocTapRepository;
 import com.hethongtruongthpt.repository.LopHocRepository;
+import com.hethongtruongthpt.repository.HocBaRepository;
+import com.hethongtruongthpt.repository.NamHocRepository;
+import com.hethongtruongthpt.entity.HocBa;
+import com.hethongtruongthpt.entity.NamHoc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -28,12 +35,18 @@ public class LopHocService {
     private static final Logger log = LoggerFactory.getLogger(LopHocService.class);
     private final LopHocRepository lopHocRepository;
     private final HocSinhRepository hocSinhRepository;
-    private final com.hethongtruongthpt.repository.GiaoVienRepository giaoVienRepository;
+    private final GiaoVienRepository giaoVienRepository;
+    private final LichSuHocTapRepository lichSuHocTapRepository;
+    private final HocBaRepository hocBaRepository;
+    private final NamHocRepository namHocRepository;
 
-    public LopHocService(LopHocRepository lopHocRepository, HocSinhRepository hocSinhRepository, com.hethongtruongthpt.repository.GiaoVienRepository giaoVienRepository) {
+    public LopHocService(LopHocRepository lopHocRepository, HocSinhRepository hocSinhRepository, GiaoVienRepository giaoVienRepository, LichSuHocTapRepository lichSuHocTapRepository, HocBaRepository hocBaRepository, NamHocRepository namHocRepository) {
         this.lopHocRepository = lopHocRepository;
         this.hocSinhRepository = hocSinhRepository;
         this.giaoVienRepository = giaoVienRepository;
+        this.lichSuHocTapRepository = lichSuHocTapRepository;
+        this.hocBaRepository = hocBaRepository;
+        this.namHocRepository = namHocRepository;
     }
 
     public List<LopHoc> getAll() {
@@ -152,9 +165,12 @@ public class LopHocService {
 
         int promotedCount = 0;
         int graduatedCount = 0;
+        int failedCount = 0;
         int teacherMovedCount = 0;
         List<String> createdClasses = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+
+        NamHoc currentNamHocObj = namHocRepository.findByTenNamHoc(currentNamHoc).orElse(null);
 
         for (LopHoc oldLop : currentLops) {
             int khoi = oldLop.getKhoi();
@@ -164,10 +180,34 @@ public class LopHocService {
             if (khoi == 12) {
                 // Tot nghiep: hoc sinh trangThai=2, xoa chu nhiem
                 for (HocSinh hs : students) {
+                    HocBa hocBa = null;
+                    if (currentNamHocObj != null) {
+                        hocBa = hocBaRepository.findByHocSinhIdAndNamHocId(hs.getId(), currentNamHocObj.getId()).orElse(null);
+                    }
+                    boolean isFail = hocBa != null && ((hocBa.getDiemTBCaNam() != null && hocBa.getDiemTBCaNam().doubleValue() < 5.0) || "Yếu".equalsIgnoreCase(hocBa.getHocLuc()) || "Kém".equalsIgnoreCase(hocBa.getHocLuc()));
+
+                    if (!lichSuHocTapRepository.existsByHocSinhIdAndNamHoc(hs.getId(), currentNamHoc)) {
+                        LichSuHocTap ls = new LichSuHocTap();
+                        ls.setHocSinh(hs);
+                        ls.setLopHoc(oldLop);
+                        ls.setNamHoc(currentNamHoc);
+                        if (hocBa != null) {
+                            ls.setDiemTrungBinh(hocBa.getDiemTBCaNam());
+                            ls.setHocLuc(hocBa.getHocLuc());
+                            ls.setHanhKiem(hocBa.getHanhKiem());
+                        }
+                        ls.setKetQua(isFail ? "Ở lại lớp" : "Tốt nghiệp");
+                        lichSuHocTapRepository.save(ls);
+                    }
                     hs.setLop(null);
-                    hs.setTrangThai(2);
+                    if (isFail) {
+                        hs.setTrangThai(1); // Ở lại lớp thì trạng thái vẫn đang học, chỉ là bị gỡ lớp
+                        failedCount++;
+                    } else {
+                        hs.setTrangThai(2); // Tốt nghiệp thì trạng thái ngừng học
+                        graduatedCount++;
+                    }
                     hocSinhRepository.save(hs);
-                    graduatedCount++;
                 }
                 if (oldLop.getGvcn() != null) {
                     log.info("Xóa chủ nhiệm: GV {} thôi chủ nhiệm lớp {} (tốt nghiệp)",
@@ -198,9 +238,33 @@ public class LopHocService {
 
                 // Chuyen hoc sinh sang lop moi
                 for (HocSinh hs : students) {
-                    hs.setLop(newLop);
+                    HocBa hocBa = null;
+                    if (currentNamHocObj != null) {
+                        hocBa = hocBaRepository.findByHocSinhIdAndNamHocId(hs.getId(), currentNamHocObj.getId()).orElse(null);
+                    }
+                    boolean isFail = hocBa != null && ((hocBa.getDiemTBCaNam() != null && hocBa.getDiemTBCaNam().doubleValue() < 5.0) || "Yếu".equalsIgnoreCase(hocBa.getHocLuc()) || "Kém".equalsIgnoreCase(hocBa.getHocLuc()));
+
+                    if (!lichSuHocTapRepository.existsByHocSinhIdAndNamHoc(hs.getId(), currentNamHoc)) {
+                        LichSuHocTap ls = new LichSuHocTap();
+                        ls.setHocSinh(hs);
+                        ls.setLopHoc(oldLop);
+                        ls.setNamHoc(currentNamHoc);
+                        if (hocBa != null) {
+                            ls.setDiemTrungBinh(hocBa.getDiemTBCaNam());
+                            ls.setHocLuc(hocBa.getHocLuc());
+                            ls.setHanhKiem(hocBa.getHanhKiem());
+                        }
+                        ls.setKetQua(isFail ? "Ở lại lớp" : "Lên lớp");
+                        lichSuHocTapRepository.save(ls);
+                    }
+                    if (isFail) {
+                        hs.setLop(null); // Gỡ lớp để Admin tự xếp lại
+                        failedCount++;
+                    } else {
+                        hs.setLop(newLop);
+                        promotedCount++;
+                    }
                     hocSinhRepository.save(hs);
-                    promotedCount++;
                 }
 
                 // Dong bo siSo tu so hoc sinh active
@@ -230,6 +294,7 @@ public class LopHocService {
         Map<String, Object> result = new HashMap<>();
         result.put("promoted", promotedCount);
         result.put("graduated", graduatedCount);
+        result.put("failed", failedCount);
         result.put("teacherMoved", teacherMovedCount);
         result.put("createdClasses", createdClasses);
         result.put("errors", errors);

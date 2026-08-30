@@ -1,8 +1,25 @@
+import React, { useState, useEffect } from "react";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import { formatDate, getGenderLabel } from "./hocSinhUtils.js";
+import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
+import { getHocSinhLichSuHocTap } from "../../../api/hocSinhApi.js";
 
 export default function HocSinhViewModal({ hooks }) {
   const { viewModalOpen, setViewModalOpen, viewingStudent, parents } = hooks;
+  const [lichSu, setLichSu] = useState([]);
+  const [loadingLichSu, setLoadingLichSu] = useState(false);
+
+  useEffect(() => {
+    if (viewModalOpen && viewingStudent) {
+      setLoadingLichSu(true);
+      getHocSinhLichSuHocTap(viewingStudent.id)
+        .then(res => setLichSu(res.data?.data || []))
+        .catch(err => console.error("Error loading lịch sử:", err))
+        .finally(() => setLoadingLichSu(false));
+    } else {
+      setLichSu([]);
+    }
+  }, [viewModalOpen, viewingStudent]);
 
   return (
     <SimpleModal
@@ -14,9 +31,14 @@ export default function HocSinhViewModal({ hooks }) {
       {viewingStudent && (
         <div className="space-y-4 p-4">
           <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
-            <div className="w-16 h-16 rounded-full bg-indigo-50 border-2 border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-2xl">
-              {viewingStudent.hoTen ? viewingStudent.hoTen.charAt(0).toUpperCase() : "H"}
-            </div>
+            <CachedAvatar
+              username={viewingStudent.maHocSinh}
+              role="student"
+              src={viewingStudent.anhDaiDien}
+              fallback={viewingStudent.hoTen ? viewingStudent.hoTen.charAt(0).toUpperCase() : "H"}
+              className="w-16 h-16 rounded-full object-cover border-2 border-indigo-100"
+              fallbackClassName="w-16 h-16 rounded-full bg-indigo-50 border-2 border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-2xl"
+            />
             <div>
               <h3 className="text-xl font-bold text-blue-900">{viewingStudent.hoTen}</h3>
               <p className="text-sm font-medium text-slate-500">
@@ -37,6 +59,22 @@ export default function HocSinhViewModal({ hooks }) {
             <div>
               <span className="block text-xs font-semibold text-slate-400 uppercase">Số điện thoại</span>
               <span className="text-sm font-medium text-slate-900">{viewingStudent.sdt || "--"}</span>
+            </div>
+            <div>
+              <span className="block text-xs font-semibold text-slate-400 uppercase">Dân tộc</span>
+              <span className="text-sm font-medium text-slate-900">{viewingStudent.danToc || "Không rõ"}</span>
+            </div>
+            <div>
+              <span className="block text-xs font-semibold text-slate-400 uppercase">Tôn giáo</span>
+              <span className="text-sm font-medium text-slate-900">{viewingStudent.tonGiao || "Không"}</span>
+            </div>
+            <div>
+              <span className="block text-xs font-semibold text-slate-400 uppercase">Mã BHYT</span>
+              <span className="text-sm font-medium text-slate-900">{viewingStudent.maBhyt || "--"}</span>
+            </div>
+            <div>
+              <span className="block text-xs font-semibold text-slate-400 uppercase">Diện chính sách</span>
+              <span className="text-sm font-medium text-slate-900">{viewingStudent.dienChinhSach ? "Có" : "Không"}</span>
             </div>
             <div>
               <span className="block text-xs font-semibold text-slate-400 uppercase">Email</span>
@@ -77,6 +115,48 @@ export default function HocSinhViewModal({ hooks }) {
               </div>
             ) : (
               <p className="text-sm font-medium text-slate-500 italic">Chưa có thông tin phụ huynh</p>
+            )}
+          </div>
+          <div className="pt-4 mt-2 border-t border-slate-100">
+            <h4 className="text-sm font-bold text-blue-900 mb-3">Lịch sử học tập (Lên lớp/Chuyển lớp/Chuyển trường)</h4>
+            {loadingLichSu ? (
+              <p className="text-sm font-medium text-slate-500 italic">Đang tải dữ liệu...</p>
+            ) : lichSu && lichSu.length > 0 ? (
+              <div className="space-y-2">
+                {lichSu.map((ls, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 flex-wrap gap-2">
+                    <div className="flex flex-col gap-1">
+                      <div>
+                        <span className="font-bold text-slate-800">{ls.namHoc}</span>
+                        <span className="mx-2 text-slate-400">|</span>
+                        <span className="text-sm font-semibold text-slate-700">Lớp {ls.lopHoc?.tenLop}</span>
+                      </div>
+                      {(ls.diemTrungBinh != null || ls.hocLuc || ls.hanhKiem) && (
+                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                          {ls.diemTrungBinh != null && (
+                            <span>Điểm TB: <span className="font-semibold text-slate-700">{ls.diemTrungBinh}</span></span>
+                          )}
+                          {ls.hocLuc && (
+                            <span>Học lực: <span className="font-semibold text-slate-700">{ls.hocLuc}</span></span>
+                          )}
+                          {ls.hanhKiem && (
+                            <span>Hạnh kiểm: <span className="font-semibold text-slate-700">{ls.hanhKiem}</span></span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`px-2.5 py-1.5 text-xs font-bold rounded ${
+                      ls.ketQua === 'Ở lại lớp' ? 'bg-red-100 text-red-700' :
+                      ls.ketQua === 'Chuyển lớp' ? 'bg-amber-100 text-amber-700' :
+                      'bg-indigo-100 text-indigo-700'
+                    }`}>
+                      {ls.ketQua || "Chưa có kết quả"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm font-medium text-slate-500 italic">Chưa có lịch sử học tập</p>
             )}
           </div>
 

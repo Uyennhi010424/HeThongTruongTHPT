@@ -139,8 +139,9 @@ public class AuditLogService {
             if (entity.getHocSinh() != null) {
                 dto.setHocSinhId(entity.getHocSinh().getId());
                 dto.setHoTenHocSinh(entity.getHocSinh().getHoTen());
+                String username = (entity.getHocSinh().getUser() != null) ? entity.getHocSinh().getUser().getUsername() : null;
                 dto.setHocSinh(new DiemAuditLogDTO.HocSinhInfo(
-                    entity.getHocSinh().getId(), entity.getHocSinh().getHoTen()));
+                    entity.getHocSinh().getId(), entity.getHocSinh().getHoTen(), username));
             }
         } catch (Exception ignored) {}
 
@@ -157,8 +158,9 @@ public class AuditLogService {
             if (entity.getGiaoVien() != null) {
                 dto.setGiaoVienId(entity.getGiaoVien().getId());
                 dto.setHoTenGiaoVien(entity.getGiaoVien().getHoTen());
+                String username = (entity.getGiaoVien().getUser() != null) ? entity.getGiaoVien().getUser().getUsername() : null;
                 dto.setGiaoVien(new DiemAuditLogDTO.GiaoVienInfo(
-                    entity.getGiaoVien().getId(), entity.getGiaoVien().getHoTen()));
+                    entity.getGiaoVien().getId(), entity.getGiaoVien().getHoTen(), username));
             }
         } catch (Exception ignored) {}
 
@@ -180,18 +182,18 @@ public class AuditLogService {
                 if (gv != null) {
                     dto.setGiaoVienId(gv.getId());
                     dto.setHoTenGiaoVien(gv.getHoTen());
-                    dto.setGiaoVien(new DiemAuditLogDTO.GiaoVienInfo(gv.getId(), gv.getHoTen()));
+                    dto.setGiaoVien(new DiemAuditLogDTO.GiaoVienInfo(gv.getId(), gv.getHoTen(), entity.getUser().getUsername()));
                 }
             } else if ("HOC_SINH".equals(role)) {
                 HocSinh hs = hocSinhRepository.findByUserId(entity.getUser().getId()).orElse(null);
                 if (hs != null) {
                     dto.setHocSinhId(hs.getId());
                     dto.setHoTenHocSinh(hs.getHoTen());
-                    dto.setHocSinh(new DiemAuditLogDTO.HocSinhInfo(hs.getId(), hs.getHoTen()));
+                    dto.setHocSinh(new DiemAuditLogDTO.HocSinhInfo(hs.getId(), hs.getHoTen(), entity.getUser().getUsername()));
                 }
             } else if ("ADMIN".equals(role)) {
                 dto.setHoTenGiaoVien("Admin (" + entity.getUser().getUsername() + ")");
-                dto.setGiaoVien(new DiemAuditLogDTO.GiaoVienInfo(0, "Admin (" + entity.getUser().getUsername() + ")"));
+                dto.setGiaoVien(new DiemAuditLogDTO.GiaoVienInfo(0, "Admin (" + entity.getUser().getUsername() + ")", entity.getUser().getUsername()));
             }
         }
         return dto;

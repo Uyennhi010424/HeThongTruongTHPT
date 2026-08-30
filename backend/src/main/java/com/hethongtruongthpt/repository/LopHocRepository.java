@@ -35,7 +35,7 @@ public interface LopHocRepository extends JpaRepository<LopHoc, Integer> {
     List<LopHoc> findByGvcnId(Integer gvcnId);
 
     @EntityGraph(attributePaths = {"gvcn"})
-    List<LopHoc> findByToHopId(Integer toHopId);
+    List<LopHoc> findByToHop_Id(Integer toHopId);
     
-    long countByToHopId(Integer toHopId);
+    long countByToHop_Id(Integer toHopId);
 }

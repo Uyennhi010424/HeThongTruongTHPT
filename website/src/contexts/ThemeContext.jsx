@@ -9,6 +9,7 @@ export function ThemeProvider({ children }) {
   const [themeLogo, setThemeLogo] = useState("/logo.png");
   const [themeFavicon, setThemeFavicon] = useState("/logo.png");
   const [systemName, setSystemName] = useState("EduManager Pro");
+  const [themeFooter, setThemeFooter] = useState("© 2026 EduManager Pro. All rights reserved.");
 
   const applyTheme = (mode, color) => {
     // 1. Dark Mode Toggle
@@ -47,6 +48,7 @@ export function ThemeProvider({ children }) {
         const logo = data.find((c) => c.configKey === "theme_logo")?.configValue || "/logo.png";
         const favicon = data.find((c) => c.configKey === "theme_favicon")?.configValue || "/logo.png";
         const sysName = data.find((c) => c.configKey === "system_name")?.configValue || "EduManager Pro";
+        const footer = data.find((c) => c.configKey === "theme_footer")?.configValue || "© 2026 EduManager Pro. All rights reserved.";
         
         if (isMounted) {
           setThemeMode(mode);
@@ -54,6 +56,7 @@ export function ThemeProvider({ children }) {
           setThemeLogo(logo.startsWith("/") || logo.startsWith("http") ? logo : `http://localhost:8080${logo}`);
           setThemeFavicon(favicon.startsWith("/") || favicon.startsWith("http") ? favicon : `http://localhost:8080${favicon}`);
           setSystemName(sysName);
+          setThemeFooter(footer);
           applyTheme(mode, color);
           
           // Apply Favicon
@@ -77,7 +80,7 @@ export function ThemeProvider({ children }) {
     return () => { isMounted = false; };
   }, []);
 
-  const updateThemeState = (mode, color, logo, favicon, sysName) => {
+  const updateThemeState = (mode, color, logo, favicon, sysName, footer) => {
     if (mode) setThemeMode(mode);
     if (color) setThemeColor(color);
     if (logo) setThemeLogo(logo.startsWith("/") || logo.startsWith("http") ? logo : `http://localhost:8080${logo}`);
@@ -88,11 +91,12 @@ export function ThemeProvider({ children }) {
       if (link) link.href = favUrl;
     }
     if (sysName) setSystemName(sysName);
+    if (footer !== undefined) setThemeFooter(footer);
     applyTheme(mode || themeMode, color || themeColor);
   };
 
   return (
-    <ThemeContext.Provider value={{ themeMode, themeColor, themeLogo, themeFavicon, systemName, updateThemeState }}>
+    <ThemeContext.Provider value={{ themeMode, themeColor, themeLogo, themeFavicon, systemName, themeFooter, updateThemeState }}>
       {children}
     </ThemeContext.Provider>
   );

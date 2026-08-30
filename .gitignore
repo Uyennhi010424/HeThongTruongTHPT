@@ -55,3 +55,7 @@ TKB_FULL.md
 backend/.github/
 
 backend/backups/*.sql
+
+
+docs/
+ke_hoach/

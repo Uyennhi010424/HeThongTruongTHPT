@@ -6,6 +6,10 @@ import { ConfirmProvider } from "./contexts/ConfirmContext.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import ErrorBoundary from "./components/common/ErrorBoundary.jsx";
 import "./styles/global.css";
+import "@fontsource/roboto/400.css";
+import "@fontsource/roboto/500.css";
+import "@fontsource/roboto/700.css";
+import "material-symbols/outlined.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

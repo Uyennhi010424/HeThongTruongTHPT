@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMyNotifications, markRead, markAllRead } from "../../api/notificationApi.js";
+import { getThongBao } from "../../api/thongbaoApi.js";
+import { webSocketService } from "../../utils/websocket.js";
+import { getRole } from "../../store/authStore.js";
+import { getCurrentUsernameFromToken } from "../../utils/teacherProfile.js";
+import axiosClient from "../../api/axiosClient.js";
 
 const POLL_INTERVAL = 30000; // 30 seconds
 
@@ -18,6 +23,16 @@ const TYPE_CONFIG = {
   LEAVE_RESULT:  { nav: "/teacher/xin-nghi", label: "Kết quả đơn nghỉ" },
 };
 
+// Helper: check if a thongbao was created by current admin/vanthu user
+function isAdminOwnBroadcast(notice, currentUsername) {
+  if (!notice.tieuDe) return false; // not a thongbao
+  const creatorRole = notice.nguoiTao?.role || notice.senderRole;
+  const creatorUsername = notice.nguoiTao?.username;
+  // Admin/vanthu sees only notices from others (leave requests etc.), not their own broadcasts
+  if ((creatorRole === 'ADMIN' || creatorRole === 'VAN_THU') && creatorUsername === currentUsername) return true;
+  return false;
+}
+
 export default function NotificationBell({ role = "admin" }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -25,9 +40,60 @@ export default function NotificationBell({ role = "admin" }) {
   const navigate = useNavigate();
 
   const fetchNotifications = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
     try {
-      const res = await getMyNotifications();
-      setNotifications(res?.data?.data || []);
+      const [res, tbRes] = await Promise.all([
+        getMyNotifications().catch(() => null),
+        getThongBao().catch(() => null)
+      ]);
+      
+      let appNotifs = res?.data?.data || [];
+      let thongBaos = tbRes?.data?.data || [];
+      
+      const role = getRole();
+      if (role === "GIAOVIEN" || role === "GIAO_VIEN") {
+        thongBaos = thongBaos.filter(item => ["GIAO_VIEN", "ALL", "CA_NHAN", "REPLY", "PHU_HUYNH"].includes(item.doiTuong));
+      } else if (role === "ADMIN" || role === "VAN_THU") {
+        const currentUsername = getCurrentUsernameFromToken();
+        thongBaos = thongBaos.filter(item => {
+          const creatorRole = item.nguoiTao?.role;
+          const creatorUsername = item.nguoiTao?.username;
+          return creatorRole !== "ADMIN" && creatorRole !== "VAN_THU" && creatorUsername !== currentUsername;
+        });
+      }
+
+      const mappedTb = thongBaos.map(tb => {
+        let displayTitle = tb.tieuDe;
+        if (tb.senderRole === "PHU_HUYNH" && tb.hocSinh?.hoTen) {
+          displayTitle = `Trao đổi từ phụ huynh em ${tb.hocSinh.hoTen}`;
+        }
+        return {
+          id: `tb_${tb.id}`,
+          realId: tb.id,
+          title: displayTitle,
+          message: tb.noiDung,
+          createdAt: tb.ngayDang,
+          isRead: true, // Will be overridden if existing is unread
+          type: 'THONG_BAO'
+        };
+      });
+
+      setNotifications(prev => {
+        const allNew = [...appNotifs, ...mappedTb];
+        // Preserve isRead state from prev for ThongBao
+        const merged = allNew.map(n => {
+          if (n.type === 'THONG_BAO') {
+            const existing = prev.find(p => p.id === n.id);
+            if (existing && existing.isRead === false) {
+              return { ...n, isRead: false };
+            }
+          }
+          return n;
+        });
+        return merged.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      });
     } catch {
       // silently ignore
     }
@@ -36,7 +102,94 @@ export default function NotificationBell({ role = "admin" }) {
   useEffect(() => {
     fetchNotifications();
     const timer = setInterval(fetchNotifications, POLL_INTERVAL);
-    return () => clearInterval(timer);
+    
+    let active = true;
+    let userId = null;
+    let subUser = null;
+    let subAll = null;
+    const setupWebSocket = async () => {
+      try {
+        const userRes = await axiosClient.get("/users/me");
+        if (active && userRes.data?.data) {
+          userId = userRes.data.data.id;
+          webSocketService.connect(() => {
+            if (userId) {
+              subUser = webSocketService.subscribe(`/topic/user/${userId}`, (newNotice) => {
+                // Admin/VanThu: skip own broadcast thongbao
+                const curRole = getRole();
+                if ((curRole === 'ADMIN' || curRole === 'VAN_THU') && isAdminOwnBroadcast(newNotice, getCurrentUsernameFromToken())) return;
+
+                setNotifications(prev => {
+                  // Phân biệt AppNotification (có title) và ThongBao (có tieuDe)
+                  const isThongBao = !!newNotice.tieuDe;
+                  const noticeId = isThongBao ? `tb_${newNotice.id}` : newNotice.id;
+                  
+                  if (prev.find(n => n.id === noticeId)) return prev;
+                  
+                  let displayTitle = newNotice.tieuDe;
+                  if (isThongBao && newNotice.senderRole === "PHU_HUYNH" && newNotice.hocSinh?.hoTen) {
+                    displayTitle = `Trao đổi từ phụ huynh em ${newNotice.hocSinh.hoTen}`;
+                  }
+
+                  const mapped = isThongBao ? {
+                    id: noticeId,
+                    realId: newNotice.id,
+                    title: displayTitle,
+                    message: newNotice.noiDung,
+                    createdAt: newNotice.ngayDang,
+                    isRead: false,
+                    type: 'THONG_BAO'
+                  } : {
+                    ...newNotice,
+                    isRead: false
+                  };
+                  return [mapped, ...prev];
+                });
+              });
+            }
+            subAll = webSocketService.subscribe('/topic/notifications', (newNotice) => {
+              // Admin/VanThu: skip their own broadcast thongbao coming through the global topic
+              const curRole = getRole();
+              if ((curRole === 'ADMIN' || curRole === 'VAN_THU') && isAdminOwnBroadcast(newNotice, getCurrentUsernameFromToken())) return;
+
+              setNotifications(prev => {
+                const isThongBao = !!newNotice.tieuDe;
+                const noticeId = isThongBao ? `tb_${newNotice.id}` : newNotice.id;
+                
+                if (prev.find(n => n.id === noticeId)) return prev;
+                
+                let displayTitle = newNotice.tieuDe;
+                if (isThongBao && newNotice.senderRole === "PHU_HUYNH" && newNotice.hocSinh?.hoTen) {
+                  displayTitle = `Trao đổi từ phụ huynh em ${newNotice.hocSinh.hoTen}`;
+                }
+
+                const mapped = isThongBao ? {
+                  id: noticeId,
+                  realId: newNotice.id,
+                  title: displayTitle,
+                  message: newNotice.noiDung,
+                  createdAt: newNotice.ngayDang,
+                  isRead: false,
+                  type: 'THONG_BAO'
+                } : {
+                  ...newNotice,
+                  isRead: false
+                };
+                return [mapped, ...prev];
+              });
+            });
+          });
+        }
+      } catch {}
+    };
+    setupWebSocket();
+    
+    return () => {
+      active = false;
+      clearInterval(timer);
+      if (userId && subUser) webSocketService.unsubscribe(`/topic/user/${userId}`, subUser);
+      if (subAll) webSocketService.unsubscribe('/topic/notifications', subAll);
+    };
   }, [fetchNotifications]);
 
   useEffect(() => {
@@ -56,6 +209,16 @@ export default function NotificationBell({ role = "admin" }) {
       setNotifications((prev) =>
         prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
       );
+    }
+    if (n.type === 'THONG_BAO') {
+      const role = getRole();
+      if (role === "ADMIN" || role === "VAN_THU") {
+        navigate("/admin/thongbao");
+      } else {
+        navigate("/teacher/thongbao");
+      }
+      setOpen(false);
+      return;
     }
     const cfg = TYPE_CONFIG[n.type];
     if (cfg) navigate(cfg.nav, { state: { referenceId: n.referenceId } });

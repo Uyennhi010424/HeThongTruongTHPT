@@ -70,20 +70,34 @@ public class DiemCalculationService {
     public List<DiemProgressDTO> getProgressSummary(String namHoc, Integer hocKy) {
         List<Map<String, Object>> raw = diemRepository.getProgressSummary(namHoc, hocKy);
         List<DiemProgressDTO> result = new ArrayList<>();
+        if (!raw.isEmpty()) {
+            logger.info("getProgressSummary sample row keys: {}", raw.get(0).keySet());
+            logger.info("getProgressSummary sample row values: {}", raw.get(0));
+        }
         for (Map<String, Object> row : raw) {
             DiemProgressDTO dto = new DiemProgressDTO();
-            dto.setLopId(row.get("lopId") != null ? ((Number) row.get("lopId")).intValue() : 0);
-            dto.setTenLop(row.get("tenLop") != null ? String.valueOf(row.get("tenLop")) : "");
-            dto.setTenGvcn(row.get("tenGvcn") != null ? String.valueOf(row.get("tenGvcn")) : "Chưa gán");
-            dto.setSiSo(row.get("siSo") != null ? ((Number) row.get("siSo")).intValue() : 0);
-            
-            Integer hasScoresInt = row.get("hasScores") != null ? ((Number) row.get("hasScores")).intValue() : 0;
-            dto.setHasScores(hasScoresInt > 0);
+            dto.setLopId(getVal(row, "lopId", "lop_id") != null ? ((Number) getVal(row, "lopId", "lop_id")).intValue() : 0);
+            dto.setTenLop(getVal(row, "tenLop", "ten_lop") != null ? String.valueOf(getVal(row, "tenLop", "ten_lop")) : "");
+            dto.setTenGvcn(getVal(row, "tenGvcn", "ten_gvcn") != null ? String.valueOf(getVal(row, "tenGvcn", "ten_gvcn")) : "Chưa gán");
+            dto.setSiSo(getVal(row, "siSo", "si_so") != null ? ((Number) getVal(row, "siSo", "si_so")).intValue() : 0);
             
             Integer siSo = dto.getSiSo();
-            Integer expectedPerStudent = row.get("expectedScoresPerStudent") != null ? ((Number) row.get("expectedScoresPerStudent")).intValue() : 0;
+            Object expectedObj = getVal(row, "expectedScoresPerStudent", "expectedscoresperstudent", "expected_scores_per_student");
+            int expectedPerStudent = 0;
+            if (expectedObj != null) {
+                try { expectedPerStudent = (int) Double.parseDouble(expectedObj.toString()); } catch (Exception ignored) {}
+            }
             Integer totalExpected = siSo * expectedPerStudent;
-            Integer entered = row.get("enteredScores") != null ? ((Number) row.get("enteredScores")).intValue() : 0;
+            
+            Object enteredObj = getVal(row, "enteredScores", "enteredscores", "entered_scores");
+            int entered = 0;
+            if (enteredObj != null) {
+                try { entered = (int) Double.parseDouble(enteredObj.toString()); } catch (Exception ignored) {}
+            }
+            
+            // Derive hasScores directly from enteredScores to avoid alias mapping issues
+            boolean hasScores = entered > 0;
+            dto.setHasScores(hasScores);
             
             dto.setTotalExpectedScores(totalExpected);
             dto.setTotalEnteredScores(entered);

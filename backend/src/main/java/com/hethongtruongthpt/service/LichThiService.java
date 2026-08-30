@@ -134,7 +134,10 @@ public class LichThiService {
             List<MonHoc> monHocKhoi = new ArrayList<>();
             for (MonHoc m : allMon) {
                 if (m.getKhoiApDung() != null && m.getKhoiApDung().contains(String.valueOf(khoi))) {
-                    monHocKhoi.add(m);
+                    String ten = m.getTenMon() != null ? m.getTenMon().toLowerCase() : "";
+                    if (!ten.contains("shdc") && !ten.contains("sinh hoạt") && !ten.contains("chào cờ")) {
+                        monHocKhoi.add(m);
+                    }
                 }
             }
             Collections.shuffle(monHocKhoi);

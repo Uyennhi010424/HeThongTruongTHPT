@@ -56,11 +56,13 @@ public class HocSinh {
     @Column(name = "email", length = 100)
     private String email;
 
-    @Column(name = "dan_toc")
-    private String danToc;
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "dan_toc_id")
+    private DanToc danToc;
 
-    @Column(name = "ton_giao")
-    private String tonGiao;
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "ton_giao_id")
+    private TonGiao tonGiao;
 
     @Column(name = "ma_bhyt", length = 50)
     private String maBhyt;
@@ -86,6 +88,15 @@ public class HocSinh {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @AssertTrue(message = "Tuổi nhập học phải từ 15 tuổi trở lên")
+    @JsonIgnore
+    public boolean isTuoiNhapHocHopLe() {
+        if (ngaySinh == null || namNhapHoc == null) {
+            return true;
+        }
+        return (namNhapHoc - ngaySinh.getYear()) >= 15;
+    }
 
     @PostLoad
     private void normalizeText() {
@@ -193,19 +204,19 @@ public class HocSinh {
         this.email = email;
     }
 
-    public String getDanToc() {
+    public DanToc getDanToc() {
         return danToc;
     }
 
-    public void setDanToc(String danToc) {
+    public void setDanToc(DanToc danToc) {
         this.danToc = danToc;
     }
 
-    public String getTonGiao() {
+    public TonGiao getTonGiao() {
         return tonGiao;
     }
 
-    public void setTonGiao(String tonGiao) {
+    public void setTonGiao(TonGiao tonGiao) {
         this.tonGiao = tonGiao;
     }
 

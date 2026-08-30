@@ -31,7 +31,7 @@ public class Diem {
     @JoinColumn(name = "hoc_sinh_id", nullable = false)
     private HocSinh hocSinh;
 
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @ManyToOne(fetch = jakarta.persistence.FetchType.EAGER)
     @JoinColumn(name = "mon_hoc_id", nullable = false)
     private MonHoc monHoc;
 
@@ -126,6 +126,11 @@ public class Diem {
 
     public void setMonHoc(MonHoc monHoc) {
         this.monHoc = monHoc;
+    }
+
+    @JsonProperty("monHocId")
+    public Integer getMonHocIdValue() {
+        return this.monHoc != null ? this.monHoc.getId() : null;
     }
 
     public PhanCongDay getPhanCongDay() {

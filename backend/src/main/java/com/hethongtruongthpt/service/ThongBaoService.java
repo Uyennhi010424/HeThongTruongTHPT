@@ -12,15 +12,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import com.hethongtruongthpt.repository.HocSinhRepository;
 
 @Service
 public class ThongBaoService {
     private final ThongBaoRepository thongBaoRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final HocSinhRepository hocSinhRepository;
 
-    public ThongBaoService(ThongBaoRepository thongBaoRepository, SimpMessagingTemplate messagingTemplate) {
+    public ThongBaoService(ThongBaoRepository thongBaoRepository, 
+                           SimpMessagingTemplate messagingTemplate,
+                           HocSinhRepository hocSinhRepository) {
         this.thongBaoRepository = thongBaoRepository;
         this.messagingTemplate = messagingTemplate;
+        this.hocSinhRepository = hocSinhRepository;
     }
 
     public List<ThongBao> getAll() {
@@ -40,6 +45,19 @@ public class ThongBaoService {
 
     public ThongBao create(ThongBao thongBao) {
         if (thongBao == null) throw new IllegalArgumentException("Thông báo không được để trống");
+        
+        // Tự động tìm GVCN nếu phụ huynh bắt đầu nhắn cho giáo viên nhưng chưa có recipientId
+        if (thongBao.getRecipientId() == null && 
+            "PHU_HUYNH".equals(thongBao.getSenderRole()) && 
+            thongBao.getHocSinh() != null) {
+            hocSinhRepository.findByIdWithLop(thongBao.getHocSinh().getId())
+                .ifPresent(hs -> {
+                    if (hs.getLop() != null && hs.getLop().getGvcn() != null) {
+                        thongBao.setRecipientId(hs.getLop().getGvcn().getUser().getId());
+                    }
+                });
+        }
+        
         ThongBao saved = thongBaoRepository.save(thongBao);
         broadcastThongBao(saved);
         return saved;
@@ -47,9 +65,14 @@ public class ThongBaoService {
 
     public ThongBao update(Integer id, ThongBao thongBao) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
-        getById(id);
-        thongBao.setId(id);
-        return thongBaoRepository.save(thongBao);
+        ThongBao existing = getById(id);
+        
+        if (thongBao.getTieuDe() != null) existing.setTieuDe(thongBao.getTieuDe());
+        if (thongBao.getNoiDung() != null) existing.setNoiDung(thongBao.getNoiDung());
+        if (thongBao.getTrangThai() != null) existing.setTrangThai(thongBao.getTrangThai());
+        if (thongBao.getLoai() != null) existing.setLoai(thongBao.getLoai());
+
+        return thongBaoRepository.save(existing);
     }
 
     public void delete(Integer id) {
@@ -72,10 +95,46 @@ public class ThongBaoService {
         // Nếu cha đã là reply, lấy parentId của nó để giữ thread phẳng (1 cấp)
         Integer rootId = (parent.getParentId() != null) ? parent.getParentId() : parent.getId();
 
+        // Kế thừa hocSinh từ tin nhắn gốc nếu chưa có
+        if (reply.getHocSinh() == null && parent.getHocSinh() != null) {
+            reply.setHocSinh(parent.getHocSinh());
+        }
+
+        // Tự động tính recipientId dựa trên người tạo root và người đang reply
+        if (reply.getRecipientId() == null) {
+            if ("PHU_HUYNH".equals(reply.getSenderRole())) {
+                if ("GIAO_VIEN".equals(parent.getSenderRole()) && parent.getNguoiTao() != null) {
+                    reply.setRecipientId(parent.getNguoiTao().getId());
+                } else {
+                    if (reply.getHocSinh() != null) {
+                        hocSinhRepository.findByIdWithLop(reply.getHocSinh().getId())
+                            .ifPresent(hs -> {
+                                reply.setHocSinh(hs); // Set full entity for WebSocket
+                                if (hs.getLop() != null && hs.getLop().getGvcn() != null) {
+                                    reply.setRecipientId(hs.getLop().getGvcn().getUser().getId());
+                                }
+                            });
+                    }
+                    if (reply.getRecipientId() == null) {
+                        reply.setRecipientId(parent.getRecipientId());
+                    }
+                }
+            } else if ("GIAO_VIEN".equals(reply.getSenderRole())) {
+                if ("PHU_HUYNH".equals(parent.getSenderRole()) && parent.getNguoiTao() != null) {
+                    reply.setRecipientId(parent.getNguoiTao().getId());
+                } else {
+                    reply.setRecipientId(parent.getRecipientId());
+                }
+            }
+        }
+
         reply.setParentId(rootId);
         reply.setIsReply(true);
         if (reply.getLoai() == null || reply.getLoai().isBlank()) {
             reply.setLoai("REPLY");
+        }
+        if (reply.getTieuDe() == null || reply.getTieuDe().isBlank()) {
+            reply.setTieuDe("Phản hồi: " + parent.getTieuDe());
         }
         ThongBao saved = thongBaoRepository.save(reply);
         broadcastThongBao(saved);

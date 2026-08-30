@@ -51,7 +51,7 @@ public class AdminSeeder implements CommandLineRunner {
     private void seedAdmin() {
         User existing = userRepository.findByUsername(adminUsername).orElse(null);
         if (existing != null) {
-            // Admin already exists – check if reset is requested
+            // Admin already exists - check if reset is requested
             if (resetPassword && adminPassword != null && !adminPassword.isBlank()) {
                 existing.setPassword(passwordEncoder.encode(adminPassword));
                 existing.setIsActive(true);

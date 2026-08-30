@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { getThongBao } from "../../../api/thongbaoApi.js";
 import { getCurrentGiaoVien } from "../../../api/giaovienApi.js";
+import axiosClient from "../../../api/axiosClient.js";
 import ThongBaoInbox from "./ThongBaoInbox.jsx";
 import AdminRequestTab from "./AdminRequestTab.jsx";
 import ParentContactTab from "./ParentContactTab.jsx";
 import { getChuNhiem } from "../../../api/chunhiemApi.js";
+import { webSocketService } from "../../../utils/websocket.js";
 
 
 
@@ -46,6 +48,38 @@ export default function TeacherThongBao() {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    let userId = null;
+    let subUser = null;
+
+    const setupWebSocket = async () => {
+      try {
+        const userRes = await axiosClient.get("/users/me");
+        if (active && userRes.data?.data) {
+          userId = userRes.data.data.id;
+          webSocketService.connect(() => {
+            subUser = webSocketService.subscribe(`/topic/user/${userId}`, (newMessage) => {
+              setAllNotices(prev => {
+                if (prev.find(n => n.id === newMessage.id)) return prev;
+                return [newMessage, ...prev];
+              });
+            });
+          });
+        }
+      } catch {}
+    };
+
+    if (teacher) {
+      setupWebSocket();
+    }
+
+    return () => {
+      active = false;
+      if (userId && subUser) webSocketService.unsubscribe(`/topic/user/${userId}`, subUser);
+    };
+  }, [teacher]);
 
   // Lọc thông báo cho các Tab
   const bghNotices = allNotices.filter(n => 
@@ -106,7 +140,7 @@ export default function TeacherThongBao() {
           </div>
         ) : (
           <>
-            {activeTab === "inbox" && <ThongBaoInbox notices={bghNotices} onRefresh={() => fetchInitialData(true)} />}
+            {activeTab === "inbox" && <ThongBaoInbox notices={bghNotices} onRefresh={() => fetchInitialData(true)} teacher={teacher} />}
             {activeTab === "parent" && isHomeroom && <ParentContactTab teacher={teacher} parentMessages={parentMessages} onRefresh={() => fetchInitialData(true)} />}
           </>
         )}

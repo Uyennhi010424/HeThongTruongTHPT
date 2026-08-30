@@ -2,6 +2,7 @@ import axiosClient from "./axiosClient";
 
 export const getPhuHuynh = () => axiosClient.get("/phuhuynh");
 export const getCurrentPhuHuynh = () => axiosClient.get("/phuhuynh/me");
+export const updateCurrentPhuHuynh = (data) => axiosClient.put("/phuhuynh/me", data);
 export const getStudentsByPhuHuynhId = (id) => axiosClient.get(`/phuhuynh/${id}/hocsinh`);
 export const createPhuHuynh = (data) => axiosClient.post("/phuhuynh", data);
 export const updatePhuHuynh = (id, data) => axiosClient.put(`/phuhuynh/${id}`, data);

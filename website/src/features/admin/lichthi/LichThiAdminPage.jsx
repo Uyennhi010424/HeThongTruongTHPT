@@ -15,11 +15,14 @@ import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getPhanCongDay } from "../../../api/phancongDayApi.js";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import PdfPreviewModal from "../../../components/common/PdfPreviewModal.jsx";
+import Pagination from "../../../components/common/Pagination.jsx";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
+import { useTheme } from "../../../contexts/ThemeContext.jsx";
 
 export default function LichThiAdminPage() {
   const { confirm } = useConfirm();
+  const { systemName } = useTheme();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({
@@ -30,6 +33,9 @@ export default function LichThiAdminPage() {
     monThi: "",
     ngayThi: "",
   });
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfHtmlContent, setPdfHtmlContent] = useState("");
@@ -140,6 +146,10 @@ export default function LichThiAdminPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
+
   const filteredItems = useMemo(() => {
     if (!items || items.length === 0) return [];
     return items.filter((item) => {
@@ -160,6 +170,12 @@ export default function LichThiAdminPage() {
       return true;
     });
   }, [items, filter]);
+
+  const totalPages = Math.ceil(filteredItems.length / pageSize);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredItems.slice(startIndex, startIndex + pageSize);
+  }, [filteredItems, page, pageSize]);
 
   const handleExportPdf = (singleRow = null) => {
     const dataToExport = singleRow ? [singleRow] : filteredItems;
@@ -215,6 +231,7 @@ export default function LichThiAdminPage() {
         th{background:#1565c0;color:white;padding:8px;border:1px solid #ccc;text-align:center;font-size:12px}
         @media print{body{padding:0} @page{size:landscape;margin:10mm}}
       </style></head><body>
+      <div style="font-weight:bold; font-size:16px; margin-bottom:10px;">${systemName?.toUpperCase()}</div>
       <h1>LỊCH THI - Năm học ${namHoc} - Học kỳ ${hocKy}</h1>
       <h2>Tổng số: ${sorted.length} lịch thi</h2>
       <table>
@@ -477,16 +494,16 @@ export default function LichThiAdminPage() {
                 <tr>
                   <td colSpan="11" className="px-6 py-12 text-center text-slate-500">Đang tải dữ liệu...</td>
                 </tr>
-              ) : filteredItems.length === 0 ? (
+              ) : paginatedItems.length === 0 ? (
                 <tr>
                   <td colSpan="11" className="px-6 py-12 text-center text-slate-500">Không tìm thấy lịch thi nào phù hợp.</td>
                 </tr>
               ) : (
-                filteredItems.map((row, idx) => {
+                paginatedItems.map((row, idx) => {
                   const status = getStatus(row.ngayThi, row.gioBatDau, row.thoiGianLamBai);
                   return (
                     <tr key={row.id} className="hover:bg-slate-50 transition-colors group even:bg-slate-50/30">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{idx + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{(page - 1) * pageSize + idx + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{row.monHoc?.tenMon || "—"}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-slate-700">{row.lop?.khoi || "—"}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-slate-700">{row.lop?.tenLop || "—"}</td>
@@ -565,6 +582,17 @@ export default function LichThiAdminPage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="shrink-0 border-t border-slate-200">
+          <Pagination
+            currentPage={page} 
+            totalPages={totalPages} 
+            totalItems={filteredItems.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            pageSizeOptions={[10, 15, 20, 50]}
+          />
         </div>
       </div>
 

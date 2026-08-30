@@ -3,7 +3,8 @@ import { MessageSquare, Bell, ChevronRight, Send, Inbox, X, Clock, User, AlertCi
 import { getThongBao, getConversationByHocSinh, replyThongBao, getThread, createThongBao } from "../../api/thongbaoApi.js";
 import { notifySuccess, notifyError } from "../../utils/notify.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
-import NoticeModal, { getNoticeConfig } from "../../components/thongbao/NoticeModal";
+import NoticeModal from "../../components/thongbao/NoticeModal";
+import BaoCongThongBaoUI from "../../components/common/BaoCongThongBaoUI.jsx";
 import { webSocketService } from "../../utils/websocket.js";
 
 const formatTimeShort = (value) => {
@@ -315,60 +316,17 @@ export default function ParentThongBao() {
         </p>
       </div>
 
-      <div className="flex-1 max-w-3xl mx-auto w-full flex flex-col h-[calc(100vh-160px)] min-h-[500px]">
-        {/* Notices list */}
-        <div className="w-full flex flex-col shrink-0 h-full">
-          <div className="flex items-center gap-2 mb-4 shrink-0">
-            <div className="w-1 h-5 rounded-full bg-blue-500" />
-            <h3 className="font-bold text-slate-800 text-[16px]">Thông báo từ nhà trường</h3>
-            {displayNotices.length > 0 && (
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[11px] font-bold ml-1">
-                {displayNotices.length}
-              </span>
-            )}
+      <div className="flex-1 w-full mx-auto flex flex-col h-[calc(100vh-160px)] min-h-[500px] overflow-y-auto custom-scrollbar">
+        {loadingNotices ? (
+          <div className="flex justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
           </div>
-
-          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3 pb-4">
-            {loadingNotices ? (
-              <div className="flex justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-              </div>
-            ) : displayNotices.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
-                <Inbox size={40} className="mx-auto text-slate-300 mb-3" />
-                <p className="text-slate-500 font-semibold">Chưa có thông báo nào</p>
-                <p className="text-slate-400 text-[13px] mt-1">Các thông báo mới nhất sẽ hiển thị tại đây</p>
-              </div>
-            ) : (
-              displayNotices.map(notice => {
-                const cfg = getNoticeConfig(notice);
-                return (
-                  <button
-                    key={notice.id}
-                    onClick={() => setSelectedNotice(notice)}
-                    className="w-full text-left bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all p-4 flex gap-4 group"
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${cfg.bg} ${cfg.color}`}>
-                      {cfg.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${cfg.color}`}>{cfg.label}</span>
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1"><Clock size={10} />{formatTimeShort(notice.ngayDang)}</span>
-                      </div>
-                      <h4 className="text-[14px] font-bold text-slate-800 mb-1 leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
-                        {notice.tieuDe}
-                      </h4>
-                      <p className="text-[13px] text-slate-500 line-clamp-1">
-                        {notice.noiDung}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
+        ) : (
+          <BaoCongThongBaoUI 
+            notices={displayNotices}
+            onNoticeClick={(notice) => setSelectedNotice(notice)}
+          />
+        )}
       </div>
 
       {/* Floating Chat Box */}

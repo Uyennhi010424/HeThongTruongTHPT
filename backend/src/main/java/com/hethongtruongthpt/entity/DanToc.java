@@ -3,17 +3,17 @@ package com.hethongtruongthpt.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "DAN_TOC")
+@Table(name = "dan_toc")
 public class DanToc {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_DANTOC")
+    @Column(name = "id_dantoc")
     private Integer id;
 
-    @Column(name = "TEN_DANTOC", length = 50)
+    @Column(name = "ten_dantoc", length = 50, nullable = false)
     private String tenDanToc;
 
-    @Column(name = "MO_TA", length = 255)
+    @Column(name = "mo_ta", length = 255)
     private String moTa;
 
     public Integer getId() {

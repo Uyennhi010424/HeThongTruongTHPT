@@ -7,6 +7,7 @@ public class LopHocDTO {
     private Integer khoi;
     private String namHoc;
     private Integer gvcnId;
+    private com.hethongtruongthpt.dto.giaovien.GiaoVienDTO gvcn;
     private Integer siSo;
     private String phongHoc;
 
@@ -48,6 +49,14 @@ public class LopHocDTO {
 
     public void setGvcnId(Integer gvcnId) {
         this.gvcnId = gvcnId;
+    }
+
+    public com.hethongtruongthpt.dto.giaovien.GiaoVienDTO getGvcn() {
+        return gvcn;
+    }
+
+    public void setGvcn(com.hethongtruongthpt.dto.giaovien.GiaoVienDTO gvcn) {
+        this.gvcn = gvcn;
     }
 
     public Integer getSiSo() {

@@ -33,18 +33,11 @@ export default function AttendanceScreen() {
     if (!student?.id) return;
     try {
       setError(null);
-      // Giả sử năm học hiện tại, từ 01-09 năm trước đến 31-05 năm nay
+      // Tính năm học giống web: tháng >= 8 thì năm học bắt đầu từ năm nay
       const now = new Date();
-      let startYear = now.getFullYear();
-      let endYear = now.getFullYear();
-      if (now.getMonth() < 7) { // Trước tháng 8
-        startYear -= 1;
-      } else {
-        endYear += 1;
-      }
-      
-      const from = `${startYear}-09-01`;
-      const to = `${endYear}-05-31`;
+      const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+      const from = `${year}-09-01`;
+      const to = `${year + 1}-06-30`;
 
       const response = await axiosClient.get('/diemdanh/statistics/student', {
         params: {
@@ -55,11 +48,20 @@ export default function AttendanceScreen() {
       });
       
       if (response.data && response.data.data) {
-        setStats(response.data.data);
+        const d = response.data.data;
+        // Map các field trả về từ backend sang interface local
+        setStats({
+          tongNgayHoc: d.tongNgayHoc ?? d.totalDays ?? 0,
+          coMat: d.coMat ?? d.present ?? 0,
+          coPhep: d.coPhep ?? d.excusedAbsent ?? 0,
+          khongPhep: d.khongPhep ?? d.unexcusedAbsent ?? 0,
+          tyLeChuyenCan: d.tyLeChuyenCan ?? 0,
+          details: Array.isArray(d.details) ? d.details : [],
+        });
       }
     } catch (err: any) {
-      console.error(err);
-      setError('Không thể tải dữ liệu chuyên cần.');
+      console.log(err);
+      setError('Không thể tải dữ liệu điểm danh. Vui lòng thử lại.');
     } finally {
       setLoading(false);
       setRefreshing(false);

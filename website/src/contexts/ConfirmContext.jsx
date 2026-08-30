@@ -50,9 +50,9 @@ export function ConfirmProvider({ children }) {
               <h3 className="text-xl font-bold text-slate-900 mb-2">
                 {title}
               </h3>
-              <p className="text-sm text-slate-600 mb-6 px-2">
+              <div className="text-sm text-slate-600 mb-6 px-2">
                 {message}
-              </p>
+              </div>
               
               <div className="flex w-full gap-3">
                 <button

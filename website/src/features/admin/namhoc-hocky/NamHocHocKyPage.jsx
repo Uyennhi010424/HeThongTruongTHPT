@@ -123,6 +123,7 @@ export default function NamHocHocKyPage() {
   const [createError, setCreateError] = useState("");
   const [createYearName, setCreateYearName] = useState("");
   const [createForm, setCreateForm] = useState({ ...emptyConfig });
+  const [isManualForm, setIsManualForm] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ open: false, year: null });
 
   useEffect(() => {
@@ -155,6 +156,7 @@ export default function NamHocHocKyPage() {
     setCreateError("");
     setCreateYearName("");
     setCreateForm({ ...emptyConfig });
+    setIsManualForm(false);
   };
 
   const closeCreateModal = () => {
@@ -162,14 +164,14 @@ export default function NamHocHocKyPage() {
     setCreateError("");
     setCreateYearName("");
     setCreateForm({ ...emptyConfig });
+    setIsManualForm(false);
   };
 
   const handleCreateYearNameChange = (value) => {
     setCreateYearName(value);
-    setCreateForm((prev) => {
-      const hasManualDate = Object.values(prev).some(Boolean);
-      return hasManualDate ? prev : inferConfigFromYearName(value);
-    });
+    if (!isManualForm) {
+      setCreateForm(inferConfigFromYearName(value));
+    }
   };
 
   const handleCreateYear = async (event) => {
@@ -599,17 +601,17 @@ export default function NamHocHocKyPage() {
               <LabeledDateField
                 label="Bắt đầu"
                 value={createForm.hk1Start}
-                onChange={(v) => setCreateForm((f) => ({ ...f, hk1Start: v }))}
+                onChange={(v) => { setIsManualForm(true); setCreateForm((f) => ({ ...f, hk1Start: v })); }}
               />
               <LabeledDateField
                 label="Kết thúc"
                 value={createForm.hk1End}
-                onChange={(v) => setCreateForm((f) => ({ ...f, hk1End: v }))}
+                onChange={(v) => { setIsManualForm(true); setCreateForm((f) => ({ ...f, hk1End: v })); }}
               />
               <LabeledDateField
                 label="Hạn điểm"
                 value={createForm.hk1Deadline}
-                onChange={(v) => setCreateForm((f) => ({ ...f, hk1Deadline: v }))}
+                onChange={(v) => { setIsManualForm(true); setCreateForm((f) => ({ ...f, hk1Deadline: v })); }}
               />
             </div>
 
@@ -619,17 +621,17 @@ export default function NamHocHocKyPage() {
               <LabeledDateField
                 label="Bắt đầu"
                 value={createForm.hk2Start}
-                onChange={(v) => setCreateForm((f) => ({ ...f, hk2Start: v }))}
+                onChange={(v) => { setIsManualForm(true); setCreateForm((f) => ({ ...f, hk2Start: v })); }}
               />
               <LabeledDateField
                 label="Kết thúc"
                 value={createForm.hk2End}
-                onChange={(v) => setCreateForm((f) => ({ ...f, hk2End: v }))}
+                onChange={(v) => { setIsManualForm(true); setCreateForm((f) => ({ ...f, hk2End: v })); }}
               />
               <LabeledDateField
                 label="Hạn điểm"
                 value={createForm.hk2Deadline}
-                onChange={(v) => setCreateForm((f) => ({ ...f, hk2Deadline: v }))}
+                onChange={(v) => { setIsManualForm(true); setCreateForm((f) => ({ ...f, hk2Deadline: v })); }}
               />
             </div>
           </div>

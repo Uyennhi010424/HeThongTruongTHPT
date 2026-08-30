@@ -22,7 +22,7 @@ public class HanhKiem {
     @JoinColumn(name = "ID_GIAOVIEN")
     private GiaoVien giaoVien;
 
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @ManyToOne(fetch = jakarta.persistence.FetchType.EAGER)
     @JoinColumn(name = "ID_NAMHOC")
     private NamHoc namHoc;
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
+import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
@@ -44,6 +45,7 @@ const getStatusLabel = (value) => (value === 1 ? "Đang hiển thị" : "Đã �
 export default function ThongBaoManager() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { confirm } = useConfirm();
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -164,7 +166,7 @@ export default function ThongBaoManager() {
   };
 
   const handleDelete = async (notice) => {
-    if (!window.confirm(`Xóa thông báo: ${notice.tieuDe}?`)) return;
+    if (!(await confirm(`Xóa thông báo: ${notice.tieuDe}?`))) return;
     try {
       await deleteThongBao(notice.id);
       setNotices((prev) => prev.filter((item) => item.id !== notice.id));
@@ -188,9 +190,8 @@ export default function ThongBaoManager() {
     const payload = {
       tieuDe: form.tieuDe.trim(),
       noiDung: form.noiDung.trim(),
-      loai: form.doiTuong,
+      doiTuong: form.doiTuong,
       trangThai: Number(form.trangThai),
-      ngayDang: editingNotice?.ngayDang || new Date().toISOString()
     };
 
     try {
@@ -213,36 +214,14 @@ export default function ThongBaoManager() {
 
   return (
     <div className="page users-page">
-      <PageHeader title="Thông báo nhà trường" />
-
-      <div className="card users-toolbar">
-        <div>
-          <div className="users-title">Quản lý thông báo</div>
-          <div className="users-subtitle">
-            Gửi thông báo theo đối tượng và theo dõi trạng thái
-          </div>
-        </div>
-        <div className="users-actions">
+      <PageHeader 
+        title="Thông báo nhà trường" 
+        actions={
           <button className="btn-primary" onClick={openCreate}>
             Thêm thông báo
           </button>
-        </div>
-      </div>
-
-      <div className="users-stats">
-        <div className="stat-card stat-blue">
-          <div className="stat-label">Tổng thông báo</div>
-          <div className="stat-value">{loading ? "..." : stats.total}</div>
-        </div>
-        <div className="stat-card stat-sky">
-          <div className="stat-label">Đang hiển thị</div>
-          <div className="stat-value">{loading ? "..." : stats.activeCount}</div>
-        </div>
-        <div className="stat-card stat-ice">
-          <div className="stat-label">Đã ẩn</div>
-          <div className="stat-value">{loading ? "..." : stats.archivedCount}</div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="card users-table">
         <div className="table-header">

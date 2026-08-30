@@ -9,8 +9,21 @@ export const getStudentDashboard = async (): Promise<DashboardData | null> => {
     }
     return null;
   } catch (error) {
-    console.error('Error fetching student dashboard:', error);
+    console.log('Error fetching student dashboard:', error);
     throw error;
+  }
+};
+
+export const getTimetableByDate = async (dateStr: string): Promise<any[]> => {
+  try {
+    const response = await axiosClient.get(`/hocsinh/me/thoikhoabieu?date=${dateStr}`);
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error) {
+    console.log('Error fetching timetable by date:', error);
+    return [];
   }
 };
 
@@ -26,7 +39,7 @@ export const getUnreadNotificationCount = async (): Promise<number> => {
     }
     return 0;
   } catch (error) {
-    console.error('Error fetching unread count:', error);
+    console.log('Error fetching unread count:', error);
     return 0; // Don't throw for notification count, just return 0
   }
 };

@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View } from 'react-native';
-import { Home, Users, CalendarDays, User, CheckCircle } from 'lucide-react-native';
+import { Home, CalendarDays, CheckCircle, GraduationCap, ClipboardList } from 'lucide-react-native';
 
 export default function StudentLayout() {
   const insets = useSafeAreaInsets();
@@ -40,21 +40,28 @@ export default function StudentLayout() {
           }}
         />
         <Tabs.Screen
+          name="scores"
+          options={{
+            title: 'Xem điểm',
+            tabBarIcon: ({ color }) => <GraduationCap size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="exam"
+          options={{
+            title: 'Bài tập',
+            tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="attendance"
           options={{
             title: 'Chuyên cần',
-            tabBarIcon: ({ color }) => <CheckCircle size={24} color={color} />, // Or any suitable icon
+            tabBarIcon: ({ color }) => <CheckCircle size={24} color={color} />,
           }}
         />
         <Tabs.Screen
           name="profile"
-          options={{
-            title: 'Cá nhân',
-            tabBarIcon: ({ color }) => <User size={24} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="scores"
           options={{
             href: null,
           }}
@@ -72,7 +79,7 @@ export default function StudentLayout() {
           }}
         />
         <Tabs.Screen
-          name="exam"
+          name="feedback"
           options={{
             href: null,
           }}

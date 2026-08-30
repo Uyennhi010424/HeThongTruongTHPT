@@ -251,9 +251,13 @@ const UserDetailDrawer = ({ user, activeTab: initialTab, onClose }) => {
           {activeTab === "INFO" && (
             <div className="space-y-6">
               <div className="flex items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200/60">
-                <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl font-bold">
-                  {user.username.charAt(0).toUpperCase()}
-                </div>
+                {user.anhDaiDien ? (
+                  <img src={user.anhDaiDien} alt={user.username} className="w-16 h-16 rounded-full object-cover border-2 border-slate-100 shadow-sm" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl font-bold">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <h3 className="text-lg font-bold text-blue-900">{user.username}</h3>
                   <p className="text-sm text-slate-500">{user.email}</p>
@@ -588,9 +592,13 @@ export default function UserList() {
                   <tr key={user.id} className="hover:bg-slate-50/80 transition-colors duration-150 group">
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0 text-sm">
-                          {user.username.charAt(0).toUpperCase()}
-                        </div>
+                        {user.anhDaiDien ? (
+                          <img src={user.anhDaiDien} alt={user.username} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0 text-sm">
+                            {user.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <div className="text-sm font-bold text-slate-900">{user.username}</div>
                           <div className="text-xs text-slate-500 mt-0.5">{user.email}</div>

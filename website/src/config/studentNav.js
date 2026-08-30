@@ -9,13 +9,5 @@ export const STUDENT_NAV = [
       { path: "/student/baikiemtra", label: "Bài kiểm tra", icon: "quiz" },
       { path: "/student/hocba", label: "Học bạ", icon: "menu_book" }
     ]
-  },
-  {
-    group: "Cá nhân",
-    children: [
-      { path: "/student/diemdanh", label: "Điểm danh", icon: "fact_check" },
-      { path: "/student/conduct", label: "Hạnh kiểm", icon: "verified" },
-      { path: "/student/khen-thuong", label: "Khen thưởng", icon: "emoji_events" }
-    ]
   }
 ];

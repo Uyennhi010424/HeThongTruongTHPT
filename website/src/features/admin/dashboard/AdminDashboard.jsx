@@ -192,10 +192,16 @@ export default function AdminDashboard() {
         if (cancelled) return;
 
         const teachersArr = gv?.data?.data || [];
-        const classesArr = lop?.data?.data || [];
+        const allClassesArr = lop?.data?.data || [];
         const homeroomArr = chuNhiemRes?.data?.data || [];
 
-        const namHocArr = (namHocRes?.data?.data || [])
+        const namHocArrRaw = namHocRes?.data?.data || [];
+        const activeNamHocObj = namHocArrRaw.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO");
+        const activeNamHoc = activeNamHocObj ? activeNamHocObj.tenNamHoc : null;
+
+        const classesArr = activeNamHoc ? allClassesArr.filter(c => c.namHoc === activeNamHoc) : allClassesArr;
+
+        const namHocArr = namHocArrRaw
           .map((item) => item?.tenNamHoc || "")
           .filter(Boolean)
           .sort((a, b) => {
@@ -261,8 +267,8 @@ export default function AdminDashboard() {
           setChartLoading(true);
         }
         const [avgRes, distRes] = await Promise.all([
-          withTimeout(getDiemAvgByGrade(), 30000).catch(() => ({ data: { data: [] } })),
-          withTimeout(getDiemDistribution(), 120000).catch(() => ({ data: { data: { counts: {}, total: 0, avgScore: null } } })),
+          withTimeout(getDiemAvgByGrade({ namHoc: activeNamHoc }), 30000).catch(() => ({ data: { data: [] } })),
+          withTimeout(getDiemDistribution({ namHoc: activeNamHoc }), 120000).catch(() => ({ data: { data: { counts: {}, total: 0, avgScore: null } } })),
         ]);
 
         if (cancelled) return;
@@ -379,10 +385,6 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs font-bold">
-                  <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
-                  {card.trend}
                 </div>
               </div>
             </div>
@@ -614,4 +616,5 @@ function RecentClassesList({ classes = [], siSoByLopId = {}, homeroomByClassId =
     </>
   );
 }
+
 

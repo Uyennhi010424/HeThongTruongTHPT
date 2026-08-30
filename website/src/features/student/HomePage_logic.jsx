@@ -73,10 +73,14 @@ export default function HomePage() {
           getMonHoc(),
           getCurrentHocSinh(),
         ]);
-        const subjectsRes = { data: { data: (rawSubjectsRes?.data?.data || []).filter(s => {
-          const name = (s.tenMon || "").toLowerCase();
-          return !name.includes("shdc") && !name.includes("sinh hoáº¡t lá»›p");
-        }) } };
+        const subjectsRes = {
+          data: {
+            data: (rawSubjectsRes?.data?.data || []).filter(s => {
+              const name = (s.tenMon || "").toLowerCase();
+              return !name.includes("shdc") && !name.includes("sinh hoáº¡t lá»›p");
+            })
+          }
+        };
         if (!active) return;
         const studentData = studentRes?.data?.data || null;
         setStudent(studentData);
@@ -124,12 +128,12 @@ export default function HomePage() {
               .then((r) => {
                 timetableData = r?.data?.data || [];
               })
-              .catch(() => {}),
+              .catch(() => { }),
             getLichThiByLop(lopId)
               .then((r) => {
                 examsData = r?.data?.data || [];
               })
-              .catch(() => {})
+              .catch(() => { })
           );
         }
         if (hocSinhId) {
@@ -138,12 +142,12 @@ export default function HomePage() {
               .then((r) => {
                 scoresData = r?.data?.data || [];
               })
-              .catch(() => {}),
+              .catch(() => { }),
             getHanhKiem({ hocSinhId })
               .then((r) => {
                 conductsData = r?.data?.data || [];
               })
-              .catch(() => {})
+              .catch(() => { })
           );
           const now = new Date();
           const yearStart =
@@ -156,7 +160,7 @@ export default function HomePage() {
               .then((r) => {
                 attendanceStats = r?.data?.data || null;
               })
-              .catch(() => {})
+              .catch(() => { })
           );
         }
         await Promise.all(fetchPromises);
@@ -171,10 +175,10 @@ export default function HomePage() {
               const availableWeeks = [...new Set(allData.map((i) => i.tuan || 0).filter(Boolean))].sort((a, b) => a - b);
               const closestWeek = availableWeeks.reduce((prev, curr) =>
                 Math.abs(curr - currentTuan) < Math.abs(prev - currentTuan) ? curr : prev
-              , availableWeeks[availableWeeks.length - 1]);
+                , availableWeeks[availableWeeks.length - 1]);
               timetableData = allData.filter((i) => i.tuan === closestWeek);
             }
-          } catch {}
+          } catch { }
         }
         setData({
           notices: noticesRes?.data?.data || [],
@@ -442,4 +446,4 @@ export default function HomePage() {
       </div>
     );
   }
-
+}

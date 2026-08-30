@@ -53,7 +53,7 @@ const getToday = () => {
 
 const getCurrentAcademicYear = () => {
   const now = new Date();
-  const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  const year = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
   return `${year}-${year + 1}`;
 };
 

@@ -122,7 +122,7 @@ public class ToHopMonService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tổ hợp môn"));
 
         // Kiểm tra có lớp nào đang dùng không
-        long lopUsing = lopHocRepository.countByToHopId(id);
+        long lopUsing = lopHocRepository.countByToHop_Id(id);
         if (lopUsing > 0) {
             throw new ApiException("Không thể xóa tổ hợp môn đang được sử dụng bởi " + lopUsing + " lớp học");
         }
@@ -177,7 +177,7 @@ public class ToHopMonService {
                 .collect(Collectors.toList()));
 
         // Đếm số lớp đang dùng tổ hợp này
-        List<com.hethongtruongthpt.entity.LopHoc> lops = lopHocRepository.findByToHopId(toHop.getId());
+        List<com.hethongtruongthpt.entity.LopHoc> lops = lopHocRepository.findByToHop_Id(toHop.getId());
         dto.setSoLopSuDung(lops.size());
         dto.setDanhSachLop(lops.stream()
                 .map(com.hethongtruongthpt.entity.LopHoc::getTenLop)

@@ -2,10 +2,12 @@ package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.entity.DiemDanh;
 import com.hethongtruongthpt.entity.HocSinh;
+import com.hethongtruongthpt.entity.ThongBao;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.repository.DiemDanhRepository;
 import com.hethongtruongthpt.repository.HocSinhRepository;
 import com.hethongtruongthpt.repository.LichNamHocRepository;
+import com.hethongtruongthpt.repository.ThongBaoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,12 +27,14 @@ public class DiemDanhService {
     private final HocSinhRepository hocSinhRepository;
     private final LichNamHocRepository lichNamHocRepository;
     private final SmsService smsService;
+    private final ThongBaoRepository thongBaoRepository;
 
-    public DiemDanhService(DiemDanhRepository repository, HocSinhRepository hocSinhRepository, SmsService smsService, LichNamHocRepository lichNamHocRepository) {
+    public DiemDanhService(DiemDanhRepository repository, HocSinhRepository hocSinhRepository, SmsService smsService, LichNamHocRepository lichNamHocRepository, ThongBaoRepository thongBaoRepository) {
         this.repository = repository;
         this.hocSinhRepository = hocSinhRepository;
         this.smsService = smsService;
         this.lichNamHocRepository = lichNamHocRepository;
+        this.thongBaoRepository = thongBaoRepository;
     }
 
     public List<DiemDanh> getByNgayAndLopHocId(LocalDate ngay, Integer lopHocId) {
@@ -114,16 +118,35 @@ public class DiemDanhService {
 
         List<DiemDanh> saved = repository.saveAll(toSave);
 
-        // Send SMS for absent students
-        try {
-            List<DiemDanh> absentRecords = saved.stream()
-                .filter(d -> "CO_PHEP".equals(d.getLoaiVang()) || "KHONG_PHEP".equals(d.getLoaiVang()))
-                .collect(Collectors.toList());
-            if (!absentRecords.isEmpty()) {
+        // Create notifications for absent students
+        List<DiemDanh> absentRecords = saved.stream()
+            .filter(d -> "CO_PHEP".equals(d.getLoaiVang()) || "KHONG_PHEP".equals(d.getLoaiVang()))
+            .collect(Collectors.toList());
+
+        if (!absentRecords.isEmpty()) {
+            try {
                 smsService.sendAbsenceNotifications(absentRecords);
+            } catch (Exception e) {
+                log.warn("Không thể gửi SMS thông báo vắng mặt: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("Không thể gửi SMS thông báo vắng mặt: {}", e.getMessage());
+
+            try {
+                for (DiemDanh d : absentRecords) {
+                    ThongBao tb = new ThongBao();
+                    tb.setTieuDe("Thông báo vắng mặt");
+                    String loaiVang = "CO_PHEP".equals(d.getLoaiVang()) ? "có phép" : "không phép";
+                    tb.setNoiDung("Bạn đã bị đánh vắng mặt " + loaiVang + " vào ngày " + d.getNgay() + 
+                                  (d.getTietHoc() != null ? (" (Tiết " + d.getTietHoc() + ")") : "") + ".");
+                    tb.setLoai("HOC_SINH");
+                    tb.setHocSinh(d.getHocSinh());
+                    if (d.getHocSinh().getUser() != null) {
+                        tb.setRecipientId(d.getHocSinh().getUser().getId());
+                    }
+                    thongBaoRepository.save(tb);
+                }
+            } catch (Exception e) {
+                log.warn("Lỗi khi tạo thông báo vắng mặt trên hệ thống: {}", e.getMessage());
+            }
         }
 
         return saved;

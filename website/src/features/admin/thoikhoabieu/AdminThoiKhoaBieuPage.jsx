@@ -8,7 +8,7 @@ import {
   moveThoiKhoaBieu,
   swapThoiKhoaBieu
 } from "../../../api/thoikhoabieuApi.js";
-import { checkExamWeek } from "../../../api/lichthiApi.js";
+import { checkExamWeek, getLichThi } from "../../../api/lichthiApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import {
   getAllNghi,
@@ -19,13 +19,17 @@ import {
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
-import { getLimitedSemesterWeeks } from "../../../utils/helpers.js";
+import { getLimitedSemesterWeeks, getWeekDates, mapTimeToPeriod } from "../../../utils/helpers.js";
 import PdfPreviewModal from "../../../components/common/PdfPreviewModal.jsx";
+import { useTheme } from "../../../contexts/ThemeContext.jsx";
 
 const getApiMessage = (err, fallback) =>
   err?.response?.data?.message || err?.response?.data?.error || fallback;
 
 export default function AdminThoiKhoaBieuPage() {
+  const { confirm } = useConfirm();
+  const { systemName } = useTheme();
+
   const [timetable, setTimetable] = useState([]);
   const [lops, setLops] = useState([]);
   const [namHocs, setNamHocs] = useState([]);
@@ -53,8 +57,10 @@ export default function AdminThoiKhoaBieuPage() {
     return getLimitedSemesterWeeks(selectedYear, selectedHocKy);
   }, [selectedYear, selectedHocKy]);
 
+  const [hasInitializedWeek, setHasInitializedWeek] = useState(false);
+
   useEffect(() => {
-    if (!semesterWeeks.includes(selectedTuan)) {
+    if (semesterWeeks.length > 0 && !hasInitializedWeek) {
       let currentWeek = semesterWeeks[0] || 1;
       if (selectedYear?.ngayBatDauHk1) {
         const schoolStart = new Date(selectedYear.ngayBatDauHk1 + "T00:00:00");
@@ -72,27 +78,18 @@ export default function AdminThoiKhoaBieuPage() {
         }
       }
       setSelectedTuan(currentWeek);
+      setHasInitializedWeek(true);
     }
-  }, [semesterWeeks, selectedYear, selectedHocKy, selectedTuan]);
+  }, [semesterWeeks, selectedYear, hasInitializedWeek]);
+
+  // Handle manual semester change
+  useEffect(() => {
+    if (hasInitializedWeek && !semesterWeeks.includes(selectedTuan)) {
+      setSelectedTuan(semesterWeeks[0] || 1);
+    }
+  }, [semesterWeeks, selectedTuan, hasInitializedWeek]);
 
   // Helper functions for date range calculation and formatting
-  const getWeekDates = (tuan) => {
-    if (!selectedYear) {
-      return { monday: new Date(), sunday: new Date() };
-    }
-    const startYear = selectedYear.tenNamHoc ? parseInt(selectedYear.tenNamHoc.split("-")[0]) : new Date().getFullYear();
-    const schoolStart = selectedYear.ngayBatDauHk1
-      ? new Date(selectedYear.ngayBatDauHk1 + "T00:00:00")
-      : new Date(startYear, 8, 5); // fallback 5/9
-    const dayOfWeek = schoolStart.getDay();
-    const monday = new Date(schoolStart);
-    monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    monday.setDate(monday.getDate() + (tuan - 1) * 7);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    return { monday, sunday };
-  };
-
   const formatShortDate = (d) => `${d.getDate()}/${d.getMonth() + 1}`;
   const formatLongDate = (d) => {
     const day = String(d.getDate()).padStart(2, "0");
@@ -189,12 +186,54 @@ export default function AdminThoiKhoaBieuPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getThoiKhoaBieu({
-        namHoc: selectedYear.tenNamHoc,
-        hocKy: Number(selectedHocKy),
-        tuan: selectedTuan
+      const [response, examResponse] = await Promise.all([
+        getThoiKhoaBieu({
+          namHoc: selectedYear.tenNamHoc,
+          hocKy: Number(selectedHocKy),
+          tuan: selectedTuan
+        }),
+        getLichThi({
+          namHoc: selectedYear.tenNamHoc,
+          hocKy: Number(selectedHocKy)
+        })
+      ]);
+      const baseTimetable = response?.data?.data || [];
+      const exams = examResponse?.data?.data || [];
+
+      let mergedTimetable = [...baseTimetable];
+      
+      const schoolStart = selectedYear.ngayBatDauHk1
+        ? new Date(selectedYear.ngayBatDauHk1 + "T00:00:00")
+        : new Date(new Date().getFullYear(), 8, 5);
+      const dayOfWeek = schoolStart.getDay();
+      const monday = new Date(schoolStart);
+      monday.setDate(schoolStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      monday.setDate(monday.getDate() + (selectedTuan - 1) * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      exams.forEach(exam => {
+        if (!exam.ngayThi) return;
+        const d = new Date(exam.ngayThi + "T00:00:00");
+        if (d >= monday && d <= sunday) {
+          const dow = d.getDay();
+          const thu = dow === 0 ? 8 : dow + 1;
+          const period = mapTimeToPeriod(exam.gioBatDau);
+          mergedTimetable.push({
+            id: 'ex-' + exam.id,
+            thu: thu,
+            tietBatDau: period,
+            soTiet: 1,
+            monHoc: exam.monHoc,
+            giaoVien: { hoTen: exam.phongThi ? `P.${exam.phongThi}` : "Thi" },
+            lop: { id: exam.lopId },
+            isExam: true,
+            loaiKiemTra: exam.loaiKiemTra
+          });
+        }
       });
-      setTimetable(response?.data?.data || []);
+
+      setTimetable(mergedTimetable);
       
       // Use message from backend or fallback to checkExamWeek API
       if (response?.data?.message === "TUAN_THI") {
@@ -238,6 +277,10 @@ export default function AdminThoiKhoaBieuPage() {
   const [draggedSlot, setDraggedSlot] = useState(null);
 
   const handleDragStart = (e, slot) => {
+    if (isExamWeek) {
+      e.preventDefault();
+      return;
+    }
     setDraggedSlot(slot);
     e.dataTransfer.effectAllowed = "move";
   };
@@ -249,7 +292,7 @@ export default function AdminThoiKhoaBieuPage() {
 
   const handleDrop = async (e, thu, tiet, lopId, targetSlot) => {
     e.preventDefault();
-    if (!draggedSlot) return;
+    if (!draggedSlot || isExamWeek) return;
 
     const sourceLopId = draggedSlot.lop?.id || draggedSlot.lopHoc?.id;
     if (sourceLopId !== lopId) {
@@ -400,8 +443,6 @@ export default function AdminThoiKhoaBieuPage() {
     }
   };
 
-  const { confirm } = useConfirm();
-
   const handleDeleteLeave = async (requestId) => {
     if (!(await confirm("Bạn có chắc chắn muốn xóa đơn xin nghỉ này không?"))) return;
     try {
@@ -473,6 +514,7 @@ export default function AdminThoiKhoaBieuPage() {
           @page{size:landscape;margin:8mm}
         }
       </style></head><body>
+      <div style="font-weight:bold; font-size:16px; margin-bottom:10px;">${systemName?.toUpperCase()}</div>
       <h1>THỜI KHÓA BIỂU TOÀN TRƯỜNG</h1>
       <h2>Năm học: ${selectedYear?.tenNamHoc || "—"} | Học kỳ: ${selectedHocKy === "1" ? "I" : "II"} | Tuần ${selectedTuan} (${formatLongDate(monday)} - ${formatFullDate(sunday)})</h2>
       <table>
@@ -487,7 +529,8 @@ export default function AdminThoiKhoaBieuPage() {
     setShowPdfPreview(true);
   };
 
-  const getSubjectColor = (subjectName) => {
+  const getSubjectColor = (subjectName, isExam) => {
+    if (isExam) return "bg-red-50 border-red-200 text-red-800";
     if (!subjectName) return "bg-gray-50 border-gray-100 text-gray-400";
     const name = subjectName.toLowerCase();
     if (name.includes("toán")) return "bg-blue-50 border-blue-100 text-blue-800";
@@ -537,7 +580,7 @@ export default function AdminThoiKhoaBieuPage() {
     return classes.size > 0 ? classes.size : lops.length;
   }, [timetable, lops]);
 
-  const { monday, sunday } = getWeekDates(selectedTuan);
+  const { monday, sunday } = getWeekDates(selectedTuan, selectedYear);
   const relativeWeek = selectedTuan;
 
   return (
@@ -546,7 +589,15 @@ export default function AdminThoiKhoaBieuPage() {
       {/* ─── TITLE & ACTIONS HEADER ─── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight">Thời khóa biểu</h2>
+          <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
+            Thời khóa biểu
+            {isExamWeek && (
+              <span className="bg-red-100 text-red-700 text-sm px-3 py-1 rounded-full font-bold border border-red-200 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px]">warning</span>
+                TUẦN THI (Không xếp TKB)
+              </span>
+            )}
+          </h2>
           <p className="text-xs text-gray-500 mt-1 font-medium">
             Năm học: {selectedYear?.tenNamHoc || "—"} | Học kỳ: {selectedHocKy === "1" ? "I" : "II"} | Bảng tổng hợp theo lớp.
           </p>
@@ -564,7 +615,8 @@ export default function AdminThoiKhoaBieuPage() {
           <button
             type="button"
             onClick={handleGenerate}
-            disabled={saving || loading}
+            disabled={saving || loading || isExamWeek}
+            title={isExamWeek ? "Không thể xếp TKB tự động trong tuần thi" : "Xếp TKB tự động"}
             className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-blue-200/50 disabled:opacity-50 cursor-pointer select-none"
           >
             <span className="material-symbols-outlined text-[16px]">auto_fix_high</span>
@@ -714,33 +766,20 @@ export default function AdminThoiKhoaBieuPage() {
         </div>
 
         {/* Scrollable Table View */}
-        {isExamWeek ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-gray-150/80 shadow-xs">
-            <span className="material-symbols-outlined text-[64px] text-blue-500 mb-4 animate-bounce">
-              event_available
-            </span>
-            <h2 className="text-4xl font-black text-blue-900 uppercase tracking-widest text-center">
-              TUẦN THI
-            </h2>
-            <p className="mt-3 text-sm text-gray-500 font-medium text-center max-w-md">
-              Học sinh được nghỉ học các môn văn hóa trong tuần này. Vui lòng xem lịch thi chi tiết tại phân hệ Lịch Thi.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto overflow-y-auto max-h-[70vh] flex-1 rounded-2xl border border-gray-150/80 shadow-xs">
+        <div className="overflow-x-auto overflow-y-auto max-h-[70vh] flex-1 rounded-2xl border border-gray-150/80 shadow-xs">
             <table className="w-full text-left border-collapse table-fixed min-w-[1400px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider sticky top-0 z-30 shadow-xs">
-                  <th className="px-4 py-4 w-[100px] bg-slate-50 sticky left-0 z-40 border-r border-gray-150 text-center font-bold text-slate-600 text-xs">Thứ</th>
-                  <th className="px-4 py-4 w-[90px] border-r border-gray-150 text-center sticky left-[100px] z-40 bg-slate-50 font-bold text-slate-600 text-xs">Tiết</th>
+                <tr className="bg-[#00236f] text-[12px] font-semibold text-white uppercase tracking-wider sticky top-0 z-30 shadow-xs">
+                  <th className="px-4 py-4 w-[100px] bg-[#00236f] sticky left-0 z-40 border-r border-[#001a4f] text-center font-semibold text-white">Thứ</th>
+                  <th className="px-4 py-4 w-[90px] bg-[#00236f] border-r border-[#001a4f] text-center sticky left-[100px] z-40 font-semibold text-white">Tiết</th>
                   {lops.map((lop) => (
-                    <th key={lop.id} className="px-5 py-4 w-[220px] border-r border-gray-150 text-center">
-                      <div className="font-black text-blue-900 text-sm uppercase tracking-wider">{lop.tenLop}</div>
+                    <th key={lop.id} className="px-5 py-4 w-[220px] bg-[#00236f] border-r border-[#001a4f] text-center">
+                      <div className="font-bold text-white text-sm uppercase tracking-wider">{lop.tenLop}</div>
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-150/70 text-xs">
+              <tbody className="text-[12px]">
                 {DAYS.map((thu) => {
                   const activePeriods = PERIODS.filter(p => {
                     if (buoiFilter === "SANG") return p <= 5;
@@ -750,26 +789,27 @@ export default function AdminThoiKhoaBieuPage() {
 
                   return activePeriods.map((tiet, pIdx) => {
                     return (
-                      <tr key={`${thu}-${tiet}`} className="hover:bg-slate-50/20 transition-colors">
+                      <tr key={`${thu}-${tiet}`} className="hover:bg-slate-50 transition-colors">
                         {/* Gộp Thứ */}
                         {pIdx === 0 && (
                           <td
                             rowSpan={activePeriods.length}
-                            className="font-black text-blue-900 text-sm bg-slate-50 border-r border-gray-150 text-center sticky left-0 z-20 border-b border-gray-150 align-middle px-3 shadow-xs"
+                            className="font-bold text-[#854d0e] text-sm bg-[#fef9c3] border-r border-[#fef08a] text-center sticky left-0 z-20 border-b align-middle px-3 shadow-xs"
                           >
-                            <div className="text-blue-900">Thứ {thu}</div>
-                            <div className="text-[11px] text-blue-700/60 font-bold mt-1.5">{formatDateForDay(thu)}</div>
+                            <div>Thứ {thu}</div>
+                            <div className="text-[10px] text-gray-500 font-normal mt-1">{formatDateForDay(thu)}</div>
                           </td>
                         )}
 
                         {/* Tiết học */}
-                        <td className="px-2.5 py-2 border-r border-gray-150 font-extrabold text-center text-gray-500 bg-slate-50 sticky left-[100px] z-20 border-b border-gray-150">
-                          <div className="text-xs font-black text-blue-900">{tiet}</div>
-                          {tiet === 1 && <div className="text-[8px] text-blue-600 font-extrabold mt-0.5 uppercase tracking-wider">Sáng</div>}
-                          {tiet === 6 && <div className="text-[8px] text-orange-600 font-extrabold mt-0.5 uppercase tracking-wider">Chiều</div>}
+                        <td className="px-2 py-2 border-r border-gray-200 font-semibold text-center text-slate-700 bg-white sticky left-[100px] z-20 border-b shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                          <div className="text-[14px]">{tiet}</div>
+                          <div className="text-[9px] text-gray-400 font-normal mt-0.5">
+                            {tiet <= 5 ? "Sáng" : "Chiều"}
+                          </div>
                         </td>
 
-                        {/* Lớp học */}
+                        {/* Các lớp */}
                         {lops.map((lop) => {
                           const slot = findSlot(thu, tiet, lop.id);
                           return (
@@ -781,11 +821,11 @@ export default function AdminThoiKhoaBieuPage() {
                             >
                               {slot ? (
                                 <div 
-                                  className={`p-2 rounded-xl border flex flex-col justify-center gap-0.5 h-full shadow-xs transition-all hover:scale-[1.01] hover:shadow-sm cursor-grab active:cursor-grabbing ${getSubjectColor(slot.monHoc?.tenMon)} ${slot.isLocked ? "ring-2 ring-blue-400" : ""}`}
-                                  draggable={true}
-                                  onDragStart={(e) => handleDragStart(e, slot)}
+                                  className={`p-2 rounded-xl border flex flex-col justify-center gap-0.5 h-full shadow-xs transition-all hover:scale-[1.01] hover:shadow-sm ${!slot.isExam ? 'cursor-grab active:cursor-grabbing' : ''} ${getSubjectColor(slot.monHoc?.tenMon, slot.isExam)} ${slot.isLocked ? "ring-2 ring-blue-400" : ""}`}
+                                  draggable={!slot.isExam}
+                                  onDragStart={!slot.isExam ? (e) => handleDragStart(e, slot) : undefined}
                                 >
-                                  <span className="font-black text-blue-955 text-xs leading-snug">{slot.monHoc?.tenMon}</span>
+                                  <span className="font-black text-blue-955 text-xs leading-snug">{slot.isExam ? `[THI] ${slot.monHoc?.tenMon}` : slot.monHoc?.tenMon}</span>
                                   <span className="text-[10px] opacity-90 font-bold text-slate-600 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-[12px] opacity-75">person</span>
                                     {slot.giaoVien?.hoTen || "Chưa phân"}
@@ -807,7 +847,6 @@ export default function AdminThoiKhoaBieuPage() {
               </tbody>
             </table>
           </div>
-        )}
       </div>
 
       {/* ─── MODAL QUẢN LÝ NGHỈ DẠY & DẠY THAY ─── */}

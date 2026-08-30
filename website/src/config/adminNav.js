@@ -1,8 +1,8 @@
-import { 
-  LayoutDashboard, 
-  Users, 
-  GraduationCap, 
-  BookOpen, 
+import {
+  LayoutDashboard,
+  Users,
+  GraduationCap,
+  BookOpen,
   Settings,
   BarChart3,
   School,
@@ -51,7 +51,7 @@ export const ADMIN_NAV = [
       { path: "/admin/monhoc", label: "Môn học", icon: Book },
       { path: "/admin/tohopmon", label: "Tổ hợp môn", icon: Shapes },
       { path: "/admin/lop", label: "Lớp học", icon: Component },
-      { path: "/admin/diem", label: "Nhập điểm", icon: PenTool },
+      { path: "/admin/diem", label: "Quản lý điểm", icon: PenTool },
       { path: "/admin/hanhkiem", label: "Duyệt hạnh kiểm", icon: CheckCircle }
     ]
   },

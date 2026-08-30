@@ -5,6 +5,7 @@ import AdminHeader from "../components/admin/header/AdminHeader.jsx";
 import Toast from "../components/common/Toast.jsx";
 import PasswordChangeBanner from "../components/common/PasswordChangeBanner.jsx";
 import { AdminSearchProvider } from "../contexts/AdminSearchContext.jsx";
+import { useTheme } from "../contexts/ThemeContext.jsx";
 
 export default function MainLayout({
   children,
@@ -17,6 +18,8 @@ export default function MainLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopExpanded, setIsDesktopExpanded] = useState(true);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  
+  const { themeFooter } = useTheme();
 
   useEffect(() => {
     if (window.innerWidth < 1024) {
@@ -68,11 +71,16 @@ export default function MainLayout({
         className="mt-16 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar transition-all duration-300 print:mt-0 print:h-auto print:overflow-visible print:ml-0 print:w-full print:p-0"
         style={{ marginLeft: typeof window !== "undefined" && window.innerWidth >= 1024 ? sidebarWidth : 0 }}
       >
-        <div className="print-hidden">
-          <PasswordChangeBanner />
-        </div>
-        <div className="mx-auto max-w-container-max p-lg print:p-0 print:max-w-none print:mx-0">
-          {children}
+        <div className="flex flex-col min-h-full">
+          <div className="print-hidden">
+            <PasswordChangeBanner />
+          </div>
+          <div className="mx-auto max-w-container-max p-lg print:p-0 print:max-w-none print:mx-0 w-full flex-grow">
+            {children}
+          </div>
+          <div className="mt-auto py-6 text-center text-sm font-medium text-gray-500 border-t border-outline-variant/30 print-hidden shrink-0 bg-background relative z-50">
+            {themeFooter}
+          </div>
         </div>
       </main>
     </div>
