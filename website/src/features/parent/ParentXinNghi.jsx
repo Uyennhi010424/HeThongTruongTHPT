@@ -92,13 +92,16 @@ export default function ParentXinNghi() {
   const getStatusBadge = (status) => {
     switch (status) {
       case "PENDING":
-        return <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">Chờ duyệt</span>;
+      case "CHO_DUYET":
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Chờ duyệt</span>;
       case "APPROVED":
-        return <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Đã duyệt</span>;
+      case "DA_DUYET":
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Đã duyệt</span>;
       case "REJECTED":
-        return <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Từ chối</span>;
+      case "TU_CHOI":
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">Từ chối</span>;
       default:
-        return status;
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{status || "--"}</span>;
     }
   };
 

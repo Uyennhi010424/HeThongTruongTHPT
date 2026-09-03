@@ -59,16 +59,39 @@ const isFemaleVietnameseName = (fullName) => {
   return false;
 };
 
+const getStudentSortPriority = (s) => {
+  const status = Number(s?.trangThai ?? s?.trang_thai ?? 1);
+  const className = String(s?.lopHoc?.tenLop || s?.lop?.tenLop || "").trim();
+
+  // Đang học và có lớp -> ưu tiên cao nhất (xếp đầu)
+  if (status === 1 && className) return 1;
+
+  // Đang học nhưng chưa xếp lớp
+  if (status === 1 && !className) return 2;
+
+  // Tốt nghiệp (status === 2) hoặc Ngừng học (status === 0) hoặc Chuyển trường (status === 3) -> về cuối danh sách
+  return 3;
+};
+
 // Lấy từ hocSinhUtils để sort nếu thiếu
 const compareClassThenGivenName = (a, b) => {
+  // 1. So sánh độ ưu tiên trạng thái (Đang học lên trước, Tốt nghiệp/Ngừng học về cuối)
+  const priorityA = getStudentSortPriority(a);
+  const priorityB = getStudentSortPriority(b);
+  if (priorityA !== priorityB) return priorityA - priorityB;
+
+  // 2. Nếu cùng có lớp: So sánh lớp học (10A1 -> 10A2 -> 11A1...)
   const classA = String(a?.lopHoc?.tenLop || a?.lop?.tenLop || "").trim();
   const classB = String(b?.lopHoc?.tenLop || b?.lop?.tenLop || "").trim();
-  const classCompare = classA.localeCompare(classB, "vi", {
-    numeric: true,
-    sensitivity: "base"
-  });
-  if (classCompare !== 0) return classCompare;
+  if (classA && classB) {
+    const classCompare = classA.localeCompare(classB, "vi", {
+      numeric: true,
+      sensitivity: "base"
+    });
+    if (classCompare !== 0) return classCompare;
+  }
 
+  // 3. So sánh tên (A -> Z tiếng Việt)
   const nameA = String(a?.hoTen || "").trim();
   const nameB = String(b?.hoTen || "").trim();
 
@@ -314,6 +337,7 @@ export function useHocSinhList() {
     setIsSearchVisible(true);
     return () => setIsSearchVisible(false);
   }, [setSearchPlaceholder, setIsSearchVisible]);
+  const [yearFilter, setYearFilter] = useState("all");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -410,6 +434,18 @@ export function useHocSinhList() {
     return { total, activeCount, pausedCount };
   }, [students]);
 
+  const academicYears = useMemo(() => {
+    const set = new Set();
+    classes.forEach((c) => {
+      if (c?.namHoc) set.add(c.namHoc);
+    });
+    students.forEach((s) => {
+      const yr = s?.lopHoc?.namHoc || s?.lop?.namHoc;
+      if (yr) set.add(yr);
+    });
+    return Array.from(set).sort().reverse();
+  }, [classes, students]);
+
   const filteredStudents = useMemo(() => {
     const lower = keyword.toLowerCase();
     const source = students.filter((student) => {
@@ -419,21 +455,27 @@ export function useHocSinhList() {
             .some((field) => field.toLowerCase().includes(lower))
         : true;
 
+      const studentYear = String(student?.lopHoc?.namHoc || student?.lop?.namHoc || "");
       const studentGrade = String(student?.lopHoc?.khoi || student?.lop?.khoi || "");
       const studentClassId = String(student?.lopHoc?.id || student?.lop?.id || "");
 
+      const matchYear = yearFilter === "all" ? true : studentYear === yearFilter;
       const matchGrade = gradeFilter === "all" ? true : studentGrade === gradeFilter;
       const matchClass = classFilter === "all" ? true : studentClassId === classFilter;
 
-      return matchKeyword && matchGrade && matchClass;
+      return matchKeyword && matchYear && matchGrade && matchClass;
     });
 
     return [...source].sort(compareClassThenGivenName);
-  }, [keyword, students, gradeFilter, classFilter]);
+  }, [keyword, students, yearFilter, gradeFilter, classFilter]);
 
   const classesByGrade = useMemo(() => {
     const map = new Map();
-    classes.forEach((item) => {
+    const classesForGrade = yearFilter === "all"
+      ? classes
+      : classes.filter((item) => String(item?.namHoc || "") === yearFilter);
+
+    classesForGrade.forEach((item) => {
       const grade = item?.khoi ? String(item.khoi) : "Khác";
       if (!map.has(grade)) map.set(grade, []);
       map.get(grade).push(item);
@@ -447,12 +489,15 @@ export function useHocSinhList() {
           String(x.tenLop || "").localeCompare(String(y.tenLop || ""))
         )
       }));
-  }, [classes]);
+  }, [classes, yearFilter]);
 
   const filteredClasses = useMemo(() => {
-    if (gradeFilter === "all") return classes;
-    return classes.filter((item) => String(item?.khoi || "") === gradeFilter);
-  }, [classes, gradeFilter]);
+    return classes.filter((item) => {
+      const matchYear = yearFilter === "all" ? true : String(item?.namHoc || "") === yearFilter;
+      const matchGrade = gradeFilter === "all" ? true : String(item?.khoi || "") === gradeFilter;
+      return matchYear && matchGrade;
+    });
+  }, [classes, yearFilter, gradeFilter]);
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(filteredStudents.length / pageSize));
@@ -465,7 +510,7 @@ export function useHocSinhList() {
 
   useEffect(() => {
     setPage(1);
-  }, [keyword, pageSize, gradeFilter, classFilter]);
+  }, [keyword, pageSize, yearFilter, gradeFilter, classFilter]);
 
   useEffect(() => {
     if (classFilter === "all") return;
@@ -479,12 +524,16 @@ export function useHocSinhList() {
   const handleClassSelect = (classId) => {
     setClassFilter(classId);
     if (classId === "all") {
-      setGradeFilter("all");
       return;
     }
     const found = classes.find((c) => String(c.id) === String(classId));
-    if (found && found.khoi !== undefined && found.khoi !== null) {
-      setGradeFilter(String(found.khoi));
+    if (found) {
+      if (found.khoi !== undefined && found.khoi !== null) {
+        setGradeFilter(String(found.khoi));
+      }
+      if (found.namHoc) {
+        setYearFilter(found.namHoc);
+      }
     }
   };
 
@@ -732,10 +781,9 @@ export function useHocSinhList() {
       gioiTinh: form.gioiTinh === "true" ? "NAM" : "NU",
       lop: form.lopHocId ? { id: Number(form.lopHocId) } : null,
       hocBaId: editingStudent?.hocBaId || 1,
-      danTocId,
-      danToc: ethnicityName,
+      danToc: danTocId ? { id: Number(danTocId) } : { id: 1 },
       phuHuynhId,
-      tonGiao: form.tonGiao.trim() || null,
+      tonGiao: null,
       sdt: form.sdt.trim() || null,
       email: editingStudent
         ? form.email.trim() || null
@@ -910,118 +958,6 @@ export function useHocSinhList() {
       // ✅ FIX: Thêm cellDates: true để SheetJS tự convert số serial thành JS Date
       const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
 
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-
-      // Đọc toàn bộ dưới dạng mảng thô để phát hiện header
-      const allRows = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        defval: "",
-        raw: false  // ✅ FIX: raw: false giúp giá trị Date được format đúng khi dùng với cellDates
-      });
-
-      if (!allRows || allRows.length === 0) {
-        setExcelError("File Excel không có dữ liệu.");
-        return;
-      }
-
-      // Tìm dòng header trong 5 dòng đầu
-      let headerRowIndex = -1;
-      let headerArray = null;
-
-      for (let i = 0; i < Math.min(5, allRows.length); i += 1) {
-        const hdr = allRows[i] || [];
-        const normalized = new Set(hdr.map((h) => normalizeText(String(h || ""))));
-        const hasAll = REQUIRED_EXCEL_FIELDS.every((field) =>
-          EXCEL_FIELD_ALIASES[field].some((alias) => normalized.has(normalizeText(alias)))
-        );
-        if (hasAll) {
-          headerRowIndex = i;
-          headerArray = hdr.map((h) => String(h || ""));
-          break;
-        }
-      }
-
-      // Nếu không tìm thấy, thử gộp 2-3 dòng đầu
-      if (headerRowIndex === -1) {
-        const maxCombine = Math.min(3, allRows.length - 1);
-        for (let span = 1; span <= maxCombine && headerRowIndex === -1; span += 1) {
-          const maxCols = Math.max(...allRows.slice(0, span + 1).map((r) => (r || []).length));
-          const combined = [];
-          for (let c = 0; c < maxCols; c += 1) {
-            const parts = [];
-            for (let r = 0; r <= span; r += 1) {
-              const cell = (allRows[r] || [])[c];
-              if (cell !== undefined && cell !== null && String(cell || "").trim() !== "") {
-                parts.push(String(cell));
-              }
-            }
-            combined[c] = parts.join(" ").trim();
-          }
-
-          const normalizedCombined = new Set(
-            combined.map((h) => normalizeText(String(h || "")))
-          );
-          const hasAll = REQUIRED_EXCEL_FIELDS.every((field) =>
-            EXCEL_FIELD_ALIASES[field].some((alias) =>
-              normalizedCombined.has(normalizeText(alias))
-            )
-          );
-          if (hasAll) {
-            headerRowIndex = span;
-            headerArray = combined;
-            break;
-          }
-        }
-      }
-
-      let rows = [];
-      let baseRowNumber = 2;
-
-      if (headerRowIndex >= 0) {
-        const header =
-          headerArray || allRows[headerRowIndex].map((h) => String(h || ""));
-        const dataRows = allRows.slice(headerRowIndex + 1);
-        rows = dataRows.map((r) => {
-          const obj = {};
-          for (let c = 0; c < header.length; c += 1) {
-            const key = header[c] || `COL_${c}`;
-            obj[key] = r[c] === undefined ? "" : r[c];
-          }
-          return obj;
-        });
-        baseRowNumber = headerRowIndex + 2;
-      } else {
-        // Fallback: dùng dòng đầu làm header
-        const tmp = XLSX.utils.sheet_to_json(worksheet, { defval: "", raw: false });
-        if (!tmp.length) {
-          setExcelError("File Excel không có dữ liệu.");
-          return;
-        }
-        rows = tmp;
-        baseRowNumber = 2;
-      }
-
-      if (!rows.length) {
-        setExcelError("File Excel không có dữ liệu (sau khi xử lý header).");
-        return;
-      }
-
-      const normalizedHeaders = new Set(
-        Object.keys(rows[0] || {}).map((header) => normalizeText(header))
-      );
-      const missingFields = REQUIRED_EXCEL_FIELDS.filter(
-        (field) =>
-          !EXCEL_FIELD_ALIASES[field].some((alias) =>
-            normalizedHeaders.has(normalizeText(alias))
-          )
-      );
-      if (missingFields.length) {
-        const missingLabels = missingFields.map((field) => EXCEL_FIELD_ALIASES[field][0]);
-        setExcelError(`Thiếu cột bắt buộc: ${missingLabels.join(", ")}`);
-        return;
-      }
-
       const classMap = new Map();
       classes.forEach((lop) => {
         classMap.set(normalizeText(lop.tenLop), lop);
@@ -1040,18 +976,138 @@ export function useHocSinhList() {
         return null;
       };
 
+      const allCollectedRows = [];
+      let processedSheetCount = 0;
+
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) continue;
+
+        // Đọc toàn bộ dưới dạng mảng thô để phát hiện header
+        const allRows = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: "",
+          raw: false  // ✅ FIX: raw: false giúp giá trị Date được format đúng khi dùng với cellDates
+        });
+
+        if (!allRows || allRows.length === 0) continue;
+
+        // Tìm dòng header trong 5 dòng đầu
+        let headerRowIndex = -1;
+        let headerArray = null;
+
+        for (let i = 0; i < Math.min(5, allRows.length); i += 1) {
+          const hdr = allRows[i] || [];
+          const normalized = new Set(hdr.map((h) => normalizeText(String(h || ""))));
+          const hasHoTen = EXCEL_FIELD_ALIASES.hoTen.some((alias) => normalized.has(normalizeText(alias)));
+          const hasLop = EXCEL_FIELD_ALIASES.lop.some((alias) => normalized.has(normalizeText(alias)));
+          const sheetClassMatch = classMap.get(normalizeText(sheetName)) || fuzzyFindClass(normalizeText(sheetName));
+          if (hasHoTen && (hasLop || sheetClassMatch)) {
+            headerRowIndex = i;
+            headerArray = hdr.map((h) => String(h || ""));
+            break;
+          }
+        }
+
+        // Nếu không tìm thấy, thử gộp 2-3 dòng đầu
+        if (headerRowIndex === -1) {
+          const maxCombine = Math.min(3, allRows.length - 1);
+          for (let span = 1; span <= maxCombine && headerRowIndex === -1; span += 1) {
+            const maxCols = Math.max(...allRows.slice(0, span + 1).map((r) => (r || []).length));
+            const combined = [];
+            for (let c = 0; c < maxCols; c += 1) {
+              const parts = [];
+              for (let r = 0; r <= span; r += 1) {
+                const cell = (allRows[r] || [])[c];
+                if (cell !== undefined && cell !== null && String(cell || "").trim() !== "") {
+                  parts.push(String(cell));
+                }
+              }
+              combined[c] = parts.join(" ").trim();
+            }
+
+            const normalizedCombined = new Set(
+              combined.map((h) => normalizeText(String(h || "")))
+            );
+            const hasHoTen = EXCEL_FIELD_ALIASES.hoTen.some((alias) => normalizedCombined.has(normalizeText(alias)));
+            const hasLop = EXCEL_FIELD_ALIASES.lop.some((alias) => normalizedCombined.has(normalizeText(alias)));
+            const sheetClassMatch = classMap.get(normalizeText(sheetName)) || fuzzyFindClass(normalizeText(sheetName));
+            if (hasHoTen && (hasLop || sheetClassMatch)) {
+              headerRowIndex = span;
+              headerArray = combined;
+              break;
+            }
+          }
+        }
+
+        if (headerRowIndex >= 0) {
+          const header = headerArray || allRows[headerRowIndex].map((h) => String(h || ""));
+          const dataRows = allRows.slice(headerRowIndex + 1);
+          const baseRowNumber = headerRowIndex + 2;
+
+          dataRows.forEach((r, idx) => {
+            const obj = {};
+            for (let c = 0; c < header.length; c += 1) {
+              const key = header[c] || `COL_${c}`;
+              obj[key] = r[c] === undefined ? "" : r[c];
+            }
+            const rawClass = findColumnValue(obj, EXCEL_FIELD_ALIASES.lop);
+            if (!rawClass || String(rawClass).trim() === "") {
+              obj["Lớp"] = sheetName;
+            }
+            allCollectedRows.push({
+              row: obj,
+              rowNumber: baseRowNumber + idx,
+              sheetName
+            });
+          });
+          processedSheetCount += 1;
+        } else {
+          // Fallback: sheet_to_json default
+          const tmp = XLSX.utils.sheet_to_json(worksheet, { defval: "", raw: false });
+          if (tmp && tmp.length > 0) {
+            const normalizedHeaders = new Set(
+              Object.keys(tmp[0] || {}).map((h) => normalizeText(h))
+            );
+            const hasHoTen = EXCEL_FIELD_ALIASES.hoTen.some((alias) => normalizedHeaders.has(normalizeText(alias)));
+            const hasLop = EXCEL_FIELD_ALIASES.lop.some((alias) => normalizedHeaders.has(normalizeText(alias)));
+            const sheetClassMatch = classMap.get(normalizeText(sheetName)) || fuzzyFindClass(normalizeText(sheetName));
+            if (hasHoTen && (hasLop || sheetClassMatch)) {
+              tmp.forEach((rowObj, idx) => {
+                const rawClass = findColumnValue(rowObj, EXCEL_FIELD_ALIASES.lop);
+                if (!rawClass || String(rawClass).trim() === "") {
+                  rowObj["Lớp"] = sheetName;
+                }
+                allCollectedRows.push({
+                  row: rowObj,
+                  rowNumber: 2 + idx,
+                  sheetName
+                });
+              });
+              processedSheetCount += 1;
+            }
+          }
+        }
+      }
+
+      if (allCollectedRows.length === 0) {
+        setExcelError("Không tìm thấy dữ liệu học sinh hợp lệ trong các sheet của file Excel.");
+        return;
+      }
+
       // ✅ FIX: Cache phụ huynh đã tạo trong lần import để tránh tạo trùng
       const createdParentCache = new Map(); // key: email hoặc sdt → phuHuynhId
 
       const createdStudents = [];
       const failedRows = [];
-      const originalRowNumbers = rows.map((_, i) => baseRowNumber + i);
       let totalNonEmptyRows = 0;
 
+      const isMultiSheet = workbook.SheetNames.length > 1;
+
       // PRE-VALIDATION PASS
-      for (let index = 0; index < rows.length; index += 1) {
-        const row = rows[index];
-        const rowNumber = originalRowNumbers[index];
+      for (const item of allCollectedRows) {
+        const { row, rowNumber, sheetName } = item;
+        const rowLabel = isMultiSheet ? `[${sheetName}] Dòng ${rowNumber}` : `Dòng ${rowNumber}`;
         const isEmptyRow = Object.values(row || {}).every(
           (v) => v === null || v === undefined || String(v || "").trim() === ""
         );
@@ -1067,12 +1123,12 @@ export function useHocSinhList() {
         const fullName = String(findColumnValue(row, EXCEL_FIELD_ALIASES.hoTen) || "").trim();
 
         if (!fullName) {
-          failedRows.push(`Dòng ${rowNumber}: thiếu cột Họ tên`);
+          failedRows.push(`${rowLabel}: thiếu cột Họ tên`);
           continue;
         }
 
         if (!classMatch) {
-          failedRows.push(`Dòng ${rowNumber}: không tìm thấy lớp '${className || "(trống)"}'`);
+          failedRows.push(`${rowLabel}: không tìm thấy lớp '${className || "(trống)"}'`);
           continue;
         }
 
@@ -1082,7 +1138,7 @@ export function useHocSinhList() {
 
         const ageError = validateStudentAgeAndYear(ngaySinhNormalized, namNhapHoc, classMatch.khoi);
         if (ageError) {
-          failedRows.push(`Dòng ${rowNumber}: ${ageError}`);
+          failedRows.push(`${rowLabel}: ${ageError}`);
         }
       }
 
@@ -1094,9 +1150,9 @@ export function useHocSinhList() {
       }
 
       // EXECUTION PASS
-      for (let index = 0; index < rows.length; index += 1) {
-        const row = rows[index];
-        const rowNumber = originalRowNumbers[index];
+      for (const item of allCollectedRows) {
+        const { row, rowNumber, sheetName } = item;
+        const rowLabel = isMultiSheet ? `[${sheetName}] Dòng ${rowNumber}` : `Dòng ${rowNumber}`;
 
         // Bỏ qua dòng trống hoàn toàn
         const isEmptyRow = Object.values(row || {}).every(
@@ -1203,15 +1259,15 @@ export function useHocSinhList() {
                   }
                 }
 
-                      const phPayload = {
-                        hoTen: phHoTen || null,
-                        soDienThoai: phSdt || null,
-                        email: phEmail || null,
-                        diaChi: null,
-                        ngheNghiep: phNgheNghiep || null,
-                        quanHe: isFemaleVietnameseName(phHoTen) ? "ME" : "CHA",
-                        isSmSActive: true
-                      };
+                const phPayload = {
+                  hoTen: phHoTen || null,
+                  soDienThoai: phSdt || null,
+                  email: phEmail || null,
+                  diaChi: null,
+                  ngheNghiep: phNgheNghiep || null,
+                  quanHe: isFemaleVietnameseName(phHoTen) ? "ME" : "CHA",
+                  isSmSActive: true
+                };
                 if (createdUserId) phPayload.user = { id: Number(createdUserId) };
 
                 const phRes = await createPhuHuynh(phPayload);
@@ -1237,7 +1293,7 @@ export function useHocSinhList() {
         const ngaySinhRaw = findColumnValue(row, EXCEL_FIELD_ALIASES.ngaySinh);
         const ngaySinhNormalized = normalizeDateCell(ngaySinhRaw);
 
-          const payload = {
+        const payload = {
           hoTen: fullName,
           ngaySinh: ngaySinhNormalized,
           gioiTinh: parseBoolean(
@@ -1246,9 +1302,7 @@ export function useHocSinhList() {
           ) ? "NAM" : "NU",
           lop: { id: Number(classMatch.id) },
           hocBaId,
-          danTocId,
-          danToc:
-            String(findColumnValue(row, EXCEL_FIELD_ALIASES.danToc) || "").trim() || null,
+          danToc: danTocId ? { id: Number(danTocId) } : { id: 1 },
           phuHuynhId,
           sdt: normalizePhone(findColumnValue(row, EXCEL_FIELD_ALIASES.sdt) || "") || null,
           email:
@@ -1262,8 +1316,7 @@ export function useHocSinhList() {
           ),
           maBhyt:
             String(findColumnValue(row, EXCEL_FIELD_ALIASES.maBhyt) || "").trim() || null,
-          tonGiao:
-            String(findColumnValue(row, EXCEL_FIELD_ALIASES.tonGiao) || "").trim() || null,
+          tonGiao: null,
           dienChinhSach: parseBoolean(
             findColumnValue(row, EXCEL_FIELD_ALIASES.dienChinhSach),
             false
@@ -1276,7 +1329,7 @@ export function useHocSinhList() {
           const created = response?.data?.data;
           if (created) createdStudents.push(created);
         } catch (err) {
-          failedRows.push(`Dòng ${rowNumber}: ${extractBackendError(err)}`);
+          failedRows.push(`${rowLabel}: ${extractBackendError(err)}`);
         }
       }
 
@@ -1327,6 +1380,8 @@ export function useHocSinhList() {
     error, setError,
     successMessage, setSuccessMessage,
     keyword,
+    yearFilter, setYearFilter,
+    academicYears,
     gradeFilter, setGradeFilter,
     classFilter, setClassFilter,
     page, setPage, pageSize, setPageSize, totalPages,

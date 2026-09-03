@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
@@ -8,6 +8,7 @@ import { updateTkbNote } from "../../../api/thoikhoabieuApi.js";
 import { getLimitedSemesterWeeks, mapTimeToPeriod } from "../../../utils/helpers.js";
 import { getCurrentGiaoVien } from "../../../api/giaovienApi.js";
 import { getLichThi } from "../../../api/lichthiApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
 
 const DAYS = [
   { value: 2, label: "Thứ Hai" },
@@ -28,6 +29,7 @@ export default function TeacherRegisterPhanCong() {
   const [timetable, setTimetable] = useState([]);
   const [myClasses, setMyClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [teacherProfile, setTeacherProfile] = useState(null);
   const [isExamWeek, setIsExamWeek] = useState(false);
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -45,113 +47,59 @@ export default function TeacherRegisterPhanCong() {
   const [namHoc, setNamHoc] = useState("2025-2026");
   const [hocKy, setHocKy] = useState(1);
   const [tuan, setTuan] = useState(1);
-  const [allWeeks, setAllWeeks] = useState([]);
+  const [allWeeks, setAllWeeks] = useState(Array.from({ length: 36 }, (_, i) => i + 1));
+  const isInitialized = useRef(false);
 
-  // Fetch initial year info to calculate correct initial hocKy and tuan
-  useEffect(() => {
-    const fetchInit = async () => {
-      try {
-        const res = await axiosClient.get("/dashboard/info");
-        const yList = res?.data?.data?.namHocList || [];
-        const currentYear = yList.find(y => y.trangThai === "DANG_HOAT_DONG");
-        if (currentYear) {
-          setNamHoc(currentYear.tenNamHoc);
-          
-          let schoolStart;
-          if (currentYear.ngayBatDauHk1) {
-            schoolStart = new Date(currentYear.ngayBatDauHk1 + "T00:00:00");
-          } else {
-            schoolStart = new Date(parseInt(currentYear.tenNamHoc.split("-")[0]), 8, 5);
-          }
-          
-          const dow = schoolStart.getDay();
-          const monday = new Date(schoolStart);
-          monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-          
-          let currentWeek = 1;
-          const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
-          if (diffDays >= 0) {
-            currentWeek = Math.floor(diffDays / 7) + 1;
-          }
-          currentWeek = Math.min(38, Math.max(1, currentWeek));
-          
-          const maxAvailWeek = Math.min(38, currentWeek + 2);
-          const weeks = Array.from({length: maxAvailWeek}, (_, i) => i + 1);
-          setAllWeeks(weeks);
-          setTuan(currentWeek);
-          
-          // Auto calc hocKy
-          let actualHk = 1;
-          if (currentYear.ngayBatDauHk2) {
-            const currentMonday = new Date(schoolStart);
-            currentMonday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1) + (currentWeek - 1) * 7);
-            const hk2Start = new Date(currentYear.ngayBatDauHk2 + "T00:00:00");
-            if (currentMonday >= hk2Start) actualHk = 2;
-          } else if (currentWeek >= 19) {
-            actualHk = 2;
-          }
-          setHocKy(actualHk);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    fetchInit();
-  }, []);
-
-  const fetchData = async (silent = false) => {
+  const loadScheduleData = async (targetNamHoc, targetHocKy, targetTuan, currentTeacherObj, silent = false) => {
     try {
       if (!silent) setLoading(true);
-        const params = { namHoc, hocKy, tuan };
-        const [resTkb, resClasses, resExams, meRes] = await Promise.all([
-          axiosClient.get("/giaoviendangky/thoikhoabieu", { params, skipCache: true }),
-          axiosClient.get("/giaoviendangky/lop-cua-toi", { params: { namHoc, hocKy }, skipCache: true }),
-          getLichThi({ namHoc, hocKy }),
-          getCurrentGiaoVien().catch(() => null)
-        ]);
-        const serverSlots = resTkb?.data?.data || [];
-        const allLichThi = resExams?.data?.data || [];
-        const teacher = meRes?.data?.data || null;
+      const params = { namHoc: targetNamHoc, hocKy: targetHocKy, tuan: targetTuan };
+      const [resTkb, resClasses, resExams] = await Promise.all([
+        axiosClient.get("/giaoviendangky/thoikhoabieu", { params, skipCache: true }),
+        axiosClient.get("/giaoviendangky/lop-cua-toi", { params: { namHoc: targetNamHoc, hocKy: targetHocKy }, skipCache: true }),
+        getLichThi({ namHoc: targetNamHoc, hocKy: targetHocKy }).catch(() => ({ data: { data: [] } }))
+      ]);
+      const serverSlots = resTkb?.data?.data || [];
+      const allLichThi = resExams?.data?.data || [];
+      const teacher = currentTeacherObj || teacherProfile;
 
-        // Lấy ngày đầu tuần / cuối tuần để filter lịch thi
-        const startYear = parseInt(namHoc.split("-")[0]);
-        const schoolStart = new Date(startYear, 8, 5); 
-        const dow = schoolStart.getDay();
-        const monday = new Date(schoolStart);
-        monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
-        monday.setDate(monday.getDate() + (tuan - 1) * 7);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
+      // Lấy ngày đầu tuần / cuối tuần để filter lịch thi
+      const startYear = parseInt(String(targetNamHoc).split("-")[0]) || 2025;
+      const schoolStart = new Date(startYear, 8, 5); 
+      const dow = schoolStart.getDay();
+      const monday = new Date(schoolStart);
+      monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+      monday.setDate(monday.getDate() + (targetTuan - 1) * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
 
-        allLichThi.forEach(exam => {
-          if (!exam.ngayThi) return;
-          const d = new Date(exam.ngayThi + "T00:00:00");
-          if (d >= monday && d <= sunday) {
-             const isGiamThi = teacher && (Number(exam.giamThi1Id ?? exam.giamThi1?.id) === Number(teacher.id) || Number(exam.giamThi2Id ?? exam.giamThi2?.id) === Number(teacher.id));
-             const isChuNhiem = teacher?.lopChuNhiem && Number(exam.lopId) === Number(teacher.lopChuNhiem.id);
+      allLichThi.forEach(exam => {
+        if (!exam.ngayThi) return;
+        const d = new Date(exam.ngayThi + "T00:00:00");
+        if (d >= monday && d <= sunday) {
+           const isGiamThi = teacher && (Number(exam.giamThi1Id ?? exam.giamThi1?.id) === Number(teacher.id) || Number(exam.giamThi2Id ?? exam.giamThi2?.id) === Number(teacher.id));
+           const isChuNhiem = teacher?.lopChuNhiem && Number(exam.lopId) === Number(teacher.lopChuNhiem.id);
+           
+           if (isGiamThi || isChuNhiem) {
+             const examDow = d.getDay();
+             const thu = examDow === 0 ? 8 : examDow + 1;
+             const period = mapTimeToPeriod(exam.gioBatDau);
              
-             if (isGiamThi || isChuNhiem) {
-               const examDow = d.getDay();
-               const thu = examDow === 0 ? 8 : examDow + 1;
-               const period = mapTimeToPeriod(exam.gioBatDau);
-               
-               serverSlots.push({
-                 id: 'ex-' + exam.id,
-                 thu: thu,
-                 tietBatDau: period,
-                 soTiet: 1,
-                 tenMon: "[THI] " + (exam.monHoc?.tenMon || ""),
-                 tenLop: exam.phongThi ? `Phòng: ${exam.phongThi}` : "Lịch thi",
-                 isExam: true,
-                 isLocked: true // Make it un-editable
-               });
-             }
-          }
-        });
+             serverSlots.push({
+               id: 'ex-' + exam.id,
+               thu: thu,
+               tietBatDau: period,
+               soTiet: 1,
+               tenMon: "[THI] " + (exam.monHoc?.tenMon || ""),
+               tenLop: exam.phongThi ? `Phòng: ${exam.phongThi}` : "Lịch thi",
+               isExam: true,
+               isLocked: true // Make it un-editable
+             });
+           }
+        }
+      });
 
-        setIsExamWeek(resTkb?.data?.message === "TUAN_THI");
+      setIsExamWeek(resTkb?.data?.message === "TUAN_THI");
       if (silent) {
         setTimetable((prev) => {
           const merged = [...serverSlots];
@@ -172,23 +120,100 @@ export default function TeacherRegisterPhanCong() {
       }
       setMyClasses(resClasses?.data?.data || []);
     } catch (err) {
+      console.error(err);
       notifyError("Không thể tải lịch dạy của giáo viên.");
     } finally {
       if (!silent) setLoading(false);
     }
   };
 
-  useEffect(() => {
-    // When tuan changes, recalculate hocKy if needed
-    if (tuan >= 19 && hocKy === 1) setHocKy(2);
-    else if (tuan < 19 && hocKy === 2) setHocKy(1);
-  }, [tuan]);
+  const fetchData = useCallback((silent = false) => {
+    return loadScheduleData(namHoc, hocKy, tuan, teacherProfile, silent);
+  }, [namHoc, hocKy, tuan, teacherProfile]);
 
+  // Fetch initial year info to calculate correct initial hocKy and tuan
   useEffect(() => {
-    if (allWeeks.length > 0) {
-      fetchData();
+    let active = true;
+    const fetchInit = async () => {
+      try {
+        setLoading(true);
+        const [namHocRes, meRes] = await Promise.all([
+          getNamHoc().catch(() => null),
+          getCurrentGiaoVien().catch(() => null)
+        ]);
+        if (!active) return;
+
+        const teacher = meRes?.data?.data || null;
+        setTeacherProfile(teacher);
+
+        const yList = namHocRes?.data?.data || [];
+        const currentYear = yList.find(y => y.trangThai === "DANG_MO") || yList[0] || null;
+        let selectedNamHoc = "2025-2026";
+        let actualHk = 1;
+        let currentWeek = 1;
+
+        if (currentYear) {
+          selectedNamHoc = currentYear.tenNamHoc;
+          setNamHoc(selectedNamHoc);
+          
+          let schoolStart;
+          if (currentYear.ngayBatDauHk1) {
+            schoolStart = new Date(currentYear.ngayBatDauHk1 + "T00:00:00");
+          } else {
+            schoolStart = new Date(parseInt(currentYear.tenNamHoc.split("-")[0]), 8, 5);
+          }
+          
+          const dow = schoolStart.getDay();
+          const monday = new Date(schoolStart);
+          monday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1));
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          
+          const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
+          if (diffDays >= 0) {
+            currentWeek = Math.floor(diffDays / 7) + 1;
+          }
+          currentWeek = Math.min(38, Math.max(1, currentWeek));
+          
+          const maxAvailWeek = Math.min(38, currentWeek + 2);
+          const weeks = Array.from({ length: maxAvailWeek }, (_, i) => i + 1);
+          setAllWeeks(weeks);
+          setTuan(currentWeek);
+          
+          // Auto calc hocKy
+          if (currentYear.ngayBatDauHk2) {
+            const currentMonday = new Date(schoolStart);
+            currentMonday.setDate(schoolStart.getDate() - (dow === 0 ? 6 : dow - 1) + (currentWeek - 1) * 7);
+            const hk2Start = new Date(currentYear.ngayBatDauHk2 + "T00:00:00");
+            if (currentMonday >= hk2Start) actualHk = 2;
+          } else if (currentWeek >= 19) {
+            actualHk = 2;
+          }
+          setHocKy(actualHk);
+        }
+
+        await loadScheduleData(selectedNamHoc, actualHk, currentWeek, teacher, false);
+      } catch (e) {
+        console.error(e);
+        if (active) setLoading(false);
+      }
+    };
+    fetchInit();
+    return () => { active = false; };
+  }, []);
+
+  // When tuan changes via dropdown, reload schedule
+  useEffect(() => {
+    if (!isInitialized.current) {
+      isInitialized.current = true;
+      return;
     }
-  }, [namHoc, hocKy, tuan, allWeeks.length]);
+    const newHocKy = tuan >= 19 ? 2 : 1;
+    if (newHocKy !== hocKy) {
+      setHocKy(newHocKy);
+    }
+    loadScheduleData(namHoc, newHocKy, tuan, teacherProfile, false);
+  }, [tuan]);
 
   const weekDates = useMemo(() => {
     const startYear = parseInt(namHoc.split("-")[0]);
@@ -357,7 +382,7 @@ export default function TeacherRegisterPhanCong() {
   const handleDelete = async (id) => {
     try {
       await axiosClient.delete(`/giaoviendangky/thoikhoabieu/${id}`);
-      notifyError("Đã hủy đăng ký tiết dạy thành công.");
+      notifySuccess("Đã hủy đăng ký tiết dạy thành công.");
       
       // Optimistic update
       setTimetable((prev) => prev.filter((t) => t.id !== id));

@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import axiosClient from '../../api/axiosClient';
+import { BASE_URL } from '@/constants/config';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -13,13 +14,20 @@ export default function ProfileScreen() {
   const student = data?.student;
   const [uploading, setUploading] = useState(false);
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   const getAvatarUri = () => {
     if (localAvatar) return localAvatar;
     if (!student?.anhDaiDien) return null;
     if (student.anhDaiDien.startsWith('http')) return student.anhDaiDien;
-    const baseURL = axiosClient.defaults.baseURL?.replace('/api', '') || 'http://192.168.110.210:8080';
+    const baseURL = axiosClient.defaults.baseURL?.replace('/api', '') || BASE_URL;
     return `${baseURL}${student.anhDaiDien.startsWith('/') ? '' : '/'}${student.anhDaiDien}`;
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'HS';
+    const parts = name.trim().split(/\s+/);
+    return parts[parts.length - 1].charAt(0).toUpperCase();
   };
 
   const handlePickAvatar = async () => {
@@ -37,8 +45,9 @@ export default function ProfileScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets[0]) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
+      setImageError(false);
       setLocalAvatar(asset.uri);
       await uploadAvatar(asset);
     }
@@ -47,7 +56,7 @@ export default function ProfileScreen() {
   const uploadAvatar = async (asset: ImagePicker.ImagePickerAsset) => {
     try {
       setUploading(true);
-
+      // Bước 1: Upload file ảnh
       const filename = asset.uri.split('/').pop() || 'avatar.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -59,7 +68,6 @@ export default function ProfileScreen() {
         type,
       } as any);
 
-      // Bước 1: Upload file lên server
       const uploadRes = await axiosClient.post('/upload/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -70,18 +78,19 @@ export default function ProfileScreen() {
       // Bước 2: Cập nhật avatar qua endpoint chuyên dụng
       await axiosClient.patch('/hocsinh/me/avatar', { anhDaiDien: newAvatarUrl });
 
-      // Bước 3: Làm mới dữ liệu dashboard
+      // Refresh lại dashboard để cập nhật avatar trên toàn app
       await fetchData();
-
       Alert.alert('Thành công', 'Cập nhật ảnh đại diện thành công!');
     } catch (error: any) {
+      console.log('Error uploading avatar:', error);
+      Alert.alert('Thất bại', 'Không thể tải ảnh lên. Vui lòng thử lại.');
       setLocalAvatar(null);
-      const msg = error?.response?.data?.message || error?.message || 'Không thể tải ảnh lên. Vui lòng thử lại.';
-      Alert.alert('Lỗi', msg);
     } finally {
       setUploading(false);
     }
   };
+
+  const avatarUri = getAvatarUri();
 
   const InfoItem = ({ icon, label, value }: { icon: any, label: string, value: string }) => (
     <View style={styles.infoRow}>
@@ -108,10 +117,19 @@ export default function ProfileScreen() {
         <View style={styles.avatarSection}>
           {/* Avatar có nút camera */}
           <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickAvatar} disabled={uploading}>
-            <Image
-              source={getAvatarUri() ? { uri: getAvatarUri()! } : require('../../../assets/images/logo.png')}
-              style={styles.avatar}
-            />
+            {avatarUri && !imageError ? (
+              <Image
+                source={{ uri: avatarUri }}
+                style={styles.avatar}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>
+                  {getInitials(student?.hoTen)}
+                </Text>
+              </View>
+            )}
             <View style={styles.cameraOverlay}>
               {uploading ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -199,6 +217,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
     borderWidth: 3,
     borderColor: '#FFFFFF',
+  },
+  avatarFallback: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: '#2563EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarInitial: {
+    color: '#FFFFFF',
+    fontSize: 42,
+    fontWeight: 'bold',
   },
   cameraOverlay: {
     position: 'absolute',

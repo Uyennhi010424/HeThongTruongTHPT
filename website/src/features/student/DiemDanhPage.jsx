@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
+import { getNamHoc } from "../../api/namhocApi.js";
 
 const STATUS_MAP = {
   CO_MAT: { label: "Có mặt", color: "text-green-700 bg-green-50" },
@@ -13,6 +14,8 @@ export default function StudentDiemDanhPage() {
   const [error, setError] = useState("");
   const [student, setStudent] = useState(null);
   const [statistics, setStatistics] = useState(null);
+  const [namHocList, setNamHocList] = useState([]);
+  const [selectedNamHoc, setSelectedNamHoc] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -22,7 +25,10 @@ export default function StudentDiemDanhPage() {
       try {
         setLoading(true);
         setError("");
-        const studentRes = await getCurrentHocSinh();
+        const [studentRes, namHocRes] = await Promise.all([
+          getCurrentHocSinh(),
+          getNamHoc()
+        ]);
         if (!active) return;
         const currentStudent = studentRes?.data?.data || null;
         setStudent(currentStudent);
@@ -33,11 +39,20 @@ export default function StudentDiemDanhPage() {
           return;
         }
 
-        // Default: full academic year (Sep → Jun, same as teacher page)
-        const now = new Date();
-        const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-        const fromStr = `${year}-09-01`;
-        const toStr = `${year + 1}-06-30`;
+        const years = (namHocRes?.data?.data || [])
+          .map((item) => item?.tenNamHoc || "")
+          .filter(Boolean)
+          .sort((a, b) => Number(b.match(/(\d{4})/)?.[1] || 0) - Number(a.match(/(\d{4})/)?.[1] || 0));
+
+        setNamHocList(years);
+        const curYear = currentStudent?.lop?.namHoc || years[0] || "2026-2027";
+        setSelectedNamHoc(curYear);
+
+        const match = curYear.match(/(\d{4})-(\d{4})/);
+        const startY = match ? match[1] : "2026";
+        const endY = match ? match[2] : "2027";
+        const fromStr = `${startY}-09-01`;
+        const toStr = `${endY}-06-30`;
         setFromDate(fromStr);
         setToDate(toStr);
 
@@ -55,6 +70,28 @@ export default function StudentDiemDanhPage() {
     return () => { active = false; };
   }, []);
 
+  const handleYearChange = async (newYear) => {
+    setSelectedNamHoc(newYear);
+    if (!student?.id) return;
+    try {
+      setLoading(true);
+      const match = newYear.match(/(\d{4})-(\d{4})/);
+      const startY = match ? match[1] : "2026";
+      const endY = match ? match[2] : "2027";
+      const fromStr = `${startY}-09-01`;
+      const toStr = `${endY}-06-30`;
+      setFromDate(fromStr);
+      setToDate(toStr);
+
+      const statsRes = await getStudentStatistics(student.id, fromStr, toStr);
+      setStatistics(statsRes?.data?.data || null);
+    } catch {
+      setError("Không thể tải dữ liệu điểm danh.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     if (!student?.id || !fromDate || !toDate) return;
     try {
@@ -70,20 +107,24 @@ export default function StudentDiemDanhPage() {
 
   const stats = useMemo(() => {
     if (!statistics) return { tongNgayHoc: 0, coMat: 0, vangCoPhep: 0, vangKhongPhep: 0, diTre: 0 };
+    const total = statistics.tongNgayHoc ?? statistics.totalDays ?? 0;
+    const coPhep = statistics.excusedAbsent ?? statistics.vangCoPhep ?? 0;
+    const khongPhep = statistics.unexcusedAbsent ?? statistics.vangKhongPhep ?? 0;
+    const coMat = statistics.present ?? statistics.coMat ?? Math.max(0, total - coPhep - khongPhep);
     return {
-      tongNgayHoc: statistics.tongNgayHoc ?? statistics.totalDays ?? statistics.total ?? 0,
-      coMat: statistics.present ?? statistics.coMat ?? 0,
-      vangCoPhep: statistics.excusedAbsent ?? statistics.vangCoPhep ?? 0,
-      vangKhongPhep: statistics.unexcusedAbsent ?? statistics.vangKhongPhep ?? 0,
+      tongNgayHoc: total,
+      coMat,
+      vangCoPhep: coPhep,
+      vangKhongPhep: khongPhep,
       diTre: statistics.late ?? statistics.diTre ?? 0
     };
   }, [statistics]);
 
   const total = stats.tongNgayHoc;
-  const attendanceRate = total > 0 ? ((stats.coMat / total) * 100).toFixed(1) : "--";
-  const absentRate = total > 0 ? (((stats.vangCoPhep + stats.vangKhongPhep) / total) * 100).toFixed(1) : "--";
-  const excusedRate = total > 0 ? ((stats.vangCoPhep / total) * 100).toFixed(1) : "--";
-  const unexcusedRate = total > 0 ? ((stats.vangKhongPhep / total) * 100).toFixed(1) : "--";
+  const attendanceRate = total > 0 ? ((stats.coMat / total) * 100).toFixed(1) : "100.0";
+  const absentRate = total > 0 ? (((stats.vangCoPhep + stats.vangKhongPhep) / total) * 100).toFixed(1) : "0.0";
+  const excusedRate = total > 0 ? ((stats.vangCoPhep / total) * 100).toFixed(1) : "0.0";
+  const unexcusedRate = total > 0 ? ((stats.vangKhongPhep / total) * 100).toFixed(1) : "0.0";
 
   return (
     <div className="student-page">
@@ -91,7 +132,7 @@ export default function StudentDiemDanhPage() {
         <div className="student-hero-copy">
           <div className="student-hero-kicker">EduManager Pro</div>
           <h2 className="student-hero-title">Điểm danh</h2>
-          <p className="student-hero-subtitle">Theo dõi tình hình đi học cả năm học.</p>
+          <p className="student-hero-subtitle">Theo dõi tình hình đi học cả năm học {selectedNamHoc}.</p>
         </div>
         <div className="student-hero-metrics">
           <div className="student-hero-chip">{loading ? "..." : absentRate}% vắng</div>
@@ -100,6 +141,20 @@ export default function StudentDiemDanhPage() {
 
       <div className="card users-toolbar">
         <div className="users-actions">
+          {namHocList.length > 0 && (
+            <label className="form-field">
+              <span>Năm học</span>
+              <select 
+                value={selectedNamHoc} 
+                onChange={(e) => handleYearChange(e.target.value)}
+                className="font-bold text-blue-800"
+              >
+                {namHocList.map((y) => (
+                  <option key={y} value={y}>Năm học {y}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="form-field">
             <span>Từ ngày</span>
             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />

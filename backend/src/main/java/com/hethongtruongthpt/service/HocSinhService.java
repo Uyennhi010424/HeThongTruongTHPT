@@ -38,6 +38,8 @@ import com.hethongtruongthpt.entity.LichSuHocTap;
 import java.util.stream.Collectors;
 import java.time.Year;
 
+import com.hethongtruongthpt.repository.PhuHuynhRepository;
+
 @Service
 @Transactional
 public class HocSinhService {
@@ -47,6 +49,7 @@ public class HocSinhService {
     private final HocSinhRepository hocSinhRepository;
     private final LopHocRepository lopHocRepository;
     private final UserRepository userRepository;
+    private final PhuHuynhRepository phuHuynhRepository;
     private final PhuHuynhHocSinhRepository phuHuynhHocSinhRepository;
     private final LichSuHocTapRepository lichSuHocTapRepository;
     private final PasswordEncoder passwordEncoder;
@@ -58,6 +61,7 @@ public class HocSinhService {
             LopHocRepository lopHocRepository,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
+            PhuHuynhRepository phuHuynhRepository,
             PhuHuynhHocSinhRepository phuHuynhHocSinhRepository,
             LichSuHocTapRepository lichSuHocTapRepository,
             DefaultAccountPasswordPolicy passwordPolicy,
@@ -66,6 +70,7 @@ public class HocSinhService {
         this.lopHocRepository = lopHocRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.phuHuynhRepository = phuHuynhRepository;
         this.phuHuynhHocSinhRepository = phuHuynhHocSinhRepository;
         this.lichSuHocTapRepository = lichSuHocTapRepository;
         this.passwordPolicy = passwordPolicy;
@@ -218,16 +223,15 @@ public class HocSinhService {
                     // 4. Link phụ huynh (nếu có)
                     if (phuHuynhId != null) {
                         try {
-                            PhuHuynhHocSinh link = new PhuHuynhHocSinh();
-                            PhuHuynh ph = new PhuHuynh();
-                            ph.setId(phuHuynhId);
-                            link.setPhuHuynh(ph);
-                            HocSinh href = new HocSinh();
-                            href.setId(result.getId());
-                            link.setHocSinh(href);
-                            link.setQuanHe("CHA");
-                            link.setLaNguoiLienHeChinh(Boolean.TRUE);
-                            phuHuynhHocSinhRepository.save(link);
+                            PhuHuynh ph = phuHuynhRepository.findById(phuHuynhId).orElse(null);
+                            if (ph != null) {
+                                PhuHuynhHocSinh link = new PhuHuynhHocSinh();
+                                link.setPhuHuynh(ph);
+                                link.setHocSinh(result);
+                                link.setQuanHe(ph.getQuanHe() != null ? ph.getQuanHe() : "CHA");
+                                link.setLaNguoiLienHeChinh(Boolean.TRUE);
+                                phuHuynhHocSinhRepository.save(link);
+                            }
                         } catch (Exception e) {
                             log.warn("Không thể liên kết phụ huynh: {}", e.getMessage());
                         }
@@ -337,6 +341,31 @@ public class HocSinhService {
                 String newLopName = (newLop != null) ? newLop.getTenLop() : "lớp khác";
                 ls.setKetQua("Từ " + oldLop.getTenLop() + " sang " + newLopName);
                 lichSuHocTapRepository.save(ls);
+            }
+        }
+
+        // Cập nhật liên kết phụ huynh nếu có
+        Integer phuHuynhId = hocSinh.getPhuHuynhId();
+        if (phuHuynhId != null) {
+            try {
+                PhuHuynh ph = phuHuynhRepository.findById(phuHuynhId).orElse(null);
+                if (ph != null) {
+                    List<PhuHuynhHocSinh> existingLinks = phuHuynhHocSinhRepository.findByHocSinhIdIn(List.of(saved.getId()));
+                    if (existingLinks.isEmpty()) {
+                        PhuHuynhHocSinh link = new PhuHuynhHocSinh();
+                        link.setPhuHuynh(ph);
+                        link.setHocSinh(saved);
+                        link.setQuanHe(ph.getQuanHe() != null ? ph.getQuanHe() : "CHA");
+                        link.setLaNguoiLienHeChinh(Boolean.TRUE);
+                        phuHuynhHocSinhRepository.save(link);
+                    } else {
+                        PhuHuynhHocSinh link = existingLinks.get(0);
+                        link.setPhuHuynh(ph);
+                        phuHuynhHocSinhRepository.save(link);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Không thể cập nhật liên kết phụ huynh: {}", e.getMessage());
             }
         }
 
@@ -527,9 +556,9 @@ public class HocSinhService {
             int khoi = lop.getKhoi();
             
             boolean validAge = false;
-            if (khoi == 10 && (age >= 16 && age <= 18)) validAge = true;
-            else if (khoi == 11 && (age >= 17 && age <= 19)) validAge = true;
-            else if (khoi == 12 && (age >= 18 && age <= 20)) validAge = true;
+            if (khoi == 10 && (age >= 15 && age <= 18)) validAge = true;
+            else if (khoi == 11 && (age >= 16 && age <= 19)) validAge = true;
+            else if (khoi == 12 && (age >= 17 && age <= 20)) validAge = true;
             
             if (!validAge) {
                 throw new ApiException("Độ tuổi " + age + " không phù hợp với Khối " + khoi + " (Năm sinh: " + hocSinh.getNgaySinh().getYear() + ", Năm hiện tại: " + currentYear + ")");

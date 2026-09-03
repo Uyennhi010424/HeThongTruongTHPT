@@ -4,9 +4,11 @@ import { getNamHoc } from "../../../api/namhocApi.js";
 import { getHocKy } from "../../../api/hockyApi.js";
 import {
   generateThoiKhoaBieu,
+  generateThoiKhoaBieuAll,
   getThoiKhoaBieu,
   moveThoiKhoaBieu,
-  swapThoiKhoaBieu
+  swapThoiKhoaBieu,
+  deleteThoiKhoaBieuBulk
 } from "../../../api/thoikhoabieuApi.js";
 import { checkExamWeek, getLichThi } from "../../../api/lichthiApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
@@ -37,7 +39,7 @@ export default function AdminThoiKhoaBieuPage() {
 
   const [selectedYearId, setSelectedYearId] = useState("");
   const [selectedHocKy, setSelectedHocKy] = useState("");
-  const [selectedTuan, setSelectedTuan] = useState(3); // Mặc định tuần 3 như trong ảnh
+  const [selectedTuan, setSelectedTuan] = useState(1);
   const [buoiFilter, setBuoiFilter] = useState("ALL"); // ALL, SANG, CHIEU
   const [showSettings, setShowSettings] = useState(false);
 
@@ -52,6 +54,15 @@ export default function AdminThoiKhoaBieuPage() {
   const selectedYear = useMemo(() => {
     return namHocs.find(y => y.id.toString() === selectedYearId);
   }, [namHocs, selectedYearId]);
+
+  const currentYearLops = useMemo(() => {
+    const list = selectedYear?.tenNamHoc 
+      ? lops.filter(l => l.namHoc === selectedYear.tenNamHoc)
+      : lops;
+    return (list.length > 0 ? list : lops)
+      .slice()
+      .sort((a, b) => String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { numeric: true }));
+  }, [lops, selectedYear]);
 
   const semesterWeeks = useMemo(() => {
     return getLimitedSemesterWeeks(selectedYear, selectedHocKy);
@@ -273,6 +284,32 @@ export default function AdminThoiKhoaBieuPage() {
     }
   };
 
+  const handleDeleteTkb = async () => {
+    if (!selectedYear?.tenNamHoc) return;
+    const ok = await confirm({
+      title: "Xác nhận xóa TKB",
+      message: `Bạn có chắc chắn muốn xóa toàn bộ thời khóa biểu của Năm học ${selectedYear.tenNamHoc} (Học kỳ ${selectedHocKy})?`,
+      confirmLabel: "Xóa toàn bộ",
+      variant: "danger"
+    });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      await deleteThoiKhoaBieuBulk({
+        namHoc: selectedYear.tenNamHoc,
+        hocKy: Number(selectedHocKy)
+      });
+      notifySuccess(`Đã xóa sạch thời khóa biểu của Năm học ${selectedYear.tenNamHoc}!`);
+      axiosClient.invalidateCache("/thoikhoabieu");
+      fetchTimetable();
+    } catch (err) {
+      console.error("Delete TKB error:", err);
+      notifyError(getApiMessage(err, "Không thể xóa thời khóa biểu."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ─── DRAG & DROP TKB ───
   const [draggedSlot, setDraggedSlot] = useState(null);
 
@@ -470,7 +507,7 @@ export default function AdminThoiKhoaBieuPage() {
 
     let headerCols = `<th style="border:1px solid #ccc;padding:8px;background:#f1f5f9;text-align:center;width:100px;font-family:Arial,sans-serif;font-size:11px">Thứ</th>`;
     headerCols += `<th style="border:1px solid #ccc;padding:8px;background:#f1f5f9;text-align:center;width:80px;font-family:Arial,sans-serif;font-size:11px">Tiết</th>`;
-    lops.forEach(lop => {
+    currentYearLops.forEach(lop => {
       headerCols += `<th style="border:1px solid #ccc;padding:8px;background:#f1f5f9;text-align:center;font-family:Arial,sans-serif;font-size:11px">${lop.tenLop}</th>`;
     });
 
@@ -486,12 +523,12 @@ export default function AdminThoiKhoaBieuPage() {
         }
         tableRows += `<td style="border:1px solid #ccc;padding:8px;text-align:center;font-weight:bold;color:#475569;font-family:Arial,sans-serif;font-size:12px">${tiet}</td>`;
 
-        lops.forEach(lop => {
+        currentYearLops.forEach(lop => {
           const slot = findSlot(thu, tiet, lop.id);
           if (slot) {
             tableRows += `<td style="border:1px solid #ccc;padding:8px;text-align:center;font-size:11px;font-family:Arial,sans-serif">
               <div style="font-weight:bold;color:#1e3a8a;margin-bottom:2px">${slot.monHoc?.tenMon || ""}</div>
-              <div style="font-size:10px;color:#475569">${slot.giaoVien?.hoTen || ""}</div>
+              <div style="font-size:10px;color:#475569">${slot.giaoVien?.hoTen || (['SHDC', 'SHL', 'Sinh hoạt lớp', 'Chào cờ'].includes(slot.monHoc?.tenMon) || slot.monHoc?.maMon === 'SHDC' || slot.monHoc?.maMon === 'SHL' ? (lop.gvcn?.hoTen || lop.gvcnHoTen || "GVCN") : "")}</div>
             </td>`;
           } else {
             tableRows += `<td style="border:1px solid #ccc;padding:8px;text-align:center;color:#cbd5e1;font-size:12px;font-family:Arial,sans-serif">—</td>`;
@@ -577,8 +614,8 @@ export default function AdminThoiKhoaBieuPage() {
       const lid = t.lop?.id || t.lopHoc?.id;
       if (lid) classes.add(lid);
     });
-    return classes.size > 0 ? classes.size : lops.length;
-  }, [timetable, lops]);
+    return classes.size > 0 ? classes.size : currentYearLops.length;
+  }, [timetable, currentYearLops]);
 
   const { monday, sunday } = getWeekDates(selectedTuan, selectedYear);
   const relativeWeek = selectedTuan;
@@ -626,9 +663,24 @@ export default function AdminThoiKhoaBieuPage() {
       </div>
 
       {/* ─── WEEK NAVIGATION BAR ─── */}
-      <div className="flex items-center justify-between bg-white border border-gray-150 p-4 rounded-2xl shadow-xs">
-        {/* Left Side: Semester Selector & Week Dropdown Selector */}
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between bg-white border border-gray-150 p-4 rounded-2xl shadow-xs gap-3">
+        {/* Left Side: Year Selector, Semester Selector & Week Dropdown Selector */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Year Selector */}
+          <div className="relative">
+            <select
+              value={selectedYearId}
+              onChange={(e) => setSelectedYearId(e.target.value)}
+              className="bg-white border border-gray-200 hover:border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none cursor-pointer shadow-sm min-w-[130px]"
+            >
+              {namHocs.map((y) => (
+                <option key={y.id} value={y.id.toString()}>
+                  Năm học {y.tenNamHoc}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Semester Toggle Tabs */}
           <div className="flex bg-slate-100 p-0.5 rounded-xl border border-gray-150">
             <button
@@ -760,7 +812,7 @@ export default function AdminThoiKhoaBieuPage() {
 
             {/* Total Classes Badge */}
             <span className="px-3.5 py-1.5 bg-blue-50/50 border border-blue-100 text-blue-600 rounded-xl text-xs font-bold select-none">
-              {lops.length || 15} lớp
+              {currentYearLops.length} lớp
             </span>
           </div>
         </div>
@@ -772,7 +824,7 @@ export default function AdminThoiKhoaBieuPage() {
                 <tr className="bg-[#00236f] text-[12px] font-semibold text-white uppercase tracking-wider sticky top-0 z-30 shadow-xs">
                   <th className="px-4 py-4 w-[100px] bg-[#00236f] sticky left-0 z-40 border-r border-[#001a4f] text-center font-semibold text-white">Thứ</th>
                   <th className="px-4 py-4 w-[90px] bg-[#00236f] border-r border-[#001a4f] text-center sticky left-[100px] z-40 font-semibold text-white">Tiết</th>
-                  {lops.map((lop) => (
+                  {currentYearLops.map((lop) => (
                     <th key={lop.id} className="px-5 py-4 w-[220px] bg-[#00236f] border-r border-[#001a4f] text-center">
                       <div className="font-bold text-white text-sm uppercase tracking-wider">{lop.tenLop}</div>
                     </th>
@@ -810,7 +862,7 @@ export default function AdminThoiKhoaBieuPage() {
                         </td>
 
                         {/* Các lớp */}
-                        {lops.map((lop) => {
+                        {currentYearLops.map((lop) => {
                           const slot = findSlot(thu, tiet, lop.id);
                           return (
                             <td
@@ -828,7 +880,7 @@ export default function AdminThoiKhoaBieuPage() {
                                   <span className="font-black text-blue-955 text-xs leading-snug">{slot.isExam ? `[THI] ${slot.monHoc?.tenMon}` : slot.monHoc?.tenMon}</span>
                                   <span className="text-[10px] opacity-90 font-bold text-slate-600 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-[12px] opacity-75">person</span>
-                                    {slot.giaoVien?.hoTen || "Chưa phân"}
+                                    {slot.giaoVien?.hoTen || (['SHDC', 'SHL', 'Sinh hoạt lớp', 'Chào cờ'].includes(slot.monHoc?.tenMon) || slot.monHoc?.maMon === 'SHDC' || slot.monHoc?.maMon === 'SHL' ? (lop.gvcn?.hoTen || lop.gvcnHoTen || "GVCN") : "Chưa phân")}
                                   </span>
                                   {slot.isLocked && (
                                     <span className="text-[9px] font-bold text-blue-600 mt-0.5 bg-white/60 rounded px-1 self-start">Giáo viên ĐK</span>

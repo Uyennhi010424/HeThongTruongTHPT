@@ -38,9 +38,21 @@ export const getStudentKhoi = (s) => {
 /** Lấy tên lớp để sort cùng khối */
 export const getStudentTenLop = (s) => String(s?.lop?.tenLop || "");
 
-/** Sort: 1) Khối 10→11→12, 2) Tên lớp, 3) Tên (A→Z tiếng Việt) */
+export const getStudentSortPriority = (s) => {
+  const status = Number(s?.trangThai ?? s?.trang_thai ?? 1);
+  const className = String(s?.lop?.tenLop || s?.lopHoc?.tenLop || "").trim();
+  if (status === 1 && className) return 1;
+  if (status === 1 && !className) return 2;
+  return 3;
+};
+
+/** Sort: 1) Đang học lên trước, tốt nghiệp/ngừng học về cuối, 2) Khối 10→11→12, 3) Tên lớp, 4) Tên (A→Z tiếng Việt) */
 export const sortByGivenName = (list) =>
   [...list].sort((a, b) => {
+    const priorityA = getStudentSortPriority(a);
+    const priorityB = getStudentSortPriority(b);
+    if (priorityA !== priorityB) return priorityA - priorityB;
+
     const khoiA = getStudentKhoi(a);
     const khoiB = getStudentKhoi(b);
     if (khoiA !== khoiB) return khoiA - khoiB;
@@ -157,9 +169,9 @@ export const validateStudentAgeAndYear = (ngaySinh, namNhapHoc, khoi) => {
     const age = currentYear - birthYear;
     
     let validAge = false;
-    if (khoi == 10 && (age >= 16 && age <= 18)) validAge = true;
-    else if (khoi == 11 && (age >= 17 && age <= 19)) validAge = true;
-    else if (khoi == 12 && (age >= 18 && age <= 20)) validAge = true;
+    if (khoi == 10 && (age >= 15 && age <= 18)) validAge = true;
+    else if (khoi == 11 && (age >= 16 && age <= 19)) validAge = true;
+    else if (khoi == 12 && (age >= 17 && age <= 20)) validAge = true;
 
     if (!validAge) {
       error = `Độ tuổi ${age} không phù hợp với Khối ${khoi} (Năm sinh: ${birthYear}, Năm hiện tại: ${currentYear})`;
@@ -312,13 +324,25 @@ export const EXCEL_FIELD_ALIASES = {
   tonGiao: ["Tôn giáo", "TON_GIAO"],
   dienChinhSach: ["Diện chính sách", "DIEN_CHINH_SACH"],
   trangThai: ["Trạng thái", "TRANG_THAI"],
-  phuHuynhHoTen: ["Phụ huynh - Họ tên", "PHU_HUYNH_HO_TEN", "PHUHUYNH_HOTEN"],
-  phuHuynhSdt: ["Phụ huynh - SĐT", "PHU_HUYNH_SDT", "PHUHUYNH_SDT"],
-  phuHuynhEmail: ["Phụ huynh - Email", "PHU_HUYNH_EMAIL", "PHUHUYNH_EMAIL"],
+  phuHuynhHoTen: [
+    "Phụ huynh - Họ tên", "PHU_HUYNH_HO_TEN", "PHUHUYNH_HOTEN",
+    "Họ tên phụ huynh", "Tên phụ huynh", "Phụ huynh", "Họ và tên phụ huynh",
+    "Họ tên cha", "Họ tên mẹ", "Họ và tên cha", "Họ và tên mẹ", "Người giám hộ", "Họ tên người giám hộ",
+    "Họ tên PH", "Tên PH", "Cha", "Mẹ", "Cha / Mẹ", "Cha/Mẹ"
+  ],
+  phuHuynhSdt: [
+    "Phụ huynh - SĐT", "PHU_HUYNH_SDT", "PHUHUYNH_SDT",
+    "SĐT phụ huynh", "Số điện thoại phụ huynh", "Số điện thoại PH", "SĐT PH",
+    "Điện thoại phụ huynh", "Điện thoại PH", "SĐT cha", "SĐT mẹ", "Số điện thoại cha", "Số điện thoại mẹ",
+    "SĐT người giám hộ", "Điện thoại liên hệ", "SĐT liên hệ"
+  ],
+  phuHuynhEmail: [
+    "Phụ huynh - Email", "PHU_HUYNH_EMAIL", "PHUHUYNH_EMAIL",
+    "Email phụ huynh", "Email PH", "Email cha", "Email mẹ", "Email người giám hộ"
+  ],
   phuHuynhNgheNghiep: [
-    "Phụ huynh - Nghề nghiệp",
-    "PHU_HUYNH_NGHE_NGHIEP",
-    "PHUHUYNH_NGHENGHIEP"
+    "Phụ huynh - Nghề nghiệp", "PHU_HUYNH_NGHE_NGHIEP", "PHUHUYNH_NGHENGHIEP",
+    "Nghề nghiệp phụ huynh", "Nghề nghiệp", "Nghề nghiệp cha", "Nghề nghiệp mẹ", "Nghề nghiệp PH"
   ],
   phuHuynhIdOptional: [
     "ID phụ huynh (tùy chọn)",

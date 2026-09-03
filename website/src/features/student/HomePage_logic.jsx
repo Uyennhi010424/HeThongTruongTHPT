@@ -97,8 +97,7 @@ export default function HomePage() {
         let activeYearObj = null;
         try {
           const namHocRes = await getNamHoc();
-          const years = namHocRes?.data?.data || [];
-          activeYearObj = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1] || null;
+          activeYearObj = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[0] || null;
           if (activeYearObj) {
             curNamHoc = activeYearObj.tenNamHoc || "";
             // Xác định học kỳ hiện tại bằng ngày bắt đầu HK2 từ database

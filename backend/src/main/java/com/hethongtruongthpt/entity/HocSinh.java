@@ -56,13 +56,11 @@ public class HocSinh {
     @Column(name = "email", length = 100)
     private String email;
 
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
-    @JoinColumn(name = "dan_toc_id")
-    private DanToc danToc;
+    @Column(name = "dan_toc")
+    private String danToc;
 
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
-    @JoinColumn(name = "ton_giao_id")
-    private TonGiao tonGiao;
+    @Column(name = "ton_giao")
+    private String tonGiao;
 
     @Column(name = "ma_bhyt", length = 50)
     private String maBhyt;
@@ -204,20 +202,64 @@ public class HocSinh {
         this.email = email;
     }
 
-    public DanToc getDanToc() {
+    public String getDanToc() {
         return danToc;
     }
 
-    public void setDanToc(DanToc danToc) {
+    public void setDanToc(String danToc) {
         this.danToc = danToc;
     }
 
-    public TonGiao getTonGiao() {
+    @com.fasterxml.jackson.annotation.JsonProperty("danToc")
+    public void setDanTocFromJson(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null || node.isNull()) {
+            this.danToc = null;
+        } else if (node.isObject()) {
+            if (node.has("tenDanToc")) this.danToc = node.get("tenDanToc").asText();
+            else if (node.has("ten_dantoc")) this.danToc = node.get("ten_dantoc").asText();
+            else this.danToc = "Kinh";
+        } else if (node.isTextual()) {
+            this.danToc = node.asText();
+        } else if (node.isNumber()) {
+            this.danToc = node.asInt() == 2 ? "Tày" : (node.asInt() == 3 ? "Thái" : (node.asInt() == 4 ? "Mường" : (node.asInt() == 5 ? "Khmer" : "Kinh")));
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("danTocId")
+    public void setDanTocId(Integer danTocId) {
+        if (danTocId != null) {
+            this.danToc = danTocId == 2 ? "Tày" : (danTocId == 3 ? "Thái" : (danTocId == 4 ? "Mường" : (danTocId == 5 ? "Khmer" : "Kinh")));
+        }
+    }
+
+    public String getTonGiao() {
         return tonGiao;
     }
 
-    public void setTonGiao(TonGiao tonGiao) {
+    public void setTonGiao(String tonGiao) {
         this.tonGiao = tonGiao;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("tonGiao")
+    public void setTonGiaoFromJson(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null || node.isNull()) {
+            this.tonGiao = null;
+        } else if (node.isObject()) {
+            if (node.has("tenTonGiao")) this.tonGiao = node.get("tenTonGiao").asText();
+            else if (node.has("ten_tongiao")) this.tonGiao = node.get("ten_tongiao").asText();
+            else this.tonGiao = "Không";
+        } else if (node.isTextual()) {
+            this.tonGiao = node.asText();
+        } else if (node.isNumber()) {
+            this.tonGiao = node.asInt() == 2 ? "Phật giáo" : (node.asInt() == 3 ? "Thiên Chúa giáo" : (node.asInt() == 4 ? "Tin Lành" : (node.asInt() == 5 ? "Cao Đài" : "Không")));
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("tonGiaoId")
+    public void setTonGiaoId(Integer tonGiaoId) {
+        if (tonGiaoId != null) {
+            this.tonGiao = tonGiaoId == 2 ? "Phật giáo" : (tonGiaoId == 3 ? "Thiên Chúa giáo" : (tonGiaoId == 4 ? "Tin Lành" : (tonGiaoId == 5 ? "Cao Đài" : "Không")));
+        }
     }
 
     public String getMaBhyt() {

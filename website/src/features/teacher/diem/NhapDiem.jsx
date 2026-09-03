@@ -281,7 +281,7 @@ export default function NhapDiem() {
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     let active = true;
@@ -404,7 +404,7 @@ export default function NhapDiem() {
   const paginatedStudents = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredStudents.slice(start, start + pageSize);
-  }, [filteredStudents, currentPage]);
+  }, [filteredStudents, currentPage, pageSize]);
 
   const getFullRecord = (studentId, subject) => {
     const policy = getPolicyBySubjectName(subject.tenMon);
@@ -888,7 +888,7 @@ export default function NhapDiem() {
                   pageSize={pageSize}
                   onPageChange={setCurrentPage}
                   onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
-                  pageSizeOptions={[20, 30, 50, 100]}
+                  pageSizeOptions={[10, 20, 30, 50, 100]}
                 />
               </div>
             )}

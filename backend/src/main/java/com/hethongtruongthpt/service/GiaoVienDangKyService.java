@@ -107,51 +107,8 @@ public class GiaoVienDangKyService {
     public List<ThoiKhoaBieu> getThoiKhoaBieu(String namHoc, Integer hocKy, Integer tuan) {
         GiaoVien gv = getCurrentTeacher();
         if (tuan == null) tuan = 1;
-        
-        Integer mappedTuan = (tuan % 2 != 0) ? 1 : 2;
-
         List<ThoiKhoaBieu> weekSlots = thoiKhoaBieuRepository.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, tuan);
-
-        List<ThoiKhoaBieu> teacherSlots = weekSlots.stream()
-                .filter(t -> Boolean.TRUE.equals(t.getIsLocked()))
-                .collect(Collectors.toList());
-
-        List<ThoiKhoaBieu> systemSlots = weekSlots.stream()
-                .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
-                .collect(Collectors.toList());
-
-        boolean isExamWeek = thoiKhoaBieuCrudService.isExamWeek(namHoc, tuan);
-        if (systemSlots.isEmpty() && !tuan.equals(mappedTuan) && !isExamWeek) {
-            List<ThoiKhoaBieu> fallbackSlots = thoiKhoaBieuRepository.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, mappedTuan);
-            systemSlots = fallbackSlots.stream()
-                    .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
-                    .collect(Collectors.toList());
-        }
-
-        List<ThoiKhoaBieu> all = new ArrayList<>();
-        all.addAll(systemSlots);
-        all.addAll(teacherSlots);
-
-        List<ThoiKhoaBieu> result = new java.util.ArrayList<>();
-        for (ThoiKhoaBieu tkb : all) {
-            ThoiKhoaBieu clone = new ThoiKhoaBieu();
-            clone.setId(tkb.getId());
-            clone.setLop(tkb.getLop());
-            clone.setMonHoc(tkb.getMonHoc());
-            clone.setGiaoVien(tkb.getGiaoVien());
-            clone.setThu(tkb.getThu());
-            clone.setTietBatDau(tkb.getTietBatDau());
-            clone.setSoTiet(tkb.getSoTiet());
-            clone.setPhongHoc(tkb.getPhongHoc());
-            clone.setHocKy(tkb.getHocKy());
-            clone.setNamHoc(tkb.getNamHoc());
-            clone.setIsLocked(tkb.getIsLocked());
-            clone.setGhiChu(tkb.getGhiChu());
-            clone.setIsDeleted(tkb.getIsDeleted());
-            clone.setTuan(tuan);
-            result.add(clone);
-        }
-        return result;
+        return weekSlots != null ? weekSlots : new ArrayList<>();
     }
 
     @Transactional(readOnly = true)

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Calendar as CalendarIcon, AlertCircle, CheckCircle2, XCircle } from 'lucide-react-native';
+import { ChevronLeft, Calendar as CalendarIcon, AlertCircle, CheckCircle2, XCircle, ChevronDown, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axiosClient from '../../api/axiosClient';
 import { useDashboardStore } from '../../store/useDashboardStore';
@@ -23,21 +23,40 @@ export default function AttendanceScreen() {
   const router = useRouter();
   const { data } = useDashboardStore();
   const student = data?.student;
-  
+  const allScores = data?.scores || [];
+
+  const currentStudentNamHoc = data?.student?.lop?.namHoc || '2026-2027';
+
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<string>();
+    if (currentStudentNamHoc) yearsSet.add(currentStudentNamHoc);
+    allScores.forEach((s: any) => {
+      if (s.namHoc) yearsSet.add(s.namHoc);
+    });
+    const arr = Array.from(yearsSet).sort((a, b) => {
+      const yA = Number(a.match(/(\d{4})/)?.[1] || 0);
+      const yB = Number(b.match(/(\d{4})/)?.[1] || 0);
+      return yB - yA;
+    });
+    return arr.length > 0 ? arr : ['2026-2027', '2025-2026'];
+  }, [allScores, currentStudentNamHoc]);
+
+  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || '2026-2027');
+  const [showYearModal, setShowYearModal] = useState(false);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAttendance = async () => {
+  const fetchAttendance = async (yearStr?: string) => {
     if (!student?.id) return;
     try {
       setError(null);
-      // Tính năm học giống web: tháng >= 8 thì năm học bắt đầu từ năm nay
-      const now = new Date();
-      const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-      const from = `${year}-09-01`;
-      const to = `${year + 1}-06-30`;
+      const targetYear = yearStr || selectedYear;
+      const match = targetYear.match(/(\d{4})-(\d{4})/);
+      const startYear = match ? Number(match[1]) : 2026;
+      const from = `${startYear}-09-01`;
+      const to = `${startYear + 1}-06-30`;
 
       const response = await axiosClient.get('/diemdanh/statistics/student', {
         params: {
@@ -49,13 +68,12 @@ export default function AttendanceScreen() {
       
       if (response.data && response.data.data) {
         const d = response.data.data;
-        // Map các field trả về từ backend sang interface local
         setStats({
           tongNgayHoc: d.tongNgayHoc ?? d.totalDays ?? 0,
           coMat: d.coMat ?? d.present ?? 0,
           coPhep: d.coPhep ?? d.excusedAbsent ?? 0,
           khongPhep: d.khongPhep ?? d.unexcusedAbsent ?? 0,
-          tyLeChuyenCan: d.tyLeChuyenCan ?? 0,
+          tyLeChuyenCan: d.tyLeChuyenCan ?? 100.0,
           details: Array.isArray(d.details) ? d.details : [],
         });
       }
@@ -70,16 +88,16 @@ export default function AttendanceScreen() {
 
   useEffect(() => {
     if (student?.id) {
-      fetchAttendance();
+      fetchAttendance(selectedYear);
     } else {
       setLoading(false);
       setError('Không tìm thấy thông tin học sinh.');
     }
-  }, [student?.id]);
+  }, [student?.id, selectedYear]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchAttendance();
+    fetchAttendance(selectedYear);
   };
 
   const formatDate = (dateString: string) => {
@@ -94,10 +112,9 @@ export default function AttendanceScreen() {
     return (
       <View style={styles.statsCard}>
         <View style={styles.statsHeader}>
-          <Text style={styles.statsTitle}>Tổng quan năm học</Text>
-          <View style={styles.rateContainer}>
-            <Text style={styles.rateValue}>{stats.tyLeChuyenCan}%</Text>
-            <Text style={styles.rateLabel}>Tỷ lệ</Text>
+          <View style={styles.titleWrapper}>
+            <Text style={styles.statsTitle}>Tổng quan chuyên cần</Text>
+            <Text style={styles.statsSubtitle}>Năm học {selectedYear}</Text>
           </View>
         </View>
 
@@ -133,7 +150,7 @@ export default function AttendanceScreen() {
         <View style={styles.emptyContainer}>
           <CheckCircle2 size={48} color="#10B981" />
           <Text style={styles.emptyTitle}>Rất tốt!</Text>
-          <Text style={styles.emptyDesc}>Bạn chưa vắng buổi học nào trong khoảng thời gian này.</Text>
+          <Text style={styles.emptyDesc}>Chưa có ngày nào bị ghi nhận vắng trong năm học {selectedYear}.</Text>
         </View>
       );
     }
@@ -175,6 +192,40 @@ export default function AttendanceScreen() {
         <View style={{ width: 40 }} />
       </View>
 
+      {/* Year Selector */}
+      <View style={styles.filterWrapper}>
+        <TouchableOpacity 
+          style={styles.yearSelectorBtn} 
+          onPress={() => setShowYearModal(true)}
+          activeOpacity={0.8}
+        >
+          <CalendarIcon size={18} color="#2563EB" />
+          <Text style={styles.yearSelectorText}>Năm học: {selectedYear}</Text>
+          <ChevronDown size={16} color="#64748B" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Year Selection Modal */}
+      <Modal visible={showYearModal} transparent={true} animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowYearModal(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Chọn năm học</Text>
+            {availableYears.map((year) => (
+              <TouchableOpacity 
+                key={year} 
+                style={styles.modalOptionRow} 
+                onPress={() => { setSelectedYear(year); setShowYearModal(false); }}
+              >
+                <Text style={[styles.modalOptionText, selectedYear === year && styles.modalOptionTextActive]}>
+                  Năm học {year}
+                </Text>
+                {selectedYear === year && <Check size={20} color="#2563EB" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#2563EB" />
@@ -183,7 +234,7 @@ export default function AttendanceScreen() {
       ) : error ? (
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchAttendance}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => fetchAttendance(selectedYear)}>
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
@@ -273,27 +324,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
+  titleWrapper: {
+    flex: 1,
+    marginRight: 12,
+  },
   statsTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#0F172A',
   },
-  rateContainer: {
-    alignItems: 'center',
-  },
-  rateValue: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#2563EB',
-  },
-  rateLabel: {
-    fontSize: 12,
+  statsSubtitle: {
+    fontSize: 13,
     color: '#64748B',
+    marginTop: 2,
     fontWeight: '500',
   },
   statsGrid: {
@@ -391,5 +439,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     lineHeight: 18,
-  }
+  },
+  filterWrapper: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  yearSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  yearSelectorText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1D4ED8',
+    flex: 1,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#475569',
+  },
+  modalOptionTextActive: {
+    color: '#2563EB',
+    fontWeight: 'bold',
+  },
 });

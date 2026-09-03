@@ -75,8 +75,7 @@ export default function TimetableFollow() {
         let activeYearObj = null;
         try {
           const namHocRes = await getNamHoc();
-          const years = namHocRes?.data?.data || [];
-          activeYearObj = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1] || null;
+          activeYearObj = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[0] || null;
           if (activeYearObj) {
             curNamHoc = activeYearObj.tenNamHoc || "";
             if (activeYearObj.ngayBatDauHk2) {
@@ -394,24 +393,7 @@ export default function TimetableFollow() {
 
           {error && <div className="tkb-error">{error}</div>}
 
-          {(() => {
-            let hasExam = false;
-            let loai = "GIỮA KỲ / CUỐI KỲ";
-            Object.values(examsByDay).forEach((list) => {
-              list.forEach((e) => {
-                if (e.loaiKiemTra === "GK") { hasExam = true; loai = "GIỮA KỲ"; }
-                if (e.loaiKiemTra === "CK") { hasExam = true; loai = "CUỐI KỲ"; }
-              });
-            });
-            if (hasExam) {
-              return (
-                <div style={{ backgroundColor: "#fef2f2", color: "#b91c1c", padding: "12px 16px", borderRadius: "8px", marginBottom: "16px", border: "1px solid #f87171", fontWeight: "bold", fontSize: "1.1rem", textAlign: "center", textTransform: "uppercase" }}>
-                  🚨 TUẦN THI {loai} - CHÚC CÁC BẠN HỌC SINH LÀM BÀI THI TỐT! 🚨
-                </div>
-              );
-            }
-            return null;
-          })()}
+
 
           <div className="tkb-table-wrap">
             <table className="tkb-table">

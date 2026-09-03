@@ -58,16 +58,16 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
     // hoặc sử dụng Materialized View / Redis để cache kết quả thống kê.
     // Tạm thời giữ nguyên List để không làm gãy (break) kiến trúc hiển thị Grid của React Frontend trong phạm vi khóa luận.
 
-    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL", nativeQuery = true)
+    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, COALESCE(ls.lop_id, hs.lop_id) as lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = d.nam_hoc LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) WHERE d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL AND (l.is_deleted = false OR l.is_deleted IS NULL)", nativeQuery = true)
     List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryByNamHoc(@Param("namHoc") String namHoc);
 
-    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.nam_hoc = :namHoc AND hs.lop_id = :lopId AND d.gia_tri IS NOT NULL", nativeQuery = true)
+    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, COALESCE(ls.lop_id, hs.lop_id) as lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = d.nam_hoc LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) WHERE d.nam_hoc = :namHoc AND COALESCE(ls.lop_id, hs.lop_id) = :lopId AND d.gia_tri IS NOT NULL AND (l.is_deleted = false OR l.is_deleted IS NULL)", nativeQuery = true)
     List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryByNamHocAndLopId(@Param("namHoc") String namHoc, @Param("lopId") Integer lopId);
 
-    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.nam_hoc = :namHoc AND d.hoc_ky = :hocKy AND d.gia_tri IS NOT NULL", nativeQuery = true)
+    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, COALESCE(ls.lop_id, hs.lop_id) as lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = d.nam_hoc LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) WHERE d.nam_hoc = :namHoc AND d.hoc_ky = :hocKy AND d.gia_tri IS NOT NULL AND (l.is_deleted = false OR l.is_deleted IS NULL)", nativeQuery = true)
     List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryByNamHocAndHocKy(@Param("namHoc") String namHoc, @Param("hocKy") Integer hocKy);
 
-    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, hs.lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lop l ON l.id = hs.lop_id WHERE d.gia_tri IS NOT NULL", nativeQuery = true)
+    @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, COALESCE(ls.lop_id, hs.lop_id) as lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = d.nam_hoc LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) WHERE d.gia_tri IS NOT NULL AND (l.is_deleted = false OR l.is_deleted IS NULL)", nativeQuery = true)
     List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryAll();
 
     @Query(value = "SELECT hs.lop_id as classId, l.ten_lop as tenLop, l.khoi as khoi, l.si_so as siSo, " +
@@ -81,7 +81,7 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
             "JOIN hoc_sinh hs ON d.hoc_sinh_id = hs.id " +
             "JOIN lop l ON hs.lop_id = l.id " +
             "JOIN phan_cong_day pcd ON pcd.lop_id = hs.lop_id AND pcd.mon_hoc_id = d.mon_hoc_id AND pcd.nam_hoc = d.nam_hoc " +
-            "WHERE pcd.giao_vien_id = :giaoVienId AND d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL " +
+            "WHERE pcd.giao_vien_id = :giaoVienId AND d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL AND (l.is_deleted = false OR l.is_deleted IS NULL) " +
             "GROUP BY hs.lop_id, l.ten_lop, l.khoi, l.si_so", nativeQuery = true)
     List<Map<String, Object>> findTeacherReportStats(@Param("namHoc") String namHoc, @Param("giaoVienId") Integer giaoVienId);
 
@@ -121,10 +121,12 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
             "COALESCE(pcd_agg.expectedScoresPerStudent, 0) as expectedScoresPerStudent, " +
             "COALESCE(d_agg.enteredScores, 0) as enteredScores " +
             "FROM lop l " +
-            "LEFT JOIN giao_vien g ON l.gvcn_id = g.id " +
+            "LEFT JOIN giao_vien g ON l.gvcn_id = g.id AND (g.is_deleted = false OR g.is_deleted IS NULL) " +
             "LEFT JOIN (SELECT lop_id, COUNT(id) as siSo FROM hoc_sinh WHERE trang_thai = 1 GROUP BY lop_id) hs_agg ON hs_agg.lop_id = l.id " +
             "LEFT JOIN (SELECT hs.lop_id, COUNT(d.id) as enteredScores FROM diem d JOIN hoc_sinh hs ON d.hoc_sinh_id = hs.id WHERE d.nam_hoc = :namHoc AND d.hoc_ky = :hocKy AND (d.gia_tri IS NOT NULL OR d.nhan_xet IS NOT NULL) GROUP BY hs.lop_id) d_agg ON d_agg.lop_id = l.id " +
-            "LEFT JOIN (SELECT pcd.lop_id, SUM(mh.so_dtx_hoc_ky + 2) as expectedScoresPerStudent FROM phan_cong_day pcd JOIN mon_hoc mh ON pcd.mon_hoc_id = mh.id WHERE pcd.nam_hoc = :namHoc AND pcd.hoc_ky = :hocKy GROUP BY pcd.lop_id) pcd_agg ON pcd_agg.lop_id = l.id", nativeQuery = true)
+            "LEFT JOIN (SELECT pcd.lop_id, SUM(mh.so_dtx_hoc_ky + 2) as expectedScoresPerStudent FROM phan_cong_day pcd JOIN mon_hoc mh ON pcd.mon_hoc_id = mh.id WHERE pcd.nam_hoc = :namHoc AND pcd.hoc_ky = :hocKy AND (mh.is_deleted = false OR mh.is_deleted IS NULL) GROUP BY pcd.lop_id) pcd_agg ON pcd_agg.lop_id = l.id " +
+            "WHERE (l.is_deleted = false OR l.is_deleted IS NULL) AND l.nam_hoc = :namHoc " +
+            "ORDER BY l.khoi ASC, l.ten_lop ASC", nativeQuery = true)
     List<Map<String, Object>> getProgressSummary(@Param("namHoc") String namHoc, @Param("hocKy") Integer hocKy);
 
     @Query(value = "SELECT " +
@@ -135,8 +137,8 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
             "mh.so_dtx_hoc_ky as soDtxHocKy, " +
             "COALESCE(d_agg.enteredScores, 0) as enteredScores " +
             "FROM phan_cong_day pcd " +
-            "JOIN mon_hoc mh ON pcd.mon_hoc_id = mh.id " +
-            "LEFT JOIN giao_vien gv ON pcd.giao_vien_id = gv.id " +
+            "JOIN mon_hoc mh ON pcd.mon_hoc_id = mh.id AND (mh.is_deleted = false OR mh.is_deleted IS NULL) " +
+            "LEFT JOIN giao_vien gv ON pcd.giao_vien_id = gv.id AND (gv.is_deleted = false OR gv.is_deleted IS NULL) " +
             "LEFT JOIN (SELECT lop_id, COUNT(id) as siSo FROM hoc_sinh WHERE trang_thai = 1 AND lop_id = :lopId GROUP BY lop_id) hs_agg ON hs_agg.lop_id = pcd.lop_id " +
             "LEFT JOIN (SELECT d.mon_hoc_id, COUNT(d.id) as enteredScores FROM diem d JOIN hoc_sinh hs ON d.hoc_sinh_id = hs.id WHERE hs.lop_id = :lopId AND d.nam_hoc = :namHoc AND d.hoc_ky = :hocKy AND (d.gia_tri IS NOT NULL OR d.nhan_xet IS NOT NULL) GROUP BY d.mon_hoc_id) d_agg ON d_agg.mon_hoc_id = pcd.mon_hoc_id " +
             "WHERE pcd.lop_id = :lopId AND pcd.nam_hoc = :namHoc AND pcd.hoc_ky = :hocKy", nativeQuery = true)

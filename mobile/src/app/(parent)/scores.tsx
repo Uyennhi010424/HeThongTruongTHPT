@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Pressable } from 'react-native';
+import { Calendar as CalendarIcon, ChevronDown, Check } from 'lucide-react-native';
 import { useParentStore } from '../../store/useParentStore';
 
 type FilterType = 1 | 2 | 'CA_NAM';
@@ -24,6 +25,38 @@ const calculateTBM = (scores: any[]) => {
 export default function ParentScores() {
   const { dashboardData, selectedChild } = useParentStore();
   const [filter, setFilter] = useState<FilterType>(1);
+  const [showYearModal, setShowYearModal] = useState(false);
+
+  const subjects = dashboardData?.subjects || [];
+  const allScores = dashboardData?.scores || [];
+
+  const currentChildNamHoc = selectedChild?.lop?.namHoc || '2026-2027';
+
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<string>();
+    if (currentChildNamHoc) yearsSet.add(currentChildNamHoc);
+    allScores.forEach((s: any) => {
+      if (s.namHoc) yearsSet.add(s.namHoc);
+    });
+    const arr = Array.from(yearsSet).sort((a, b) => {
+      const yA = Number(a.match(/(\d{4})/)?.[1] || 0);
+      const yB = Number(b.match(/(\d{4})/)?.[1] || 0);
+      return yB - yA;
+    });
+    return arr.length > 0 ? arr : ['2026-2027', '2025-2026'];
+  }, [allScores, currentChildNamHoc]);
+
+  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || '2026-2027');
+
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [availableYears]);
+
+  const yearScores = useMemo(() => {
+    return allScores.filter((s: any) => !s.namHoc || s.namHoc === selectedYear);
+  }, [allScores, selectedYear]);
 
   if (!selectedChild || !dashboardData) {
     return (
@@ -34,12 +67,9 @@ export default function ParentScores() {
     );
   }
 
-  const subjects = dashboardData?.subjects || [];
-  const allScores = dashboardData?.scores || [];
-
   const renderSemesterView = () => {
     const enrichedSubjects = subjects.map((subject: any) => {
-      const subjectScores = allScores.filter((s: any) => s.monHoc?.id === subject.id && s.hocKy === filter);
+      const subjectScores = yearScores.filter((s: any) => s.monHoc?.id === subject.id && s.hocKy === filter);
       const isEval = subjectScores.some((s: any) => s.nhanXet === 'DAT' || s.nhanXet === 'CHUA_DAT');
       return { ...subject, subjectScores, isEval };
     }).filter((s: any) => s.subjectScores.length > 0);
@@ -48,7 +78,11 @@ export default function ParentScores() {
     enrichedSubjects.sort((a: any, b: any) => (a.isEval === b.isEval ? 0 : a.isEval ? 1 : -1));
 
     if (enrichedSubjects.length === 0) {
-      return <Text style={{ textAlign: 'center', color: '#64748b', marginTop: 20 }}>Chưa có điểm.</Text>;
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Chưa có điểm cho HK{filter} - Năm học {selectedYear}.</Text>
+        </View>
+      );
     }
 
     return enrichedSubjects.map((data: any) => {
@@ -107,7 +141,7 @@ export default function ParentScores() {
 
   const renderYearView = () => {
     const enrichedSubjects = subjects.map((subject: any) => {
-      const subjectScores = allScores.filter((s: any) => s.monHoc?.id === subject.id);
+      const subjectScores = yearScores.filter((s: any) => s.monHoc?.id === subject.id);
       const isEval = subjectScores.some((s: any) => s.nhanXet === 'DAT' || s.nhanXet === 'CHUA_DAT');
       return { ...subject, subjectScores, isEval };
     }).filter((s: any) => s.subjectScores.length > 0);
@@ -116,7 +150,11 @@ export default function ParentScores() {
     enrichedSubjects.sort((a: any, b: any) => (a.isEval === b.isEval ? 0 : a.isEval ? 1 : -1));
 
     if (enrichedSubjects.length === 0) {
-      return <Text style={{ textAlign: 'center', color: '#64748b', marginTop: 20 }}>Chưa có điểm.</Text>;
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Chưa có điểm cho cả năm - Năm học {selectedYear}.</Text>
+        </View>
+      );
     }
 
     return enrichedSubjects.map((data: any) => {
@@ -189,6 +227,16 @@ export default function ParentScores() {
   return (
     <View style={styles.container}>
       <View style={styles.filterWrapper}>
+        <TouchableOpacity 
+          style={styles.yearSelectorBtn} 
+          onPress={() => setShowYearModal(true)}
+          activeOpacity={0.8}
+        >
+          <CalendarIcon size={18} color="#2563EB" />
+          <Text style={styles.yearSelectorText}>Năm học: {selectedYear}</Text>
+          <ChevronDown size={16} color="#64748B" />
+        </TouchableOpacity>
+
         <View style={styles.filterContainer}>
           <TouchableOpacity 
             style={[styles.filterBtn, filter === 1 && styles.filterBtnActive]}
@@ -211,6 +259,27 @@ export default function ParentScores() {
         </View>
       </View>
 
+      {/* Year Selection Modal */}
+      <Modal visible={showYearModal} transparent={true} animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowYearModal(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Chọn năm học</Text>
+            {availableYears.map((year) => (
+              <TouchableOpacity 
+                key={year} 
+                style={styles.modalOptionRow} 
+                onPress={() => { setSelectedYear(year); setShowYearModal(false); }}
+              >
+                <Text style={[styles.modalOptionText, selectedYear === year && styles.modalOptionTextActive]}>
+                  Năm học {year}
+                </Text>
+                {selectedYear === year && <Check size={20} color="#2563EB" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {filter === 'CA_NAM' ? renderYearView() : renderSemesterView()}
       </ScrollView>
@@ -229,6 +298,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    gap: 12,
+  },
+  yearSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  yearSelectorText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1D4ED8',
+    flex: 1,
+    marginLeft: 8,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -261,6 +349,16 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     gap: 16,
+  },
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 15,
+    color: '#64748B',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -316,6 +414,41 @@ const styles = StyleSheet.create({
   colValue: {
     fontSize: 15,
     color: '#0F172A',
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#475569',
+  },
+  modalOptionTextActive: {
+    color: '#2563EB',
     fontWeight: 'bold',
   },
 });

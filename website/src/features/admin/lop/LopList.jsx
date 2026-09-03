@@ -6,6 +6,7 @@ import {
   UserCheck, AlertCircle, TrendingUp, Filter, GraduationCap, ArrowUpCircle, Eye, Shield
 } from "lucide-react";
 import { createLop, createLopBulk, deleteLop, getLop, syncSiSo, updateLop, assignGvcn, promoteStudents } from "../../../api/lopApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
@@ -35,12 +36,6 @@ const extractGradeFromClassName = (tenLop) => {
   return match ? match[1] : null;
 };
 
-const getCurrentAcademicYear = () => {
-  const now = new Date();
-  const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-  return `${year}-${year + 1}`;
-};
-
 const getNextAcademicYear = (currentYear) => {
   const parts = String(currentYear || "").split("-");
   if (parts.length === 2) {
@@ -48,8 +43,7 @@ const getNextAcademicYear = (currentYear) => {
     const y2 = parseInt(parts[1], 10);
     if (!isNaN(y1) && !isNaN(y2)) return `${y1 + 1}-${y2 + 1}`;
   }
-  const now = new Date();
-  return `${now.getFullYear() + 1}-${now.getFullYear() + 2}`;
+  return "2026-2027";
 };
 
 // --- Dropdown Thao tác ---
@@ -443,6 +437,7 @@ export default function LopList() {
   
   const [classes, setClasses] = useState([]);
   const [toHopList, setToHopList] = useState([]);
+  const [allNamHoc, setAllNamHoc] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
@@ -458,11 +453,17 @@ export default function LopList() {
   const [assignTeacherModalOpen, setAssignTeacherModalOpen] = useState(false);
   const [studentListModalOpen, setStudentListModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
+
+  const activeNamHoc = useMemo(() => {
+    return allNamHoc.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || allNamHoc[0] || null;
+  }, [allNamHoc]);
+
+  const currentAcademicYear = activeNamHoc?.tenNamHoc || "2025-2026";
   
   const [form, setForm] = useState({
     tenLop: "",
     khoi: "10",
-    namHoc: getCurrentAcademicYear(),
+    namHoc: "2025-2026",
     toHopId: ""
   });
   
@@ -476,12 +477,14 @@ export default function LopList() {
     try {
       setLoading(true);
       setError("");
-      const [lopRes, toHopRes] = await Promise.all([
+      const [lopRes, toHopRes, namHocRes] = await Promise.all([
         getLop(),
-        getToHopMon()
+        getToHopMon(),
+        getNamHoc().catch(() => ({ data: { data: [] } }))
       ]);
       setClasses(lopRes?.data?.data || []);
       setToHopList(toHopRes?.data?.data || []);
+      setAllNamHoc(namHocRes?.data?.data || []);
     } catch (err) {
       setError("Không thể tải dữ liệu.");
     } finally {
@@ -490,27 +493,40 @@ export default function LopList() {
   };
 
   const handlePromoteYear = async () => {
-    const currentYear = getCurrentAcademicYear();
+    const currentYear = currentAcademicYear;
     const parts = currentYear.split("-");
     if (parts.length !== 2) {
       notifyError("Định dạng năm học không hợp lệ.");
       return;
     }
-    const [start, end] = parts.map(Number);
-    const nextYear = `${start + 1}-${end + 1}`;
+    const nextYear = getNextAcademicYear(currentYear);
+    const nextYearExists = allNamHoc.some((y) => y.tenNamHoc === nextYear);
+
     const confirmMessage = (
       <div className="text-left space-y-3 w-full mt-2">
-        <p className="text-slate-800 text-[15px]">Bạn có chắc chắn muốn kết thúc năm học <strong>{currentYear}</strong> và đưa toàn bộ học sinh lên lớp cho năm học <strong>{nextYear}</strong> không?</p>
-        <div className="bg-amber-50 text-amber-900 p-3 rounded-xl text-sm border border-amber-200">
-          <p className="font-bold mb-2 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <p className="text-slate-800 text-[15px]">
+          Bạn có chắc chắn muốn kết thúc năm học hiện hành <strong>{currentYear}</strong> và đưa toàn bộ học sinh lên lớp cho năm học <strong>{nextYear}</strong> không?
+        </p>
+        <div className="bg-amber-50 text-amber-900 p-3.5 rounded-xl text-sm border border-amber-200">
+          <p className="font-bold mb-2 flex items-center gap-2 text-amber-950">
+            <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             Lưu ý quan trọng:
           </p>
-          <ul className="list-disc pl-5 space-y-1.5 font-medium">
+          <ul className="list-disc pl-5 space-y-1.5 font-medium text-xs sm:text-sm">
+            <li>Năm học hiện hành: <strong>{currentYear}</strong> (Đang mở trong hệ thống).</li>
             <li>Khối 12 sẽ được xét <strong>Tốt nghiệp</strong>.</li>
-            <li>Khối 10, 11 sẽ tự động <strong>lên lớp tiếp theo</strong>.</li>
+            <li>Khối 10, 11 sẽ tự động <strong>lên lớp tiếp theo</strong> ({nextYear}).</li>
             <li>Giáo viên chủ nhiệm sẽ được luân chuyển theo lớp mới (nếu có).</li>
-            <li>Cần thiết lập danh sách năm học {nextYear} trong hệ thống trước.</li>
+            <li>
+              Cần thiết lập danh sách năm học <strong>{nextYear}</strong> trong hệ thống trước.
+              {nextYearExists ? (
+                <span className="text-green-700 font-semibold ml-1">(&#10003; Đã có sẵn trên hệ thống)</span>
+              ) : (
+                <span className="text-amber-700 font-semibold ml-1">(&#9888; Chưa tạo trong Năm học & Học kỳ)</span>
+              )}
+            </li>
           </ul>
         </div>
       </div>
@@ -520,8 +536,7 @@ export default function LopList() {
       try {
         setLoading(true);
         const res = await promoteStudents({ currentNamHoc: currentYear, nextNamHoc: nextYear });
-        const d = res.data?.data;
-        notifySuccess(`Lên lớp thành công! ${d?.promoted || 0} học sinh lên lớp, ${d?.graduated || 0} học sinh tốt nghiệp.`);
+        notifySuccess("Lên lớp thành công!");
         loadData();
       } catch (err) {
         notifyError("Lỗi lên lớp: " + (err.response?.data?.message || err.message));
@@ -567,7 +582,7 @@ export default function LopList() {
 
   const openCreate = () => {
     setEditingClass(null);
-    setForm({ tenLop: "", khoi: "10", namHoc: getCurrentAcademicYear(), toHopId: "" });
+    setForm({ tenLop: "", khoi: "10", namHoc: currentAcademicYear, toHopId: "" });
     setModalOpen(true);
   };
 
@@ -576,7 +591,7 @@ export default function LopList() {
     setForm({
       tenLop: item.tenLop || "",
       khoi: String(item.khoi || "10"),
-      namHoc: item.namHoc || getCurrentAcademicYear(),
+      namHoc: item.namHoc || currentAcademicYear,
       toHopId: item.toHopId ? String(item.toHopId) : ""
     });
     setModalOpen(true);
@@ -814,13 +829,30 @@ export default function LopList() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Năm học <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    value={form.namHoc}
-                    onChange={e => setForm(p => ({ ...p, namHoc: e.target.value }))}
-                    placeholder="VD: 2026-2027"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
-                  />
+                  {allNamHoc.length > 0 ? (
+                    <select
+                      value={form.namHoc}
+                      onChange={e => setForm(p => ({ ...p, namHoc: e.target.value }))}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                    >
+                      {allNamHoc.map(nh => (
+                        <option key={nh.id || nh.tenNamHoc} value={nh.tenNamHoc}>
+                          {nh.tenNamHoc} {((nh.trangThai || nh.trang_thai) === "DANG_MO") ? "(Hiện hành)" : ""}
+                        </option>
+                      ))}
+                      {form.namHoc && !allNamHoc.some(nh => nh.tenNamHoc === form.namHoc) && (
+                        <option value={form.namHoc}>{form.namHoc}</option>
+                      )}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={form.namHoc}
+                      onChange={e => setForm(p => ({ ...p, namHoc: e.target.value }))}
+                      placeholder="VD: 2025-2026"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                    />
+                  )}
                 </div>
               </div>
               <div>

@@ -8,11 +8,19 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 @Repository
 public interface LichSuHocTapRepository extends JpaRepository<LichSuHocTap, Integer> {
     
     @EntityGraph(attributePaths = {"lopHoc"})
     List<LichSuHocTap> findByHocSinhIdOrderByNamHocDesc(Integer hocSinhId);
     
+    List<LichSuHocTap> findByNamHoc(String namHoc);
+
     boolean existsByHocSinhIdAndNamHoc(Integer hocSinhId, String namHoc);
+
+    @Query("SELECT COUNT(l) FROM LichSuHocTap l WHERE l.lopHoc.id = :lopId")
+    long countByLopId(@Param("lopId") Integer lopId);
 }

@@ -8,6 +8,7 @@ import { getHanhKiem, saveAllHanhKiem } from "../../../api/hanhkiemApi.js";
 import { getCurrentUsernameFromToken, findTeacherByUsername } from "../../../utils/teacherProfile.js";
 import { getStudentClass, getStudentClassId, sortStudentsByGivenName } from "../../../utils/helpers.js";
 import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
+import Pagination from "../../../components/common/Pagination.jsx";
 import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
 
 const TERM_MAP = { KI1: 1, KI2: 2, CA_NAM: 0 };
@@ -23,7 +24,8 @@ export default function HanhKiemPage() {
     selectedClassId,
     allStudents: students,
     filteredClasses: classes,
-    selectedClassObj: selectedClass
+    selectedClassObj: selectedClass,
+    setSelectedClassId
   } = filters;
 
   const [selectedTerm, setSelectedTerm] = useState("KI1");
@@ -36,6 +38,9 @@ export default function HanhKiemPage() {
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Load existing records from backend when class or term changes
   useEffect(() => {
@@ -46,14 +51,6 @@ export default function HanhKiemPage() {
       try {
         setLoading(true);
         const hocKy = TERM_MAP[selectedTerm];
-        const params = { lopId: selectedClassId, namHocId: selectedNamHoc }; // We pass selectedNamHoc instead of currentNamHoc.id. Wait! Backend getHanhKiem expects namHocId. selectedNamHoc is the name of the year! Let's check how the backend handles it. Usually we might just need to fetch all and filter, or the backend accepts `namHoc` as name.
-        // Actually, in the old code: `currentNamHoc.id`. Our `selectedNamHoc` is the string "2023-2024".
-        // Oh wait, `getHanhKiem` API doesn't support `namHoc` string? Let me check `getHanhKiem` arguments. In the old code: `const params = { lopId: selectedClassId, namHocId: currentNamHoc.id }`.
-        // Let's pass selectedNamHoc and hope the backend supports it, or we fetch the ID.
-        // But wait, the backend `HanhKiemController.java` probably just accepts `namHocId`. 
-        // Wait, what if we use `getHanhKiem({ lopId: selectedClassId, namHoc: selectedNamHoc })` ? Let's see if we can get the `namHocId` from `namHocList` inside `useTeacherFilters`. No, `namHocList` is just strings.
-        // What if we just fetch `getHanhKiem({ lopId: selectedClassId })` and filter on the frontend?
-        // Let's fetch without `namHocId` and see. Or `namHoc: selectedNamHoc`.
         const res = await getHanhKiem({ lopId: selectedClassId });
         if (!active) return;
 
@@ -105,10 +102,6 @@ export default function HanhKiemPage() {
     return () => window.clearTimeout(timer);
   }, [saveMessage]);
 
-  const selectedClassInternal = useMemo(
-    () => classes.find((item) => String(item.id) === selectedClassId) || null,
-    [classes, selectedClassId]
-  );
   const showNoHomeroom = (!filterLoading && !loading) && (!selectedClassId || classes.length === 0);
 
   const filteredStudents = useMemo(() => {
@@ -118,6 +111,17 @@ export default function HanhKiemPage() {
     );
     return sortStudentsByGivenName(classStudents);
   }, [students, selectedClassId]);
+
+  // Reset page on filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClassId, selectedTerm, selectedNamHoc]);
+
+  const totalPages = Math.ceil(filteredStudents.length / pageSize) || 1;
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
 
   const stats = useMemo(() => {
     let tot = 0;
@@ -178,7 +182,7 @@ export default function HanhKiemPage() {
             hocKy: hocKy === 0 ? null : hocKy,
             xepLoai: draft.xepLoai || "TOT",
             nhanXet: draft.nhanXet || "",
-            ngayDanhGia: new Date().toISOString().split("T")[0]
+            status: server?.status || "DRAFT"
           };
 
           // Include id for update if record already exists on server
@@ -244,6 +248,7 @@ export default function HanhKiemPage() {
               </p>
             </div>
             <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <TeacherFilter filters={filters} showGrade={false} showSubject={false} showClass={false} showSemester={false} align="right" />
               <label style={{ margin: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#475569", marginRight: 8 }}>Học kì:</span>
                 <select value={selectedTerm} onChange={(e) => setSelectedTerm(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 14, minWidth: 120 }}>
@@ -268,58 +273,48 @@ export default function HanhKiemPage() {
           </div>
 
           {/* Class tabs */}
-          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
-            {classes.map((item) => {
-              const isActive = String(item.id) === selectedClassId;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  style={{
-                    padding: "8px 16px", borderRadius: 20, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
-                    whiteSpace: "nowrap", transition: "all 0.2s",
-                    background: isActive ? "#2563eb" : "#f1f5f9",
-                    color: isActive ? "#fff" : "#475569"
-                  }}
-                  onClick={() => { setSelectedClassId(String(item.id)); setSaveMessage(""); }}
-                >
-                  {item.tenLop}
-                </button>
-              );
-            })}
-          </div>
+          {classes.length > 1 && (
+            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
+              {classes.map((item) => {
+                const isActive = String(item.id) === selectedClassId;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    style={{
+                      padding: "8px 16px", borderRadius: 20, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
+                      whiteSpace: "nowrap", transition: "all 0.2s",
+                      background: isActive ? "#2563eb" : "#f1f5f9",
+                      color: isActive ? "#fff" : "#475569"
+                    }}
+                    onClick={() => { setSelectedClassId(String(item.id)); setSaveMessage(""); }}
+                  >
+                    {item.tenLop}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-          {/* Stats Summary */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-            <div style={{ background: "#eff6ff", padding: 20, borderRadius: 12, border: "1px solid #bfdbfe" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1e3a8a", marginBottom: 8 }}>Tốt</div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: "#1d4ed8" }}>{loading ? "..." : stats.tot}</div>
-            </div>
-            <div style={{ background: "#fef9c3", padding: 20, borderRadius: 12, border: "1px solid #fef08a" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#854d0e", marginBottom: 8 }}>Khá</div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: "#a16207" }}>{loading ? "..." : stats.kha}</div>
-            </div>
-            <div style={{ background: "#fef08a", padding: 20, borderRadius: 12, border: "1px solid #fde047" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#713f12", marginBottom: 8 }}>Trung bình</div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: "#854d0e" }}>{loading ? "..." : stats.trungBinh}</div>
-            </div>
-            <div style={{ background: "#fee2e2", padding: 20, borderRadius: 12, border: "1px solid #fecaca" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#991b1b", marginBottom: 8 }}>Yếu</div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: "#b91c1c" }}>{loading ? "..." : stats.yeu}</div>
-            </div>
-          </div>
-
-          {/* Table */}
+          {/* Table Container */}
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden" }}>
-            <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {/* Table Header with Inline Stats */}
+            <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Danh sách học sinh {selectedClass?.tenLop || ""}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+                  Danh sách học sinh lớp {selectedClass?.tenLop || ""}
+                </div>
                 <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>
-                  Đánh giá hạnh kiểm: Tốt, Khá, Trung bình, Yếu · {selectedTerm === "KI1" ? "Kì 1" : "Kì 2"}
+                  {filteredStudents.length} học sinh · {selectedTerm === "KI1" ? "Học kỳ I" : "Học kỳ II"} · Năm học {selectedNamHoc}
                 </div>
               </div>
-              <div style={{ background: "#f1f5f9", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "#475569" }}>
-                {filteredStudents.length} học sinh
+
+              {/* Inline Stats Badges */}
+              <div style={{ display: "flex", gap: 16, background: "#f8fafc", padding: "8px 16px", borderRadius: 8, border: "1px solid #e2e8f0", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#16a34a" }}>● Tốt: {loading ? "..." : stats.tot}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>● Khá: {loading ? "..." : stats.kha}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#ca8a04" }}>● Trung bình: {loading ? "..." : stats.trungBinh}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#dc2626" }}>● Yếu: {loading ? "..." : stats.yeu}</span>
               </div>
             </div>
 
@@ -330,66 +325,85 @@ export default function HanhKiemPage() {
             )}
 
             {!!selectedClassId && filteredStudents.length > 0 && (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                  <thead style={{ background: "#f8fafc" }}>
-                    <tr>
-                      <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0", width: 260 }}>Học sinh</th>
-                      <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0", width: 200 }}>Hạnh kiểm</th>
-                      <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0" }}>Nhận xét</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading
-                      ? Array.from({ length: 5 }).map((_, i) => (
-                          <tr key={`skel-${i}`}>
-                            <td colSpan={3} style={{ padding: 16 }}>Đang tải...</td>
-                          </tr>
-                        ))
-                      : filteredStudents.map((student, idx) => {
-                          const record = draftRecords[student.id] || { xepLoai: "TOT", nhanXet: "" };
-                          const isEven = idx % 2 === 0;
-                          return (
-                            <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
-                              <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
-                                <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
-                                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
-                              </td>
-                              <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
-                                <select
-                                  value={record.xepLoai}
-                                  disabled={record.status === "APPROVED" || saving}
-                                  onChange={(event) => updateRecord(student.id, { xepLoai: event.target.value })}
-                                  style={{
-                                    width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
-                                    fontSize: 14, background: (record.status === "APPROVED" || saving) ? "#f1f5f9" : "#fff",
-                                    fontWeight: 500, color: record.xepLoai === "YEU" ? "#dc2626" : record.xepLoai === "TRUNG_BINH" ? "#ca8a04" : "#0f172a"
-                                  }}
-                                >
-                                  <option value="TOT">Tốt</option>
-                                  <option value="KHA">Khá</option>
-                                  <option value="TRUNG_BINH">Trung bình</option>
-                                  <option value="YEU">Yếu</option>
-                                </select>
-                              </td>
-                              <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
-                                <input
-                                  value={record.nhanXet}
-                                  disabled={record.status === "APPROVED" || saving}
-                                  onChange={(event) => updateRecord(student.id, { nhanXet: event.target.value })}
-                                  placeholder={record.status === "APPROVED" ? "Đã duyệt & khóa" : "Nhận xét hạnh kiểm"}
-                                  style={{
-                                    width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
-                                    fontSize: 14, background: (record.status === "APPROVED" || saving) ? "#f1f5f9" : "#fff"
-                                  }}
-                                />
-                              </td>
+              <>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead style={{ background: "#f8fafc" }}>
+                      <tr>
+                        <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0", width: 60 }}>STT</th>
+                        <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0", width: 240 }}>Học sinh</th>
+                        <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0", width: 200 }}>Hạnh kiểm</th>
+                        <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e2e8f0" }}>Nhận xét</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading
+                        ? Array.from({ length: 5 }).map((_, i) => (
+                            <tr key={`skel-${i}`}>
+                              <td colSpan={4} style={{ padding: 16, textAlign: "center", color: "#94a3b8" }}>Đang tải...</td>
                             </tr>
-                          );
-                        })}
-                  </tbody>
-                </table>
-              </div>
+                          ))
+                        : paginatedStudents.map((student, idx) => {
+                            const record = draftRecords[student.id] || { xepLoai: "TOT", nhanXet: "" };
+                            const isEven = idx % 2 === 0;
+                            return (
+                              <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
+                                <td style={{ padding: "16px 16px", textAlign: "center", borderBottom: "1px solid #f1f5f9", fontWeight: 600, color: "#475569" }}>
+                                  {(currentPage - 1) * pageSize + idx + 1}
+                                </td>
+                                <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+                                  <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
+                                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
+                                </td>
+                                <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+                                  <select
+                                    value={record.xepLoai}
+                                    disabled={record.status === "APPROVED" || saving}
+                                    onChange={(event) => updateRecord(student.id, { xepLoai: event.target.value })}
+                                    style={{
+                                      width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
+                                      fontSize: 14, background: (record.status === "APPROVED" || saving) ? "#f1f5f9" : "#fff",
+                                      fontWeight: 600, color: record.xepLoai === "YEU" ? "#dc2626" : record.xepLoai === "TRUNG_BINH" ? "#ca8a04" : record.xepLoai === "KHA" ? "#2563eb" : "#16a34a"
+                                    }}
+                                  >
+                                    <option value="TOT">Tốt</option>
+                                    <option value="KHA">Khá</option>
+                                    <option value="TRUNG_BINH">Trung bình</option>
+                                    <option value="YEU">Yếu</option>
+                                  </select>
+                                </td>
+                                <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+                                  <input
+                                    value={record.nhanXet}
+                                    disabled={record.status === "APPROVED" || saving}
+                                    onChange={(event) => updateRecord(student.id, { nhanXet: event.target.value })}
+                                    placeholder={record.status === "APPROVED" ? "Đã duyệt & khóa" : "Nhận xét hạnh kiểm"}
+                                    style={{
+                                      width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
+                                      fontSize: 14, background: (record.status === "APPROVED" || saving) ? "#f1f5f9" : "#fff"
+                                    }}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {!loading && filteredStudents.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={filteredStudents.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                    pageSizeOptions={[10, 20, 30, 50]}
+                  />
+                )}
+              </>
             )}
           </div>
         </>

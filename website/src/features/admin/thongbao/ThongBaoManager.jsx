@@ -10,6 +10,7 @@ import {
   getThongBao,
   updateThongBao
 } from "../../../api/thongbaoApi.js";
+import Pagination from "../../../components/common/Pagination.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const formatDateTime = (value) => {
@@ -51,7 +52,7 @@ export default function ThongBaoManager() {
   const [error, setError] = useState("");
   const { searchQuery: keyword, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(6);
+  const [pageSize, setPageSize] = useState(5);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNotice, setEditingNotice] = useState(null);
   const [formError, setFormError] = useState("");
@@ -294,25 +295,18 @@ export default function ThongBaoManager() {
                 </div>
               ))}
         </div>
-        <div className="pagination">
-          <button
-            className="btn-outline btn-sm"
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            disabled={page === 1}
-          >
-            Trước
-          </button>
-          <div className="pagination-info">
-            Trang {page} / {totalPages}
-          </div>
-          <button
-            className="btn-outline btn-sm"
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            disabled={page === totalPages}
-          >
-            Sau
-          </button>
-        </div>
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={filteredNotices.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(sz) => {
+            setPageSize(sz);
+            setPage(1);
+          }}
+          pageSizeOptions={[5, 10, 20, 50]}
+        />
       </div>
 
       <SimpleModal

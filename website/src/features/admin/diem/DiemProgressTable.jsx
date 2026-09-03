@@ -4,11 +4,16 @@ import { Link } from "react-router-dom";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { tinhHocLucLop } from "../../../api/hocbaApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
+import Pagination from "../../../components/common/Pagination.jsx";
 
 export default function DiemProgressTable({ progressData = [], loading, onRefresh, namHoc: namHocProp, setNamHoc, hocKy, setHocKy, searchQuery }) {
   const [availableNamHoc, setAvailableNamHoc] = useState([]);
   const [namHocListFull, setNamHocListFull] = useState([]);
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Modal states
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [summaryMode, setSummaryMode] = useState("ALL"); // "ALL" | "SINGLE"
@@ -37,6 +42,12 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
       })
       .catch(() => {});
   }, []);
+
+  // Reset to page 1 when filter or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, namHoc, hocKy]);
+
   const filteredData = useMemo(() => {
     const dataArray = Array.isArray(progressData) ? progressData : [];
     if (dataArray.length === 0) return [];
@@ -49,6 +60,12 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
       return matchSearch;
     });
   }, [progressData, searchQuery]);
+
+  const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, currentPage, pageSize]);
 
   const getSelectedNamHocId = () => {
     const selected = namHocListFull.find(nh => nh.tenNamHoc === namHoc);
@@ -107,7 +124,7 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
   
   return (
     <>
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
       {/* Toolbar */}
       <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-end gap-3">
         <select
@@ -166,7 +183,7 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
           <tbody className="bg-white divide-y divide-slate-200">
             {loading ? (
               <tr>
-                <td colSpan="4" className="px-6 py-12 text-center text-slate-500">
+                <td colSpan="5" className="px-6 py-12 text-center text-slate-500">
                   <div className="flex justify-center items-center">
                     <div className="w-6 h-6 border-2 border-blue-500/20 border-t-blue-600 rounded-full animate-spin"></div>
                     <span className="ml-2">Đang tải dữ liệu...</span>
@@ -175,12 +192,12 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
               </tr>
             ) : filteredData.length === 0 ? (
               <tr>
-                <td colSpan="4" className="px-6 py-12 text-center text-slate-500">
+                <td colSpan="5" className="px-6 py-12 text-center text-slate-500">
                   Không tìm thấy lớp học nào.
                 </td>
               </tr>
             ) : (
-              (Array.isArray(filteredData) ? filteredData : []).map((item) => (
+              (Array.isArray(paginatedData) ? paginatedData : []).map((item) => (
                 <tr key={item?.lopId || Math.random()} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">{item?.tenLop}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{item?.tenGvcn}</td>
@@ -210,6 +227,22 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="mt-auto">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredData.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(sz) => {
+            setPageSize(sz);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
 
     </div>

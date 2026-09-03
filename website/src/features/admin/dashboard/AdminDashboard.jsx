@@ -134,6 +134,10 @@ const CountUp = ({ end, duration = 1500, decimals = 0, isNumber = true }) => {
 export default function AdminDashboard() {
   const [adminName, setAdminName] = useState("Quản trị viên");
   const [schoolYears, setSchoolYears] = useState([]);
+  const [activeYear, setActiveYear] = useState("");
+  const [allRawClasses, setAllRawClasses] = useState([]);
+  const [allRawTeachers, setAllRawTeachers] = useState([]);
+  const [allRawHomeroom, setAllRawHomeroom] = useState([]);
   const [stats, setStats] = useState({
     students: 0,
     teachers: 0,
@@ -195,9 +199,14 @@ export default function AdminDashboard() {
         const allClassesArr = lop?.data?.data || [];
         const homeroomArr = chuNhiemRes?.data?.data || [];
 
+        setAllRawClasses(allClassesArr);
+        setAllRawTeachers(teachersArr);
+        setAllRawHomeroom(homeroomArr);
+
         const namHocArrRaw = namHocRes?.data?.data || [];
-        const activeNamHocObj = namHocArrRaw.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO");
-        const activeNamHoc = activeNamHocObj ? activeNamHocObj.tenNamHoc : null;
+        const activeNamHocObj = namHocArrRaw.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || namHocArrRaw[0] || null;
+        const activeNamHoc = activeNamHocObj ? activeNamHocObj.tenNamHoc : "2025-2026";
+        setActiveYear(activeNamHoc);
 
         const classesArr = activeNamHoc ? allClassesArr.filter(c => c.namHoc === activeNamHoc) : allClassesArr;
 
@@ -220,6 +229,12 @@ export default function AdminDashboard() {
           if (item?.lopId != null) acc[String(item.lopId)] = item?.giaoVienId ?? null;
           return acc;
         }, {});
+
+        classesArr.forEach((c) => {
+          if (c?.id != null && (c.gvcn?.id || c.gvcnId)) {
+            homeroomByClassId[String(c.id)] = c.gvcn?.id || c.gvcnId;
+          }
+        });
 
         const totalStudentCount = classesArr.reduce((acc, c) => acc + (c.siSo || 0), 0);
 
@@ -323,6 +338,91 @@ export default function AdminDashboard() {
     };
   }, []);
 
+  const handleYearChange = async (targetYear) => {
+    setActiveYear(targetYear);
+    const classesArr = targetYear ? allRawClasses.filter(c => c.namHoc === targetYear) : allRawClasses;
+
+    const teacherNameById = allRawTeachers.reduce((acc, item) => {
+      if (item?.id != null) acc[String(item.id)] = item?.hoTen || "--";
+      return acc;
+    }, {});
+
+    const homeroomByClassId = allRawHomeroom.reduce((acc, item) => {
+      if (item?.lopId != null) acc[String(item.lopId)] = item?.giaoVienId ?? null;
+      return acc;
+    }, {});
+
+    classesArr.forEach((c) => {
+      if (c?.id != null && (c.gvcn?.id || c.gvcnId)) {
+        homeroomByClassId[String(c.id)] = c.gvcn?.id || c.gvcnId;
+      }
+    });
+
+    const totalStudentCount = classesArr.reduce((acc, c) => acc + (c.siSo || 0), 0);
+    const g10Classes = classesArr.filter((c) => String(c.khoi) === "10");
+    const g11Classes = classesArr.filter((c) => String(c.khoi) === "11");
+    const g12Classes = classesArr.filter((c) => String(c.khoi) === "12");
+
+    const grade10Students = g10Classes.reduce((acc, c) => acc + (c.siSo || 0), 0);
+    const grade11Students = g11Classes.reduce((acc, c) => acc + (c.siSo || 0), 0);
+    const grade12Students = g12Classes.reduce((acc, c) => acc + (c.siSo || 0), 0);
+
+    const siSoByLopId = classesArr.reduce((acc, item) => {
+      acc[String(item.id)] = item.siSo || 0;
+      return acc;
+    }, {});
+
+    setStats({
+      students: totalStudentCount,
+      teachers: allRawTeachers.length,
+      classes: classesArr.length,
+      grade10: g10Classes.length,
+      grade11: g11Classes.length,
+      grade12: g12Classes.length,
+      avgScore: null,
+    });
+
+    setDashboardData((prev) => ({
+      ...prev,
+      classes: classesArr,
+      teachers: allRawTeachers,
+      homeroomByClassId,
+      teacherNameById,
+      siSoByLopId,
+      grade10Students,
+      grade11Students,
+      grade12Students,
+    }));
+
+    setChartLoading(true);
+    try {
+      const [avgRes, distRes] = await Promise.all([
+        withTimeout(getDiemAvgByGrade({ namHoc: targetYear }), 30000).catch(() => ({ data: { data: [] } })),
+        withTimeout(getDiemDistribution({ namHoc: targetYear }), 120000).catch(() => ({ data: { data: { counts: {}, total: 0, avgScore: null } } })),
+      ]);
+      const avgByGrade = avgRes?.data?.data || [];
+      const dist = distRes?.data?.data || {};
+      const blockAvg = avgByGrade.map((item) => ({
+        name: `Khối ${item.khoi}`,
+        value: item.avgScore != null ? Number(item.avgScore) : null,
+        count: item.studentCount || 0,
+      }));
+      const distributionCounts = dist.counts || { "TỐT": 0, "KHÁ": 0, "ĐẠT": 0, "CHƯA ĐẠT": 0 };
+      setDashboardData((prev) => ({
+        ...prev,
+        blockAvg,
+        distributionCounts,
+        totalStudents: dist.total || 0,
+      }));
+      setStats((prev) => ({
+        ...prev,
+        avgScore: dist.avgScore ?? null,
+      }));
+    } finally {
+      setChartLoading(false);
+    }
+  };
+
   const gradeDistribution = useMemo(() => {
     const total = dashboardData.totalStudents || 1;
     const counts = dashboardData.distributionCounts;
@@ -346,13 +446,29 @@ export default function AdminDashboard() {
     <div className="space-y-6 pb-12 bg-[#f8fafc] min-h-screen text-slate-900 font-sans">
 
       {/* 2. Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-2">
             <TypewriterText text={`Chào mừng trở lại, ${adminName}`} />
           </h1>
           <p className="text-slate-500 mt-1 font-medium">Cập nhật dữ liệu mới nhất của trường hôm nay</p>
         </div>
+
+        {schoolYears.length > 0 && (
+          <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="material-symbols-outlined text-[20px] text-blue-600">calendar_month</span>
+            <span className="text-xs font-bold text-slate-500">Năm học:</span>
+            <select
+              value={activeYear}
+              onChange={(e) => handleYearChange(e.target.value)}
+              className="bg-transparent text-sm font-bold text-blue-900 outline-none cursor-pointer"
+            >
+              {schoolYears.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -398,7 +514,7 @@ export default function AdminDashboard() {
         {/* Bar Chart (70%) */}
         <div className="lg:w-[70%] h-[420px] rounded-[24px] bg-white border border-slate-200 shadow-sm p-6 flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-blue-900">Điểm trung bình theo khối (Năm học hiện tại)</h3>
+            <h3 className="text-lg font-bold text-blue-900">Điểm trung bình theo khối (Năm học {activeYear || "hiện tại"})</h3>
           </div>
           <div className="flex-1 w-full relative">
             {chartLoading ? (
@@ -580,7 +696,7 @@ function RecentClassesList({ classes = [], siSoByLopId = {}, homeroomByClassId =
         id: item.id,
         lop: item.tenLop || "--",
         siSo: siSoByLopId[String(item.id)] ?? item.siSo ?? 0,
-        gvcn: teacherNameById[String(homeroomByClassId[String(item.id)] || "")] || "Chưa có GVCN",
+        gvcn: item.gvcn?.hoTen || item.gvcnHoTen || teacherNameById[String(item.gvcn?.id || item.gvcnId || homeroomByClassId[String(item.id)] || "")] || "Chưa có GVCN",
       };
     });
   }, [classes, siSoByLopId, homeroomByClassId, teacherNameById]);

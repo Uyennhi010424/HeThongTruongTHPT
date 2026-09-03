@@ -3,7 +3,7 @@ import { User, Calendar, MapPin } from "lucide-react";
 
 const StudentProfileWidget = ({ student, avatarSrc, selectedNamHoc, selectedHK, homeroomTeacher }) => {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col gap-6 border border-slate-100">
+    <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col gap-6 border border-slate-100 flex-shrink-0">
       <div className="flex items-start gap-4">
         <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 border border-slate-200 overflow-hidden">
           {avatarSrc ? (

@@ -81,4 +81,12 @@ public class PhanCongDayController {
         List<PhanCongDayDTO> created = service.autoAssignAllSubjects(namHoc, hocKy);
         return ResponseEntity.ok(ApiResponse.ok(created));
     }
+
+    @org.springframework.web.bind.annotation.PostMapping("/sync-hk2")
+    public ResponseEntity<ApiResponse<Object>> syncHk2(
+            @RequestParam(required = false, defaultValue = "2025-2026") String namHoc
+    ) {
+        service.syncHocKy2FromHocKy1(namHoc);
+        return ResponseEntity.ok(ApiResponse.ok("Đã đồng bộ phân công HK2 theo HK1 thành công", null));
+    }
 }

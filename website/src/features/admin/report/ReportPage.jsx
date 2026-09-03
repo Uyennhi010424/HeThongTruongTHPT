@@ -82,7 +82,7 @@ export default function ReportPage() {
         setSubjects(filteredSubjects);
         setStudents(stRes?.data?.data || []);
         setTeachers(tRes?.data?.data || []);
-        const current = yData.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || yData[yData.length - 1];
+        const current = yData.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || yData[0];
         if (current) setSelectedYear(current.tenNamHoc);
       } catch {
         if (!active) return;
@@ -413,7 +413,9 @@ td.center{text-align:center}
             onChange={(e) => setSelectedYear(e.target.value)}
           >
             {years.map((y) => (
-              <option key={y.id} value={y.tenNamHoc}>{y.tenNamHoc}</option>
+              <option key={y.id} value={y.tenNamHoc}>
+                {y.tenNamHoc} {((y.trangThai || y.trang_thai) === "DANG_MO") ? "(Hiện hành)" : ""}
+              </option>
             ))}
           </select>
           <select

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Clock, Edit3, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import useAuth from '../../../hooks/useAuth';
 import api from '../../../api/axiosClient';
 import { notifyError, notifySuccess } from '../../../utils/notify';
 import { useConfirm } from '../../../contexts/ConfirmContext.jsx';
+import Pagination from '../../../components/common/Pagination.jsx';
 
 const StudentBaiKiemTra = () => {
   const { user } = useAuth();
@@ -11,7 +12,7 @@ const StudentBaiKiemTra = () => {
   const [isTakingExam, setIsTakingExam] = useState(false);
   const [currentExam, setCurrentExam] = useState(null);
   const [currentAttemptId, setCurrentAttemptId] = useState(null);
-  const sessionTokenRef = React.useRef(null);
+  const sessionTokenRef = useRef(null);
   const [answers, setAnswers] = useState({});
   
   const [resultModalVisible, setResultModalVisible] = useState(false);
@@ -19,6 +20,8 @@ const StudentBaiKiemTra = () => {
   
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9); // Bố cục 3x3 = 9 bài kiểm tra / trang
 
   useEffect(() => {
     fetchExams();
@@ -251,81 +254,123 @@ const StudentBaiKiemTra = () => {
     }
   };
 
+  const totalPages = Math.ceil(exams.length / pageSize) || 1;
+  const paginatedExams = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return exams.slice(start, start + pageSize);
+  }, [exams, currentPage, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
+    }
+  }, [totalPages, currentPage]);
+
   return (
-    <div className="p-6 max-w-7xl mx-auto relative">
-      <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight mb-6">Bài kiểm tra của tôi</h2>
+    <div className="p-6 max-w-7xl mx-auto relative pb-12">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight mb-1">Bài kiểm tra của tôi</h2>
+          <p className="text-sm font-medium text-slate-500">Danh sách các bài kiểm tra trực tuyến định kỳ và thường xuyên.</p>
+        </div>
+        {exams.length > 0 && (
+          <div className="text-sm font-semibold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+            Tổng cộng: <strong className="text-blue-600">{exams.length}</strong> bài kiểm tra
+          </div>
+        )}
+      </div>
       
       {loading ? (
-        <div className="text-center py-10">Đang tải danh sách bài kiểm tra...</div>
+        <div className="text-center py-16 text-slate-500 bg-white rounded-2xl shadow-sm border border-slate-100">
+          <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+          <p className="font-medium">Đang tải danh sách bài kiểm tra...</p>
+        </div>
       ) : exams.length === 0 ? (
-        <div className="text-center py-10 text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="text-center py-16 text-slate-500 bg-white rounded-2xl shadow-sm border border-slate-100 font-medium">
           Hiện tại không có bài kiểm tra nào.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {exams.map(item => {
-            const status = getExamStatus(item);
-            
-            let statusBadge = null;
-            if (status === 'CHUA_DEN_GIO') {
-              statusBadge = (
-                <span className="px-2.5 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full flex items-center">
-                  <AlertCircle size={12} className="mr-1" /> Chưa đến giờ
-                </span>
-              );
-            } else if (status === 'DA_KET_THUC') {
-              statusBadge = (
-                <span className="px-2.5 py-1 bg-gray-100 text-gray-800 text-xs font-semibold rounded-full flex items-center">
-                  <XCircle size={12} className="mr-1" /> Đã kết thúc
-                </span>
-              );
-            } else {
-              statusBadge = (
-                <span className="px-2.5 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full flex items-center">
-                  <CheckCircle size={12} className="mr-1" /> Đang mở
-                </span>
-              );
-            }
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedExams.map(item => {
+              const status = getExamStatus(item);
+              
+              let statusBadge = null;
+              if (status === 'CHUA_DEN_GIO') {
+                statusBadge = (
+                  <span className="px-2.5 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full flex items-center">
+                    <AlertCircle size={12} className="mr-1" /> Chưa đến giờ
+                  </span>
+                );
+              } else if (status === 'DA_KET_THUC') {
+                statusBadge = (
+                  <span className="px-2.5 py-1 bg-gray-100 text-gray-800 text-xs font-semibold rounded-full flex items-center">
+                    <XCircle size={12} className="mr-1" /> Đã kết thúc
+                  </span>
+                );
+              } else {
+                statusBadge = (
+                  <span className="px-2.5 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full flex items-center">
+                    <CheckCircle size={12} className="mr-1" /> Đang mở
+                  </span>
+                );
+              }
 
-            return (
-              <div key={item.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                <div className="p-6 border-b border-gray-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 leading-tight flex-1 pr-4">{item.tieuDe}</h3>
-                    {statusBadge}
-                  </div>
-                  <div className="space-y-2 text-sm text-gray-600 mb-6">
-                    <p><span className="font-medium text-gray-700">Môn học:</span> {item.tenMonHoc}</p>
-                    <p><span className="font-medium text-gray-700">Giáo viên:</span> {item.tenGiaoVien}</p>
-                    <p><span className="font-medium text-gray-700">Thời gian làm bài:</span> {item.thoiGianLamBai} phút</p>
-                    <p><span className="font-medium text-gray-700">Bắt đầu:</span> {new Date(item.thoiGianBatDau).toLocaleString('vi-VN')}</p>
-                    <p><span className="font-medium text-gray-700">Kết thúc:</span> {new Date(item.thoiGianKetThuc).toLocaleString('vi-VN')}</p>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-6 py-4">
-                  <button 
-                    onClick={() => handleStart(item)}
-                    disabled={status !== 'DANG_MO' || item.trangThaiLamBai === 'HET_LAN_LAM_BAI'}
-                    className={`w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
-                      ${(status === 'DANG_MO' && item.trangThaiLamBai !== 'HET_LAN_LAM_BAI') ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
-                  >
-                    <Edit3 size={16} className="mr-2" />
-                    {item.trangThaiLamBai === 'HET_LAN_LAM_BAI' ? 'Đã nộp bài' : (status === 'CHUA_DEN_GIO' ? 'Chưa mở' : status === 'DA_KET_THUC' ? 'Đã đóng' : (item.trangThaiLamBai === 'DANG_LAM' ? 'Tiếp tục làm bài' : 'Làm bài ngay'))}
-                  </button>
-                  {item.trangThaiLamBai === 'HET_LAN_LAM_BAI' && item.diemDatDuoc != null && (
-                    <div className="mt-3 text-center">
-                      <span 
-                        onClick={() => handleViewResult(item.id)}
-                        className="text-sm text-gray-600 hover:text-blue-600 font-medium cursor-pointer"
-                      >
-                        Xem kết quả: <strong className="text-blue-700 text-base">{item.diemDatDuoc} điểm</strong>
-                      </span>
+              return (
+                <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-4 gap-2">
+                      <h3 className="text-lg font-bold text-slate-800 leading-tight flex-1 line-clamp-2">{item.tieuDe}</h3>
+                      {statusBadge}
                     </div>
-                  )}
+                    <div className="space-y-2 text-sm text-slate-600">
+                      <p><span className="font-semibold text-slate-700">Môn học:</span> {item.tenMonHoc}</p>
+                      <p><span className="font-semibold text-slate-700">Giáo viên:</span> {item.tenGiaoVien}</p>
+                      <p><span className="font-semibold text-slate-700">Thời gian làm bài:</span> {item.thoiGianLamBai} phút</p>
+                      <p><span className="font-semibold text-slate-700">Bắt đầu:</span> {new Date(item.thoiGianBatDau).toLocaleString('vi-VN')}</p>
+                      <p><span className="font-semibold text-slate-700">Kết thúc:</span> {new Date(item.thoiGianKetThuc).toLocaleString('vi-VN')}</p>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 px-6 py-4 border-t border-slate-100">
+                    <button 
+                      onClick={() => handleStart(item)}
+                      disabled={status !== 'DANG_MO' || item.trangThaiLamBai === 'HET_LAN_LAM_BAI'}
+                      className={`w-full flex items-center justify-center px-4 py-2.5 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white transition-all
+                        ${(status === 'DANG_MO' && item.trangThaiLamBai !== 'HET_LAN_LAM_BAI') ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.99]' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
+                    >
+                      <Edit3 size={16} className="mr-2" />
+                      {item.trangThaiLamBai === 'HET_LAN_LAM_BAI' ? 'Đã nộp bài' : (status === 'CHUA_DEN_GIO' ? 'Chưa mở' : status === 'DA_KET_THUC' ? 'Đã đóng' : (item.trangThaiLamBai === 'DANG_LAM' ? 'Tiếp tục làm bài' : 'Làm bài ngay'))}
+                    </button>
+                    {item.trangThaiLamBai === 'HET_LAN_LAM_BAI' && item.diemDatDuoc != null && (
+                      <div className="mt-3 text-center">
+                        <span 
+                          onClick={() => handleViewResult(item.id)}
+                          className="text-sm text-slate-600 hover:text-blue-600 font-medium cursor-pointer inline-flex items-center gap-1"
+                        >
+                          Xem kết quả: <strong className="text-blue-700 text-base">{item.diemDatDuoc} điểm</strong>
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={exams.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              pageSizeOptions={[9, 18, 27]}
+            />
+          </div>
         </div>
       )}
 

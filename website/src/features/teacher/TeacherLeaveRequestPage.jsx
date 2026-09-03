@@ -25,22 +25,45 @@ export default function TeacherLeaveRequestPage() {
   const [timetable, setTimetable] = useState([]);
 
   const [currentYear, setCurrentYear] = useState("2025-2026");
-  const [targetYear, setTargetYear] = useState(null);
+  const [targetYear, setTargetYear] = useState("2025-2026");
+  const [targetSemester, setTargetSemester] = useState(1);
   const [allYears, setAllYears] = useState([]);
   const [detailTarget, setDetailTarget] = useState(null);
   const location = useLocation();
 
-  // Tính targetYear dựa trên ngày được chọn (hoặc hôm nay nếu chưa chọn)
+  const currentYearObj = allYears.find((y) => y.tenNamHoc === (targetYear || currentYear));
+
+  // Tính targetYear và targetSemester dựa trên ngày được chọn (hoặc năm học đang mở nếu chưa chọn)
   useEffect(() => {
     if (allYears.length === 0) return;
-    const checkDate = date ? new Date(date) : new Date();
-    const time = checkDate.getTime();
-    const matched = allYears.find(
-      (y) =>
-        time >= new Date(y.ngayBatDauHk1).getTime() &&
-        time <= new Date(y.ngayKetThucHk2).getTime()
-    );
-    setTargetYear(matched ? matched.tenNamHoc : null);
+    const checkDate = date ? new Date(date + "T00:00:00") : null;
+    
+    // Nếu giáo viên chọn ngày cụ thể, tìm năm học và học kỳ tương ứng với ngày đó
+    if (checkDate && !isNaN(checkDate.getTime())) {
+      const time = checkDate.getTime();
+      const matchedYear = allYears.find(
+        (y) =>
+          time >= new Date(y.ngayBatDauHk1 + "T00:00:00").getTime() &&
+          time <= new Date((y.ngayKetThucHk2 || y.ngayKetThucHk1) + "T23:59:59").getTime()
+      );
+      if (matchedYear) {
+        setTargetYear(matchedYear.tenNamHoc);
+        if (matchedYear.ngayBatDauHk2) {
+          const startHk2 = new Date(matchedYear.ngayBatDauHk2 + "T00:00:00").getTime();
+          const endHk2 = new Date((matchedYear.ngayKetThucHk2 || matchedYear.ngayBatDauHk2) + "T23:59:59").getTime();
+          setTargetSemester(time >= startHk2 && time <= endHk2 ? 2 : 1);
+        } else {
+          setTargetSemester(1);
+        }
+        return;
+      }
+    }
+
+    // Nếu chưa chọn ngày, luôn ưu tiên năm học đang mở (DANG_MO)
+    const activeYear = allYears.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO") || allYears[0];
+    if (activeYear) {
+      setTargetYear(activeYear.tenNamHoc);
+    }
   }, [date, allYears]);
 
   // Tải thông tin giáo viên đăng nhập
@@ -60,8 +83,10 @@ export default function TeacherLeaveRequestPage() {
         const years = namHocRes?.data?.data || [];
         setAllYears(years);
         if (years.length > 0) {
-          const activeYear = years.find((nh) => nh.trangThai === "DANG_MO");
-          setCurrentYear(activeYear ? activeYear.tenNamHoc : years[years.length - 1].tenNamHoc);
+          const activeYear = years.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO");
+          const yrName = activeYear ? activeYear.tenNamHoc : years[0]?.tenNamHoc || "2025-2026";
+          setCurrentYear(yrName);
+          setTargetYear(yrName);
         }
       } catch {
         /* ignore */
@@ -98,12 +123,13 @@ export default function TeacherLeaveRequestPage() {
 
   const loadSchedule = async () => {
     if (!teacher?.id) return;
-    if (!targetYear) {
+    const yearToFetch = targetYear || currentYear;
+    if (!yearToFetch) {
       setTimetable([]);
       return;
     }
     try {
-      const tkbRes = await getThoiKhoaBieu({ namHoc: targetYear });
+      const tkbRes = await getThoiKhoaBieu({ namHoc: yearToFetch, hocKy: targetSemester });
       const allSlots = tkbRes?.data?.data || [];
       const teacherSlots = allSlots.filter(s => 
         String(s?.giaoVien?.id ?? s?.giaoVienId) === String(teacher.id)
@@ -137,18 +163,39 @@ export default function TeacherLeaveRequestPage() {
       loadSchedule();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacher?.id, targetYear]);
+  }, [teacher?.id, targetYear, targetSemester]);
 
-  // Tính toán ngày trong tuần hiện tại dựa trên "Thứ" (2 = Thứ hai -> 7 = Thứ bảy) của tuần chứa ngày xin nghỉ
-  const getCalculatedDateForDay = (thuValue) => {
-    if (!date) return "--/--"; // Nếu chưa chọn ngày nghỉ thì không hiển thị ngày cụ thể
-    const baseDate = new Date(date);
+  // Tính toán ngày trong tuần dựa trên "Thứ" (2 = Thứ hai -> 7 = Thứ bảy)
+  const getCalculatedDateForDay = (thuValue, fullFormat = false) => {
+    let baseDate;
+    if (date) {
+      baseDate = new Date(date + "T00:00:00");
+    } else if (currentYearObj) {
+      const startHk1 = new Date(currentYearObj.ngayBatDauHk1 + "T00:00:00");
+      const startHk2 = currentYearObj.ngayBatDauHk2 ? new Date(currentYearObj.ngayBatDauHk2 + "T00:00:00") : startHk1;
+      baseDate = targetSemester === 2 ? startHk2 : startHk1;
+    } else {
+      baseDate = new Date();
+    }
+
+    if (isNaN(baseDate.getTime())) baseDate = new Date();
+
     let currentDay = baseDate.getDay(); // 0 = Chủ nhật, 1 = Thứ hai,...
-    if (currentDay === 0) currentDay = 7; // Coi Chủ nhật là cuối tuần (ngày 7)
-    const distance = (thuValue - 1) - currentDay; // Tính khoảng cách ngày
+    if (currentDay === 0) currentDay = 7; // Coi Chủ nhật là ngày 7
+    const distance = (Number(thuValue) - 1) - currentDay;
     const targetDate = new Date(baseDate);
     targetDate.setDate(baseDate.getDate() + distance);
-    return targetDate.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+
+    if (fullFormat) {
+      const yyyy = targetDate.getFullYear();
+      const mm = String(targetDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(targetDate.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    const day = String(targetDate.getDate()).padStart(2, "0");
+    const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+    return `${day}/${month}`;
   };
 
   const handleSubmit = async (e) => {
@@ -322,29 +369,76 @@ export default function TeacherLeaveRequestPage() {
           </div>
 
           {/* Lịch dạy của giáo viên */}
-          {timetable.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-1.5">
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-green-600">calendar_month</span>
                 Lịch giảng dạy trong tuần
               </h3>
-              <p className="text-xs text-gray-400 mb-4">Các tiết dạy chính thức được xếp lịch dạy của bạn:</p>
-              <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
-                {timetable.map((s) => (
-                  <div key={s.id} className="rounded-lg bg-gray-50 p-2.5 text-xs border border-gray-100">
-                    <div className="flex justify-between font-bold text-gray-800">
-                      <span>{s.monHoc?.tenMon}</span>
-                      <span className="text-blue-600">Lớp {s.lop?.tenLop}</span>
-                    </div>
-                    <div className="text-gray-500 mt-1 flex justify-between">
-                      <span>{getDayLabel(s.thu)} ({getCalculatedDateForDay(s.thu)})</span>
-                      <span>Tiết {s.tietBatDau} ({s.soTiet} tiết)</span>
-                    </div>
-                  </div>
-                ))}
+              {/* Semester Switcher */}
+              <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTargetSemester(1)}
+                  className={`px-2 py-0.5 rounded-md font-semibold transition-all ${
+                    targetSemester === 1 ? "bg-white text-blue-600 shadow-xs" : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  HK I
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetSemester(2)}
+                  className={`px-2 py-0.5 rounded-md font-semibold transition-all ${
+                    targetSemester === 2 ? "bg-white text-blue-600 shadow-xs" : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  HK II
+                </button>
               </div>
             </div>
-          )}
+
+            <p className="text-xs text-gray-400 mb-3">
+              Năm học {targetYear} · Học kỳ {targetSemester === 2 ? "II" : "I"} (Nhấn vào tiết để chọn ngày nghỉ)
+            </p>
+
+            {timetable.length === 0 ? (
+              <div className="py-6 text-center text-xs text-gray-400 italic bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                Không có lịch dạy trong học kỳ này.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
+                {timetable.map((s) => {
+                  const calculatedDateStr = getCalculatedDateForDay(s.thu);
+                  const fullDateStr = getCalculatedDateForDay(s.thu, true);
+                  const isSelected = date === fullDateStr;
+
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => setDate(fullDateStr)}
+                      className={`rounded-lg p-2.5 text-xs border transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-blue-50 border-blue-300 ring-1 ring-blue-300"
+                          : "bg-gray-50 border-gray-100 hover:bg-blue-50/50 hover:border-blue-200"
+                      }`}
+                    >
+                      <div className="flex justify-between font-bold text-gray-800">
+                        <span>{s.monHoc?.tenMon}</span>
+                        <span className="text-blue-600">Lớp {s.lop?.tenLop}</span>
+                      </div>
+                      <div className="text-gray-500 mt-1 flex justify-between">
+                        <span className={isSelected ? "font-semibold text-blue-700" : ""}>
+                          {getDayLabel(s.thu)} ({calculatedDateStr})
+                        </span>
+                        <span>Tiết {s.tietBatDau} ({s.soTiet} tiết)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Lịch sử đơn báo nghỉ */}

@@ -11,6 +11,7 @@ export interface StudentInfo {
     id: number;
     tenLop: string;
     khoi: number;
+    namHoc?: string;
     giaoVienChuNhiem: {
       id: number;
       hoTen: string;

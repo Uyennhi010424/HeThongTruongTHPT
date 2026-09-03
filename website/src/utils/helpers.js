@@ -77,7 +77,7 @@ export const getLimitedSemesterWeeks = (selectedYear, hocKy = null) => {
     schoolStart = new Date(selectedYear.ngayBatDauHk1 + "T00:00:00");
   } else if (typeof selectedYear === "string") {
     const startYear = parseInt(selectedYear.split("-")[0]);
-    schoolStart = new Date(startYear, 8, 5); // 5th Sept
+    schoolStart = new Date(startYear, 8, 7); // 7th Sept
   }
   
   if (schoolStart) {
@@ -116,7 +116,7 @@ export const getCurrentSemesterWeek = (selectedYear) => {
     schoolStart = new Date(selectedYear.ngayBatDauHk1 + "T00:00:00");
   } else if (typeof selectedYear === "string") {
     const startYear = parseInt(selectedYear.split("-")[0]);
-    schoolStart = new Date(startYear, 8, 5);
+    schoolStart = new Date(startYear, 8, 7);
   }
   
   if (schoolStart) {
@@ -139,13 +139,13 @@ export const getWeekDates = (tuan, selectedYear = null) => {
     schoolStart = new Date(selectedYear.ngayBatDauHk1 + "T00:00:00");
   } else if (typeof selectedYear === "string") {
     const startYear = parseInt(selectedYear.split("-")[0]);
-    schoolStart = new Date(startYear, 8, 5);
+    schoolStart = new Date(startYear, 8, 7);
   } else if (selectedYear?.tenNamHoc) {
     const startYear = parseInt(selectedYear.tenNamHoc.split("-")[0]);
-    schoolStart = new Date(startYear, 8, 5);
+    schoolStart = new Date(startYear, 8, 7);
   } else {
     const currentYear = new Date().getFullYear();
-    schoolStart = new Date(currentYear, 8, 5);
+    schoolStart = new Date(currentYear, 8, 7);
   }
 
   const dow = schoolStart.getDay();

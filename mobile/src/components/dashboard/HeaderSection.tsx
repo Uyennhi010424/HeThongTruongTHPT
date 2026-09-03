@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Menu, Bell } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StudentInfo } from '../../models/dashboard.type';
 import axiosClient from '../../api/axiosClient';
+import { BASE_URL } from '@/constants/config';
 
 interface HeaderSectionProps {
   student: StudentInfo | null;
@@ -19,6 +20,8 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({
   onNotificationPress,
   onMenuPress
 }) => {
+  const [imageError, setImageError] = useState(false);
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Chào buổi sáng ';
@@ -29,9 +32,17 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({
   const getAvatarUri = () => {
     if (!student?.anhDaiDien) return null;
     if (student.anhDaiDien.startsWith('http')) return student.anhDaiDien;
-    const baseURL = axiosClient.defaults.baseURL?.replace('/api', '') || 'http://192.168.110.210:8080';
+    const baseURL = axiosClient.defaults.baseURL?.replace('/api', '') || BASE_URL;
     return `${baseURL}${student.anhDaiDien.startsWith('/') ? '' : '/'}${student.anhDaiDien}`;
   };
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'HS';
+    const parts = name.trim().split(/\s+/);
+    return parts[parts.length - 1].charAt(0).toUpperCase();
+  };
+
+  const avatarUri = getAvatarUri();
 
   return (
     <LinearGradient
@@ -71,10 +82,19 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({
             </View>
           </View>
           <View style={styles.avatarContainer}>
-            <Image
-              source={getAvatarUri() ? { uri: getAvatarUri() } : require('../../../assets/images/logo.png')}
-              style={styles.avatar}
-            />
+            {avatarUri && !imageError ? (
+              <Image
+                source={{ uri: avatarUri }}
+                style={styles.avatar}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>
+                  {getInitials(student?.hoTen)}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </SafeAreaView>
@@ -170,10 +190,28 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: '#FFFFFF',
     padding: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
   avatar: {
     width: '100%',
     height: '100%',
     borderRadius: 28,
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: '#143872',
+    fontSize: 22,
+    fontWeight: 'bold',
   },
 });

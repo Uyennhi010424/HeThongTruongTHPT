@@ -5,6 +5,7 @@ import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
 import { getMonHoc, createMonHoc } from "../../../api/monhocApi.js";
 import { getLop } from "../../../api/lopApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
 import { autoAssignAll, createPhanCongDay, deletePhanCongDay, deletePhanCongDayById, getPhanCongDay } from "../../../api/phancongDayApi.js";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
@@ -138,7 +139,6 @@ export default function PhanCongPage() {
   // Auto assign state
   const [autoOpen, setAutoOpen] = useState(false);
   const [autoNamHoc, setAutoNamHoc] = useState("");
-  const [autoHocKy, setAutoHocKy] = useState(1);
 
   // Filter state
   const [filter, setFilter] = useState({
@@ -160,10 +160,16 @@ export default function PhanCongPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
+  const [academicYears, setAcademicYears] = useState([]);
+
   const namHocList = useMemo(() => {
-    const set = new Set(assignments.map((a) => a.namHoc).filter(Boolean));
+    const set = new Set([
+      ...academicYears,
+      ...assignments.map((a) => a.namHoc),
+      ...classes.map((c) => c.namHoc)
+    ].filter(Boolean));
     return Array.from(set).sort().reverse();
-  }, [assignments]);
+  }, [academicYears, assignments, classes]);
   
   const khoiList = ["Khối 10", "Khối 11", "Khối 12"];
 
@@ -203,15 +209,34 @@ export default function PhanCongPage() {
     try {
       setLoading(true);
       setError("");
-      const [gv, mh, lop, phanCong] = await Promise.all([getGiaoVien(), getMonHoc(), getLop(), getPhanCongDay()]);
+      const [gv, mh, lop, phanCong, nhRes] = await Promise.all([
+        getGiaoVien(),
+        getMonHoc(),
+        getLop(),
+        getPhanCongDay(),
+        getNamHoc().catch(() => ({ data: { data: [] } }))
+      ]);
+
       setTeachers((gv?.data?.data || []).sort((a, b) => String(a?.hoTen || "").localeCompare(String(b?.hoTen || ""), "vi", { sensitivity: "base", numeric: true })));
       setSubjects(mh?.data?.data || []);
-      setClasses(lop?.data?.data || []);
-      const defaultNam = lop?.data?.data?.[0]?.namHoc || "";
+      const classList = lop?.data?.data || [];
+      setClasses(classList);
+
+      const rawNamHoc = nhRes?.data?.data || [];
+      const activeNamHoc = rawNamHoc.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO");
+      
+      const yearsFromNh = rawNamHoc.map(nh => nh.tenNamHoc).filter(Boolean);
+      const allYears = Array.from(new Set([
+        ...yearsFromNh,
+        ...classList.map(l => l.namHoc).filter(Boolean),
+        ...(phanCong?.data?.data || []).map(p => p.namHoc).filter(Boolean)
+      ])).sort().reverse();
+      
+      setAcademicYears(allYears);
+
+      const defaultNam = activeNamHoc?.tenNamHoc || allYears[0] || "2026-2027";
       setAutoNamHoc(defaultNam);
-      if (!filter.namHoc) {
-        setFilter(p => ({ ...p, namHoc: defaultNam }));
-      }
+      setFilter(p => ({ ...p, namHoc: p.namHoc || defaultNam }));
 
       const rows = (phanCong?.data?.data || []).map((item) => ({
         id: item.id,
@@ -284,11 +309,11 @@ export default function PhanCongPage() {
   };
 
   const handleAutoAssign = async () => {
-    if (!autoNamHoc) { notifyError("Nhập năm học."); return; }
+    if (!autoNamHoc) { notifyError("Vui lòng chọn năm học."); return; }
     try {
-      const res = await autoAssignAll(autoNamHoc, Number(autoHocKy));
+      const res = await autoAssignAll(autoNamHoc, 1);
       const createdCount = (res?.data?.data || []).length;
-      notifySuccess(`Tạo ${createdCount} phân công thành công.`);
+      notifySuccess(`Tự động phân công cả năm học ${autoNamHoc} thành công!`);
       axiosClient.invalidateCache("/phancong-day");
       fetchData();
       setAutoOpen(false);
@@ -384,7 +409,7 @@ export default function PhanCongPage() {
               >
                 <option value="">Tất cả</option>
                 {classes
-                  .filter(c => !filter.khoi || String(c.tenLop).startsWith(filter.khoi.replace("Khối ", "")))
+                  .filter(c => (!filter.namHoc || c.namHoc === filter.namHoc) && (!filter.khoi || String(c.tenLop).startsWith(filter.khoi.replace("Khối ", ""))))
                   .sort((a,b) => String(a.tenLop).localeCompare(String(b.tenLop), "vi", {numeric: true}))
                   .map((l) => <option key={l.id} value={l.tenLop}>{l.tenLop}</option>)
                 }
@@ -636,12 +661,21 @@ export default function PhanCongPage() {
             <select 
               value={selectedClassId} 
               onChange={(e) => setSelectedClassId(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="">-- Chọn lớp --</option>
-              {classes.slice().sort((a, b) => String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { numeric: true })).map((l) => (
-                <option key={l.id} value={l.id}>{l.tenLop}</option>
-              ))}
+              {classes
+                .slice()
+                .sort((a, b) => {
+                  const cmp = String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { numeric: true });
+                  if (cmp !== 0) return cmp;
+                  return String(b.namHoc || "").localeCompare(String(a.namHoc || ""));
+                })
+                .map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.tenLop} {l.namHoc ? `(${l.namHoc})` : ""}
+                  </option>
+                ))}
             </select>
           </div>
           <div className="space-y-1.5">
@@ -666,29 +700,23 @@ export default function PhanCongPage() {
       </SimpleModal>
 
       {/* Auto Assign Modal */}
-      <SimpleModal open={autoOpen} title="Tự động phân công" onClose={() => setAutoOpen(false)}>
+      <SimpleModal open={autoOpen} title="Tự động phân công giảng dạy" onClose={() => setAutoOpen(false)}>
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
-            Hệ thống sẽ tự động phân công giáo viên dạy các lớp theo bộ môn chuyên môn.
+            Hệ thống sẽ tự động phân bổ và phân công giáo viên giảng dạy cho tất cả các lớp trong năm học theo đúng chuyên môn bộ môn (áp dụng cho cả <strong>Học kỳ 1</strong> và <strong>Học kỳ 2</strong>).
           </p>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Năm học *</label>
-            <input 
+            <label className="text-sm font-medium text-slate-700">Năm học áp dụng *</label>
+            <select 
               value={autoNamHoc} 
               onChange={(e) => setAutoNamHoc(e.target.value)} 
-              placeholder="2025-2026"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Học kỳ *</label>
-            <select 
-              value={autoHocKy} 
-              onChange={(e) => setAutoHocKy(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value={1}>Học kỳ 1</option>
-              <option value={2}>Học kỳ 2</option>
+              {namHocList.map((n) => (
+                <option key={n} value={n}>
+                  Năm học {n}
+                </option>
+              ))}
             </select>
           </div>
           <div className="pt-4 flex items-center justify-end gap-2">

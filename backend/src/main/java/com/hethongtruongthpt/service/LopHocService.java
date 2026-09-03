@@ -29,6 +29,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class LopHocService {
@@ -172,6 +174,33 @@ public class LopHocService {
 
         NamHoc currentNamHocObj = namHocRepository.findByTenNamHoc(currentNamHoc).orElse(null);
 
+        // Pre-fetch all HocBa for current school year into map (hocSinhId -> HocBa)
+        Map<Integer, HocBa> hocBaByStudentId = new HashMap<>();
+        if (currentNamHocObj != null) {
+            List<HocBa> allHocBa = hocBaRepository.findByNamHocId(currentNamHocObj.getId());
+            for (HocBa hb : allHocBa) {
+                if (hb.getHocSinh() != null && hb.getHocSinh().getId() != null) {
+                    hocBaByStudentId.put(hb.getHocSinh().getId(), hb);
+                }
+            }
+        }
+
+        // Pre-fetch all LichSuHocTap for current school year into set of student IDs
+        Set<Integer> existingHistoryStudentIds = lichSuHocTapRepository.findByNamHoc(currentNamHoc)
+                .stream()
+                .filter(ls -> ls.getHocSinh() != null && ls.getHocSinh().getId() != null)
+                .map(ls -> ls.getHocSinh().getId())
+                .collect(Collectors.toSet());
+
+        // Pre-fetch next year classes into a map (tenLop -> LopHoc)
+        Map<String, LopHoc> nextYearClassMap = lopHocRepository.findByNamHoc(nextNamHoc)
+                .stream()
+                .collect(Collectors.toMap(LopHoc::getTenLop, lop -> lop, (existing, replace) -> existing));
+
+        List<LichSuHocTap> historyToSave = new ArrayList<>();
+        List<HocSinh> studentsToSave = new ArrayList<>();
+        List<LopHoc> classesToSave = new ArrayList<>();
+
         for (LopHoc oldLop : currentLops) {
             int khoi = oldLop.getKhoi();
             String tenLop = oldLop.getTenLop();
@@ -180,13 +209,10 @@ public class LopHocService {
             if (khoi == 12) {
                 // Tot nghiep: hoc sinh trangThai=2, xoa chu nhiem
                 for (HocSinh hs : students) {
-                    HocBa hocBa = null;
-                    if (currentNamHocObj != null) {
-                        hocBa = hocBaRepository.findByHocSinhIdAndNamHocId(hs.getId(), currentNamHocObj.getId()).orElse(null);
-                    }
+                    HocBa hocBa = hocBaByStudentId.get(hs.getId());
                     boolean isFail = hocBa != null && ((hocBa.getDiemTBCaNam() != null && hocBa.getDiemTBCaNam().doubleValue() < 5.0) || "Yếu".equalsIgnoreCase(hocBa.getHocLuc()) || "Kém".equalsIgnoreCase(hocBa.getHocLuc()));
 
-                    if (!lichSuHocTapRepository.existsByHocSinhIdAndNamHoc(hs.getId(), currentNamHoc)) {
+                    if (!existingHistoryStudentIds.contains(hs.getId())) {
                         LichSuHocTap ls = new LichSuHocTap();
                         ls.setHocSinh(hs);
                         ls.setLopHoc(oldLop);
@@ -197,26 +223,26 @@ public class LopHocService {
                             ls.setHanhKiem(hocBa.getHanhKiem());
                         }
                         ls.setKetQua(isFail ? "Ở lại lớp" : "Tốt nghiệp");
-                        lichSuHocTapRepository.save(ls);
+                        historyToSave.add(ls);
+                        existingHistoryStudentIds.add(hs.getId());
                     }
                     hs.setLop(null);
                     if (isFail) {
-                        hs.setTrangThai(1); // Ở lại lớp thì trạng thái vẫn đang học, chỉ là bị gỡ lớp
+                        hs.setTrangThai(1);
                         failedCount++;
                     } else {
-                        hs.setTrangThai(2); // Tốt nghiệp thì trạng thái ngừng học
+                        hs.setTrangThai(2);
                         graduatedCount++;
                     }
-                    hocSinhRepository.save(hs);
+                    studentsToSave.add(hs);
                 }
                 if (oldLop.getGvcn() != null) {
                     log.info("Xóa chủ nhiệm: GV {} thôi chủ nhiệm lớp {} (tốt nghiệp)",
                         oldLop.getGvcn().getId(), tenLop);
                     oldLop.setGvcn(null);
                 }
-                // Dong bo siSo lop da tot nghiep = 0
                 oldLop.setSiSo(0);
-                lopHocRepository.save(oldLop);
+                classesToSave.add(oldLop);
                 log.info("Tốt nghiệp {} học sinh từ lớp {}", students.size(), tenLop);
 
             } else if (khoi == 10 || khoi == 11) {
@@ -224,27 +250,27 @@ public class LopHocService {
                 String newTenLop = tenLop.replaceFirst("^" + khoi, String.valueOf(newKhoi));
 
                 // Tim hoac tao lop moi (giữ nguyên tổ hợp môn từ lớp cũ)
-                LopHoc newLop = lopHocRepository.findByTenLopAndNamHoc(newTenLop, nextNamHoc)
-                        .orElseGet(() -> {
-                            LopHoc created = new LopHoc();
-                            created.setTenLop(newTenLop);
-                            created.setKhoi(newKhoi);
-                            created.setNamHoc(nextNamHoc);
-                            created.setSiSo(0);
-                            created.setToHopId(oldLop.getToHopId()); // Giữ nguyên tổ hợp
-                            createdClasses.add(newTenLop);
-                            return lopHocRepository.save(created);
-                        });
+                LopHoc newLop = nextYearClassMap.get(newTenLop);
+                if (newLop == null) {
+                    LopHoc created = new LopHoc();
+                    created.setTenLop(newTenLop);
+                    created.setKhoi(newKhoi);
+                    created.setNamHoc(nextNamHoc);
+                    created.setSiSo(0);
+                    created.setToHopId(oldLop.getToHopId());
+                    newLop = lopHocRepository.save(created);
+                    nextYearClassMap.put(newTenLop, newLop);
+                    createdClasses.add(newTenLop);
+                }
+
+                int newClassStudentCount = newLop.getSiSo() != null ? newLop.getSiSo() : 0;
 
                 // Chuyen hoc sinh sang lop moi
                 for (HocSinh hs : students) {
-                    HocBa hocBa = null;
-                    if (currentNamHocObj != null) {
-                        hocBa = hocBaRepository.findByHocSinhIdAndNamHocId(hs.getId(), currentNamHocObj.getId()).orElse(null);
-                    }
+                    HocBa hocBa = hocBaByStudentId.get(hs.getId());
                     boolean isFail = hocBa != null && ((hocBa.getDiemTBCaNam() != null && hocBa.getDiemTBCaNam().doubleValue() < 5.0) || "Yếu".equalsIgnoreCase(hocBa.getHocLuc()) || "Kém".equalsIgnoreCase(hocBa.getHocLuc()));
 
-                    if (!lichSuHocTapRepository.existsByHocSinhIdAndNamHoc(hs.getId(), currentNamHoc)) {
+                    if (!existingHistoryStudentIds.contains(hs.getId())) {
                         LichSuHocTap ls = new LichSuHocTap();
                         ls.setHocSinh(hs);
                         ls.setLopHoc(oldLop);
@@ -255,40 +281,47 @@ public class LopHocService {
                             ls.setHanhKiem(hocBa.getHanhKiem());
                         }
                         ls.setKetQua(isFail ? "Ở lại lớp" : "Lên lớp");
-                        lichSuHocTapRepository.save(ls);
+                        historyToSave.add(ls);
+                        existingHistoryStudentIds.add(hs.getId());
                     }
                     if (isFail) {
-                        hs.setLop(null); // Gỡ lớp để Admin tự xếp lại
+                        hs.setLop(null);
                         failedCount++;
                     } else {
                         hs.setLop(newLop);
                         promotedCount++;
+                        newClassStudentCount++;
                     }
-                    hocSinhRepository.save(hs);
+                    studentsToSave.add(hs);
                 }
 
-                // Dong bo siSo tu so hoc sinh active
-                long newCount = hocSinhRepository.countByLopIdAndTrangThai(newLop.getId(), 1);
-                newLop.setSiSo((int) newCount);
-                lopHocRepository.save(newLop);
-                // Cap nhat siSo lop cu
-                long oldCount = hocSinhRepository.countByLopIdAndTrangThai(oldLop.getId(), 1);
-                oldLop.setSiSo((int) oldCount);
+                newLop.setSiSo(newClassStudentCount);
+                oldLop.setSiSo(0);
 
                 // Chuyen giao vien chu nhiem sang lop moi
                 if (oldLop.getGvcn() != null) {
                     if (newLop.getGvcn() == null || !newLop.getGvcn().getId().equals(oldLop.getGvcn().getId())) {
                         newLop.setGvcn(oldLop.getGvcn());
-                        lopHocRepository.save(newLop);
                         teacherMovedCount++;
                         log.info("Chuyển chủ nhiệm: GV {} từ {} sang {}", oldLop.getGvcn().getId(), tenLop, newTenLop);
                     }
                     oldLop.setGvcn(null);
                 }
-                lopHocRepository.save(oldLop);
+                classesToSave.add(newLop);
+                classesToSave.add(oldLop);
 
                 log.info("Chuyển {} học sinh từ {} sang {} năm {}", students.size(), tenLop, newTenLop, nextNamHoc);
             }
+        }
+
+        if (!historyToSave.isEmpty()) {
+            lichSuHocTapRepository.saveAll(historyToSave);
+        }
+        if (!studentsToSave.isEmpty()) {
+            hocSinhRepository.saveAll(studentsToSave);
+        }
+        if (!classesToSave.isEmpty()) {
+            lopHocRepository.saveAll(classesToSave);
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -365,12 +398,21 @@ public class LopHocService {
         List<LopHoc> allLops = lopHocRepository.findAll();
         int updated = 0;
         for (LopHoc lop : allLops) {
-            // Count all enrolled students (1 = active, 2 = graduated/grade 12)
+            // Count all enrolled students currently in this class
             long count1 = hocSinhRepository.countByLopIdAndTrangThai(lop.getId(), 1);
             long count2 = hocSinhRepository.countByLopIdAndTrangThai(lop.getId(), 2);
             int newSiSo = (int)(count1 + count2);
+
+            // If current count is 0, check historical enrollment from lich_su_hoc_tap
+            if (newSiSo == 0 && lop.getId() != null) {
+                long histCount = lichSuHocTapRepository.countByLopId(lop.getId());
+                if (histCount > 0) {
+                    newSiSo = (int) histCount;
+                }
+            }
+
             if (!Integer.valueOf(newSiSo).equals(lop.getSiSo())) {
-                log.info("Đồng bộ sĩ số lớp {}: {} → {}", lop.getTenLop(), lop.getSiSo(), newSiSo);
+                log.info("Đồng bộ sĩ số lớp {} ({}): {} → {}", lop.getTenLop(), lop.getNamHoc(), lop.getSiSo(), newSiSo);
                 lop.setSiSo(newSiSo);
                 lopHocRepository.save(lop);
                 updated++;

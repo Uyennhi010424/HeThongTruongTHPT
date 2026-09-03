@@ -28,6 +28,8 @@ public interface ThoiKhoaBieuRepository extends JpaRepository<ThoiKhoaBieu, Inte
     List<ThoiKhoaBieu> findByLopIdAndTuan(Integer lopId, Integer tuan);
     @EntityGraph(attributePaths = {"monHoc", "giaoVien", "lop"})
     List<ThoiKhoaBieu> findByNamHocAndHocKyAndTuan(String namHoc, Integer hocKy, Integer tuan);
+    @EntityGraph(attributePaths = {"monHoc", "giaoVien", "lop"})
+    List<ThoiKhoaBieu> findByTuan(Integer tuan);
     
     void deleteByNamHocAndHocKyAndTuan(String namHoc, Integer hocKy, Integer tuan);
     @EntityGraph(attributePaths = {"monHoc", "giaoVien", "lop"})

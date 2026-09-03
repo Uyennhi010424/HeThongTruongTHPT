@@ -61,8 +61,8 @@ public class HocSinhResponseDTO {
         dto.setNamNhapHoc(hs.getNamNhapHoc());
         dto.setSdt(hs.getSdt());
         dto.setEmail(hs.getEmail());
-        dto.setDanToc(hs.getDanToc() != null ? hs.getDanToc().getTenDanToc() : null);
-        dto.setTonGiao(hs.getTonGiao() != null ? hs.getTonGiao().getTenTonGiao() : null);
+        dto.setDanToc(hs.getDanToc());
+        dto.setTonGiao(hs.getTonGiao());
         dto.setMaBhyt(hs.getMaBhyt());
         dto.setDienChinhSach(hs.getDienChinhSach());
         dto.setTrangThai(hs.getTrangThai());

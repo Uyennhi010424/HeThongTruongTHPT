@@ -1,7 +1,7 @@
 import axiosClient from "./axiosClient";
 
-export const getThoiKhoaBieu = (params = {}) => axiosClient.get("/thoikhoabieu", { params });
-export const getGiaoVienThoiKhoaBieu = (params = {}) => axiosClient.get("/giaoviendangky/thoikhoabieu", { params });
+export const getThoiKhoaBieu = (params = {}, config = {}) => axiosClient.get("/thoikhoabieu", { params, skipCache: true, ...config });
+export const getGiaoVienThoiKhoaBieu = (params = {}, config = {}) => axiosClient.get("/giaoviendangky/thoikhoabieu", { params, skipCache: true, ...config });
 export const createThoiKhoaBieu = (data) => axiosClient.post("/thoikhoabieu", data);
 export const updateThoiKhoaBieu = (id, data) => axiosClient.put(`/thoikhoabieu/${id}`, data);
 export const deleteThoiKhoaBieu = (id) => axiosClient.delete(`/thoikhoabieu/${id}`);

@@ -85,6 +85,11 @@ public class ThoiKhoaBieuGeneratorService {
             if (lops == null || lops.isEmpty()) {
                 lops = lopRepo.findAll();
             }
+            for (LopHoc lop : lops) {
+                if (lop.getGvcn() != null && lop.getGvcn().getId() != null) {
+                    chuNhiemMap.put(lop.getId(), lop.getGvcn().getId());
+                }
+            }
 
             Map<Integer, String> classRoomMap = new HashMap<>();
             for (LopHoc lop : lops)
@@ -320,6 +325,11 @@ public class ThoiKhoaBieuGeneratorService {
             }
             tkbRepo.flush();
 
+            List<LopHoc> lops = lopRepo.findByNamHoc(namHoc);
+            if (lops == null || lops.isEmpty()) {
+                lops = lopRepo.findAll();
+            }
+
             Map<Integer, GiaoVien> gvcnMap = new HashMap<>();
             try {
                 for (ChuNhiem cn : cnRepo.findAll()) {
@@ -327,9 +337,13 @@ public class ThoiKhoaBieuGeneratorService {
                     if (gv != null) gvcnMap.put(cn.getId().getLopId(), gv);
                 }
             } catch (Exception ex) { logger.warn("Khong the tai du lieu chu nhiem: {}", ex.getMessage()); }
+            for (LopHoc lop : lops) {
+                if (lop.getGvcn() != null && lop.getId() != null) {
+                    gvcnMap.put(lop.getId(), lop.getGvcn());
+                }
+            }
 
             List<PhanCongDay> phanCongList = pcRepo.findByNamHocAndHocKy(namHoc, hocKy);
-            List<LopHoc> lops = lopRepo.findByNamHoc(namHoc);
 
             Map<Integer, String> classRoomMap = new HashMap<>();
             for (LopHoc lop : lops)
@@ -428,6 +442,11 @@ public class ThoiKhoaBieuGeneratorService {
                 if (gv != null) gvcnMap.put(cn.getId().getLopId(), gv);
             }
         } catch (Exception ex) { logger.warn("Khong the tai du lieu chu nhiem: {}", ex.getMessage()); }
+        for (LopHoc lop : lops) {
+            if (lop.getGvcn() != null && lop.getId() != null) {
+                gvcnMap.put(lop.getId(), lop.getGvcn());
+            }
+        }
 
         MonHoc shdcMon = findMon("SHDC", "SHDC");
         MonHoc shlMon  = findMon("SHL",  "Sinh hoạt lớp");

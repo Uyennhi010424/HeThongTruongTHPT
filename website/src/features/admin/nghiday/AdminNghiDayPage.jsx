@@ -44,11 +44,21 @@ function ApproveDialog({ record, onClose, onDone }) {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const teacherSubject = record.giaoVien?.boMon?.trim();
+
   useEffect(() => {
     getGiaoVien()
       .then(res => setTeachers(res?.data?.data || []))
       .catch(() => {});
   }, []);
+
+  const filteredTeachers = useMemo(() => {
+    const available = teachers.filter(t => t.id !== record.giaoVien?.id);
+    if (teacherSubject) {
+      return available.filter(t => t.boMon?.trim().toLowerCase() === teacherSubject.toLowerCase());
+    }
+    return available;
+  }, [teachers, record.giaoVien?.id, teacherSubject]);
 
   const submit = async () => {
     setLoading(true);
@@ -68,35 +78,43 @@ function ApproveDialog({ record, onClose, onDone }) {
 
   return (
     <div style={overlayStyle}>
-      <div style={{ ...dialogStyle, maxWidth: 520 }}>
+      <div style={{ ...dialogStyle, maxWidth: 540 }}>
         <div style={dlgHeader("#16a34a")}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>Duyệt đơn xin nghỉ</span>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>Duyệt đơn xin nghỉ & Phân công dạy thay</span>
           <button onClick={onClose} style={closeBtn}>✕</button>
         </div>
         <div style={{ padding: "20px 24px 8px" }}>
-          <InfoRow label="Giáo viên" value={record.giaoVien?.hoTen || "--"} />
-          <InfoRow label="Mã GV" value={record.giaoVien?.maGiaoVien || "--"} />
-          <InfoRow label="Ngày nghỉ" value={fmtDate(record.ngay)} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+            <InfoRow label="Giáo viên" value={record.giaoVien?.hoTen || "--"} />
+            <InfoRow label="Mã GV" value={record.giaoVien?.maGiaoVien || "--"} />
+            <InfoRow label="Bộ môn" value={teacherSubject || "Chưa xác định"} />
+            <InfoRow label="Ngày nghỉ" value={fmtDate(record.ngay)} />
+          </div>
           <InfoRow label="Lý do" value={record.lyDo || "--"} />
-          <InfoRow label="Ghi chú" value={record.ghiChu || "--"} />
+          {record.ghiChu && <InfoRow label="Ghi chú" value={record.ghiChu} />}
         </div>
         <div style={{ padding: "0 24px 20px" }}>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Phân công giáo viên dạy thay (Không bắt buộc)</label>
+            <label style={labelStyle}>
+              Phân công giáo viên dạy thay {teacherSubject ? `(Bộ môn ${teacherSubject})` : "(Không bắt buộc)"}
+            </label>
             <select
               value={giaoVienThayId}
               onChange={(e) => setGiaoVienThayId(e.target.value)}
               style={{ ...textareaStyle, padding: "8px 12px", cursor: "pointer", appearance: "auto" }}
             >
               <option value="">-- Không phân công (để trống) --</option>
-              {teachers
-                .filter(t => t.id !== record.giaoVien?.id) // Bỏ qua giáo viên đang xin nghỉ
-                .map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.hoTen} ({t.maGiaoVien})
-                  </option>
+              {filteredTeachers.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.hoTen} ({t.maGiaoVien}) - Môn {t.boMon || teacherSubject}
+                </option>
               ))}
             </select>
+            {filteredTeachers.length === 0 && (
+              <p style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                Hiện không có giáo viên cùng bộ môn nào khác để phân công.
+              </p>
+            )}
           </div>
 
           <label style={labelStyle}>Ghi chú gửi giáo viên</label>
@@ -211,7 +229,9 @@ function DetailDialog({ record, onClose }) {
             </div>
             <div>
               <div style={{ fontWeight: 700, color: "#1e3a8a", fontSize: 15 }}>{record.giaoVien?.hoTen || "--"}</div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>{record.giaoVien?.maGiaoVien || ""}</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                {record.giaoVien?.maGiaoVien || ""}{record.giaoVien?.boMon ? ` · Môn ${record.giaoVien.boMon}` : ""}
+              </div>
             </div>
             <div style={{ marginLeft: "auto" }}><StatusBadge status={record.trangThai} /></div>
           </div>
@@ -221,7 +241,12 @@ function DetailDialog({ record, onClose }) {
             <InfoRow label="Năm học" value={record.namHoc || "--"} />
             <InfoRow label="Lý do" value={record.lyDo || "--"} />
             <InfoRow label="Ghi chú" value={record.ghiChu || "--"} />
-            {record.giaoVienThay && <InfoRow label="Người dạy thay" value={record.giaoVienThay?.hoTen || "--"} />}
+            {record.giaoVienThay && (
+              <InfoRow
+                label="Người dạy thay"
+                value={`${record.giaoVienThay?.hoTen || "--"}${record.giaoVienThay?.boMon ? ` (Môn ${record.giaoVienThay.boMon})` : ""}`}
+              />
+            )}
             {record.lyDoTuChoi && <InfoRow label="Lý do từ chối" value={record.lyDoTuChoi} />}
           </div>
 

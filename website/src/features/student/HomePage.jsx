@@ -203,8 +203,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 pb-20">
-      <div className="w-full flex flex-col lg:flex-row gap-6">
-        <div className="w-full lg:w-[40%] flex flex-col gap-6">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="lg:col-span-5 flex flex-col gap-6 min-h-0 lg:h-full">
           <StudentProfileWidget
             student={data?.student}
             avatarSrc={avatarSrc}
@@ -222,7 +222,7 @@ export default function HomePage() {
           />
         </div>
 
-        <div className="w-full lg:w-[60%] flex flex-col gap-6">
+        <div className="lg:col-span-7 flex flex-col gap-6">
           <StatCardsWidget
             weekTimetable={data?.timetable || []}
             subjectsCount={data?.subjects?.length || 0}

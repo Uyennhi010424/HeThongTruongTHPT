@@ -115,10 +115,13 @@ public class SampleDataSeeder implements CommandLineRunner {
     }
 
     private void seedPhanCongDay() {
-        if (checkDataExists("phan_cong_day")) { log.info("PhanCongDay already exists, skip"); return; }
+        if (checkDataExists("phan_cong_day")) {
+            log.info("PhanCongDay already exists, skip");
+            return;
+        }
         log.info("Bắt đầu tự động phân công giảng dạy...");
         phanCongDayService.autoAssignAllSubjects("2025-2026", 1);
-        log.info("Đã hoàn thành phân công giảng dạy HK1 2025-2026.");
+        log.info("Đã hoàn thành phân công giảng dạy HK1 & HK2 2025-2026.");
     }
 
     private void seedChuNhiem() {
@@ -234,8 +237,9 @@ public class SampleDataSeeder implements CommandLineRunner {
                 hs.setNgaySinh(LocalDate.of(2010 - (lop.getKhoi() - 10), 1, 1).plusDays(new Random().nextInt(300)));
                 hs.setTrangThai(1);
                 hs.setDiaChi("Cần Thơ");
-                // Gán dân tộc mặc định "Kinh" qua FK
-                danTocRepository.findByTenDanToc("Kinh").ifPresent(hs::setDanToc);
+                // Gán dân tộc mặc định "Kinh"
+                hs.setDanToc("Kinh");
+                hs.setTonGiao("Không");
 
                 hs = hocSinhRepository.save(hs);
 

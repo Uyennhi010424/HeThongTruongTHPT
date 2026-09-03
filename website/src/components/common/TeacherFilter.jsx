@@ -2,9 +2,12 @@ import { useRef, useState, useEffect } from "react";
 
 export default function TeacherFilter({ 
   filters, 
+  config,
   showGrade = true,
   showClass = true,
-  showSubject = true 
+  showSubject = true,
+  showSemester = true,
+  align = "right"
 }) {
   const {
     namHocList,
@@ -24,6 +27,11 @@ export default function TeacherFilter({
     resetFilters
   } = filters;
 
+  const isShowGrade = config?.showGrade !== undefined ? config.showGrade : showGrade;
+  const isShowClass = config?.showClass !== undefined ? config.showClass : showClass;
+  const isShowSubject = config?.showSubject !== undefined ? config.showSubject : showSubject;
+  const isShowSemester = config?.showSemester !== undefined ? config.showSemester : showSemester;
+
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef(null);
 
@@ -39,12 +47,16 @@ export default function TeacherFilter({
   }, [filterOpen]);
 
   const hasActiveFilters = 
-    selectedSemester !== "HK1" || 
-    (showGrade && selectedGrade !== "all") || 
-    (showClass && selectedClassId) ||
-    (showSubject && selectedSubjectId);
+    (isShowSemester && selectedSemester !== "HK1") || 
+    (isShowGrade && selectedGrade !== "all") || 
+    (isShowClass && selectedClassId && filteredClasses.length > 1 && selectedClassId !== filteredClasses[0]?.id?.toString()) ||
+    (isShowSubject && selectedSubjectId);
 
   const inputClassFilter = "w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-700";
+
+  const alignClass = align === "left" ? "left-0" : "right-0";
+  const isSingleField = !isShowSemester && !isShowGrade && !isShowClass && !isShowSubject;
+  const widthClass = isSingleField ? "w-[260px]" : isShowSemester ? "w-[340px]" : "w-[300px]";
 
   return (
     <div className="relative w-fit" ref={filterRef}>
@@ -64,17 +76,17 @@ export default function TeacherFilter({
       </button>
 
       {filterOpen && (
-        <div className="absolute right-0 mt-2 w-[340px] bg-white rounded-xl shadow-xl border border-slate-200 p-5 z-50 flex flex-col gap-4">
+        <div className={`absolute ${alignClass} mt-2 ${widthClass} bg-white rounded-xl shadow-xl border border-slate-200 p-5 z-50 flex flex-col gap-4`}>
           <div className="text-[15px] font-bold text-slate-800 border-b border-slate-100 pb-3 flex justify-between items-center">
             <span>Lọc danh sách</span>
-            {(hasActiveFilters) && (
+            {hasActiveFilters && (
               <button type="button" className="text-[12px] font-semibold text-red-600 hover:text-red-700" onClick={resetFilters}>
                 Xóa lọc
               </button>
             )}
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid ${isShowSemester ? "grid-cols-2" : "grid-cols-1"} gap-4`}>
             <div className="flex flex-col gap-1.5">
               <span className="text-[13px] font-semibold text-slate-600">Năm học</span>
               <select className={inputClassFilter} value={selectedNamHoc} onChange={(e) => setSelectedNamHoc(e.target.value)}>
@@ -86,16 +98,18 @@ export default function TeacherFilter({
               </select>
             </div>
             
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-semibold text-slate-600">Học kỳ</span>
-              <select className={inputClassFilter} value={selectedSemester} onChange={(e) => setSelectedSemester(e.target.value)}>
-                <option value="HK1">Học kỳ I</option>
-                <option value="HK2">Học kỳ II</option>
-              </select>
-            </div>
+            {isShowSemester && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[13px] font-semibold text-slate-600">Học kỳ</span>
+                <select className={inputClassFilter} value={selectedSemester} onChange={(e) => setSelectedSemester(e.target.value)}>
+                  <option value="HK1">Học kỳ I</option>
+                  <option value="HK2">Học kỳ II</option>
+                </select>
+              </div>
+            )}
             
-            {showGrade && (
-              <div className="flex flex-col gap-1.5 col-span-2">
+            {isShowGrade && (
+              <div className={`flex flex-col gap-1.5 ${isShowSemester ? "col-span-2" : ""}`}>
                 <span className="text-[13px] font-semibold text-slate-600">Khối</span>
                 <select className={inputClassFilter} value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
                   <option value="all">Tất cả khối</option>
@@ -106,8 +120,8 @@ export default function TeacherFilter({
               </div>
             )}
             
-            {showClass && (
-              <div className="flex flex-col gap-1.5 col-span-2">
+            {isShowClass && (
+              <div className={`flex flex-col gap-1.5 ${isShowSemester ? "col-span-2" : ""}`}>
                 <span className="text-[13px] font-semibold text-slate-600">Lớp</span>
                 <select className={inputClassFilter} value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
                   {filteredClasses.length === 0 ? (
@@ -121,8 +135,8 @@ export default function TeacherFilter({
               </div>
             )}
 
-            {showSubject && (
-              <div className="flex flex-col gap-1.5 col-span-2">
+            {isShowSubject && (
+              <div className={`flex flex-col gap-1.5 ${isShowSemester ? "col-span-2" : ""}`}>
                 <span className="text-[13px] font-semibold text-slate-600">Môn học</span>
                 <select className={inputClassFilter} value={selectedSubjectId} onChange={(e) => setSelectedSubjectId(e.target.value)}>
                   {allowedSubjects.length === 0 ? (
@@ -141,3 +155,4 @@ export default function TeacherFilter({
     </div>
   );
 }
+

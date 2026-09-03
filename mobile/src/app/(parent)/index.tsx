@@ -1,9 +1,10 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useParentStore } from '../../store/useParentStore';
 import { useRouter } from 'expo-router';
+import { BASE_URL } from '@/constants/config';
 
 const formatConduct = (val: string) => {
   if (val === 'TOT') return 'Tốt';
@@ -13,10 +14,17 @@ const formatConduct = (val: string) => {
   return val;
 };
 
+const getInitials = (name?: string) => {
+  if (!name) return 'HS';
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1].charAt(0).toUpperCase();
+};
+
 export default function ParentDashboard() {
   const { signOut } = useAuthStore();
   const { selectedChild, dashboardData } = useParentStore();
   const router = useRouter();
+  const [imgError, setImgError] = useState(false);
 
   if (!selectedChild || !dashboardData) {
     return (
@@ -26,6 +34,14 @@ export default function ParentDashboard() {
       </View>
     );
   }
+
+  const getAvatarUri = () => {
+    if (!selectedChild?.anhDaiDien) return null;
+    if (selectedChild.anhDaiDien.startsWith('http')) return selectedChild.anhDaiDien;
+    return `${BASE_URL}${selectedChild.anhDaiDien.startsWith('/') ? '' : '/'}${selectedChild.anhDaiDien}`;
+  };
+
+  const avatarUri = getAvatarUri();
 
   // Calculate stats
   const gpa = dashboardData.gpa ?? '--';
@@ -52,7 +68,15 @@ export default function ParentDashboard() {
       <View style={styles.header}>
         <View style={styles.childInfo}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{selectedChild.hoTen?.charAt(0) || 'A'}</Text>
+            {avatarUri && !imgError ? (
+              <Image
+                source={{ uri: avatarUri }}
+                style={styles.avatarImg}
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <Text style={styles.avatarText}>{getInitials(selectedChild.hoTen)}</Text>
+            )}
           </View>
           <View>
             <Text style={styles.childName}>{selectedChild.hoTen}</Text>
@@ -155,6 +179,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
   },
   avatarText: {
     fontSize: 16,

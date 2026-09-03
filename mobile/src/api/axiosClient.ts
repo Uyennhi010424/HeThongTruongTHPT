@@ -1,9 +1,10 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '@/store/useAuthStore';
+import { API_BASE_URL } from '@/constants/config';
 
 const axiosClient = axios.create({
-  baseURL: 'http://192.168.110.210:8080/api', // IP máy tính
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

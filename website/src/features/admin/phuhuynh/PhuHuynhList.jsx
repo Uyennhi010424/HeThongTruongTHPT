@@ -82,7 +82,7 @@ export default function PhuHuynhList() {
   // Add / Edit modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editingParent, setEditingParent] = useState(null);
-  
+
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
@@ -247,7 +247,7 @@ export default function PhuHuynhList() {
   const openCreate = () => {
     setEditingParent(null);
     setForm({ ...emptyForm });
-    
+
     setModalOpen(true);
   };
 
@@ -262,7 +262,7 @@ export default function PhuHuynhList() {
       ngheNghiep: parent.ngheNghiep || "",
       isSmSActive: !!parent.isSmSActive
     });
-    
+
     setModalOpen(true);
   };
 
@@ -285,7 +285,7 @@ export default function PhuHuynhList() {
   /* ---------- submit ---------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
 
     if (!form.hoTen.trim()) {
       notifyError("Vui lòng nhập họ tên.");
@@ -361,11 +361,10 @@ export default function PhuHuynhList() {
           <div className="relative" ref={filterRef}>
             <button
               onClick={() => setFilterOpen(!filterOpen)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${
-                filterOpen || hasFilter
-                  ? "bg-blue-50 border-blue-200 text-blue-700"
-                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
-              }`}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 ${filterOpen || hasFilter
+                ? "bg-blue-50 border-blue-200 text-blue-700"
+                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                }`}
             >
               <Filter className="w-4 h-4" />
               <span>Bộ lọc</span>
@@ -426,21 +425,12 @@ export default function PhuHuynhList() {
           </div>
 
           {/* Làm mới */}
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="inline-flex items-center justify-center w-[42px] h-[42px] bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition-colors duration-200"
             title="Làm mới dữ liệu"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-
-          {/* Thêm mới */}
-          <button 
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors duration-200"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm phụ huynh</span>
           </button>
         </div>
       </div>
@@ -492,14 +482,14 @@ export default function PhuHuynhList() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div 
+                        <div
                           className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0 cursor-pointer"
                           onClick={() => openDetail(parent)}
                         >
                           {parent.hoTen ? parent.hoTen.charAt(0).toUpperCase() : "P"}
                         </div>
                         <div>
-                          <div 
+                          <div
                             className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors cursor-pointer"
                             onClick={() => openDetail(parent)}
                           >
@@ -546,7 +536,7 @@ export default function PhuHuynhList() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination */}
         <div className="mt-auto">
           <Pagination
@@ -611,7 +601,7 @@ export default function PhuHuynhList() {
                 placeholder="vd: email@example.com"
               />
             </div>
-            
+
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700">Nghề nghiệp</label>
               <input
@@ -650,12 +640,12 @@ export default function PhuHuynhList() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700">Kích hoạt SMS (Nút gạt)</label>
-              <div 
+              <div
                 className="flex items-center h-[46px] cursor-pointer"
                 onClick={() => setForm((prev) => ({ ...prev, isSmSActive: !prev.isSmSActive }))}
               >
                 <div className={`relative inline-flex items-center w-12 h-6 rounded-full transition-colors duration-300 ease-in-out ${form.isSmSActive ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                  <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ease-in-out shadow-sm ${form.isSmSActive ? 'translate-x-7' : 'translate-x-1'}`}/>
+                  <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ease-in-out shadow-sm ${form.isSmSActive ? 'translate-x-7' : 'translate-x-1'}`} />
                 </div>
                 <span className={`ml-3 text-sm font-bold ${form.isSmSActive ? 'text-blue-600' : 'text-slate-500'}`}>
                   {form.isSmSActive ? 'Đang bật SMS' : 'Đang tắt'}
@@ -672,8 +662,8 @@ export default function PhuHuynhList() {
             >
               Hủy bỏ
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2"
               disabled={saving}
             >
@@ -706,11 +696,10 @@ export default function PhuHuynhList() {
               <div className="pt-1 w-full">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-blue-900 tracking-tight">{detailParent.hoTen}</h3>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
-                    detailParent.isSmSActive 
-                      ? "bg-blue-50 text-blue-700 border-blue-200" 
-                      : "bg-slate-100 text-slate-600 border-slate-200"
-                  }`}>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${detailParent.isSmSActive
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}>
                     <span className={`w-1.5 h-1.5 rounded-full mr-2 ${detailParent.isSmSActive ? "bg-blue-500" : "bg-slate-400"}`}></span>
                     {detailParent.isSmSActive ? "SMS Hoạt động" : "Tắt SMS"}
                   </span>
@@ -718,7 +707,7 @@ export default function PhuHuynhList() {
                 <div className="text-sm font-semibold text-indigo-600 mt-1 mb-3">
                   {getQuanHeLabel(detailParent.quanHe)}
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-y-3 gap-x-6">
                   <div className="flex items-center gap-2.5 text-slate-600 text-sm">
                     <span className="material-symbols-outlined !text-[18px] text-slate-400">call</span>
@@ -738,7 +727,7 @@ export default function PhuHuynhList() {
 
             <div>
               <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider mb-4 border-b border-slate-100 pb-3">Học sinh liên quan</h4>
-              
+
               {detailLoading ? (
                 <div className="flex items-center justify-center p-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
                   <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />

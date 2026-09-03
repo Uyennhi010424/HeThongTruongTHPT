@@ -86,6 +86,10 @@ public class DashboardService {
             com.hethongtruongthpt.entity.NamHoc active = activeNamHocs.get(0);
             curNamHoc = active.getTenNamHoc();
 
+            if (active.getNgayBatDauHk1() != null && targetDate.isBefore(active.getNgayBatDauHk1())) {
+                return new ArrayList<>();
+            }
+
             if (active.getNgayBatDauHk2() != null && !targetDate.isBefore(active.getNgayBatDauHk2())) {
                 curHocKy = 2;
             } else if (active.getNgayBatDauHk1() != null && !targetDate.isBefore(active.getNgayBatDauHk1())) {
@@ -95,12 +99,6 @@ public class DashboardService {
         }
 
         List<ThoiKhoaBieu> timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(hocSinh.getLop().getId(), curHocKy, curNamHoc, currentWeek);
-        boolean isExamWeek = thoiKhoaBieuCrudService.isExamWeek(curNamHoc, currentWeek);
-        if (timetable.isEmpty() && !isExamWeek) {
-            int mappedTuan = (currentWeek % 2 != 0) ? 1 : 2;
-            timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(hocSinh.getLop().getId(), curHocKy, curNamHoc, mappedTuan);
-            for (ThoiKhoaBieu t : timetable) { t.setTuan(currentWeek); }
-        }
         return timetable;
     }
 

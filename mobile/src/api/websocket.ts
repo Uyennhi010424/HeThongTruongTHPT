@@ -1,6 +1,5 @@
 import { Client } from '@stomp/stompjs';
-
-const SOCKET_URL = 'ws://192.168.110.210:8080/ws/websocket'; // Đường dẫn thô của SockJS endpoint
+import { SOCKET_URL } from '@/constants/config';
 
 class WebSocketService {
   client: Client | null = null;

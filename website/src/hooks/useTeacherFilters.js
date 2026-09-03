@@ -88,19 +88,22 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
         setNamHocList(years);
         
         const now = new Date();
-        // If month is >= 8 (September), year starts this year, else it started last year
         const currentYearValue = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
         const currentNamHocString = `${currentYearValue}-${currentYearValue + 1}`;
         
-        let targetNamHoc = "";
-        if (years.includes(currentNamHocString)) {
-          targetNamHoc = currentNamHocString;
-        } else {
-          const activeNamHoc = rawNamHoc.find((nh) => nh.trangThai === "DANG_MO");
-          targetNamHoc = activeNamHoc?.tenNamHoc || years[0] || "";
-        }
+        // Priority 1: Check active academic year (DANG_MO)
+        const activeNamHoc = rawNamHoc.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO");
+        let targetNamHoc = activeNamHoc?.tenNamHoc || (years.includes(currentNamHocString) ? currentNamHocString : years[0] || "");
         
         setSelectedNamHoc((prev) => prev || targetNamHoc);
+
+        if (activeNamHoc?.ngayBatDauHk2) {
+          const startHk2 = new Date(activeNamHoc.ngayBatDauHk2 + "T00:00:00");
+          const endHk2 = activeNamHoc.ngayKetThucHk2 ? new Date(activeNamHoc.ngayKetThucHk2 + "T23:59:59") : null;
+          if (now >= startHk2 && (!endHk2 || now <= endHk2)) {
+            setSelectedSemester((prev) => prev || "HK2");
+          }
+        }
 
       } catch (err) {
         if (!active) return;
@@ -122,7 +125,12 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     // 2. Class they are homeroom teacher for
     const homeroomClassIds = new Set(
       chuNhiemData
-        .filter((cn) => Number(cn?.giaoVienId ?? cn?.giaoVien?.id) === Number(currentTeacher.id))
+        .filter((cn) => {
+          const gvMatch = Number(cn?.giaoVienId ?? cn?.giaoVien?.id) === Number(currentTeacher.id);
+          if (!gvMatch) return false;
+          if (selectedNamHoc && cn?.namHoc && cn.namHoc !== selectedNamHoc) return false;
+          return true;
+        })
         .map((cn) => String(cn?.lopId ?? cn?.lop?.id ?? ""))
         .filter(Boolean)
     );
@@ -134,7 +142,16 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     // 1. Classes they teach
     const assignedClassIds = new Set(
       phanCongData
-        .filter((p) => Number(p?.giaoVienId ?? p?.giaoVien?.id) === Number(currentTeacher.id))
+        .filter((p) => {
+          const teacherMatch = Number(p?.giaoVienId ?? p?.giaoVien?.id) === Number(currentTeacher.id);
+          if (!teacherMatch) return false;
+          if (selectedNamHoc && p?.namHoc && p.namHoc !== selectedNamHoc) return false;
+          if (selectedSemester) {
+            const semNum = selectedSemester === "HK1" ? 1 : 2;
+            if (p?.hocKy && Number(p.hocKy) !== semNum) return false;
+          }
+          return true;
+        })
         .map((p) => String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? ""))
         .filter(Boolean)
     );
@@ -150,7 +167,7 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     return allClasses.filter(
       (c) => assignedClassIds.has(String(c.id)) || homeroomClassIds.has(String(c.id))
     );
-  }, [allClasses, currentTeacher, phanCongData, chuNhiemData, showClass, homeroomOnly, teachOnly]);
+  }, [allClasses, currentTeacher, phanCongData, chuNhiemData, showClass, homeroomOnly, teachOnly, selectedNamHoc, selectedSemester]);
 
   // Derived state: Available Grades from allowed classes
   const availableGrades = useMemo(() => {
@@ -210,14 +227,20 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
         .filter((p) => {
           const pTeacherId = Number(p?.giaoVienId ?? p?.giaoVien?.id);
           const pClassId = String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? "");
-          return pTeacherId === Number(currentTeacher.id) && pClassId === selectedClassId;
+          if (pTeacherId !== Number(currentTeacher.id) || pClassId !== selectedClassId) return false;
+          if (selectedNamHoc && p?.namHoc && p.namHoc !== selectedNamHoc) return false;
+          if (selectedSemester) {
+            const semNum = selectedSemester === "HK1" ? 1 : 2;
+            if (p?.hocKy && Number(p.hocKy) !== semNum) return false;
+          }
+          return true;
         })
         .map((p) => String(p?.monHocId ?? p?.monHoc?.id ?? ""))
         .filter(Boolean)
     );
 
     return allSubjects.filter((s) => assignedSubjectIds.has(String(s.id)));
-  }, [showSubject, allSubjects, selectedClassId, currentTeacher, isHomeroomTeacherOfSelected, phanCongData, teachOnly]);
+  }, [showSubject, allSubjects, selectedClassId, currentTeacher, isHomeroomTeacherOfSelected, phanCongData, teachOnly, selectedNamHoc, selectedSemester]);
 
   // Derived state: Taught subjects by this teacher in the selected class (used for disabling inputs)
   const taughtSubjectsInSelectedClass = useMemo(() => {
@@ -227,12 +250,18 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
         .filter((p) => {
           const pTeacherId = Number(p?.giaoVienId ?? p?.giaoVien?.id);
           const pClassId = String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? "");
-          return pTeacherId === Number(currentTeacher.id) && pClassId === selectedClassId;
+          if (pTeacherId !== Number(currentTeacher.id) || pClassId !== selectedClassId) return false;
+          if (selectedNamHoc && p?.namHoc && p.namHoc !== selectedNamHoc) return false;
+          if (selectedSemester) {
+            const semNum = selectedSemester === "HK1" ? 1 : 2;
+            if (p?.hocKy && Number(p.hocKy) !== semNum) return false;
+          }
+          return true;
         })
         .map((p) => String(p?.monHocId ?? p?.monHoc?.id ?? ""))
         .filter(Boolean)
     );
-  }, [currentTeacher, selectedClassId, phanCongData]);
+  }, [currentTeacher, selectedClassId, phanCongData, selectedNamHoc, selectedSemester]);
 
   // Auto-select subject
   useEffect(() => {

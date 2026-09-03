@@ -11,17 +11,22 @@ import java.util.Map;
 public class LopHocPromoteTest {
 
     @Autowired
-    private LopHocService lopHocService;
+    private com.hethongtruongthpt.service.HocSinhService hocSinhService;
 
     @Test
-    public void testPromote() {
-        System.out.println("====== START TEST PROMOTE ======");
+    public void testGetAll() {
+        System.out.println("====== START TEST GET ALL ======");
         try {
-            Map<String, Object> result = lopHocService.promoteStudents("2025-2026", "2026-2027");
-            System.out.println("Result: " + result);
+            var list = hocSinhService.getAll();
+            System.out.println("Fetched students count: " + list.size());
+            
+            var paged = hocSinhService.search("", null, null, 0, 10);
+            System.out.println("Paged students count: " + paged.getTotalElements());
+
+            System.out.println("Successfully verified search & getAll!");
         } catch (Exception e) {
             e.printStackTrace();
         }
-        System.out.println("====== END TEST PROMOTE ======");
+        System.out.println("====== END TEST GET ALL ======");
     }
 }

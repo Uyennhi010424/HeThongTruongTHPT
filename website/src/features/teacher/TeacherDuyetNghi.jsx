@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Header from "../../components/common/Header.jsx";
 import axiosClient from "../../api/axiosClient.js";
 import { useConfirm } from "../../contexts/ConfirmContext.jsx";
 import { notifySuccess, notifyError } from "../../utils/notify.js";
-
+import Pagination from "../../components/common/Pagination.jsx";
 
 export default function TeacherDuyetNghi() {
   const [requests, setRequests] = useState([]);
@@ -15,6 +15,10 @@ export default function TeacherDuyetNghi() {
   const [processingId, setProcessingId] = useState(null);
   const { confirm } = useConfirm();
   const [feedbackNotes, setFeedbackNotes] = useState({});
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     fetchData();
@@ -69,16 +73,32 @@ export default function TeacherDuyetNghi() {
     }
   };
 
+  const stats = useMemo(() => {
+    const pending = requests.filter(r => r.trangThai === "PENDING").length;
+    const approved = requests.filter(r => r.trangThai === "APPROVED").length;
+    const rejected = requests.filter(r => r.trangThai === "REJECTED").length;
+    return { pending, approved, rejected, total: requests.length };
+  }, [requests]);
+
+  const totalPages = Math.ceil(requests.length / pageSize) || 1;
+  const paginatedRequests = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return requests.slice(start, start + pageSize);
+  }, [requests, currentPage, pageSize]);
+
   const getStatusBadge = (status) => {
     switch (status) {
       case "PENDING":
-        return <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">Chờ duyệt</span>;
+      case "CHO_DUYET":
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Chờ duyệt</span>;
       case "APPROVED":
-        return <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Đã duyệt</span>;
+      case "DA_DUYET":
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Đã duyệt</span>;
       case "REJECTED":
-        return <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Từ chối</span>;
+      case "TU_CHOI":
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">Từ chối</span>;
       default:
-        return status;
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{status || "--"}</span>;
     }
   };
 
@@ -97,10 +117,20 @@ export default function TeacherDuyetNghi() {
 
         {!loading && !error && lopChuNhiem && (
           <div className="bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
-            <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-gray-50/50">
-              <h2 className="text-xl font-bold text-on-surface">
-                Đơn xin nghỉ - Lớp {lopChuNhiem.tenLop}
-              </h2>
+            <div className="p-6 border-b border-outline-variant flex flex-wrap justify-between items-center bg-gray-50/50 gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-on-surface">
+                  Đơn xin nghỉ - Lớp {lopChuNhiem.tenLop}
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Tổng cộng {stats.total} đơn xin nghỉ</p>
+              </div>
+
+              {/* Status badges */}
+              <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-slate-200">
+                <span className="text-xs font-semibold text-amber-600">● Chờ duyệt: {stats.pending}</span>
+                <span className="text-xs font-semibold text-emerald-600">● Đã duyệt: {stats.approved}</span>
+                <span className="text-xs font-semibold text-rose-600">● Từ chối: {stats.rejected}</span>
+              </div>
             </div>
 
             {requests.length === 0 ? (
@@ -111,104 +141,125 @@ export default function TeacherDuyetNghi() {
                 <p>Chưa có đơn xin nghỉ nào.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="p-4 pl-6 font-semibold text-sm text-slate-700 w-48 whitespace-nowrap">Học sinh</th>
-                      <th className="p-4 font-semibold text-sm text-slate-700 w-48 whitespace-nowrap">Thời gian nghỉ</th>
-                      <th className="p-4 font-semibold text-sm text-slate-700 max-w-xs">Lý do</th>
-                      <th className="p-4 font-semibold text-sm text-slate-700 w-32 text-center whitespace-nowrap">Trạng thái</th>
-                      <th className="p-4 font-semibold text-sm text-slate-700 w-64 min-w-[200px]">Phản hồi của GV</th>
-                      <th className="p-4 pr-6 font-semibold text-sm text-slate-700 w-48 text-center whitespace-nowrap">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {requests.map(req => (
-                      <tr key={req.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="p-4 pl-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
-                              {req.tenHocSinh.charAt(0)}
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-800">{req.tenHocSinh}</div>
-                              {req.tenPhuHuynh && (
-                                <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                                  <i className="fi fi-rr-user text-[10px]"></i> PH: {req.tenPhuHuynh}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm font-medium text-slate-700 whitespace-nowrap">
-                          <div className="font-semibold text-slate-700 mb-1">
-                            {req.ngayBatDau.split('-').reverse().join('/')}
-                          </div>
-                          {req.ngayBatDau !== req.ngayKetThuc && (
-                            <div className="flex items-center gap-2 text-slate-500">
-                              <i className="fi fi-rr-arrow-right text-gray-400"></i>
-                              {req.ngayKetThuc.split('-').reverse().join('/')}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-4 text-sm text-slate-600 max-w-xs" title={req.lyDo}>
-                          <div className="line-clamp-2 bg-slate-50 p-2 rounded border border-slate-100">{req.lyDo}</div>
-                        </td>
-                        <td className="p-4 text-center whitespace-nowrap">
-                          {getStatusBadge(req.trangThai)}
-                        </td>
-                        <td className="p-4">
-                          {req.trangThai === "PENDING" ? (
-                            <input 
-                              type="text"
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none shadow-sm"
-                              placeholder="Nhập ghi chú (nếu có)..."
-                              value={feedbackNotes[req.id] || ""}
-                              onChange={e => setFeedbackNotes({...feedbackNotes, [req.id]: e.target.value})}
-                            />
-                          ) : (
-                            <div className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 min-h-[42px] flex items-center gap-2">
-                              {req.phanHoiGv ? (
-                                <>
-                                  <i className="fi fi-rr-comment-alt text-slate-400 shrink-0"></i>
-                                  <span className="line-clamp-2">{req.phanHoiGv}</span>
-                                </>
-                              ) : (
-                                <span className="text-slate-400 italic">Không có ghi chú</span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-4 pr-6">
-                          {req.trangThai === "PENDING" ? (
-                            <div className="flex gap-2 justify-center">
-                              <button 
-                                onClick={() => handleProcess(req.id, "APPROVED")}
-                                disabled={processingId === req.id}
-                                className="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 transition-colors shadow-sm flex items-center gap-1.5"
-                              >
-                                <i className="fi fi-rr-check"></i> Duyệt
-                              </button>
-                              <button 
-                                onClick={() => handleProcess(req.id, "REJECTED")}
-                                disabled={processingId === req.id}
-                                className="px-4 py-2 bg-rose-50 text-rose-600 border border-rose-100 text-sm font-bold rounded-xl hover:bg-rose-100 hover:border-rose-200 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-                              >
-                                <i className="fi fi-rr-cross"></i> Từ chối
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="text-center text-slate-400 text-sm font-medium italic bg-slate-50 py-2 rounded-xl border border-slate-100">
-                              <i className="fi fi-rr-check-circle mr-1 text-emerald-500"></i> Đã xử lý
-                            </div>
-                          )}
-                        </td>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="p-4 pl-6 font-semibold text-sm text-slate-700 w-16 text-center">STT</th>
+                        <th className="p-4 font-semibold text-sm text-slate-700 w-48 whitespace-nowrap">Học sinh</th>
+                        <th className="p-4 font-semibold text-sm text-slate-700 w-48 whitespace-nowrap">Thời gian nghỉ</th>
+                        <th className="p-4 font-semibold text-sm text-slate-700 max-w-xs">Lý do</th>
+                        <th className="p-4 font-semibold text-sm text-slate-700 w-32 text-center whitespace-nowrap">Trạng thái</th>
+                        <th className="p-4 font-semibold text-sm text-slate-700 w-64 min-w-[200px]">Phản hồi của GV</th>
+                        <th className="p-4 pr-6 font-semibold text-sm text-slate-700 w-48 text-center whitespace-nowrap">Thao tác</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {paginatedRequests.map((req, idx) => (
+                        <tr key={req.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="p-4 pl-6 text-center text-sm font-semibold text-slate-500">
+                            {(currentPage - 1) * pageSize + idx + 1}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                {req.tenHocSinh.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-800">{req.tenHocSinh}</div>
+                                {req.tenPhuHuynh && (
+                                  <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                    <i className="fi fi-rr-user text-[10px]"></i> PH: {req.tenPhuHuynh}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm font-medium text-slate-700 whitespace-nowrap">
+                            <div className="font-semibold text-slate-700 mb-1">
+                              {req.ngayBatDau.split('-').reverse().join('/')}
+                            </div>
+                            {req.ngayBatDau !== req.ngayKetThuc && (
+                              <div className="flex items-center gap-2 text-slate-500">
+                                <i className="fi fi-rr-arrow-right text-gray-400"></i>
+                                {req.ngayKetThuc.split('-').reverse().join('/')}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-4 text-sm text-slate-600 max-w-xs" title={req.lyDo}>
+                            <div className="line-clamp-2 bg-slate-50 p-2 rounded border border-slate-100">{req.lyDo}</div>
+                          </td>
+                          <td className="p-4 text-center whitespace-nowrap">
+                            {getStatusBadge(req.trangThai)}
+                          </td>
+                          <td className="p-4">
+                            {req.trangThai === "PENDING" ? (
+                              <input 
+                                type="text"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none shadow-sm"
+                                placeholder="Nhập ghi chú (nếu có)..."
+                                value={feedbackNotes[req.id] || ""}
+                                onChange={e => setFeedbackNotes({...feedbackNotes, [req.id]: e.target.value})}
+                              />
+                            ) : (
+                              <div className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 min-h-[42px] flex items-center gap-2">
+                                {req.phanHoiGv ? (
+                                  <>
+                                    <i className="fi fi-rr-comment-alt text-slate-400 shrink-0"></i>
+                                    <span className="line-clamp-2">{req.phanHoiGv}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-slate-400 italic">Không có ghi chú</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-4 pr-6">
+                            {req.trangThai === "PENDING" ? (
+                              <div className="flex gap-2 justify-center">
+                                <button 
+                                  onClick={() => handleProcess(req.id, "APPROVED")}
+                                  disabled={processingId === req.id}
+                                  className="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 transition-colors shadow-sm flex items-center gap-1.5"
+                                >
+                                  <i className="fi fi-rr-check"></i> Duyệt
+                                </button>
+                                <button 
+                                  onClick={() => handleProcess(req.id, "REJECTED")}
+                                  disabled={processingId === req.id}
+                                  className="px-4 py-2 bg-rose-50 text-rose-600 border border-rose-100 text-sm font-bold rounded-xl hover:bg-rose-100 hover:border-rose-200 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                                >
+                                  <i className="fi fi-rr-cross"></i> Từ chối
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center text-slate-400 text-sm font-medium italic bg-slate-50 py-2 rounded-xl border border-slate-100">
+                                <i className="fi fi-rr-check-circle mr-1 text-emerald-500"></i> Đã xử lý
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {requests.length > 0 && (
+                  <div className="p-4 border-t border-slate-100">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={requests.length}
+                      pageSize={pageSize}
+                      onPageChange={setCurrentPage}
+                      onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                      pageSizeOptions={[10, 20, 30, 50]}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -216,3 +267,4 @@ export default function TeacherDuyetNghi() {
     </div>
   );
 }
+

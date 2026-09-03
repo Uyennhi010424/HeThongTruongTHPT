@@ -133,7 +133,7 @@ export default function TeacherDashboard() {
 
         const years = namHocRes?.data?.data || [];
         setNamHocList(years);
-        const currentYear = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[years.length - 1];
+        const currentYear = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[0] || null;
         const tenNamHoc = currentYear?.tenNamHoc || "";
         let hocKy = 1;
         if (currentYear?.ngayBatDauHk2) {

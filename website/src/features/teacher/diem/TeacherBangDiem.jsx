@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { getDiem } from "../../../api/diemApi.js";
 import { getStudentClass, sortStudentsByGivenName } from "../../../utils/helpers.js";
 import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
+import Pagination from "../../../components/common/Pagination.jsx";
 import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
 import * as XLSX from "xlsx-js-style";
 
@@ -65,6 +66,10 @@ export default function TeacherBangDiem() {
   const [scoreLoading, setScoreLoading] = useState(false);
   const [scoreError, setScoreError] = useState("");
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const tabsRef = useRef(null);
 
   useEffect(() => {
@@ -116,6 +121,17 @@ export default function TeacherBangDiem() {
       students.filter((s) => s.trangThai === 1 && String(getStudentClass(s)?.id) === selectedClassId)
     );
   }, [students, selectedClassId]);
+
+  // Reset page on filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClassId, selectedSubjectId, selectedSemester, selectedNamHoc]);
+
+  const totalPages = Math.ceil(filteredStudents.length / pageSize) || 1;
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
 
   const txCount = useMemo(() => {
     if (!selectedSubject) return 3;
@@ -439,7 +455,7 @@ export default function TeacherBangDiem() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStudents.map((s, idx) => {
+                  {paginatedStudents.map((s, idx) => {
                     const data = scoreMap[s.id]?.[selectedSemester] || { tx: Array(txCount).fill(""), gk: "", ck: "", nhanXet: "" };
                     const avg = isComment ? null : calcSemesterAvg(data.tx, data.gk, data.ck);
                     const isEven = idx % 2 === 0;
@@ -448,7 +464,7 @@ export default function TeacherBangDiem() {
                         onMouseEnter={(e) => e.currentTarget.style.background = "#eff6ff"}
                         onMouseLeave={(e) => e.currentTarget.style.background = isEven ? "#fff" : "#f9fafb"}
                       >
-                        <td style={{ ...tdStl("center"), position: "sticky", left: 0, background: isEven ? "#fff" : "#f9fafb" }}>{idx + 1}</td>
+                        <td style={{ ...tdStl("center"), position: "sticky", left: 0, background: isEven ? "#fff" : "#f9fafb" }}>{(currentPage - 1) * pageSize + idx + 1}</td>
                         <td style={{ ...tdStl("left", true), position: "sticky", left: 50, background: isEven ? "#fff" : "#f9fafb", borderRight: "1px solid #f1f5f9" }}>{s.hoTen}</td>
                         <td style={tdStl("center")}>{getStudentClass(s)?.tenLop || "--"}</td>
                         {!isComment && data.tx.map((v, i) => (
@@ -472,6 +488,19 @@ export default function TeacherBangDiem() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {!scoreLoading && filteredStudents.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredStudents.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                pageSizeOptions={[10, 20, 30, 50]}
+              />
+            )}
           </div>
         );
       })()}

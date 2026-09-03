@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../../components/edu/MaterialIcon.jsx";
+import Pagination from "../../../components/common/Pagination.jsx";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
@@ -19,11 +20,13 @@ export default function AdminHanhKiemPage() {
   const [selectedNamHoc, setSelectedNamHoc] = useState("");
 
   const [serverRecords, setServerRecords] = useState({});
-  const [draftRecords, setDraftRecords] = useState({});
-  const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Phân trang
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Tải dữ liệu ban đầu: Lớp, Năm học
   useEffect(() => {
@@ -41,7 +44,7 @@ export default function AdminHanhKiemPage() {
         setNamHocList(rawNamHoc);
 
         // Chọn năm học hiện tại
-        const currentYear = rawNamHoc.find((y) => y.trangThai === "DANG_HOAT_DONG") || rawNamHoc[0];
+        const currentYear = rawNamHoc.find((y) => y.trangThai === "DANG_MO" || y.trangThai === "DANG_HOAT_DONG") || rawNamHoc[0];
         if (currentYear) {
           setSelectedNamHoc(currentYear.tenNamHoc);
         }
@@ -83,7 +86,6 @@ export default function AdminHanhKiemPage() {
       try {
         setLoading(true);
         setError("");
-        setIsDirty(false);
 
         // Tải học sinh trong lớp
         const resHocSinh = await getHocSinh({ lopId: selectedClassId });
@@ -92,41 +94,56 @@ export default function AdminHanhKiemPage() {
         setStudents(hocSinhs);
 
         // Tải hạnh kiểm đã có
-        const hkParams = {
-          namHoc: selectedNamHoc,
-          hocKy: selectedSemester === "HK2" ? 2 : 1
-        };
-        const resHK = await getHanhKiemData(hkParams);
+        const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
+        const namHocId = currentNamHocObj?.id;
+        const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
+
+        let resHK = await getHanhKiemData({ lopId: selectedClassId, namHocId });
+        if (!resHK || resHK.length === 0) {
+          resHK = await getHanhKiemData({ lopId: selectedClassId });
+        }
         if (!active) return;
 
-        // Lọc hạnh kiểm thuộc lớp hiện tại
-        const filteredHk = resHK.filter((r) => r?.hocSinh?.lop?.id === Number(selectedClassId));
+        const studentIdSet = new Set(hocSinhs.map((s) => s.id));
 
-        // Tạo lookup: { studentId: { id, xepLoai, nhanXet, status } }
+        // Lọc hạnh kiểm thuộc lớp, năm học và học kỳ hiện tại
+        let filteredHk = resHK.filter((r) => {
+          const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
+          const matchStudent = studentIdSet.has(sid);
+          const rHocKy = r?.hocKy ?? r?.hoc_ky;
+          const matchHocKy = !targetHocKy || rHocKy === targetHocKy;
+          const rNamHocId = r?.namHoc?.id ?? r?.idNamHoc ?? r?.id_namhoc;
+          const rNamHocTen = r?.namHoc?.tenNamHoc ?? r?.namHoc?.ten_nam_hoc;
+          const matchNamHoc = !namHocId || rNamHocId === namHocId || rNamHocTen === selectedNamHoc;
+          return matchStudent && matchHocKy && matchNamHoc;
+        });
+
+        // Nếu lọc theo namHoc bị trống, thử nới lỏng điều kiện namHoc
+        if (filteredHk.length === 0 && resHK.length > 0) {
+          filteredHk = resHK.filter((r) => {
+            const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
+            const matchStudent = studentIdSet.has(sid);
+            const rHocKy = r?.hocKy ?? r?.hoc_ky;
+            return matchStudent && (!targetHocKy || rHocKy === targetHocKy);
+          });
+        }
+
+        // Tạo lookup: { studentId: { id, xepLoai, nhanXet, status, giaoVien } }
         const lookup = {};
         filteredHk.forEach((r) => {
-          const sid = r?.hocSinh?.id;
+          const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
           if (sid) {
             lookup[sid] = {
-              id: r.id,
-              xepLoai: r.xepLoai || "TOT",
-              nhanXet: r.nhanXet || "",
-              status: r.status || "DRAFT"
+              id: r.id ?? r.idHanhKiem ?? r.id_hanhkiem,
+              xepLoai: r.xepLoai ?? r.xep_loai ?? null,
+              nhanXet: r.nhanXet ?? r.nhan_xet ?? "",
+              status: r.status ?? "DRAFT",
+              giaoVien: r.giaoVien ?? r.giao_vien ?? null
             };
           }
         });
 
         setServerRecords(lookup);
-        // Khởi tạo draft từ dữ liệu server
-        const initialDraft = {};
-        hocSinhs.forEach((student) => {
-          initialDraft[student.id] = lookup[student.id] || {
-            xepLoai: "TOT",
-            nhanXet: "",
-            status: "DRAFT"
-          };
-        });
-        setDraftRecords(initialDraft);
       } catch (err) {
         setError("Lỗi tải dữ liệu hạnh kiểm từ máy chủ.");
       } finally {
@@ -136,7 +153,7 @@ export default function AdminHanhKiemPage() {
 
     fetchData();
     return () => { active = false; };
-  }, [selectedClassId, selectedNamHoc, selectedSemester]);
+  }, [selectedClassId, selectedNamHoc, selectedSemester, namHocList]);
 
   // Wrapper gọi API lấy hạnh kiểm phòng lỗi
   const getHanhKiemData = async (params) => {
@@ -148,67 +165,73 @@ export default function AdminHanhKiemPage() {
     }
   };
 
-  // Cập nhật giá trị nháp
-  const updateRecord = (studentId, fields) => {
-    setDraftRecords((prev) => {
-      const updated = {
-        ...prev,
-        [studentId]: {
-          ...prev[studentId],
-          ...fields
-        }
-      };
-      setIsDirty(true);
-      return updated;
-    });
-  };
+  // Reset page khi thay đổi bộ lọc
+  useEffect(() => {
+    setPage(1);
+  }, [selectedClassId, selectedGrade, selectedSemester, selectedNamHoc]);
 
-  // Lưu tất cả thay đổi nháp
-  const handleSave = async (customPayload = null) => {
-    if (!selectedClassId || !selectedNamHoc) return;
+  // Phân trang danh sách học sinh
+  const totalPages = Math.max(1, Math.ceil(students.length / pageSize));
+  const paginatedStudents = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return students.slice(start, start + pageSize);
+  }, [students, page, pageSize]);
+
+  // Thống kê nhanh theo lớp
+  const stats = useMemo(() => {
+    let tot = 0;
+    let kha = 0;
+    let tb = 0;
+    let yeu = 0;
+    let chuaDanhGia = 0;
+    let daDuyet = 0;
+    let choDuyet = 0;
+
+    students.forEach((student) => {
+      const record = serverRecords[student.id];
+      if (!record || !record.xepLoai) {
+        chuaDanhGia += 1;
+      } else {
+        if (record.xepLoai === "TOT") tot += 1;
+        else if (record.xepLoai === "KHA") kha += 1;
+        else if (record.xepLoai === "TRUNG_BINH") tb += 1;
+        else if (record.xepLoai === "YEU") yeu += 1;
+      }
+
+      if (record?.status === "APPROVED") {
+        daDuyet += 1;
+      } else {
+        choDuyet += 1;
+      }
+    });
+
+    return { tot, kha, tb, yeu, chuaDanhGia, daDuyet, choDuyet, total: students.length };
+  }, [students, serverRecords]);
+
+  // Lưu danh sách hạnh kiểm
+  const executeSave = async (payload, successMsg = "Cập nhật trạng thái duyệt thành công.") => {
     setSaving(true);
     try {
-      const payload = customPayload || students.map((s) => {
-        const draft = draftRecords[s.id] || { xepLoai: "TOT", nhanXet: "", status: "DRAFT" };
-        return {
-          id: draft.id || null,
-          hocSinh: { id: s.id },
-          namHoc: { tenNamHoc: selectedNamHoc },
-          hocKy: selectedSemester === "HK2" ? 2 : 1,
-          xepLoai: draft.xepLoai,
-          nhanXet: draft.nhanXet,
-          status: draft.status
-        };
-      });
-
       const res = await saveAllHanhKiem(payload);
       if (res?.data?.success) {
         const saved = res.data.data || [];
-        const newServer = {};
+        const newServer = { ...serverRecords };
         saved.forEach((r) => {
-          const sid = r?.hocSinh?.id;
+          const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
           if (sid) {
             newServer[sid] = {
-              id: r.id,
-              xepLoai: r.xepLoai || "TOT",
-              nhanXet: r.nhanXet || "",
-              status: r.status || "DRAFT"
+              id: r.id ?? r.idHanhKiem ?? r.id_hanhkiem,
+              xepLoai: r.xepLoai ?? r.xep_loai ?? null,
+              nhanXet: r.nhanXet ?? r.nhan_xet ?? "",
+              status: r.status ?? "DRAFT",
+              giaoVien: r.giaoVien ?? r.giao_vien ?? null
             };
           }
         });
         setServerRecords(newServer);
-        // Đồng bộ lại draft
-        setDraftRecords((prev) => {
-          const syncedDraft = { ...prev };
-          Object.keys(newServer).forEach((sid) => {
-            syncedDraft[sid] = { ...newServer[sid] };
-          });
-          return syncedDraft;
-        });
-        setIsDirty(false);
-        notifySuccess("Đã lưu đánh giá hạnh kiểm thành công.");
+        notifySuccess(successMsg);
       } else {
-        notifyError(res?.data?.message || "Lưu thất bại.");
+        notifyError(res?.data?.message || "Thao tác thất bại.");
       }
     } catch (err) {
       notifyError("Đã xảy ra lỗi khi gửi yêu cầu lên máy chủ.");
@@ -220,53 +243,137 @@ export default function AdminHanhKiemPage() {
   // Duyệt và khóa hạnh kiểm tất cả học sinh trong lớp hiện tại
   const handleApproveAll = async () => {
     if (students.length === 0) return;
-    
-    // Tạo payload với tất cả status = APPROVED
+    const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
+    const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
+
     const payload = students.map((s) => {
-      const draft = draftRecords[s.id] || { xepLoai: "TOT", nhanXet: "", status: "DRAFT" };
+      const server = serverRecords[s.id];
       return {
-        id: draft.id || null,
+        id: server?.id || null,
         hocSinh: { id: s.id },
-        namHoc: { tenNamHoc: selectedNamHoc },
-        hocKy: selectedSemester === "HK2" ? 2 : 1,
-        xepLoai: draft.xepLoai,
-        nhanXet: draft.nhanXet,
-        status: "APPROVED" // Ép buộc APPROVED
+        namHoc: { id: currentNamHocObj?.id },
+        hocKy: targetHocKy,
+        xepLoai: server?.xepLoai || "TOT",
+        nhanXet: server?.nhanXet || "",
+        giaoVien: server?.giaoVien ? { id: server.giaoVien.id } : null,
+        status: "APPROVED"
       };
     });
 
-    await handleSave(payload);
+    await executeSave(payload, "Đã phê duyệt và khóa toàn bộ hạnh kiểm của lớp.");
   };
 
-  // Phê duyệt hoặc Mở khóa cá nhân
-  const toggleApproveSingle = (studentId) => {
-    const draft = draftRecords[studentId] || { xepLoai: "TOT", nhanXet: "", status: "DRAFT" };
-    const nextStatus = draft.status === "APPROVED" ? "DRAFT" : "APPROVED";
-    updateRecord(studentId, { status: nextStatus });
+  // Mở khóa tất cả học sinh trong lớp hiện tại
+  const handleUnlockAll = async () => {
+    if (students.length === 0) return;
+    const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
+    const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
+
+    const payload = students.map((s) => {
+      const server = serverRecords[s.id];
+      return {
+        id: server?.id || null,
+        hocSinh: { id: s.id },
+        namHoc: { id: currentNamHocObj?.id },
+        hocKy: targetHocKy,
+        xepLoai: server?.xepLoai || "TOT",
+        nhanXet: server?.nhanXet || "",
+        giaoVien: server?.giaoVien ? { id: server.giaoVien.id } : null,
+        status: "DRAFT"
+      };
+    });
+
+    await executeSave(payload, "Đã mở khóa đánh giá hạnh kiểm cho lớp.");
+  };
+
+  // Phê duyệt hoặc Mở khóa từng học sinh
+  const toggleApproveSingle = async (studentId) => {
+    const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
+    const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
+    const server = serverRecords[studentId];
+    const isApproved = server?.status === "APPROVED";
+    const nextStatus = isApproved ? "DRAFT" : "APPROVED";
+
+    const payload = [
+      {
+        id: server?.id || null,
+        hocSinh: { id: studentId },
+        namHoc: { id: currentNamHocObj?.id },
+        hocKy: targetHocKy,
+        xepLoai: server?.xepLoai || "TOT",
+        nhanXet: server?.nhanXet || "",
+        giaoVien: server?.giaoVien ? { id: server.giaoVien.id } : null,
+        status: nextStatus
+      }
+    ];
+
+    await executeSave(
+      payload,
+      nextStatus === "APPROVED" ? "Đã duyệt hạnh kiểm học sinh." : "Đã mở khóa đánh giá học sinh."
+    );
   };
 
   const getStatusBadge = (status) => {
     if (status === "APPROVED") {
       return (
-        <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
           Đã duyệt & Khóa
         </span>
       );
     }
     return (
-      <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-        Bản nháp
+        Chờ duyệt
       </span>
     );
+  };
+
+  const getXepLoaiBadge = (xepLoai) => {
+    switch (xepLoai) {
+      case "TOT":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            Tốt
+          </span>
+        );
+      case "KHA":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+            Khá
+          </span>
+        );
+      case "TRUNG_BINH":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            Trung bình
+          </span>
+        );
+      case "YEU":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+            Yếu
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-400 border border-slate-200">
+            Chưa đánh giá
+          </span>
+        );
+    }
   };
 
   return (
     <div className="edu-card-container">
       <PageHeader
         title="Duyệt Hạnh Kiểm Học Sinh"
-        subtitle="Quản trị viên kiểm tra, mở khóa hoặc phê duyệt đóng băng kết quả hạnh kiểm từ giáo viên chủ nhiệm."
+        subtitle="Xem xét nhận xét và xếp loại rèn luyện từ Giáo viên chủ nhiệm để kiểm tra, phê duyệt hoặc mở khóa."
         icon="verified"
       />
 
@@ -336,25 +443,59 @@ export default function AdminHanhKiemPage() {
 
         {/* Hành động bulk */}
         <div className="ml-auto flex gap-3 self-end">
+          {stats.daDuyet > 0 && (
+            <button
+              className="btn btn-outline flex items-center gap-2 py-2.5 px-4 font-semibold text-sm rounded-xl border-slate-300 text-slate-700 hover:bg-slate-50 transition duration-200"
+              disabled={saving || loading || students.length === 0}
+              onClick={handleUnlockAll}
+            >
+              <MaterialIcon icon="lock_open" />
+              Mở khóa cả lớp
+            </button>
+          )}
+
           <button
-            className="btn btn-emerald flex items-center gap-2 py-2.5 px-4 font-semibold text-sm rounded-xl transition duration-200"
+            className="btn btn-emerald flex items-center gap-2 py-2.5 px-4 font-semibold text-sm rounded-xl transition duration-200 shadow-sm"
             disabled={saving || loading || students.length === 0}
             onClick={handleApproveAll}
           >
             <MaterialIcon icon="done_all" />
             Duyệt tất cả lớp
           </button>
-
-          <button
-            className={`btn ${isDirty ? "btn-primary" : "btn-disabled"} flex items-center gap-2 py-2.5 px-4 font-semibold text-sm rounded-xl transition duration-200`}
-            disabled={saving || loading || !isDirty}
-            onClick={() => handleSave()}
-          >
-            <MaterialIcon icon="save" />
-            {saving ? "Đang lưu..." : "Lưu thay đổi"}
-          </button>
         </div>
       </div>
+
+      {/* Thanh thống kê nhanh */}
+      {!loading && students.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
+            <span className="text-xs font-medium text-slate-400">Sĩ số lớp</span>
+            <span className="text-xl font-bold text-slate-700 mt-1">{stats.total} HS</span>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-sm flex flex-col">
+            <span className="text-xs font-medium text-emerald-600">Loại Tốt</span>
+            <span className="text-xl font-bold text-emerald-700 mt-1">{stats.tot}</span>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-blue-100 shadow-sm flex flex-col">
+            <span className="text-xs font-medium text-blue-600">Loại Khá</span>
+            <span className="text-xl font-bold text-blue-700 mt-1">{stats.kha}</span>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-sm flex flex-col">
+            <span className="text-xs font-medium text-amber-600">Trung bình</span>
+            <span className="text-xl font-bold text-amber-700 mt-1">{stats.tb}</span>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-rose-100 shadow-sm flex flex-col">
+            <span className="text-xs font-medium text-rose-600">Loại Yếu</span>
+            <span className="text-xl font-bold text-rose-700 mt-1">{stats.yeu}</span>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
+            <span className="text-xs font-medium text-slate-400">Đã duyệt</span>
+            <span className="text-xl font-bold text-emerald-600 mt-1">
+              {stats.daDuyet}/{stats.total}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Trạng thái lỗi */}
       {error && (
@@ -368,7 +509,7 @@ export default function AdminHanhKiemPage() {
       {loading ? (
         <div className="flex flex-col gap-4">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="attendance-row skeleton-container" style={{ gridTemplateColumns: "220px 180px 1.4fr 160px 140px" }}>
+            <div key={n} className="attendance-row skeleton-container" style={{ gridTemplateColumns: "220px 160px 1.5fr 150px 130px" }}>
               <div className="skeleton h-8 rounded-lg w-3/4" />
               <div className="skeleton h-8 rounded-lg w-1/2" />
               <div className="skeleton h-8 rounded-lg" />
@@ -386,66 +527,58 @@ export default function AdminHanhKiemPage() {
           <p className="text-sm text-slate-400 max-w-sm">Không tìm thấy học sinh nào thuộc lớp học này.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
           <div className="attendance-table">
             {/* Header */}
-            <div className="attendance-row attendance-head" style={{ gridTemplateColumns: "220px 180px 1.4fr 160px 140px", borderBottom: "2px solid #f1f5f9" }}>
+            <div className="attendance-row attendance-head" style={{ gridTemplateColumns: "220px 160px 1.5fr 150px 130px", borderBottom: "2px solid #f1f5f9" }}>
               <div className="font-bold text-slate-600">Họ và Tên</div>
-              <div className="font-bold text-slate-600">Xếp loại</div>
-              <div className="font-bold text-slate-600">Nhận xét</div>
+              <div className="font-bold text-slate-600">Xếp loại (GVCN)</div>
+              <div className="font-bold text-slate-600">Nhận xét của GVCN</div>
               <div className="font-bold text-slate-600 text-center">Trạng thái</div>
               <div className="font-bold text-slate-600 text-center">Phê duyệt</div>
             </div>
 
             {/* List */}
             <div className="attendance-body">
-              {students.map((student) => {
-                const record = draftRecords[student.id] || {
-                  xepLoai: "TOT",
+              {paginatedStudents.map((student) => {
+                const record = serverRecords[student.id] || {
+                  xepLoai: null,
                   nhanXet: "",
                   status: "DRAFT"
                 };
 
                 return (
                   <div
-                    className="attendance-row items-center"
-                    style={{ gridTemplateColumns: "220px 180px 1.4fr 160px 140px", borderBottom: "1px solid #f1f5f9" }}
+                    className="attendance-row items-center hover:bg-slate-50/60 transition-colors"
+                    style={{ gridTemplateColumns: "220px 160px 1.5fr 150px 130px", borderBottom: "1px solid #f1f5f9" }}
                     key={student.id}
                   >
                     {/* Tên */}
                     <div className="table-main">
                       <div className="table-title font-semibold text-slate-700">{student.hoTen}</div>
                       <div className="table-meta text-xs text-slate-400">
+                        {student.maHocSinh ? `Mã: ${student.maHocSinh} · ` : ""}
                         {getStudentClass(student)?.tenLop || "--"}
                       </div>
                     </div>
 
-                    {/* Xếp loại */}
+                    {/* Xếp loại của GVCN */}
                     <div>
-                      <select
-                        className="attendance-input w-full"
-                        value={record.xepLoai}
-                        onChange={(event) =>
-                          updateRecord(student.id, { xepLoai: event.target.value })
-                        }
-                      >
-                        <option value="TOT">Tốt</option>
-                        <option value="KHA">Khá</option>
-                        <option value="TRUNG_BINH">Trung bình</option>
-                        <option value="YEU">Yếu</option>
-                      </select>
+                      {getXepLoaiBadge(record.xepLoai)}
                     </div>
 
-                    {/* Nhận xét */}
-                    <div>
-                      <input
-                        className="attendance-note w-full"
-                        value={record.nhanXet}
-                        onChange={(event) =>
-                          updateRecord(student.id, { nhanXet: event.target.value })
-                        }
-                        placeholder="Nhập nhận xét của admin..."
-                      />
+                    {/* Nhận xét của GVCN (Hiển thị để Admin duyệt) */}
+                    <div className="pr-4 py-1">
+                      {record.nhanXet && record.nhanXet.trim() ? (
+                        <div className="text-sm text-slate-700 bg-slate-50/80 border border-slate-200/70 rounded-xl px-3.5 py-2 leading-relaxed shadow-xs">
+                          {record.nhanXet}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 italic flex items-center gap-1.5 px-2">
+                          <MaterialIcon icon="chat_bubble_outline" size="14px" className="text-slate-300" />
+                          Chưa có nhận xét từ GVCN
+                        </div>
+                      )}
                     </div>
 
                     {/* Trạng thái duyệt */}
@@ -456,11 +589,12 @@ export default function AdminHanhKiemPage() {
                     {/* Nút phê duyệt */}
                     <div className="flex justify-center">
                       <button
-                        className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg border transition duration-200 ${
+                        className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg border transition duration-200 cursor-pointer ${
                           record.status === "APPROVED"
                             ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
                             : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
                         }`}
+                        disabled={saving}
                         onClick={() => toggleApproveSingle(student.id)}
                       >
                         <MaterialIcon icon={record.status === "APPROVED" ? "lock_open" : "check"} size="16px" />
@@ -472,6 +606,21 @@ export default function AdminHanhKiemPage() {
               })}
             </div>
           </div>
+
+          {/* Phân trang */}
+          {students.length > 0 && (
+            <div className="mt-auto border-t border-slate-100">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={students.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+                pageSizeOptions={[10, 15, 20, 50]}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

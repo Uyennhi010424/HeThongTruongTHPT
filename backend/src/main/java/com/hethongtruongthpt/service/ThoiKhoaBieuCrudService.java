@@ -74,8 +74,6 @@ public class ThoiKhoaBieuCrudService {
                 return getAll();
         }
 
-        Integer mappedTuan = (tuan % 2 != 0) ? 1 : 2;
-
         List<ThoiKhoaBieu> allSlots;
         if (lopId != null && namHoc != null && hocKy != null)
             allSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, tuan);
@@ -86,64 +84,10 @@ public class ThoiKhoaBieuCrudService {
         else if (namHoc != null && hocKy != null)
             allSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, tuan);
         else
-            allSlots = tkbRepo.findAll();
+            allSlots = tkbRepo.findByTuan(tuan);
 
         if (allSlots == null) allSlots = new java.util.ArrayList<>();
-
-        List<ThoiKhoaBieu> teacherSlots = allSlots.stream()
-                .filter(t -> Boolean.TRUE.equals(t.getIsLocked()))
-                .collect(java.util.stream.Collectors.toList());
-
-        List<ThoiKhoaBieu> systemSlots = allSlots.stream()
-                .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
-                .collect(java.util.stream.Collectors.toList());
-
-        boolean isExamWeek = isExamWeek(namHoc, tuan);
-
-        // Nếu systemSlots trống (ví dụ tuần > 2 chưa sinh TKB tự động), fallback lấy từ tuần mẫu (mappedTuan 1 hoặc 2)
-        // Tuy nhiên, nếu là tuần thi thì KHÔNG ĐƯỢC fallback để hiện TKB trống
-        if (systemSlots.isEmpty() && !tuan.equals(mappedTuan) && !isExamWeek) {
-            List<ThoiKhoaBieu> fallbackSlots;
-            if (lopId != null && namHoc != null && hocKy != null)
-                fallbackSlots = tkbRepo.findByLopIdAndHocKyAndNamHocAndTuan(lopId, hocKy, namHoc, mappedTuan);
-            else if (lopId != null && namHoc != null)
-                fallbackSlots = tkbRepo.findByLopIdAndNamHocAndTuan(lopId, namHoc, mappedTuan);
-            else if (lopId != null)
-                fallbackSlots = tkbRepo.findByLopIdAndTuan(lopId, mappedTuan);
-            else if (namHoc != null && hocKy != null)
-                fallbackSlots = tkbRepo.findByNamHocAndHocKyAndTuan(namHoc, hocKy, mappedTuan);
-            else
-                fallbackSlots = new java.util.ArrayList<>();
-
-            systemSlots = fallbackSlots.stream()
-                    .filter(t -> !Boolean.TRUE.equals(t.getIsLocked()))
-                    .collect(java.util.stream.Collectors.toList());
-        }
-
-        List<ThoiKhoaBieu> all = new java.util.ArrayList<>();
-        all.addAll(systemSlots);
-        all.addAll(teacherSlots);
-
-        List<ThoiKhoaBieu> result = new java.util.ArrayList<>();
-        for (ThoiKhoaBieu tkb : all) {
-            ThoiKhoaBieu clone = new ThoiKhoaBieu();
-            clone.setId(tkb.getId());
-            clone.setLop(tkb.getLop());
-            clone.setMonHoc(tkb.getMonHoc());
-            clone.setGiaoVien(tkb.getGiaoVien());
-            clone.setThu(tkb.getThu());
-            clone.setTietBatDau(tkb.getTietBatDau());
-            clone.setSoTiet(tkb.getSoTiet());
-            clone.setPhongHoc(tkb.getPhongHoc());
-            clone.setHocKy(tkb.getHocKy());
-            clone.setNamHoc(tkb.getNamHoc());
-            clone.setIsLocked(tkb.getIsLocked());
-            clone.setGhiChu(tkb.getGhiChu());
-            clone.setIsDeleted(tkb.getIsDeleted());
-            clone.setTuan(tuan);
-            result.add(clone);
-        }
-        return result;
+        return allSlots;
     }
 
     @Transactional(readOnly = true)
@@ -154,18 +98,12 @@ public class ThoiKhoaBieuCrudService {
 
     public ThoiKhoaBieu create(ThoiKhoaBieu entity) {
         if (entity == null) throw new IllegalArgumentException("Thời khóa biểu không được để trống");
-        if (entity.getTuan() != null) {
-            entity.setTuan(entity.getTuan() % 2 != 0 ? 1 : 2);
-        }
         return tkbRepo.save(entity);
     }
 
     public ThoiKhoaBieu update(Integer id, ThoiKhoaBieu updatedEntity) {
         getById(id);
         updatedEntity.setId(id);
-        if (updatedEntity.getTuan() != null) {
-            updatedEntity.setTuan(updatedEntity.getTuan() % 2 != 0 ? 1 : 2);
-        }
         return tkbRepo.save(updatedEntity);
     }
 

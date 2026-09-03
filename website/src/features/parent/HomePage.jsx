@@ -7,10 +7,34 @@ import { getLichThiByLop } from "../../api/lichthiApi.js";
 import { getMonHoc } from "../../api/monhocApi.js";
 import { getDiem } from "../../api/diemApi.js";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
+import { getNamHoc } from "../../api/namhocApi.js";
 import { formatDate } from "../../utils/helpers.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
 import { webSocketService } from "../../utils/websocket.js";
+
+const formatExamDate = (dateStr) => {
+  if (!dateStr) return { fullDate: "--", dayOfWeek: "" };
+  const parts = String(dateStr).split("T")[0].split("-");
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+    const dayNames = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+    const dayOfWeek = dayNames[dateObj.getDay()];
+    return {
+      fullDate: `${d}/${m}/${y}`,
+      shortDate: `${d}/${m}`,
+      dayOfWeek: dayOfWeek
+    };
+  }
+  return { fullDate: dateStr, shortDate: dateStr, dayOfWeek: "" };
+};
+
+const formatExamTime = (timeStr, duration) => {
+  if (!timeStr) return "--";
+  const cleanTime = String(timeStr).substring(0, 5);
+  return duration ? `${cleanTime} (${duration} phút)` : cleanTime;
+};
 
 export default function HomePage() {
   const { students, currentStudent, selectStudent, loading: studentsLoading } = useParentStudents();
@@ -21,6 +45,7 @@ export default function HomePage() {
     exams: [],
     subjects: [],
     scores: [],
+    namHocs: [],
     attendanceStats: null,
   });
   const [dataLoading, setDataLoading] = useState(false);
@@ -34,48 +59,39 @@ export default function HomePage() {
         setDataLoading(true);
         const lopId = currentStudent?.lop?.id;
         const hocSinhId = currentStudent?.id;
-        const fetchPromises = [];
 
-        fetchPromises.push(
-          getThongBao().then(r => ({ notices: r?.data?.data || [] })).catch(() => ({ notices: [] })),
-          getMonHoc().then(r => ({ subjects: r?.data?.data || [] })).catch(() => ({ subjects: [] }))
-        );
+        const now = new Date();
+        const yearStart = now.getMonth() >= 8 ? `${now.getFullYear()}-09-01` : `${now.getFullYear() - 1}-09-01`;
+        const today = now.toISOString().split("T")[0];
 
-        fetchPromises.push(
-          (lopId ? getLichThiByLop(lopId) : Promise.resolve({ data: { data: [] } }))
-            .then(r => ({ exams: r?.data?.data || [] }))
-            .catch(() => ({ exams: [] }))
-        );
+        const [
+          noticesRes,
+          subjectsRes,
+          namHocsRes,
+          examsRes,
+          scoresRes,
+          statsRes
+        ] = await Promise.all([
+          getThongBao().catch(() => ({ data: { data: [] } })),
+          getMonHoc().catch(() => ({ data: { data: [] } })),
+          getNamHoc().catch(() => ({ data: { data: [] } })),
+          lopId ? getLichThiByLop(lopId).catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+          hocSinhId ? getDiem({ hocSinhId }).catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+          hocSinhId ? getStudentStatistics(hocSinhId, yearStart, today).catch(() => ({ data: { data: null } })) : Promise.resolve({ data: { data: null } })
+        ]);
 
-        if (hocSinhId) {
-          fetchPromises.push(
-            getDiem({ hocSinhId })
-              .then(r => ({ scores: r?.data?.data || [] }))
-              .catch(() => ({ scores: [] }))
-          );
-
-          const now = new Date();
-          const yearStart = now.getMonth() >= 8 ? `${now.getFullYear()}-09-01` : `${now.getFullYear() - 1}-09-01`;
-          const today = now.toISOString().split("T")[0];
-          fetchPromises.push(
-            getStudentStatistics(hocSinhId, yearStart, today)
-              .then(r => ({ attendanceStats: r?.data?.data || null }))
-              .catch(() => ({ attendanceStats: null }))
-          );
-        }
-
-        const results = await Promise.all(fetchPromises);
         if (!active) return;
 
         setData({
-          notices: results[0]?.notices || [],
-          subjects: results[1]?.subjects || [],
-          exams: results[2]?.exams || [],
-          scores: results[3]?.scores || [],
-          attendanceStats: results[4]?.attendanceStats || null,
+          notices: noticesRes?.data?.data || [],
+          subjects: subjectsRes?.data?.data || [],
+          namHocs: namHocsRes?.data?.data || [],
+          exams: examsRes?.data?.data || [],
+          scores: scoresRes?.data?.data || [],
+          attendanceStats: statsRes?.data?.data || null,
         });
       } catch (error) {
-        console.error(error);
+        console.error("Lỗi tải dữ liệu trang chủ phụ huynh:", error);
       } finally {
         if (active) setDataLoading(false);
       }
@@ -121,13 +137,43 @@ export default function HomePage() {
   }, [currentStudent]);
 
   const { upcomingExams, recentActivities, subjectsTodayCount } = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const activeYearObj = (data.namHocs || []).find(y => (y.trangThai || y.trang_thai) === "DANG_MO") || data.namHocs?.[0];
+    const curNamHoc = activeYearObj?.tenNamHoc || "";
 
-    const upcomingExams = (data.exams || [])
-      .filter(ex => new Date(ex.ngayThi) >= today)
-      .sort((a, b) => new Date(a.ngayThi) - new Date(b.ngayThi))
-      .slice(0, 3);
+    // Lọc chỉ lấy các kỳ thi chính thức (GK - Giữa kỳ, CK - Cuối kỳ), loại bỏ bài kiểm tra 15p (TP15)
+    const validExams = (data.exams || []).filter(ex => {
+      const loai = (ex.loaiKiemTra || "").toUpperCase();
+      if (loai === "TP15" || loai === "15P" || loai === "TX") return false;
+      if (curNamHoc && ex.namHoc && ex.namHoc !== curNamHoc) return false;
+      return true;
+    });
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // Lọc các kỳ thi từ hôm nay trở đi
+    const futureExams = validExams
+      .filter(ex => {
+        if (!ex.ngayThi) return false;
+        const d = new Date(ex.ngayThi + "T00:00:00");
+        return d >= now;
+      })
+      .sort((a, b) => {
+        const da = new Date(a.ngayThi + "T" + (a.gioBatDau || "00:00:00"));
+        const db = new Date(b.ngayThi + "T" + (b.gioBatDau || "00:00:00"));
+        return da - db;
+      });
+
+    // Fallback: nếu hiện tại chưa tới đợt thi mới hoặc tất cả đã qua, hiển thị đợt thi gần nhất của học kỳ
+    let upcomingExams = futureExams.slice(0, 4);
+    if (upcomingExams.length === 0 && validExams.length > 0) {
+      const sortedAll = [...validExams].sort((a, b) => {
+        const da = new Date(a.ngayThi + "T" + (a.gioBatDau || "00:00:00"));
+        const db = new Date(b.ngayThi + "T" + (b.gioBatDau || "00:00:00"));
+        return db - da; // Mới nhất lên đầu
+      });
+      upcomingExams = sortedAll.slice(0, 4).reverse();
+    }
 
     const activities = [];
     if (data.attendanceStats?.todayStatus) {
@@ -280,39 +326,54 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {/* Lịch thi sắp tới */}
-                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex-1 flex flex-col">
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-5">
-                    <Calendar size={20} className="text-purple-500" />
-                    Lịch thi sắp tới
-                  </h3>
-                  
-                  {dataLoading ? (
-                    <div className="text-sm text-slate-500">Đang tải...</div>
-                  ) : upcomingExams.length === 0 ? (
-                    <div className="py-8 flex flex-col items-center justify-center text-slate-400">
-                      <BookOpen size={32} className="mb-2 opacity-50" />
-                      <span className="text-sm">Chưa có lịch thi nào sắp tới</span>
-                    </div>
-                  ) : (
-                    <div className="relative border-l border-slate-200 ml-3 space-y-6">
-                      {upcomingExams.map((exam, idx) => {
-                        const d = new Date(exam.ngayThi);
-                        const dateStr = d.toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' });
-                        return (
-                          <div key={idx} className="relative pl-6">
-                            <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-purple-500 ring-4 ring-white"></div>
-                            <div className="text-sm font-bold text-slate-900">{dateStr}</div>
-                            <div className="mt-1 bg-slate-50 border border-slate-100 rounded-lg p-3">
-                              <div className="font-medium text-slate-800">{exam.monHoc?.tenMon || "Bài thi"}</div>
-                              <div className="text-xs text-slate-500 mt-1 flex gap-3">
-                                <span>Phòng: {exam.phongThi || "--"}</span>
-                                <span>Giờ thi: {exam.gioThi || "--"}</span>
-                              </div>
-                            </div>
+                {/* Liên hệ giáo viên chủ nhiệm */}
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex-1 flex flex-col justify-between min-h-[300px]">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
+                      <User size={20} className="text-emerald-500" />
+                      Liên hệ giáo viên chủ nhiệm
+                    </h3>
+                    
+                    {!gvcn ? (
+                      <div className="text-sm text-slate-500 text-center py-8 bg-slate-50 rounded-xl border border-slate-100">
+                        Chưa có thông tin giáo viên chủ nhiệm.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-50/80 border border-slate-100 rounded-xl mb-4">
+                        <div>
+                          <span className="font-bold text-slate-900 text-base">{gvcn.hoTen}</span>
+                          <p className="text-xs font-medium text-slate-500 mt-0.5">Giáo viên chủ nhiệm lớp {currentStudent?.lop?.tenLop}</p>
+                        </div>
+                        <div className="space-y-1.5 text-sm text-slate-600">
+                          <div className="flex items-center gap-2">
+                            <Mail size={15} className="text-slate-400 flex-shrink-0" />
+                            <span className="font-medium">{gvcn.email || "--"}</span>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center gap-2">
+                            <Phone size={15} className="text-slate-400 flex-shrink-0" />
+                            <span className="font-medium">{gvcn.sdt || "--"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {gvcn && (
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <button 
+                        onClick={() => navigate('/parent/thongbao')} 
+                        className="flex-1 bg-emerald-50 hover:bg-emerald-100 active:scale-[0.99] text-emerald-700 text-sm font-semibold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
+                      >
+                        <MessageSquare size={16} /> Gửi tin nhắn
+                      </button>
+                      {gvcn.sdt && (
+                        <a 
+                          href={`tel:${gvcn.sdt}`}
+                          className="flex-1 bg-blue-50 hover:bg-blue-100 active:scale-[0.99] text-blue-700 text-sm font-semibold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
+                        >
+                          <Phone size={16} /> Gọi điện
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>
@@ -347,42 +408,57 @@ export default function HomePage() {
                   </ul>
                 </div>
 
-                {/* Liên hệ giáo viên */}
-                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex-1 flex flex-col">
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
-                    <User size={20} className="text-emerald-500" />
-                    Liên hệ giáo viên
-                  </h3>
+                {/* Lịch thi sắp tới */}
+                <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex-1 flex flex-col min-h-[300px]">
+                  <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <Calendar size={20} className="text-purple-500" />
+                      Lịch thi sắp tới
+                    </h3>
+                    <Link to="/parent/timetable?filter=exams" className="text-xs font-semibold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg transition-colors">
+                      Xem tất cả
+                    </Link>
+                  </div>
                   
-                  {!gvcn ? (
-                    <div className="text-sm text-slate-500 text-center py-2">Chưa có thông tin giáo viên</div>
+                  {dataLoading ? (
+                    <div className="text-sm text-slate-500 py-12 text-center flex-1 flex items-center justify-center">Đang tải lịch thi...</div>
+                  ) : upcomingExams.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center justify-center text-slate-400 flex-1">
+                      <BookOpen size={32} className="mb-2 opacity-50" />
+                      <span className="text-sm font-medium">Chưa có lịch thi nào sắp tới</span>
+                    </div>
                   ) : (
-                    <>
-                      <div className="flex flex-col mb-5">
-                        <span className="font-bold text-slate-800">{gvcn.hoTen}</span>
-                        <div className="mt-2 space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Mail size={14} className="text-slate-400" />
-                            {gvcn.email || "--"}
+                    <div className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-4 relative border-l-2 border-purple-100 ml-2.5">
+                      {upcomingExams.map((exam, idx) => {
+                        const { fullDate, dayOfWeek } = formatExamDate(exam.ngayThi);
+                        const loaiKt = exam.loaiKiemTra === 'GK' ? 'Giữa kỳ' : exam.loaiKiemTra === 'CK' ? 'Cuối kỳ' : (exam.loaiKiemTra || '');
+                        return (
+                          <div key={exam.id || idx} className="relative pl-5">
+                            <div className="absolute -left-[6.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-purple-500 ring-4 ring-white shadow-sm"></div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-bold text-slate-900">{fullDate}</span>
+                              {dayOfWeek && (
+                                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">
+                                  {dayOfWeek}
+                                </span>
+                              )}
+                              {loaiKt && (
+                                <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                  {loaiKt}
+                                </span>
+                              )}
+                            </div>
+                            <div className="bg-slate-50 hover:bg-purple-50/20 border border-slate-100 hover:border-purple-100 rounded-xl p-2.5 transition-all">
+                              <div className="font-bold text-slate-800 text-sm">{exam.monHoc?.tenMon || "Bài thi"}</div>
+                              <div className="text-xs text-slate-600 mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <span>Phòng: <strong className="text-slate-800 font-semibold">{exam.phongThi || "--"}</strong></span>
+                                <span>Giờ thi: <strong className="text-slate-800 font-semibold">{formatExamTime(exam.gioBatDau, exam.thoiGianLamBai)}</strong></span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Phone size={14} className="text-slate-400" />
-                            {gvcn.sdt || "--"}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <button onClick={() => navigate('/parent/thongbao')} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
-                          <MessageSquare size={16} /> Gửi tin nhắn
-                        </button>
-                        {gvcn.sdt && (
-                          <button className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold py-2 rounded-xl transition-colors flex items-center justify-center gap-2">
-                            <Phone size={16} /> Gọi điện
-                          </button>
-                        )}
-                      </div>
-                    </>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 

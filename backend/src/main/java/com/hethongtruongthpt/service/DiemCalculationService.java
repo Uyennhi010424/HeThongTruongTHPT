@@ -291,7 +291,6 @@ public class DiemCalculationService {
         return null;
     }
 
-    @Cacheable(value = "dashboardStats", key = "'avgByGrade_' + #namHoc")
     public List<Map<String, Object>> getAvgByGrade(String namHoc) {
         String effectiveNamHoc = (namHoc != null && !namHoc.isBlank()) ? namHoc : getDefaultNamHoc();
         List<Map<String, Object>> summary = getSummaryByNamHoc(effectiveNamHoc);
@@ -423,7 +422,6 @@ public class DiemCalculationService {
         return result;
     }
 
-    @Cacheable(value = "dashboardStats", key = "'distribution_' + #namHoc + '_' + #hocKy + '_' + #khoi")
     public Map<String, Object> getDistribution(String namHoc, Integer hocKy, Integer khoi) {
         String effectiveNamHoc = (namHoc != null && !namHoc.isBlank()) ? namHoc : getDefaultNamHoc();
         List<Map<String, Object>> summary = getSummaryByNamHoc(effectiveNamHoc);

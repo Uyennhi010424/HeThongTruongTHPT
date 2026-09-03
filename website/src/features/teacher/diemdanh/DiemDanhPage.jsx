@@ -13,6 +13,7 @@ import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
 import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
 import { getHolidays } from "../../../api/lichnamhocApi.js";
+import Pagination from "../../../components/common/Pagination.jsx";
 
 const STORAGE_KEY = "teacher_attendance_records_v3";
 const LOCKS_KEY = "teacher_attendance_locks_v2";
@@ -51,11 +52,6 @@ const getToday = () => {
   return `${now.getFullYear()}-${month}-${day}`;
 };
 
-const getCurrentAcademicYear = () => {
-  const now = new Date();
-  const year = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-  return `${year}-${year + 1}`;
-};
 
 const getRecordKey = (date, classId, tietHoc, studentId) => `${date}_${classId}_${tietHoc}_${studentId}`;
 const getLockKey = (date, classId, tietHoc) => `${date}_${classId}_${tietHoc}`;
@@ -241,6 +237,35 @@ export default function DiemDanhPage() {
     return sortStudentsByGivenName(classStudents);
   }, [students, selectedClassId]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset page when class / date / tiet / semester / year change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClassId, selectedDate, selectedTiet, selectedNamHoc, selectedSemester]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
+
+  // Statistics pagination
+  const [statsCurrentPage, setStatsCurrentPage] = useState(1);
+  const [statsPageSize, setStatsPageSize] = useState(10);
+
+  useEffect(() => {
+    setStatsCurrentPage(1);
+  }, [selectedClassId, selectedNamHoc, selectedSemester]);
+
+  const statsList = useMemo(() => statsData?.hocSinh || [], [statsData]);
+  const statsTotalPages = Math.max(1, Math.ceil(statsList.length / statsPageSize));
+  const paginatedStatsList = useMemo(() => {
+    const start = (statsCurrentPage - 1) * statsPageSize;
+    return statsList.slice(start, start + statsPageSize);
+  }, [statsList, statsCurrentPage, statsPageSize]);
+
   const selectedClassInternal = useMemo(
     () => classes.find((item) => String(item.id) === selectedClassId) || null,
     [classes, selectedClassId]
@@ -362,8 +387,7 @@ export default function DiemDanhPage() {
       const records = [];
       filteredStudents.forEach((student) => {
         const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, student.id);
-        const draft = draftRecords[key];
-        if (!draft) return;
+        const draft = draftRecords[key] || { loaiVang: "CO_MAT", soNgayVang: 0, ghiChu: "" };
         records.push({
           ngay: selectedDate,
           lopHoc: { id: Number(selectedClassId) },
@@ -407,7 +431,7 @@ export default function DiemDanhPage() {
     if (!selectedClassId) return;
     setStatsLoading(true);
     try {
-      const namHoc = getCurrentAcademicYear();
+      const namHoc = filters.selectedNamHoc || "2025-2026";
       const year = parseInt(namHoc.split("-")[0]);
       const from = `${year}-09-01`;
       const to = `${year + 1}-06-30`;
@@ -624,7 +648,7 @@ export default function DiemDanhPage() {
                             <td colSpan={4} style={{ padding: 16 }}>Đang tải...</td>
                           </tr>
                         ))
-                      : filteredStudents.map((student, idx) => {
+                      : paginatedStudents.map((student, idx) => {
                           const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, student.id);
                           const record = draftRecords[key] || { loaiVang: "CO_MAT", soNgayVang: 0, ghiChu: "" };
                           const isEven = idx % 2 === 0;
@@ -695,6 +719,21 @@ export default function DiemDanhPage() {
                 </table>
               </div>
             )}
+
+            {/* Attendance Pagination */}
+            {!loading && filteredStudents.length > 0 && (
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredStudents.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                  pageSizeOptions={[10, 20, 30, 50, 100]}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -715,7 +754,7 @@ export default function DiemDanhPage() {
                 <div style={{ padding: "16px 0", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Thống kê chuyên cần {selectedClass?.tenLop || ""}</div>
-                    <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Năm học {getCurrentAcademicYear()}</div>
+                    <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Năm học {filters.selectedNamHoc || "2025-2026"}</div>
                   </div>
                 </div>
                 
@@ -732,7 +771,7 @@ export default function DiemDanhPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(statsData.hocSinh || []).map((hs, idx) => {
+                      {paginatedStatsList.map((hs, idx) => {
                         const tongNgay = hs.tongNgayHoc || statsData.tongNgayHoc || 1;
                         const tyLeVang = tongNgay > 0 ? Math.round((hs.tongVang / tongNgay) * 10000) / 100 : 0;
                         const tyLeVangCoPhep = tongNgay > 0 ? Math.round((hs.coPhep / tongNgay) * 10000) / 100 : 0;
@@ -764,6 +803,21 @@ export default function DiemDanhPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Statistics Pagination */}
+                {!statsLoading && statsList.length > 0 && (
+                  <div className="p-4 border-t border-slate-200 bg-slate-50">
+                    <Pagination
+                      currentPage={statsCurrentPage}
+                      totalPages={statsTotalPages}
+                      totalItems={statsList.length}
+                      pageSize={statsPageSize}
+                      onPageChange={setStatsCurrentPage}
+                      onPageSizeChange={(sz) => { setStatsPageSize(sz); setStatsCurrentPage(1); }}
+                      pageSizeOptions={[10, 20, 30, 50, 100]}
+                    />
+                  </div>
+                )}
               </div>
             </>
           )}

@@ -103,13 +103,13 @@ export default function HocSinhViewModal({ hooks }) {
                 <div>
                   <span className="block text-xs font-semibold text-slate-400 uppercase">Họ tên phụ huynh</span>
                   <span className="text-sm font-medium text-slate-900">
-                    {viewingStudent.phuHuynh?.hoTen || (parents.find(p => p.id === viewingStudent.phuHuynhId)?.hoTen) || "--"}
+                    {viewingStudent.phuHuynh?.hoTen || (parents.find(p => Number(p.id) === Number(viewingStudent.phuHuynhId))?.hoTen) || "--"}
                   </span>
                 </div>
                 <div>
                   <span className="block text-xs font-semibold text-slate-400 uppercase">SĐT phụ huynh</span>
                   <span className="text-sm font-medium text-slate-900">
-                    {viewingStudent.phuHuynh?.soDienThoai || (parents.find(p => p.id === viewingStudent.phuHuynhId)?.soDienThoai) || "--"}
+                    {viewingStudent.phuHuynh?.soDienThoai || (parents.find(p => Number(p.id) === Number(viewingStudent.phuHuynhId))?.soDienThoai) || "--"}
                   </span>
                 </div>
               </div>

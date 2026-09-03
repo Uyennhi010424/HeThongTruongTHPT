@@ -6,6 +6,7 @@ import com.hethongtruongthpt.entity.GiaoVien;
 import com.hethongtruongthpt.entity.LopHoc;
 import com.hethongtruongthpt.entity.MonHoc;
 import com.hethongtruongthpt.entity.PhanCongDay;
+import com.hethongtruongthpt.entity.ThoiKhoaBieu;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.ChuNhiemRepository;
@@ -62,11 +63,13 @@ public class PhanCongDayService {
         this.diemRepository = diemRepository;
     }
 
+
     /**
      * Automatically assigns teachers to all active subjects for every class in the given
      * academic year and semester. First syncs homeroom data, then for each subject:
      * (1) assigns homeroom teachers to their own class, and (2) round-robin distributes
      * remaining classes among eligible teachers.
+     * When HK1 is assigned, HK2 is automatically synchronized to match HK1.
      *
      * @param namHoc the academic year (e.g. "2025-2026")
      * @param hocKy  the semester number (1 or 2)
@@ -76,6 +79,17 @@ public class PhanCongDayService {
     public List<PhanCongDayDTO> autoAssignAllSubjects(String namHoc, Integer hocKy) {
         if (namHoc == null || namHoc.isBlank() || hocKy == null) {
             throw new ApiException("namHoc và hocKy là bắt buộc để tự động phân công");
+        }
+
+        // Nếu phân công cho HK2 mà HK1 đã có phân công, kế thừa trực tiếp từ HK1
+        if (hocKy == 2) {
+            List<PhanCongDay> hk1Assignments = repository.findByNamHocAndHocKy(namHoc, 1);
+            if (!hk1Assignments.isEmpty()) {
+                syncHocKy2FromHocKy1(namHoc);
+                return repository.findByNamHocAndHocKy(namHoc, 2).stream()
+                        .map(this::toDto)
+                        .collect(Collectors.toList());
+            }
         }
 
         // Fetch data
@@ -154,6 +168,11 @@ public class PhanCongDayService {
 
             // Second pass: load-balanced assign
             roundRobinAssign(mon, eligibleLops, teachersForMon, assignedLopIds, canTeach, markTaught, hocKy, namHoc, created, teacherPeriods, periodsPerClass);
+        }
+
+        // Nếu vừa phân công cho HK1, đồng bộ ngay sang HK2 để giáo viên dạy xuyên suốt cả năm học
+        if (hocKy == 1) {
+            syncHocKy2FromHocKy1(namHoc);
         }
 
         return created;
@@ -512,9 +531,115 @@ public class PhanCongDayService {
 
         try {
             PhanCongDay saved = repository.save(entity);
+
+            // Nếu tạo phân công cho HK1, đồng bộ ngay sang HK2 để giáo viên dạy tiếp
+            if (hocKy == 1) {
+                var existingHk2 = repository.findByMonHocIdAndLopIdAndHocKy(effectiveMonId, lopId, 2);
+                if (existingHk2.isPresent()) {
+                    PhanCongDay hk2 = existingHk2.get();
+                    hk2.setGiaoVien(gv);
+                    repository.save(hk2);
+                } else {
+                    PhanCongDay hk2 = new PhanCongDay();
+                    hk2.setGiaoVien(gv);
+                    hk2.setMonHoc(mon);
+                    hk2.setLop(lop);
+                    hk2.setHocKy(2);
+                    hk2.setNamHoc(namHoc);
+                    repository.save(hk2);
+                }
+            }
+
             return toDto(saved);
         } catch (DataIntegrityViolationException ex) {
             throw new ApiException("Phân công này đã tồn tại");
+        }
+    }
+
+    @Transactional
+    public void syncHocKy2FromHocKy1(String namHoc) {
+        if (namHoc == null || namHoc.isBlank()) return;
+        List<PhanCongDay> hk1List = repository.findByNamHocAndHocKy(namHoc, 1);
+        if (hk1List.isEmpty()) return;
+
+        List<PhanCongDay> hk2List = repository.findByNamHocAndHocKy(namHoc, 2);
+        Map<String, PhanCongDay> hk2Map = new HashMap<>();
+        for (PhanCongDay pc2 : hk2List) {
+            if (pc2.getLop() != null && pc2.getMonHoc() != null) {
+                String key = pc2.getLop().getId() + "_" + pc2.getMonHoc().getId();
+                hk2Map.put(key, pc2);
+            }
+        }
+
+        for (PhanCongDay pc1 : hk1List) {
+            if (pc1.getLop() == null || pc1.getMonHoc() == null) continue;
+            String key = pc1.getLop().getId() + "_" + pc1.getMonHoc().getId();
+            PhanCongDay pc2 = hk2Map.get(key);
+            if (pc2 != null) {
+                pc2.setGiaoVien(pc1.getGiaoVien());
+                repository.save(pc2);
+            } else {
+                PhanCongDay newPc2 = new PhanCongDay();
+                newPc2.setGiaoVien(pc1.getGiaoVien());
+                newPc2.setMonHoc(pc1.getMonHoc());
+                newPc2.setLop(pc1.getLop());
+                newPc2.setHocKy(2);
+                newPc2.setNamHoc(namHoc);
+                repository.save(newPc2);
+            }
+        }
+
+        syncThoiKhoaBieuTeachers(namHoc, 2);
+        log.info("Đã đồng bộ phân công giảng dạy HK2 theo HK1 cho năm học {}", namHoc);
+    }
+
+    @Transactional
+    public void syncThoiKhoaBieuTeachers(String namHoc, Integer hocKy) {
+        try {
+            List<PhanCongDay> pcList = repository.findByNamHocAndHocKy(namHoc, hocKy);
+            Map<String, GiaoVien> pcMap = new HashMap<>();
+            for (PhanCongDay pc : pcList) {
+                if (pc.getLop() != null && pc.getMonHoc() != null && pc.getGiaoVien() != null) {
+                    pcMap.put(pc.getLop().getId() + "_" + pc.getMonHoc().getId(), pc.getGiaoVien());
+                }
+            }
+            List<ThoiKhoaBieu> tkbList = thoiKhoaBieuRepository.findByNamHocAndHocKy(namHoc, hocKy);
+            
+            // Map để theo dõi slot đã có giáo viên dạy: key = "gvId-tiet-thu-tuan-namHoc-hocKy" -> tkbId
+            Map<String, Integer> teacherSlotMap = new HashMap<>();
+            for (ThoiKhoaBieu tkb : tkbList) {
+                if (tkb.getGiaoVien() != null && tkb.getGiaoVien().getId() != null) {
+                    String slotKey = tkb.getGiaoVien().getId() + "-" + tkb.getTietBatDau() + "-" + tkb.getThu() + "-" + tkb.getTuan() + "-" + tkb.getNamHoc() + "-" + tkb.getHocKy();
+                    teacherSlotMap.put(slotKey, tkb.getId());
+                }
+            }
+
+            for (ThoiKhoaBieu tkb : tkbList) {
+                if (tkb.getLop() != null && tkb.getMonHoc() != null) {
+                    GiaoVien gv = pcMap.get(tkb.getLop().getId() + "_" + tkb.getMonHoc().getId());
+                    if (gv != null && (tkb.getGiaoVien() == null || !tkb.getGiaoVien().getId().equals(gv.getId()))) {
+                        String newSlotKey = gv.getId() + "-" + tkb.getTietBatDau() + "-" + tkb.getThu() + "-" + tkb.getTuan() + "-" + tkb.getNamHoc() + "-" + tkb.getHocKy();
+                        Integer existingTkbId = teacherSlotMap.get(newSlotKey);
+                        if (existingTkbId != null && !existingTkbId.equals(tkb.getId())) {
+                            log.warn("Tránh trùng lịch TKB id={}: Giáo viên id={} đã có tiết tại ({}, thứ {}, tuần {})",
+                                    tkb.getId(), gv.getId(), tkb.getTietBatDau(), tkb.getThu(), tkb.getTuan());
+                            continue;
+                        }
+
+                        // Xóa slot cũ nếu có
+                        if (tkb.getGiaoVien() != null && tkb.getGiaoVien().getId() != null) {
+                            String oldSlotKey = tkb.getGiaoVien().getId() + "-" + tkb.getTietBatDau() + "-" + tkb.getThu() + "-" + tkb.getTuan() + "-" + tkb.getNamHoc() + "-" + tkb.getHocKy();
+                            teacherSlotMap.remove(oldSlotKey);
+                        }
+
+                        tkb.setGiaoVien(gv);
+                        teacherSlotMap.put(newSlotKey, tkb.getId());
+                        thoiKhoaBieuRepository.save(tkb);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Không thể đồng bộ giáo viên trong TKB: {}", e.getMessage());
         }
     }
 
