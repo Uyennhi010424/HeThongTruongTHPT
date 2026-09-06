@@ -12,6 +12,8 @@ import {
   transferSchool
 } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../../utils/helpers.js";
 import { createPhuHuynh, getPhuHuynh, updatePhuHuynh } from "../../../api/phuhuynhApi.js";
 import { getParentsForStudent } from "../../../api/phuhuynhHocSinhApi.js";
 import { createUser, getUsers } from "../../../api/userApi.js";
@@ -337,6 +339,7 @@ export function useHocSinhList() {
     setIsSearchVisible(true);
     return () => setIsSearchVisible(false);
   }, [setSearchPlaceholder, setIsSearchVisible]);
+  const [namHocList, setNamHocList] = useState([]);
   const [yearFilter, setYearFilter] = useState("all");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
@@ -390,23 +393,46 @@ export function useHocSinhList() {
       try {
         setLoading(true);
         setError("");
-        const [hsRes, lopRes, phRes] = await Promise.allSettled([
+        const [hsRes, lopRes, phRes, nhRes] = await Promise.allSettled([
           getHocSinh(),
           getLop(),
-          getPhuHuynh()
+          getPhuHuynh(),
+          getNamHoc()
         ]);
         if (!active) return;
+        let visibleYears = [];
+        let activeYrName = "";
+        if (nhRes.status === "fulfilled") {
+          const rawYears = nhRes.value?.data?.data || [];
+          visibleYears = getVisibleAcademicYears(rawYears);
+          setNamHocList(visibleYears);
+          const activeYr = getActiveAcademicYear(visibleYears) || visibleYears[0];
+          activeYrName = activeYr?.tenNamHoc || "";
+        }
         if (hsRes.status === "fulfilled") {
           const hsData = hsRes.value?.data?.data;
           const hsList = Array.isArray(hsData) ? hsData : (hsData?.content || []);
           setStudents(hsList.map(normalizeStudent));
         }
         if (lopRes.status === "fulfilled") {
-          setClasses(lopRes.value?.data?.data || []);
+          const rawClasses = lopRes.value?.data?.data || [];
+          if (visibleYears.length > 0) {
+            const validYearSet = new Set(visibleYears.map(y => y.tenNamHoc));
+            setClasses(rawClasses.filter(c => !c.namHoc || validYearSet.has(c.namHoc)));
+          } else {
+            setClasses(rawClasses);
+          }
         }
         if (phRes.status === "fulfilled") {
           setParents(phRes.value?.data?.data || []);
         }
+
+        setYearFilter((prev) => {
+          if (prev === "all" || !prev) {
+            return activeYrName || "all";
+          }
+          return prev;
+        });
 
         if (hsRes.status === "rejected" || lopRes.status === "rejected") {
           setError("Không thể tải đầy đủ dữ liệu học sinh/lớp.");
@@ -435,6 +461,9 @@ export function useHocSinhList() {
   }, [students]);
 
   const academicYears = useMemo(() => {
+    if (namHocList.length > 0) {
+      return namHocList.map(y => y.tenNamHoc);
+    }
     const set = new Set();
     classes.forEach((c) => {
       if (c?.namHoc) set.add(c.namHoc);
@@ -444,7 +473,7 @@ export function useHocSinhList() {
       if (yr) set.add(yr);
     });
     return Array.from(set).sort().reverse();
-  }, [classes, students]);
+  }, [namHocList, classes, students]);
 
   const filteredStudents = useMemo(() => {
     const lower = keyword.toLowerCase();

@@ -147,7 +147,8 @@ export default function TeacherRegisterPhanCong() {
         setTeacherProfile(teacher);
 
         const yList = namHocRes?.data?.data || [];
-        const currentYear = yList.find(y => y.trangThai === "DANG_MO") || yList[0] || null;
+        const visibleYears = getVisibleAcademicYears(yList);
+        const currentYear = getActiveAcademicYear(visibleYears) || visibleYears[0] || null;
         let selectedNamHoc = "2025-2026";
         let actualHk = 1;
         let currentWeek = 1;

@@ -27,11 +27,23 @@ const getTietTimeStr = (tietBatDau: number, soTiet: number = 1) => {
   return `${startStr} - ${endStr}`;
 };
 
-export const getWeekInfo = (date: Date) => {
-  // Tuần 1 bắt đầu từ 07/09/2026 (Thứ 2)
-  const startHk1 = new Date(2026, 8, 7); // 07/09/2026
-  startHk1.setHours(0, 0, 0, 0);
+export const getExamDateString = (date: Date) => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 
+export const getWeekRange = (date: Date) => {
+  const day = date.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const startOfWeek = new Date(date);
+  startOfWeek.setDate(date.getDate() + diffToMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+  return { startOfWeek, endOfWeek };
+};
+
+export const getWeekInfo = (date: Date) => {
   const day = date.getDay();
   const diffToMonday = day === 0 ? -6 : 1 - day;
   const monday = new Date(date);
@@ -40,15 +52,27 @@ export const getWeekInfo = (date: Date) => {
 
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
 
   const formatShort = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 
+  const month = date.getMonth(); // 0 - 11
+  const startYear = month >= 7 ? date.getFullYear() : date.getFullYear() - 1;
+
+  // Lấy ngày thứ 2 của tuần đầu tiên tháng 9
+  const sep5 = new Date(startYear, 8, 5);
+  const sep5Day = sep5.getDay();
+  const diffToSep5Monday = sep5Day === 0 ? -6 : 1 - sep5Day;
+  const startHk1 = new Date(sep5);
+  startHk1.setDate(sep5.getDate() + diffToSep5Monday);
+  startHk1.setHours(0, 0, 0, 0);
+
   if (monday.getTime() < startHk1.getTime()) {
     return {
-      weekNum: 0,
+      weekNum: 1,
       monday,
       sunday,
-      weekStr: `Chưa vào năm học (${formatShort(monday)} - ${formatShort(sunday)})`,
+      weekStr: `Tuần hè / Chuẩn bị (${formatShort(monday)} - ${formatShort(sunday)})`,
     };
   }
 
@@ -67,12 +91,8 @@ export const getWeekInfo = (date: Date) => {
 export default function CalendarScreen() {
   const { data } = useDashboardStore();
   
-  // Nếu hôm nay trước ngày khai giảng 07/09/2026 -> mặc định xem Tuần 1 (bắt đầu 07/09/2026)
   const getInitialDate = () => {
-    const today = new Date();
-    const startHk1 = new Date(2026, 8, 7);
-    startHk1.setHours(0, 0, 0, 0);
-    return today < startHk1 ? startHk1 : today;
+    return new Date();
   };
 
   const [currentDate, setCurrentDate] = useState(getInitialDate());
@@ -147,6 +167,18 @@ export default function CalendarScreen() {
     setCurrentDate(newDate);
   };
 
+  const isDateInExamWeek = (date: Date) => {
+    if (!data?.exams || data.exams.length === 0) return false;
+    const { startOfWeek, endOfWeek } = getWeekRange(date);
+    return data.exams.some((exam: any) => {
+      if (!exam.ngayThi) return false;
+      const examDate = new Date(exam.ngayThi);
+      return examDate >= startOfWeek && examDate <= endOfWeek;
+    });
+  };
+
+  const isExamWeek = isDateInExamWeek(currentDate);
+
   const renderClassItem = (item: any, index: number) => (
     <View key={index} style={styles.classCard}>
       <View style={styles.classTimeCol}>
@@ -174,7 +206,6 @@ export default function CalendarScreen() {
   );
 
   const renderNgàyView = () => {
-    const isExamWeek = data?.examWeek === true;
     const todayClasses = isExamWeek
       ? []
       : timetable
@@ -197,7 +228,6 @@ export default function CalendarScreen() {
   };
 
   const renderTuầnView = () => {
-    const isExamWeek = data?.examWeek === true;
     if (isExamWeek || !timetable || timetable.length === 0) {
       return (
         <View style={styles.emptyContainer}>
@@ -284,18 +314,14 @@ export default function CalendarScreen() {
       });
     }
 
-    const startHk1 = new Date(2026, 8, 7);
-    startHk1.setHours(0, 0, 0, 0);
-    const endHk1 = new Date(2027, 0, 10);
-    endHk1.setHours(23, 59, 59, 999);
-
     // Current month days
     for (let d = 1; d <= daysInMonth; d++) {
       const cellDate = new Date(year, month, d);
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dayOfWeek = cellDate.getDay() === 0 ? 8 : cellDate.getDay() + 1; // 2..8
 
-      const hasClasses = cellDate >= startHk1 && cellDate <= endHk1 && dayOfWeek !== 8 && timetable.some((t: any) => t.thu === dayOfWeek);
+      const isCellExamWeek = isDateInExamWeek(cellDate);
+      const hasClasses = !isCellExamWeek && dayOfWeek !== 8 && timetable && timetable.some((t: any) => t.thu === dayOfWeek);
       const hasExams = (data?.exams || []).some((e: any) => e.ngayThi === dateStr);
 
       cells.push({
@@ -325,9 +351,8 @@ export default function CalendarScreen() {
     }
 
     // Filter classes or exams for the selected date in Month view
-    const isExamWeek = data?.examWeek === true;
     const selectedDateStr = getExamDateString(currentDate);
-    const selectedDateClasses = (currentDate < startHk1 || currentDate > endHk1 || isExamWeek)
+    const selectedDateClasses = isExamWeek
       ? []
       : timetable?.filter((item: any) => item.thu === selectedDay).sort((a: any, b: any) => a.tietBatDau - b.tietBatDau) || [];
 
@@ -416,10 +441,12 @@ export default function CalendarScreen() {
               selectedDateClasses.map((item: any, index: number) => renderClassItem(item, index))
             ) : (
               <View style={styles.emptyContainerSmall}>
-                <BookOpen size={36} color="#CBD5E1" style={{ marginBottom: 8 }} />
-                <Text style={styles.emptyTextSmall}>Không có tiết học</Text>
+                <BookOpen size={36} color={isExamWeek ? '#FCA5A5' : '#CBD5E1'} style={{ marginBottom: 8 }} />
+                <Text style={[styles.emptyTextSmall, isExamWeek && { color: '#EF4444' }]}>
+                  {isExamWeek ? 'Tuần Thi!' : 'Không có tiết học'}
+                </Text>
                 <Text style={styles.emptySubtext}>
-                  {currentDate < startHk1 ? 'Chưa vào năm học mới.' : 'Ngày này không có lịch học.'}
+                  {isExamWeek ? 'Tuần này là tuần thi. Lịch học tạm dừng. Chúc bạn thi tốt!' : 'Ngày này không có lịch học.'}
                 </Text>
               </View>
             )
@@ -453,22 +480,6 @@ export default function CalendarScreen() {
     );
   };
 
-  const getExamDateString = (date: Date) => {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  };
-
-  const getWeekRange = (date: Date) => {
-    const day = date.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() + diffToMonday);
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
-    return { startOfWeek, endOfWeek };
-  };
-
   const getFilteredExams = () => {
     if (!data?.exams) return [];
     const dateStr = getExamDateString(currentDate);
@@ -496,7 +507,7 @@ export default function CalendarScreen() {
   const filteredExams = getFilteredExams();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <View style={styles.topTabs}>
         <TouchableOpacity style={[styles.topTabBtn, tab === 'HOC' && styles.topTabBtnActive]} onPress={() => setTab('HOC')}>
           <Text style={[styles.topTabText, tab === 'HOC' && styles.topTabTextActive]}>Lịch học</Text>
@@ -598,7 +609,7 @@ export default function CalendarScreen() {
           )
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -9,7 +9,8 @@ export const getDayThayByRange = (from, to, namHoc) =>
 export const getDayThayByTkb = (tkbId) =>
 	axiosClient.get(`/tkb-day-thay/tkb/${tkbId}`);
 
-export const getAllDayThay = () => axiosClient.get("/tkb-day-thay/all");
+export const getAllDayThay = (namHoc) =>
+	axiosClient.get("/tkb-day-thay/all", { params: { namHoc } });
 
 export const phanCongDayThay = (data) =>
 	axiosClient.post("/tkb-day-thay", data);

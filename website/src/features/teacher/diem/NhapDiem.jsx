@@ -382,12 +382,12 @@ export default function NhapDiem() {
   const filteredStudents = useMemo(() => {
     let result = students.filter((student) => student.trangThai === 1);
 
-    if (selectedGrade !== "all") {
-      result = result.filter((student) => String(getStudentClass(student)?.khoi || "") === selectedGrade);
+    if (selectedGrade && String(selectedGrade).toLowerCase() !== "all") {
+      result = result.filter((student) => String(getStudentClass(student)?.khoi || "") === String(selectedGrade));
     }
 
     if (selectedClass) {
-      result = result.filter((student) => String(getStudentClassId(student) || "") === selectedClass);
+      result = result.filter((student) => String(getStudentClassId(student) || "") === String(selectedClass));
     }
 
     result = sortStudentsByGivenName(result);

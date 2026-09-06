@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Calendar, Plus, X, AlertTriangle } from 'lucide-react-native';
 import api from '../../api/axiosClient';
 import { useParentStore } from '../../store/useParentStore';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -19,6 +19,16 @@ export default function ParentLeaveScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [lyDo, setLyDo] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const isSundaySelected = useMemo(() => {
+    if (leaveType === 'single') {
+      return startDate ? startDate.getDay() === 0 : false;
+    } else {
+      const startIsSun = startDate ? startDate.getDay() === 0 : false;
+      const endIsSun = endDate ? endDate.getDay() === 0 : false;
+      return startIsSun || endIsSun;
+    }
+  }, [leaveType, startDate, endDate]);
 
   useEffect(() => {
     if (selectedChild?.id) {
@@ -154,7 +164,7 @@ export default function ParentLeaveScreen() {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={48} color="#cbd5e1" />
+              <Calendar size={48} color="#cbd5e1" />
               <Text style={styles.emptyText}>Chưa có đơn xin nghỉ nào</Text>
             </View>
           }
@@ -162,7 +172,7 @@ export default function ParentLeaveScreen() {
       )}
 
       <TouchableOpacity style={styles.fab} onPress={openModal}>
-        <Ionicons name="add" size={24} color="#fff" />
+        <Plus size={24} color="#fff" />
       </TouchableOpacity>
 
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
@@ -171,7 +181,7 @@ export default function ParentLeaveScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Xin nghỉ cho {selectedChild?.hoTen}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#64748b" />
+                <X size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
 
@@ -194,7 +204,7 @@ export default function ParentLeaveScreen() {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Ngày nghỉ</Text>
                 <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowStartPicker(true)}>
-                  <Ionicons name="calendar-outline" size={20} color="#64748b" style={{ marginRight: 8 }} />
+                  <Calendar size={20} color="#64748b" style={{ marginRight: 8 }} />
                   <Text style={[styles.dateText, !startDate && { color: '#94a3b8' }]}>{formatDateDisplay(startDate)}</Text>
                 </TouchableOpacity>
               </View>
@@ -203,17 +213,26 @@ export default function ParentLeaveScreen() {
                 <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={styles.label}>Từ ngày</Text>
                   <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowStartPicker(true)}>
-                    <Ionicons name="calendar-outline" size={20} color="#64748b" style={{ marginRight: 4 }} />
+                    <Calendar size={20} color="#64748b" style={{ marginRight: 4 }} />
                     <Text style={[styles.dateText, !startDate && { color: '#94a3b8' }]}>{formatDateDisplay(startDate)}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={styles.label}>Đến ngày</Text>
                   <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowEndPicker(true)}>
-                    <Ionicons name="calendar-outline" size={20} color="#64748b" style={{ marginRight: 4 }} />
+                    <Calendar size={20} color="#64748b" style={{ marginRight: 4 }} />
                     <Text style={[styles.dateText, !endDate && { color: '#94a3b8' }]}>{formatDateDisplay(endDate)}</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            )}
+
+            {isSundaySelected && (
+              <View style={styles.sundayWarningBox}>
+                <AlertTriangle size={16} color="#d97706" style={{ marginRight: 6 }} />
+                <Text style={styles.sundayWarningText}>
+                  Lưu ý: Ngày đã chọn là Chủ nhật (ngày nghỉ của trường).
+                </Text>
               </View>
             )}
 
@@ -323,8 +342,25 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: '#2563eb', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   
+  sundayWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  sundayWarningText: {
+    fontSize: 12,
+    color: '#b45309',
+    fontWeight: '600',
+    flex: 1,
+  },
   pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  iosAbsoluteOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', borderRadius: 24, overflow: 'hidden' },
+  iosAbsoluteOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', borderRadius: 24, overflow: 'hidden' },
   pickerSheet: { backgroundColor: '#fff', paddingBottom: 20 },
   pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   pickerTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a' },

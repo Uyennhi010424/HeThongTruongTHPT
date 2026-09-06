@@ -19,7 +19,14 @@ import {
   getHomeroomAssignment,
   getTeacherSubjectLabel
 } from "../../../utils/teacherProfile.js";
-import { formatDate, getDayLabel, getCurrentSemesterWeek, getWeekDates } from "../../../utils/helpers.js";
+import {
+  formatDate,
+  getDayLabel,
+  getCurrentSemesterWeek,
+  getWeekDates,
+  getVisibleAcademicYears,
+  getActiveAcademicYear
+} from "../../../utils/helpers.js";
 import { normalizeVietnameseDisplay } from "../../../utils/normalizeText.js";
 
 const nfc = normalizeVietnameseDisplay;
@@ -119,21 +126,33 @@ export default function TeacherDashboard() {
       try {
         setLoading(true);
         setError("");
-        const [noticesRes, classesRes, subjectsRes, teachersRes, chuNhiemRes, phanCongRes, namHocRes] =
-          await Promise.all([
-            getThongBao(),
-            getLop(),
-            getMonHoc(),
-            getCurrentGiaoVien(),
-            getChuNhiem(),
-            getPhanCongDay(),
-            getNamHoc()
-          ]);
+        const [
+          noticesRes,
+          classesRes,
+          subjectsRes,
+          teachersRes,
+          chuNhiemRes,
+          phanCongRes,
+          namHocRes
+        ] = await Promise.all([
+          getThongBao().catch((err) => { console.warn("Lỗi tải thông báo:", err); return { data: { data: [] } }; }),
+          getLop().catch((err) => { console.warn("Lỗi tải lớp học:", err); return { data: { data: [] } }; }),
+          getMonHoc().catch((err) => { console.warn("Lỗi tải môn học:", err); return { data: { data: [] } }; }),
+          getCurrentGiaoVien().catch((err) => { console.warn("Lỗi tải thông tin giáo viên:", err); return { data: { data: null } }; }),
+          getChuNhiem().catch((err) => { console.warn("Lỗi tải thông tin chủ nhiệm:", err); return { data: { data: [] } }; }),
+          getPhanCongDay().catch((err) => { console.warn("Lỗi tải phân công dạy:", err); return { data: { data: [] } }; }),
+          getNamHoc().catch((err) => { console.warn("Lỗi tải năm học:", err); return { data: { data: [] } }; })
+        ]);
         if (!active) return;
 
-        const years = namHocRes?.data?.data || [];
-        setNamHocList(years);
-        const currentYear = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[0] || null;
+        if (teachersRes?.data?.data) {
+          setApiTeacher(teachersRes.data.data);
+        }
+
+        const rawYears = namHocRes?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        setNamHocList(visibleYears);
+        const currentYear = getActiveAcademicYear(visibleYears) || visibleYears[0] || null;
         const tenNamHoc = currentYear?.tenNamHoc || "";
         let hocKy = 1;
         if (currentYear?.ngayBatDauHk2) {
@@ -146,10 +165,15 @@ export default function TeacherDashboard() {
         setSelectedTuan(defaultTuan);
         setYearInfo({ tenNamHoc, hocKy });
 
-        const timetableRes = await getGiaoVienThoiKhoaBieu({ namHoc: tenNamHoc, hocKy, tuan: defaultTuan });
-        const tkbData = timetableRes?.data?.data || [];
-
-        // (removed unused fetch for all timetable weeks)
+        let tkbData = [];
+        if (tenNamHoc && defaultTuan > 0) {
+          try {
+            const timetableRes = await getGiaoVienThoiKhoaBieu({ namHoc: tenNamHoc, hocKy, tuan: defaultTuan });
+            tkbData = timetableRes?.data?.data || [];
+          } catch (tkbErr) {
+            console.warn("Lỗi tải TKB giáo viên:", tkbErr);
+          }
+        }
 
         if (!active) return;
 
@@ -164,6 +188,7 @@ export default function TeacherDashboard() {
         });
       } catch (err) {
         if (!active) return;
+        console.error("Lỗi fetchAll dashboard:", err);
         setError("Không thể tải dữ liệu dashboard.");
       } finally {
         if (active) setLoading(false);

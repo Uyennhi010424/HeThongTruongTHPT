@@ -4,6 +4,7 @@ import PageHeader from "../../../components/edu/PageHeader.jsx";
 import { getDiemProgressSummary, guiBangDiemTuDong } from "../../../api/diemApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 import DiemProgressTable from "./DiemProgressTable.jsx";
 
 
@@ -37,14 +38,12 @@ export default function AdminNhapDiemPage() {
     getNamHoc()
       .then(res => {
         const years = res?.data?.data || [];
-        if (years.length > 0) {
-          const active = years.find((nh) => nh.trangThai === "DANG_MO");
-          if (active && active.tenNamHoc) {
-            setNamHoc(active.tenNamHoc);
-          } else {
-            const unique = [...new Set(years.map(y => y.tenNamHoc || y.namHoc).filter(Boolean))].sort().reverse();
-            if (unique.length > 0) setNamHoc(unique[0]);
-          }
+        const visible = getVisibleAcademicYears(years);
+        const active = getActiveAcademicYear(years);
+        if (active && active.tenNamHoc) {
+          setNamHoc(active.tenNamHoc);
+        } else if (visible.length > 0) {
+          setNamHoc(visible[0].tenNamHoc);
         }
         setServerError(false);
       })

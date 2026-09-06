@@ -3,6 +3,8 @@ import { useLocation } from "react-router-dom";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { getAllNghi, duyetNghi, huyNghi } from "../../../api/giaoVienNghiApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
 
 const STATUS = {
@@ -313,9 +315,36 @@ export default function AdminNghiDayPage() {
   const [detailTarget, setDetailTarget] = useState(null);
   const location = useLocation();
 
-  const fetchAll = useCallback(async () => {
+  // Academic year management (only valid years <= current active year)
+  const [allNamHoc, setAllNamHoc] = useState([]);
+  const [selectedNamHoc, setSelectedNamHoc] = useState("");
+
+  const visibleNamHoc = useMemo(() => {
+    return getVisibleAcademicYears(allNamHoc);
+  }, [allNamHoc]);
+
+  const activeNamHoc = useMemo(() => {
+    return getActiveAcademicYear(allNamHoc);
+  }, [allNamHoc]);
+
+  useEffect(() => {
+    getNamHoc()
+      .then((res) => {
+        const raw = res?.data?.data || [];
+        setAllNamHoc(raw);
+        const visible = getVisibleAcademicYears(raw);
+        const activeYear = getActiveAcademicYear(raw);
+        const initialYear = activeYear?.tenNamHoc || visible[0]?.tenNamHoc || "";
+        setSelectedNamHoc(initialYear);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchAll = useCallback(async (year) => {
+    const targetYear = year !== undefined ? year : selectedNamHoc;
+    setLoading(true);
     try {
-      const res = await getAllNghi();
+      const res = await getAllNghi(targetYear && targetYear !== "ALL" ? targetYear : undefined);
       const data = (res?.data?.data || []).sort(
         (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
       );
@@ -325,9 +354,13 @@ export default function AdminNghiDayPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedNamHoc]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    if (selectedNamHoc !== "") {
+      fetchAll(selectedNamHoc);
+    }
+  }, [selectedNamHoc, fetchAll]);
 
   useEffect(() => {
     setSearchPlaceholder("Tìm giáo viên, lý do...");
@@ -355,7 +388,9 @@ export default function AdminNghiDayPage() {
         return (
           r.giaoVien?.hoTen?.toLowerCase().includes(q) ||
           r.giaoVien?.maGiaoVien?.toLowerCase().includes(q) ||
-          r.lyDo?.toLowerCase().includes(q)
+          r.giaoVienThay?.hoTen?.toLowerCase().includes(q) ||
+          r.lyDo?.toLowerCase().includes(q) ||
+          r.namHoc?.toLowerCase().includes(q)
         );
       }
       return true;
@@ -382,10 +417,29 @@ export default function AdminNghiDayPage() {
   return (
     <div style={{ background: "#f8fafc" }}>
 
-      {/* Header */}
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", letterSpacing: "-0.025em", margin: 0 }}>Quản lý Nghỉ dạy &amp; Dạy thay</h1>
-        <p style={{ fontSize: 14, color: "#64748b", margin: "4px 0 0" }}>Xem xét và xử lý các đơn xin nghỉ của giáo viên.</p>
+      {/* Header & Academic Year Selector */}
+      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", letterSpacing: "-0.025em", margin: 0 }}>Quản lý Nghỉ dạy &amp; Dạy thay</h1>
+          <p style={{ fontSize: 14, color: "#64748b", margin: "4px 0 0" }}>Xem xét và xử lý các đơn xin nghỉ, phân công giáo viên dạy thay.</p>
+        </div>
+
+        {/* Year Selector Dropdown */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", padding: "6px 12px", borderRadius: 10, border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>Năm học:</span>
+          <select
+            value={selectedNamHoc}
+            onChange={(e) => setSelectedNamHoc(e.target.value)}
+            style={{ border: "none", background: "transparent", fontSize: 13, fontWeight: 700, color: "#1e40af", outline: "none", cursor: "pointer" }}
+          >
+            {visibleNamHoc.map((nh) => (
+              <option key={nh.id || nh.tenNamHoc} value={nh.tenNamHoc}>
+                {nh.tenNamHoc}
+              </option>
+            ))}
+            <option value="ALL">-- Tất cả các năm --</option>
+          </select>
+        </div>
       </div>
 
       {/* Stat Tabs */}
@@ -415,19 +469,19 @@ export default function AdminNghiDayPage() {
       {/* Table */}
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900, fontSize: 14 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960, fontSize: 14 }}>
             <thead style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
               <tr>
-                {["Giáo viên", "Ngày nghỉ", "Lý do", "Thời gian gửi", "Trạng thái", "Thao tác"].map((h) => (
+                {["Giáo viên nghỉ", "Năm học", "Ngày nghỉ", "Lý do", "Người dạy thay", "Thời gian gửi", "Trạng thái", "Thao tác"].map((h) => (
                   <th key={h} style={{ padding: "13px 16px", textAlign: "left", fontWeight: 700, fontSize: 12, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Đang tải...</td></tr>
+                <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Đang tải dữ liệu...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Không có đơn nào.</td></tr>
+                <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Không có đơn xin nghỉ nào trong năm học này.</td></tr>
               ) : (
                 filtered.map((r, idx) => (
                   <tr
@@ -444,12 +498,25 @@ export default function AdminNghiDayPage() {
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: "#1e3a8a" }}>{r.giaoVien?.hoTen || "--"}</div>
-                          <div style={{ fontSize: 12, color: "#94a3b8" }}>{r.giaoVien?.maGiaoVien || ""}</div>
+                          <div style={{ fontSize: 12, color: "#94a3b8" }}>{r.giaoVien?.maGiaoVien || ""}{r.giaoVien?.boMon ? ` · Môn ${r.giaoVien.boMon}` : ""}</div>
                         </div>
                       </div>
                     </td>
+                    <td style={{ padding: "13px 16px", color: "#475569", whiteSpace: "nowrap", fontSize: 13 }}>
+                      <span style={{ padding: "2px 8px", background: "#f1f5f9", borderRadius: 6, fontWeight: 600 }}>{r.namHoc || "--"}</span>
+                    </td>
                     <td style={{ padding: "13px 16px", fontWeight: 600, color: "#1e3a8a", whiteSpace: "nowrap" }}>{fmtDate(r.ngay)}</td>
-                    <td style={{ padding: "13px 16px", color: "#334155", maxWidth: 220 }}><div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lyDo || "--"}</div></td>
+                    <td style={{ padding: "13px 16px", color: "#334155", maxWidth: 180 }}><div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lyDo || "--"}</div></td>
+                    <td style={{ padding: "13px 16px", color: "#1e3a8a", fontSize: 13 }}>
+                      {r.giaoVienThay ? (
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{r.giaoVienThay.hoTen}</div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>{r.giaoVienThay.maGiaoVien}{r.giaoVienThay.boMon ? ` · ${r.giaoVienThay.boMon}` : ""}</div>
+                        </div>
+                      ) : (
+                        <span style={{ color: "#94a3b8", fontStyle: "italic" }}>Chưa phân công</span>
+                      )}
+                    </td>
                     <td style={{ padding: "13px 16px", color: "#64748b", whiteSpace: "nowrap", fontSize: 13 }}>{fmtDateTime(r.createdAt)}</td>
                     <td style={{ padding: "13px 16px" }}><StatusBadge status={r.trangThai} /></td>
                     {/* Actions */}
@@ -484,4 +551,5 @@ export default function AdminNghiDayPage() {
 }
 
 const actionBtn = { padding: "5px 12px", borderRadius: 6, border: "1px solid", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" };
+
 

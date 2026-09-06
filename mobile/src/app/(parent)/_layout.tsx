@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Tabs, usePathname, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
+import { Bell, ChevronDown, ChevronLeft, LogOut, Home, GraduationCap, ShieldCheck, Calendar } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -111,12 +111,23 @@ export default function ParentLayout() {
             />
           ),
           headerLeft: () => {
+            const isNotifications = pathname.includes('notifications');
+            if (isNotifications) {
+              return (
+                <TouchableOpacity 
+                  style={{ marginLeft: 16, padding: 4 }}
+                  onPress={() => router.back()}
+                >
+                  <ChevronLeft size={24} color="#334155" />
+                </TouchableOpacity>
+              );
+            }
             return (
               <TouchableOpacity 
                 style={{ marginLeft: 16, position: 'relative' }}
                 onPress={() => router.push('/(parent)/notifications')}
               >
-                <Ionicons name="notifications-outline" size={24} color="#334155" />
+                <Bell size={22} color="#334155" />
                 {unreadCount > 0 && (
                   <View style={{
                     position: 'absolute', top: -4, right: -4, backgroundColor: '#ef4444', 
@@ -137,14 +148,14 @@ export default function ParentLayout() {
                 {children.length > 1 && (
                   <TouchableOpacity onPress={handleSelectChild} style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, flexDirection: 'row', alignItems: 'center', marginRight: isIndex ? 12 : 0 }}>
                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#334155', marginRight: 4 }}>{selectedChild?.hoTen || 'Chọn bé'}</Text>
-                    <Ionicons name="chevron-down" size={14} color="#334155" />
+                    <ChevronDown size={14} color="#334155" />
                   </TouchableOpacity>
                 )}
                 {isIndex && (
                   <TouchableOpacity onPress={async () => {
                     await useAuthStore.getState().signOut();
                   }} style={{ padding: 6, backgroundColor: '#fee2e2', borderRadius: 12 }}>
-                    <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                    <LogOut size={20} color="#ef4444" />
                   </TouchableOpacity>
                 )}
               </View>
@@ -167,28 +178,28 @@ export default function ParentLayout() {
           name="index"
           options={{
             title: 'Tổng quan',
-            tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={24} color={color} />,
+            tabBarIcon: ({ color, size }) => <Home size={size || 22} color={color} />,
           }}
         />
         <Tabs.Screen
           name="scores"
           options={{
             title: 'Bảng điểm',
-            tabBarIcon: ({ color }) => <Ionicons name="school-outline" size={24} color={color} />,
+            tabBarIcon: ({ color, size }) => <GraduationCap size={size || 22} color={color} />,
           }}
         />
         <Tabs.Screen
           name="conduct"
           options={{
-            title: 'Kỷ luật',
-            tabBarIcon: ({ color }) => <Ionicons name="shield-checkmark-outline" size={24} color={color} />,
+            title: 'Hạnh kiểm',
+            tabBarIcon: ({ color, size }) => <ShieldCheck size={size || 22} color={color} />,
           }}
         />
         <Tabs.Screen
           name="leave"
           options={{
             title: 'Xin nghỉ',
-            tabBarIcon: ({ color }) => <Ionicons name="calendar-outline" size={24} color={color} />,
+            tabBarIcon: ({ color, size }) => <Calendar size={size || 22} color={color} />,
           }}
         />
         <Tabs.Screen
@@ -202,7 +213,7 @@ export default function ParentLayout() {
           name="notifications"
           options={{
             href: null,
-            headerShown: false,
+            headerShown: true,
           }}
         />
       </Tabs>

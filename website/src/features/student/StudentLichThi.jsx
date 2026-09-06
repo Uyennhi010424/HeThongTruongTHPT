@@ -22,7 +22,14 @@ export default function StudentLichThi() {
 
         const examRes = lopId ? await getLichThiByLop(lopId) : await getLichThi();
         if (!active) return;
-        setExams(examRes?.data?.data || []);
+        const allExams = examRes?.data?.data || [];
+        setExams(allExams);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const hasUpcoming = allExams.some((e) => e.ngayThi && new Date(e.ngayThi) >= now);
+        if (!hasUpcoming && allExams.length > 0) {
+          setFilter("all");
+        }
       } catch {
         if (!active) return;
         setError("Không thể tải lịch thi.");

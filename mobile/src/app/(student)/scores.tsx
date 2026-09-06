@@ -33,7 +33,7 @@ export default function ScoresScreen() {
   const subjects = data?.subjects || [];
   const allScores = data?.scores || [];
 
-  const currentStudentNamHoc = data?.student?.lop?.namHoc || '2026-2027';
+  const currentStudentNamHoc = data?.student?.lop?.namHoc || '2025-2026';
 
   const availableYears = useMemo(() => {
     const yearsSet = new Set<string>();
@@ -46,10 +46,10 @@ export default function ScoresScreen() {
       const yB = Number(b.match(/(\d{4})/)?.[1] || 0);
       return yB - yA;
     });
-    return arr.length > 0 ? arr : ['2026-2027', '2025-2026'];
+    return arr.length > 0 ? arr : [currentStudentNamHoc];
   }, [allScores, currentStudentNamHoc]);
 
-  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || '2026-2027');
+  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || currentStudentNamHoc);
 
   useEffect(() => {
     if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
@@ -219,14 +219,7 @@ export default function ScoresScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Kết quả học tập</Text>
-      </View>
-
+    <View style={styles.container}>
       {/* Year & Semester Filter */}
       <View style={styles.filterWrapper}>
         <TouchableOpacity 
@@ -285,7 +278,7 @@ export default function ScoresScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {filter === 'CA_NAM' ? renderYearView() : renderSemesterView()}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

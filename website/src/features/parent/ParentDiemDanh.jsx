@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Calendar, CheckCircle2, AlertTriangle, XCircle, Clock, Filter, Percent } from "lucide-react";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
 
@@ -27,16 +28,18 @@ export default function ParentDiemDanh() {
     const fetchYears = async () => {
       try {
         const res = await getNamHoc();
-        const years = (res?.data?.data || [])
+        const rawYears = res?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => Number(b.match(/(\d{4})/)?.[1] || 0) - Number(a.match(/(\d{4})/)?.[1] || 0));
+          .filter(Boolean);
         setNamHocList(years);
-        const curYear = currentStudent?.lop?.namHoc || years[0] || "2026-2027";
+        const activeYr = getActiveAcademicYear(visibleYears) || visibleYears[0];
+        const curYear = activeYr?.tenNamHoc || currentStudent?.lop?.namHoc || years[0] || "";
         setSelectedNamHoc(curYear);
 
         const match = curYear.match(/(\d{4})-(\d{4})/);
-        const startYear = match ? Number(match[1]) : 2026;
+        const startYear = match ? Number(match[1]) : new Date().getFullYear();
         setFromDate(`${startYear}-09-01`);
         setToDate(`${startYear + 1}-05-31`);
       } catch (err) {
@@ -50,7 +53,7 @@ export default function ParentDiemDanh() {
     setSelectedNamHoc(year);
     setActivePreset("all");
     const match = year.match(/(\d{4})-(\d{4})/);
-    const startYear = match ? Number(match[1]) : 2026;
+    const startYear = match ? Number(match[1]) : new Date().getFullYear();
     setFromDate(`${startYear}-09-01`);
     setToDate(`${startYear + 1}-05-31`);
   };
@@ -58,7 +61,7 @@ export default function ParentDiemDanh() {
   const handlePresetChange = (preset) => {
     setActivePreset(preset);
     const match = selectedNamHoc.match(/(\d{4})-(\d{4})/);
-    const startYear = match ? Number(match[1]) : 2026;
+    const startYear = match ? Number(match[1]) : new Date().getFullYear();
 
     if (preset === "hk1") {
       setFromDate(`${startYear}-09-01`);

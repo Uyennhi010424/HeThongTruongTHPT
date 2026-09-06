@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Lock } from 'lucide-react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Lock } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axiosClient from '../../api/axiosClient';
 
@@ -40,17 +39,11 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Đổi mật khẩu</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View style={styles.content}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.formCard}>
           <View style={styles.iconWrapper}>
             <Lock size={48} color="#2563EB" />
@@ -97,8 +90,8 @@ export default function ChangePasswordScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -107,29 +100,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  backBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0F172A',
-  },
-  content: {
-    flex: 1,
+  scrollContent: {
     padding: 20,
+    paddingTop: 24,
+    paddingBottom: 40,
   },
   formCard: {
     backgroundColor: '#FFFFFF',

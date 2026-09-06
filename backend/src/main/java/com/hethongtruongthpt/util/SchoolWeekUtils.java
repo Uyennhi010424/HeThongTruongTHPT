@@ -17,10 +17,14 @@ public final class SchoolWeekUtils {
 
     /** Số tuần trong năm học (tuần 1 = tuần chứa ngày bắt đầu HK1). */
     public static int weekNumber(NamHoc namHoc, LocalDate date) {
+        if (namHoc == null || namHoc.getNgayBatDauHk1() == null || date == null) return 1;
         LocalDate week1 = mondayOfWeekContaining(namHoc.getNgayBatDauHk1());
         LocalDate target = mondayOfWeekContaining(date);
         long diff = ChronoUnit.WEEKS.between(week1, target);
-        return (int) Math.max(1, diff + 1);
+        if (diff < 0) {
+            return 0; // Chưa bắt đầu năm học
+        }
+        return (int) (diff + 1);
     }
 
     public static int semesterWeekMin(NamHoc namHoc, int hocKy) {

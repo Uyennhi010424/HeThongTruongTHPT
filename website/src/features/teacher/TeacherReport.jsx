@@ -5,6 +5,7 @@ import { getTeacherSummary } from "../../api/diemApi.js";
 import { getLop } from "../../api/lopApi.js";
 import { getMonHoc } from "../../api/monhocApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Download, RefreshCw, ChevronDown, ChevronUp, Filter } from "lucide-react";
 
@@ -48,16 +49,12 @@ export default function TeacherReport() {
         setSubjects(filteredSubjects);
 
         const allNamHoc = namHocRes?.data?.data || [];
-        const years = allNamHoc
+        const visibleYears = getVisibleAcademicYears(allNamHoc);
+        const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => {
-            const yearA = Number(String(a).match(/(\d{4})/)?.[1] || 0);
-            const yearB = Number(String(b).match(/(\d{4})/)?.[1] || 0);
-            return yearB - yearA;
-          });
+          .filter(Boolean);
         setNamHocList(years);
-        const activeYear = allNamHoc.find((y) => y.trangThai === "DANG_MO");
+        const activeYear = getActiveAcademicYear(visibleYears);
         const currentNamHoc = activeYear?.tenNamHoc || years[0] || "";
         setSelectedNamHoc((prev) => prev || currentNamHoc);
 

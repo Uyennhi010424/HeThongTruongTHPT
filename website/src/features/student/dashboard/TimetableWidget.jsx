@@ -1,20 +1,31 @@
 import React, { useMemo } from "react";
 import { CalendarDays, User } from "lucide-react";
 
+import { formatDate } from "../../../utils/helpers.js";
+
 const getDayLabel = (day) => {
   if (day === 8) return "Chủ nhật";
   return `Thứ ${day}`;
 };
 
-const TimetableWidget = ({ timetable, isSummerBreak, isExamWeek, todayDay, subjectColorMap, getSubjectName }) => {
+const TimetableWidget = ({ 
+  timetable, 
+  isSummerBreak, 
+  isNotStartedYet, 
+  schoolStartDate, 
+  isExamWeek, 
+  todayDay, 
+  subjectColorMap, 
+  getSubjectName 
+}) => {
   const todayLabel = `${getDayLabel(todayDay)}, ${new Date().getDate()}/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
 
   const todayTimetable = useMemo(() => {
-    if (isSummerBreak || isExamWeek) return [];
+    if (isSummerBreak || isNotStartedYet || isExamWeek) return [];
     return [...timetable]
       .filter((i) => i.thu === todayDay)
       .sort((a, b) => (a.tietBatDau || 0) - (b.tietBatDau || 0));
-  }, [timetable, todayDay, isSummerBreak, isExamWeek]);
+  }, [timetable, todayDay, isSummerBreak, isNotStartedYet, isExamWeek]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100 flex flex-col flex-1">
@@ -29,12 +40,23 @@ const TimetableWidget = ({ timetable, isSummerBreak, isExamWeek, todayDay, subje
       {todayTimetable.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center flex-1">
           <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
-            <CalendarDays size={28} className={isExamWeek ? "text-red-400" : "text-slate-300"} />
+            <CalendarDays size={28} className={isExamWeek ? "text-red-400" : isNotStartedYet ? "text-blue-500" : "text-slate-300"} />
           </div>
-          <div className={`font-medium text-sm ${isExamWeek ? 'text-red-500' : 'text-slate-500'}`}>
-            {isSummerBreak ? "Đang trong thời gian nghỉ hè!" : isExamWeek ? "Tuần này là Tuần Thi" : "Không có tiết học hôm nay"}
+          <div className={`font-semibold text-sm ${isExamWeek ? 'text-red-500' : isNotStartedYet ? 'text-blue-600' : 'text-slate-600'}`}>
+            {isNotStartedYet 
+              ? `Năm học mới bắt đầu từ ${schoolStartDate ? formatDate(schoolStartDate) : "07/09/2026"}`
+              : isSummerBreak 
+              ? "Đang trong thời gian nghỉ hè!" 
+              : isExamWeek 
+              ? "Tuần này là Tuần Thi" 
+              : "Không có tiết học hôm nay"}
           </div>
-          {!isSummerBreak && !isExamWeek && <div className="text-slate-400 text-xs mt-1">Nghỉ ngơi thật tốt nhé!</div>}
+          {isNotStartedYet && (
+            <div className="text-slate-400 text-xs mt-1 max-w-[260px] leading-relaxed">
+              Thời khóa biểu sẽ chính thức bắt đầu áp dụng từ ngày {schoolStartDate ? formatDate(schoolStartDate) : "07/09/2026"}.
+            </div>
+          )}
+          {!isNotStartedYet && !isSummerBreak && !isExamWeek && <div className="text-slate-400 text-xs mt-1">Nghỉ ngơi thật tốt nhé!</div>}
           {isExamWeek && <div className="text-red-400 text-xs mt-1">Lịch học tạm dừng. Chúc bạn thi tốt!</div>}
         </div>
       ) : (

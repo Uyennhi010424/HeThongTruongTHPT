@@ -21,7 +21,7 @@ import {
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
-import { getLimitedSemesterWeeks, getWeekDates, mapTimeToPeriod } from "../../../utils/helpers.js";
+import { getLimitedSemesterWeeks, getWeekDates, mapTimeToPeriod, getActiveAcademicYear, getVisibleAcademicYears } from "../../../utils/helpers.js";
 import PdfPreviewModal from "../../../components/common/PdfPreviewModal.jsx";
 import { useTheme } from "../../../contexts/ThemeContext.jsx";
 
@@ -161,8 +161,9 @@ export default function AdminThoiKhoaBieuPage() {
         setLops(listLops);
 
         const listYears = resYear?.data?.data || [];
-        setNamHocs(listYears);
-        const activeYear = listYears.find(y => (y.trangThai || y.trang_thai) === "DANG_MO") || listYears[0];
+        const visibleYears = getVisibleAcademicYears(listYears);
+        setNamHocs(visibleYears);
+        const activeYear = getActiveAcademicYear(visibleYears) || visibleYears[0];
         if (activeYear) {
           setSelectedYearId(activeYear.id.toString());
         }
@@ -387,7 +388,7 @@ export default function AdminThoiKhoaBieuPage() {
     try {
       const [gvRes, leavesRes] = await Promise.all([
         getGiaoVien(),
-        getAllNghi()
+        getAllNghi(selectedYear?.tenNamHoc)
       ]);
       setTeachers(gvRes?.data?.data || []);
       setLeaveRequests(leavesRes?.data?.data || []);
@@ -419,7 +420,7 @@ export default function AdminThoiKhoaBieuPage() {
       setRegReason("");
       setRegNote("");
 
-      const leavesRes = await getAllNghi();
+      const leavesRes = await getAllNghi(selectedYear?.tenNamHoc);
       setLeaveRequests(leavesRes?.data?.data || []);
       setActiveTab("list");
     } catch (err) {
@@ -437,14 +438,14 @@ export default function AdminThoiKhoaBieuPage() {
     setSubmittingApprove(true);
     try {
       await duyetNghi(requestId, {
-        trangThai: "DA_DUYET",
+        trangThai: "APPROVED",
         giaoVienThayId: Number(gvThayId)
       });
       notifySuccess("Đã duyệt đơn nghỉ và phân công dạy thay thành công!");
       setApprovingRequestId(null);
       setGvThayId("");
 
-      const leavesRes = await getAllNghi();
+      const leavesRes = await getAllNghi(selectedYear?.tenNamHoc);
       setLeaveRequests(leavesRes?.data?.data || []);
 
       // Reload timetable grid to update replacement teacher names if applicable
@@ -464,14 +465,14 @@ export default function AdminThoiKhoaBieuPage() {
     setSubmittingApprove(true);
     try {
       await duyetNghi(requestId, {
-        trangThai: "TU_CHOI",
+        trangThai: "REJECTED",
         lyDoTuChoi: lyDoTuChoi
       });
       notifySuccess("Đã từ chối đơn xin nghỉ dạy.");
       setRejectingRequestId(null);
       setLyDoTuChoi("");
 
-      const leavesRes = await getAllNghi();
+      const leavesRes = await getAllNghi(selectedYear?.tenNamHoc);
       setLeaveRequests(leavesRes?.data?.data || []);
     } catch (err) {
       notifyError(getApiMessage(err, "Không thể từ chối đơn nghỉ."));
@@ -485,7 +486,7 @@ export default function AdminThoiKhoaBieuPage() {
     try {
       await huyNghi(requestId);
       notifySuccess("Đã xóa đơn xin nghỉ.");
-      const leavesRes = await getAllNghi();
+      const leavesRes = await getAllNghi(selectedYear?.tenNamHoc);
       setLeaveRequests(leavesRes?.data?.data || []);
     } catch (err) {
       notifyError("Không thể xóa đơn xin nghỉ.");

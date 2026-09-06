@@ -6,6 +6,7 @@ import { getNamHoc } from "../../api/namhocApi.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 import { getHocBa } from "../../api/hocbaApi.js";
 import { getToHopMonById } from "../../api/toHopMonApi.js";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import { Download } from "lucide-react";
 import PdfPreviewModal from "../../components/common/PdfPreviewModal.jsx";
 import {
@@ -93,16 +94,17 @@ export default function ScorePage() {
         });
         setSubjects(subjectList);
 
-        const years = (namHocRes?.data?.data || [])
+        const rawYears = namHocRes?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => Number(b.match(/(\d{4})/)?.[1] || 0) - Number(a.match(/(\d{4})/)?.[1] || 0));
+          .filter(Boolean);
         
         setNamHocList(years);
-        setNamHocListObj(namHocRes?.data?.data || []);
+        setNamHocListObj(visibleYears);
 
         if (years.length > 0) {
-          const activeYearObj = (namHocRes?.data?.data || []).find(y => y.trangThai === "DANG_MO");
+          const activeYearObj = getActiveAcademicYear(visibleYears) || visibleYears[0];
           setSelectedNamHoc(activeYearObj?.tenNamHoc || years[0]);
         }
 

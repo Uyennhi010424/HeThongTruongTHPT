@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Bell, BellRing, Clock, User as UserIcon } from 'lucide-react-native';
+import { Bell, BellRing, Clock, User as UserIcon } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import axiosClient from '../../api/axiosClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,11 +9,15 @@ interface ThongBao {
   id: number;
   tieuDe: string;
   noiDung: string;
-  ngayTao: string;
-  loaiThongBao: string;
-  nguoiTao: {
+  ngayTao?: string;
+  ngayDang?: string;
+  loaiThongBao?: string;
+  doiTuong?: string;
+  loai?: string;
+  nguoiTao?: {
     hoTen: string;
   };
+  senderRole?: string;
 }
 
 export default function NotificationsScreen() {
@@ -52,8 +55,10 @@ export default function NotificationsScreen() {
       const response = await axiosClient.get('/thongbao');
       if (response.data && response.data.data) {
         // Tạm thời sắp xếp mới nhất lên đầu
-        const data = response.data.data.sort((a: ThongBao, b: ThongBao) => {
-          return new Date(b.ngayTao).getTime() - new Date(a.ngayTao).getTime();
+        const data = response.data.data.sort((a: any, b: any) => {
+          const timeA = new Date(a.ngayDang || a.ngayTao || 0).getTime();
+          const timeB = new Date(b.ngayDang || b.ngayTao || 0).getTime();
+          return timeB - timeA;
         });
         setNotifications(data);
       }
@@ -76,12 +81,20 @@ export default function NotificationsScreen() {
     fetchNotifications();
   };
 
-  const formatDateTime = (dateString: string) => {
-    if (!dateString) return '';
-    const d = new Date(dateString);
-    const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    return `${time} ${date}`;
+  const formatDateTime = (dateString?: string | null) => {
+    if (!dateString) return '--';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return String(dateString);
+      const hh = d.getHours().toString().padStart(2, '0');
+      const mm = d.getMinutes().toString().padStart(2, '0');
+      const dd = d.getDate().toString().padStart(2, '0');
+      const mo = (d.getMonth() + 1).toString().padStart(2, '0');
+      const yy = d.getFullYear();
+      return `${hh}:${mm} - ${dd}/${mo}/${yy}`;
+    } catch {
+      return String(dateString);
+    }
   };
 
   const getSenderName = (item: any) => {
@@ -93,7 +106,7 @@ export default function NotificationsScreen() {
     return 'Hệ thống';
   };
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type?: string) => {
     switch (type) {
       case 'TOAN_TRUONG':
         return <BellRing size={20} color="#3B82F6" />;
@@ -104,7 +117,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const getNotificationTypeLabel = (type: string) => {
+  const getNotificationTypeLabel = (type?: string) => {
     switch (type) {
       case 'TOAN_TRUONG': return 'Toàn trường';
       case 'GIAO_VIEN': return 'Lớp học';
@@ -114,14 +127,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thông báo</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.container}>
 
       {loading ? (
         <View style={styles.centerContainer}>
@@ -164,12 +170,12 @@ export default function NotificationsScreen() {
                 >
                   <View style={styles.cardHeader}>
                     <View style={styles.typeBadge}>
-                      {getNotificationIcon(item.loaiThongBao)}
-                      <Text style={styles.typeText}>{getNotificationTypeLabel(item.loaiThongBao)}</Text>
+                      {getNotificationIcon(item.doiTuong || item.loaiThongBao || item.loai)}
+                      <Text style={styles.typeText}>{getNotificationTypeLabel(item.doiTuong || item.loaiThongBao || item.loai)}</Text>
                     </View>
                     <View style={styles.timeContainer}>
                       <Clock size={14} color="#94A3B8" />
-                      <Text style={styles.timeText}>{formatDateTime(item.ngayTao)}</Text>
+                      <Text style={styles.timeText}>{formatDateTime(item.ngayDang || item.ngayTao)}</Text>
                     </View>
                   </View>
 
@@ -198,7 +204,7 @@ export default function NotificationsScreen() {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -206,26 +212,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F1F5F9',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  backBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0F172A',
   },
   centerContainer: {
     flex: 1,

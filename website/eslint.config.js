@@ -25,6 +25,11 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
+      parserOptions: {
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
       globals: {
         window: "readonly",
         document: "readonly",
@@ -43,6 +48,11 @@ export default [
         FormData: "readonly",
         AbortController: "readonly",
         crypto: "readonly",
+        localStorage: "readonly",
+        sessionStorage: "readonly",
+        Event: "readonly",
+        CustomEvent: "readonly",
+        import: "readonly",
       },
     },
   },

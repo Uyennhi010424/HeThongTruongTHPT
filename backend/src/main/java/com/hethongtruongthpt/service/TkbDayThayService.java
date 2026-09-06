@@ -58,8 +58,16 @@ public class TkbDayThayService {
     }
 
     @Transactional(readOnly = true)
-    public List<TkbDayThay> getAll() {
+    public List<TkbDayThay> getAll(String namHoc) {
+        if (namHoc != null && !namHoc.isBlank()) {
+            return dayThayRepo.findByNamHoc(namHoc);
+        }
         return dayThayRepo.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TkbDayThay> getAll() {
+        return getAll(null);
     }
 
     @Transactional

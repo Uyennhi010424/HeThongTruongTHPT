@@ -25,7 +25,7 @@ export default function AttendanceScreen() {
   const student = data?.student;
   const allScores = data?.scores || [];
 
-  const currentStudentNamHoc = data?.student?.lop?.namHoc || '2026-2027';
+  const currentStudentNamHoc = data?.student?.lop?.namHoc || '2025-2026';
 
   const availableYears = useMemo(() => {
     const yearsSet = new Set<string>();
@@ -38,10 +38,10 @@ export default function AttendanceScreen() {
       const yB = Number(b.match(/(\d{4})/)?.[1] || 0);
       return yB - yA;
     });
-    return arr.length > 0 ? arr : ['2026-2027', '2025-2026'];
+    return arr.length > 0 ? arr : [currentStudentNamHoc];
   }, [allScores, currentStudentNamHoc]);
 
-  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || '2026-2027');
+  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || currentStudentNamHoc);
   const [showYearModal, setShowYearModal] = useState(false);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,28 +183,7 @@ export default function AttendanceScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chuyên cần</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      {/* Year Selector */}
-      <View style={styles.filterWrapper}>
-        <TouchableOpacity 
-          style={styles.yearSelectorBtn} 
-          onPress={() => setShowYearModal(true)}
-          activeOpacity={0.8}
-        >
-          <CalendarIcon size={18} color="#2563EB" />
-          <Text style={styles.yearSelectorText}>Năm học: {selectedYear}</Text>
-          <ChevronDown size={16} color="#64748B" />
-        </TouchableOpacity>
-      </View>
-
+    <View style={styles.container}>
       {/* Year Selection Modal */}
       <Modal visible={showYearModal} transparent={true} animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setShowYearModal(false)}>
@@ -246,11 +225,23 @@ export default function AttendanceScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />
           }
         >
+          {/* Year Selector */}
+          <View style={styles.filterWrapper}>
+            <TouchableOpacity 
+              style={styles.yearSelectorBtn} 
+              onPress={() => setShowYearModal(true)}
+              activeOpacity={0.8}
+            >
+              <CalendarIcon size={18} color="#2563EB" />
+              <Text style={styles.yearSelectorText}>Năm học: {selectedYear}</Text>
+            </TouchableOpacity>
+          </View>
+
           {renderStatsCard()}
           {renderHistoryList()}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -307,7 +298,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
+    paddingBottom: 32,
   },
   statsCard: {
     backgroundColor: '#FFFFFF',
@@ -441,28 +433,27 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   filterWrapper: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    marginBottom: 16,
   },
   yearSelectorBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   yearSelectorText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1D4ED8',
-    flex: 1,
+    color: '#1E3A8A',
     marginLeft: 8,
   },
   modalOverlay: {

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { tinhHocLucLop } from "../../../api/hocbaApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 import Pagination from "../../../components/common/Pagination.jsx";
 
 export default function DiemProgressTable({ progressData = [], loading, onRefresh, namHoc: namHocProp, setNamHoc, hocKy, setHocKy, searchQuery }) {
@@ -27,12 +28,13 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
     getNamHoc()
       .then(res => {
         const years = res?.data?.data || [];
-        setNamHocListFull(years);
-        const unique = [...new Set(years.map(y => y.tenNamHoc || y.namHoc).filter(Boolean))].sort().reverse();
+        const visible = getVisibleAcademicYears(years);
+        const active = getActiveAcademicYear(years);
+        setNamHocListFull(visible);
+        const unique = [...new Set(visible.map(y => y.tenNamHoc || y.namHoc).filter(Boolean))];
         setAvailableNamHoc(unique);
         
         if (!namHocProp && setNamHoc) {
-          const active = years.find((nh) => nh.trangThai === "DANG_MO");
           if (active && active.tenNamHoc) {
             setNamHoc(active.tenNamHoc);
           } else if (unique.length > 0) {

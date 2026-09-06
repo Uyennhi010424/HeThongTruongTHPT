@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 
 const STATUS_MAP = {
   CO_MAT: { label: "Có mặt", color: "text-green-700 bg-green-50" },
@@ -39,18 +40,20 @@ export default function StudentDiemDanhPage() {
           return;
         }
 
-        const years = (namHocRes?.data?.data || [])
+        const rawYears = namHocRes?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => Number(b.match(/(\d{4})/)?.[1] || 0) - Number(a.match(/(\d{4})/)?.[1] || 0));
+          .filter(Boolean);
 
         setNamHocList(years);
-        const curYear = currentStudent?.lop?.namHoc || years[0] || "2026-2027";
+        const activeYr = getActiveAcademicYear(visibleYears) || visibleYears[0];
+        const curYear = activeYr?.tenNamHoc || currentStudent?.lop?.namHoc || years[0] || "";
         setSelectedNamHoc(curYear);
 
         const match = curYear.match(/(\d{4})-(\d{4})/);
-        const startY = match ? match[1] : "2026";
-        const endY = match ? match[2] : "2027";
+        const startY = match ? match[1] : String(new Date().getFullYear());
+        const endY = match ? match[2] : String(new Date().getFullYear() + 1);
         const fromStr = `${startY}-09-01`;
         const toStr = `${endY}-06-30`;
         setFromDate(fromStr);

@@ -10,9 +10,8 @@ import { TextInput,
   ActivityIndicator,
   Alert,
   Modal,
-  SafeAreaView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FileText, Clock, CheckCircle, XCircle, AlertCircle, ChevronRight, BookOpen, X, Eye } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -32,16 +31,16 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
     icon: <Clock size={14} color="#D97706" />,
   },
   DA_NOP: {
-    label: 'Đã nộp',
+    label: 'Đã nộp bài',
     color: '#059669',
     bg: '#D1FAE5',
     icon: <CheckCircle size={14} color="#059669" />,
   },
   HET_LAN_LAM_BAI: {
-    label: 'Hết lượt',
-    color: '#DC2626',
-    bg: '#FEE2E2',
-    icon: <XCircle size={14} color="#DC2626" />,
+    label: 'Đã nộp bài',
+    color: '#059669',
+    bg: '#D1FAE5',
+    icon: <CheckCircle size={14} color="#059669" />,
   },
   CHUA_HET_LAN_LAM_BAI: {
     label: 'Còn lượt',
@@ -49,9 +48,27 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
     bg: '#EDE9FE',
     icon: <CheckCircle size={14} color="#7C3AED" />,
   },
+  DA_KET_THUC: {
+    label: 'Đã kết thúc',
+    color: '#64748B',
+    bg: '#F1F5F9',
+    icon: <XCircle size={14} color="#64748B" />,
+  },
+  CHUA_DEN_GIO: {
+    label: 'Chưa mở',
+    color: '#D97706',
+    bg: '#FEF3C7',
+    icon: <AlertCircle size={14} color="#D97706" />,
+  },
 };
 
-function getStatusConfig(status: string | null) {
+function getStatusConfig(status: string | null, isEnded: boolean = false, isUpcoming: boolean = false) {
+  if (isEnded && status !== 'HET_LAN_LAM_BAI' && status !== 'DA_NOP') {
+    return STATUS_CONFIG['DA_KET_THUC'];
+  }
+  if (isUpcoming && status !== 'HET_LAN_LAM_BAI' && status !== 'DA_NOP') {
+    return STATUS_CONFIG['CHUA_DEN_GIO'];
+  }
   if (!status) return STATUS_CONFIG['CHUA_LAM'];
   return STATUS_CONFIG[status] || STATUS_CONFIG['CHUA_LAM'];
 }
@@ -361,15 +378,12 @@ export default function ExamScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: 0 }]}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#143872', '#0A2652']}
-        style={[styles.header, { paddingTop: insets.top + 16 }]}
-      >
-        <Text style={styles.headerTitle}>Bài Kiểm Tra</Text>
-        <Text style={styles.headerSubtitle}>{exams.length} bài kiểm tra</Text>
-      </LinearGradient>
+    <View style={styles.container}>
+      {/* Section Header */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Bài kiểm tra</Text>
+        <Text style={styles.sectionSubtitle}>Danh sách {exams.length} bài kiểm tra</Text>
+      </View>
 
       {isLoadingResult && (
         <View style={styles.fullscreenOverlay}>
@@ -405,14 +419,20 @@ export default function ExamScreen() {
         )}
 
         {exams.map((exam) => {
-          const statusCfg = getStatusConfig(exam.trangThaiLamBai);
+          const now = new Date().getTime();
+          const start = exam.thoiGianBatDau ? new Date(exam.thoiGianBatDau).getTime() : 0;
+          const end = exam.thoiGianKetThuc ? new Date(exam.thoiGianKetThuc).getTime() : Infinity;
+          const isEnded = end < now;
+          const isUpcoming = start > now;
+
           const hasResult = exam.trangThaiLamBai === 'HET_LAN_LAM_BAI' || exam.trangThaiLamBai === 'DA_NOP';
-          const canTake = exam.trangThaiLamBai !== 'HET_LAN_LAM_BAI' && exam.trangThaiLamBai !== 'DA_NOP';
+          const statusCfg = getStatusConfig(exam.trangThaiLamBai, isEnded, isUpcoming);
+          const canTake = !hasResult && !isEnded && !isUpcoming;
           
           return (
             <TouchableOpacity
               key={exam.id}
-              style={styles.examCard}
+              style={[styles.examCard, isEnded && !hasResult && { opacity: 0.85 }]}
               onPress={() => handlePressExam(exam)}
               activeOpacity={0.75}
             >
@@ -454,16 +474,26 @@ export default function ExamScreen() {
 
                 <View style={styles.cardFooter}>
                   <Text style={styles.giaoVienText}>GV: {exam.tenGiaoVien || '--'}</Text>
-                  {canTake ? (
-                    <View style={styles.doExamBtn}>
-                      <Text style={styles.doExamText}>Làm bài</Text>
-                      <ChevronRight size={14} color="#2563EB" />
-                    </View>
-                  ) : (
+                  {hasResult ? (
                     <TouchableOpacity style={styles.viewResultBtn} onPress={() => handleViewResult(exam.id)}>
                       <Eye size={14} color="#2563EB" style={{ marginRight: 4 }} />
                       <Text style={styles.viewResultText}>Xem kết quả</Text>
                     </TouchableOpacity>
+                  ) : isEnded ? (
+                    <View style={styles.endedBtn}>
+                      <Text style={styles.endedText}>Đã kết thúc</Text>
+                    </View>
+                  ) : isUpcoming ? (
+                    <View style={styles.upcomingBtn}>
+                      <Text style={styles.upcomingText}>Chưa mở</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.doExamBtn}>
+                      <Text style={styles.doExamText}>
+                        {exam.trangThaiLamBai === 'DANG_LAM' ? 'Tiếp tục làm' : 'Làm bài'}
+                      </Text>
+                      <ChevronRight size={14} color="#2563EB" />
+                    </View>
                   )}
                 </View>
               </View>
@@ -599,21 +629,22 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontSize: 14,
   },
-  header: {
+  sectionHeader: {
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  headerTitle: {
-    fontSize: 24,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    color: '#0F172A',
   },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#BFDBFE',
+  sectionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   scrollContent: {
     padding: 16,
@@ -759,6 +790,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#2563EB',
+  },
+  endedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+  },
+  endedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  upcomingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+  },
+  upcomingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#D97706',
   },
   fullscreenOverlay: {
     position: 'absolute',

@@ -8,6 +8,8 @@ import {
   getStudentsByPhuHuynhId
 } from "../../../api/phuhuynhApi.js";
 import { getLop } from "../../../api/lopApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../../utils/helpers.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import { Filter, RefreshCw, Plus, Edit, Eye } from "lucide-react";
 import Pagination from "../../../components/common/Pagination.jsx";
@@ -60,7 +62,9 @@ export default function PhuHuynhList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Class filter
+  // Academic year & Class filter
+  const [namHocList, setNamHocList] = useState([]);
+  const [yearFilter, setYearFilter] = useState("all");
   const [classes, setClasses] = useState([]);
   const [gradeFilter, setGradeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
@@ -105,14 +109,35 @@ export default function PhuHuynhList() {
       try {
         setLoading(true);
         setError("");
-        const [parentRes, classRes] = await Promise.all([
+        const [parentRes, classRes, namHocRes] = await Promise.all([
           getPhuHuynh(),
-          getLop()
+          getLop(),
+          getNamHoc()
         ]);
         if (!active) return;
         const parentData = parentRes?.data?.data || [];
         setParents(parentData);
-        setClasses(classRes?.data?.data || []);
+
+        const rawYears = namHocRes?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        setNamHocList(visibleYears);
+        const activeYr = getActiveAcademicYear(visibleYears) || visibleYears[0];
+        const activeYrName = activeYr?.tenNamHoc || "";
+
+        const rawClasses = classRes?.data?.data || [];
+        if (visibleYears.length > 0) {
+          const validYearSet = new Set(visibleYears.map(y => y.tenNamHoc));
+          setClasses(rawClasses.filter(c => !c.namHoc || validYearSet.has(c.namHoc)));
+        } else {
+          setClasses(rawClasses);
+        }
+
+        setYearFilter((prev) => {
+          if (prev === "all" || !prev) {
+            return activeYrName || "all";
+          }
+          return prev;
+        });
 
         // Build parent -> classIds map
         const entries = await Promise.all(
@@ -121,7 +146,7 @@ export default function PhuHuynhList() {
               const res = await getStudentsByPhuHuynhId(p.id);
               const students = res?.data?.data || [];
               const classIds = students
-                .map((s) => s.lopId || s.lop?.id)
+                .map((s) => s.lopId || s.lop?.id || s.lopHoc?.id)
                 .filter(Boolean);
               return [p.id, classIds];
             } catch {
@@ -151,23 +176,52 @@ export default function PhuHuynhList() {
     return { total, smsActive };
   }, [parents]);
 
+  const academicYears = useMemo(() => {
+    if (namHocList.length > 0) {
+      return namHocList.map((y) => y.tenNamHoc);
+    }
+    const set = new Set();
+    classes.forEach((c) => {
+      if (c?.namHoc) set.add(c.namHoc);
+    });
+    return Array.from(set).sort().reverse();
+  }, [namHocList, classes]);
+
   /* ---------- class filter helpers ---------- */
   const classesByGrade = useMemo(() => {
     const map = new Map();
-    classes.forEach((item) => {
+    const classesForYear = yearFilter === "all"
+      ? classes
+      : classes.filter((item) => String(item?.namHoc || "") === yearFilter);
+
+    classesForYear.forEach((item) => {
       const grade = item?.khoi ? String(item.khoi) : "Khác";
       if (!map.has(grade)) map.set(grade, []);
       map.get(grade).push(item);
     });
     return Array.from(map.entries())
       .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([grade, items]) => ({ grade, items }));
-  }, [classes]);
+      .map(([grade, items]) => ({
+        grade,
+        items: [...items].sort((x, y) =>
+          String(x.tenLop || "").localeCompare(String(y.tenLop || ""))
+        )
+      }));
+  }, [classes, yearFilter]);
 
   const filteredClasses = useMemo(() => {
-    if (gradeFilter === "all") return classes;
-    return classes.filter((item) => String(item?.khoi || "") === gradeFilter);
-  }, [classes, gradeFilter]);
+    return classes.filter((item) => {
+      const matchYear = yearFilter === "all" ? true : String(item?.namHoc || "") === yearFilter;
+      const matchGrade = gradeFilter === "all" ? true : String(item?.khoi || "") === gradeFilter;
+      return matchYear && matchGrade;
+    });
+  }, [classes, yearFilter, gradeFilter]);
+
+  const handleYearSelect = (year) => {
+    setYearFilter(year);
+    setClassFilter("all");
+    setPage(1);
+  };
 
   const handleGradeSelect = (khoi) => {
     setGradeFilter(khoi);
@@ -179,26 +233,36 @@ export default function PhuHuynhList() {
     setClassFilter(classId);
     if (classId !== "all") {
       const found = classes.find((c) => String(c.id) === String(classId));
-      if (found?.khoi !== undefined && found?.khoi !== null) {
-        setGradeFilter(String(found.khoi));
+      if (found) {
+        if (found.khoi !== undefined && found.khoi !== null) {
+          setGradeFilter(String(found.khoi));
+        }
+        if (found.namHoc) {
+          setYearFilter(found.namHoc);
+        }
       }
     }
     setPage(1);
   };
 
   const clearFilters = () => {
+    setYearFilter("all");
     setGradeFilter("all");
     setClassFilter("all");
     setPage(1);
   };
 
-  const hasFilter = gradeFilter !== "all" || classFilter !== "all";
+  const hasFilter = yearFilter !== "all" || gradeFilter !== "all" || classFilter !== "all";
+  const activeFilterCount =
+    (yearFilter !== "all" ? 1 : 0) +
+    (gradeFilter !== "all" ? 1 : 0) +
+    (classFilter !== "all" ? 1 : 0);
 
   /* ---------- filter ---------- */
   const filtered = useMemo(() => {
     let result = parents;
 
-    // Filter by class
+    // Filter by class / grade / year
     if (classFilter !== "all") {
       const selectedClassId = Number(classFilter);
       result = result.filter((p) => {
@@ -207,11 +271,23 @@ export default function PhuHuynhList() {
       });
     } else if (gradeFilter !== "all") {
       const gradeClassIds = classes
-        .filter((c) => String(c?.khoi || "") === gradeFilter)
+        .filter((c) => {
+          const matchYear = yearFilter === "all" ? true : String(c?.namHoc || "") === yearFilter;
+          const matchGrade = String(c?.khoi || "") === gradeFilter;
+          return matchYear && matchGrade;
+        })
         .map((c) => c.id);
       result = result.filter((p) => {
         const classIds = parentClassMap[p.id] || [];
         return classIds.some((id) => gradeClassIds.includes(id));
+      });
+    } else if (yearFilter !== "all") {
+      const yearClassIds = classes
+        .filter((c) => String(c?.namHoc || "") === yearFilter)
+        .map((c) => c.id);
+      result = result.filter((p) => {
+        const classIds = parentClassMap[p.id] || [];
+        return classIds.some((id) => yearClassIds.includes(id));
       });
     }
 
@@ -226,7 +302,7 @@ export default function PhuHuynhList() {
     }
 
     return result;
-  }, [keyword, parents, classFilter, gradeFilter, parentClassMap, classes]);
+  }, [keyword, parents, classFilter, gradeFilter, yearFilter, parentClassMap, classes]);
 
   /* ---------- pagination ---------- */
   const totalPages = useMemo(
@@ -370,17 +446,37 @@ export default function PhuHuynhList() {
               <span>Bộ lọc</span>
               {hasFilter && (
                 <span className="flex items-center justify-center w-5 h-5 ml-1 text-[11px] font-bold text-white bg-blue-600 rounded-full">
-                  {(gradeFilter !== "all" ? 1 : 0) + (classFilter !== "all" ? 1 : 0)}
+                  {activeFilterCount}
                 </span>
               )}
             </button>
 
             {filterOpen && (
               <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                   <h3 className="text-sm font-bold text-blue-900">Lọc phụ huynh</h3>
+                  {activeFilterCount > 0 && (
+                    <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">
+                      {activeFilterCount} điều kiện
+                    </span>
+                  )}
                 </div>
                 <div className="p-4 space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Năm học</label>
+                    <select
+                      value={yearFilter}
+                      onChange={(e) => handleYearSelect(e.target.value)}
+                      className="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block p-2.5 transition-colors"
+                    >
+                      <option value="all">Tất cả năm học</option>
+                      {(academicYears || []).map((yr) => (
+                        <option key={yr} value={yr}>
+                          Năm học {yr}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Khối học</label>
                     <select
@@ -406,18 +502,24 @@ export default function PhuHuynhList() {
                       <option value="all">Tất cả lớp</option>
                       {filteredClasses.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.tenLop}
+                          {item.tenLop} {item.namHoc && yearFilter === "all" ? `(${item.namHoc})` : ""}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <div className="p-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
                   <button
                     onClick={clearFilters}
                     className="text-sm text-slate-600 hover:text-slate-900 font-semibold px-3 py-1.5 transition-colors"
                   >
                     Xóa lọc
+                  </button>
+                  <button
+                    onClick={() => setFilterOpen(false)}
+                    className="text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-1.5 rounded-lg transition-colors shadow-sm"
+                  >
+                    Đóng
                   </button>
                 </div>
               </div>

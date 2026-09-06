@@ -30,7 +30,7 @@ export default function ParentScores() {
   const subjects = dashboardData?.subjects || [];
   const allScores = dashboardData?.scores || [];
 
-  const currentChildNamHoc = selectedChild?.lop?.namHoc || '2026-2027';
+  const currentChildNamHoc = selectedChild?.lop?.namHoc || '2025-2026';
 
   const availableYears = useMemo(() => {
     const yearsSet = new Set<string>();
@@ -43,10 +43,10 @@ export default function ParentScores() {
       const yB = Number(b.match(/(\d{4})/)?.[1] || 0);
       return yB - yA;
     });
-    return arr.length > 0 ? arr : ['2026-2027', '2025-2026'];
+    return arr.length > 0 ? arr : [currentChildNamHoc];
   }, [allScores, currentChildNamHoc]);
 
-  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || '2026-2027');
+  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || currentChildNamHoc);
 
   useEffect(() => {
     if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {

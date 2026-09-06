@@ -35,6 +35,7 @@ const ScoreChartWidget = ({
   subjectMap, 
   subjectColorMap, 
   namHocList, 
+  activeYearName,
   selectedNamHoc, 
   setSelectedNamHoc, 
   selectedHK, 
@@ -64,7 +65,7 @@ const ScoreChartWidget = ({
         </div>
         <div className="flex items-center gap-3">
           <select
-            className="bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            className="bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
             value={selectedNamHoc}
             onChange={(e) => setSelectedNamHoc(e.target.value)}
           >

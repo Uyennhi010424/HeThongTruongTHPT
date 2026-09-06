@@ -110,7 +110,6 @@ export const getLimitedSemesterWeeks = (selectedYear, hocKy = null) => {
 };
 
 export const getCurrentSemesterWeek = (selectedYear) => {
-  let currentWeek = 1;
   let schoolStart;
   if (selectedYear?.ngayBatDauHk1) {
     schoolStart = new Date(selectedYear.ngayBatDauHk1 + "T00:00:00");
@@ -127,10 +126,13 @@ export const getCurrentSemesterWeek = (selectedYear) => {
     now.setHours(0, 0, 0, 0);
     const diffDays = Math.floor((now - monday) / (1000 * 60 * 60 * 24));
     if (diffDays >= 0) {
-      currentWeek = Math.floor(diffDays / 7) + 1;
+      const currentWeek = Math.floor(diffDays / 7) + 1;
+      return Math.min(36, currentWeek);
+    } else {
+      return 0; // Chưa bắt đầu năm học
     }
   }
-  return Math.min(36, currentWeek);
+  return 1;
 };
 
 export const getWeekDates = (tuan, selectedYear = null) => {
@@ -176,3 +178,31 @@ export const mapTimeToPeriod = (timeStr) => {
   if (totalMins < 17 * 60) return 9;
   return 10;
 };
+
+export const getActiveAcademicYear = (allNamHoc) => {
+  if (!Array.isArray(allNamHoc) || allNamHoc.length === 0) return null;
+  return allNamHoc.find((y) => (y?.trangThai || y?.trang_thai) === "DANG_MO") || allNamHoc[0] || null;
+};
+
+export const getAcademicYearStart = (yearItem) => {
+  const name = typeof yearItem === "string" ? yearItem : (yearItem?.tenNamHoc || yearItem?.namHoc || "");
+  const match = String(name).trim().match(/^(\d{4})/);
+  return match ? parseInt(match[1], 10) : 0;
+};
+
+export const getVisibleAcademicYears = (allNamHoc) => {
+  if (!Array.isArray(allNamHoc) || allNamHoc.length === 0) return [];
+  const activeYear = getActiveAcademicYear(allNamHoc);
+  if (!activeYear) return allNamHoc;
+
+  const activeStartYear = getAcademicYearStart(activeYear);
+  if (!activeStartYear) return allNamHoc;
+
+  return allNamHoc
+    .filter((y) => {
+      const yStart = getAcademicYearStart(y);
+      return yStart > 0 ? yStart <= activeStartYear : true;
+    })
+    .sort((a, b) => getAcademicYearStart(b) - getAcademicYearStart(a));
+};
+

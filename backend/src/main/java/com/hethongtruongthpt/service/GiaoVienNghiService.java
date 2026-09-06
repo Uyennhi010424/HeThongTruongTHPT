@@ -51,12 +51,20 @@ public class GiaoVienNghiService {
     }
 
     @Transactional(readOnly = true)
-    public List<GiaoVienNghi> getByGiaoVienAndRange(Integer giaoVienId, LocalDate from, LocalDate to) {
+    public List<GiaoVienNghi> getByGiaoVienAndRange(Integer giaoVienId, LocalDate from, LocalDate to, String namHoc) {
         if (giaoVienId == null) throw new ApiException("Thiếu giáo viên");
         if (from != null && to != null) {
             return nghiRepo.findByGiaoVienIdAndNgayBetween(giaoVienId, from, to);
         }
+        if (namHoc != null && !namHoc.isBlank()) {
+            return nghiRepo.findByGiaoVienIdAndNamHoc(giaoVienId, namHoc);
+        }
         return nghiRepo.findByGiaoVienId(giaoVienId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GiaoVienNghi> getByGiaoVienAndRange(Integer giaoVienId, LocalDate from, LocalDate to) {
+        return getByGiaoVienAndRange(giaoVienId, from, to, null);
     }
 
     @Transactional(readOnly = true)
@@ -113,16 +121,19 @@ public class GiaoVienNghiService {
         GiaoVienNghi nghi = nghiRepo.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn xin nghỉ"));
 
-        if (!"APPROVED".equals(trangThai) && !"REJECTED".equals(trangThai)) {
+        String normalizedStatus = "DA_DUYET".equalsIgnoreCase(trangThai) ? "APPROVED" :
+                                  "TU_CHOI".equalsIgnoreCase(trangThai) ? "REJECTED" : trangThai;
+
+        if (!"APPROVED".equals(normalizedStatus) && !"REJECTED".equals(normalizedStatus)) {
             throw new ApiException("Trạng thái phê duyệt không hợp lệ");
         }
 
-        nghi.setTrangThai(trangThai);
+        nghi.setTrangThai(normalizedStatus);
         nghi.setAdminMessage(adminMessage);
         nghi.setApprovedBy(approvedByUser);
         nghi.setApprovedAt(LocalDateTime.now());
 
-        if ("REJECTED".equals(trangThai)) {
+        if ("REJECTED".equals(normalizedStatus)) {
             nghi.setLyDoTuChoi(lyDoTuChoi);
             nghi.setGiaoVienThay(null);
             logger.info("Admin tu choi don nghi cua GV {} ngay {}", nghi.getGiaoVien().getHoTen(), nghi.getNgay());

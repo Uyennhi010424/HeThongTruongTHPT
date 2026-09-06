@@ -234,6 +234,15 @@ public class HocBaService {
      */
     public List<HocBaDTO> tinhHocLucLop(Integer lopId, Integer namHocId) {
         List<HocSinh> hocSinhs = hocSinhRepository.findByLopId(lopId);
+        if (hocSinhs.isEmpty() && namHocId != null) {
+            com.hethongtruongthpt.entity.NamHoc nh = namHocRepository.findById(namHocId).orElse(null);
+            if (nh != null) {
+                List<Integer> hsIds = diemRepository.findDistinctHocSinhIdsByLopIdAndNamHoc(lopId, nh.getTenNamHoc());
+                if (!hsIds.isEmpty()) {
+                    hocSinhs = hocSinhRepository.findAllById(hsIds);
+                }
+            }
+        }
         List<HocBaDTO> results = new ArrayList<>();
         for (HocSinh hs : hocSinhs) {
             try {

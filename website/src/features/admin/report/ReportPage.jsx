@@ -12,6 +12,7 @@ import { getStatisticsOverview, getStatisticsAcademic } from "../../../api/stati
 import statisticsApi from "../../../api/statisticsApi.js";
 import { notifyError } from "../../../utils/notify.js";
 import PdfPreviewModal from "../../../components/common/PdfPreviewModal.jsx";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 
 /* -- Helpers -------------------------------------------------------- */
 const classifyColor = (avg) => {
@@ -72,7 +73,8 @@ export default function ReportPage() {
         ]);
         if (!active) return;
         const yData = yRes?.data?.data || [];
-        setYears(yData);
+        const visibleYears = getVisibleAcademicYears(yData);
+        setYears(visibleYears);
         setClasses((cRes?.data?.data || []).sort(sortByClass));
         const rawSubjects = sRes?.data?.data || [];
         const filteredSubjects = rawSubjects.filter(s => {
@@ -82,7 +84,7 @@ export default function ReportPage() {
         setSubjects(filteredSubjects);
         setStudents(stRes?.data?.data || []);
         setTeachers(tRes?.data?.data || []);
-        const current = yData.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || yData[0];
+        const current = getActiveAcademicYear(visibleYears) || visibleYears[0];
         if (current) setSelectedYear(current.tenNamHoc);
       } catch {
         if (!active) return;
@@ -414,7 +416,7 @@ td.center{text-align:center}
           >
             {years.map((y) => (
               <option key={y.id} value={y.tenNamHoc}>
-                {y.tenNamHoc} {((y.trangThai || y.trang_thai) === "DANG_MO") ? "(Hiện hành)" : ""}
+                {y.tenNamHoc}
               </option>
             ))}
           </select>

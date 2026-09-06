@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Mail, Phone, MapPin, Calendar as CalendarIcon, User as UserIcon, Camera } from 'lucide-react-native';
+import { 
+  ChevronLeft, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Calendar as CalendarIcon, 
+  User as UserIcon, 
+  Camera, 
+  GraduationCap, 
+  IdCard, 
+  ShieldCheck, 
+  BookOpen,
+  UserCheck,
+  Heart
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useDashboardStore } from '../../store/useDashboardStore';
@@ -31,7 +44,6 @@ export default function ProfileScreen() {
   };
 
   const handlePickAvatar = async () => {
-    // Xin quyền truy cập thư viện ảnh
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Thông báo', 'Cần cấp quyền truy cập thư viện ảnh để thay đổi ảnh đại diện.');
@@ -56,7 +68,6 @@ export default function ProfileScreen() {
   const uploadAvatar = async (asset: ImagePicker.ImagePickerAsset) => {
     try {
       setUploading(true);
-      // Bước 1: Upload file ảnh
       const filename = asset.uri.split('/').pop() || 'avatar.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -75,10 +86,7 @@ export default function ProfileScreen() {
       const newAvatarUrl = uploadRes.data?.data?.url;
       if (!newAvatarUrl) throw new Error('Không nhận được URL ảnh từ server');
 
-      // Bước 2: Cập nhật avatar qua endpoint chuyên dụng
       await axiosClient.patch('/hocsinh/me/avatar', { anhDaiDien: newAvatarUrl });
-
-      // Refresh lại dashboard để cập nhật avatar trên toàn app
       await fetchData();
       Alert.alert('Thành công', 'Cập nhật ảnh đại diện thành công!');
     } catch (error: any) {
@@ -92,31 +100,45 @@ export default function ProfileScreen() {
 
   const avatarUri = getAvatarUri();
 
-  const InfoItem = ({ icon, label, value }: { icon: any, label: string, value: string }) => (
+  const InfoItem = ({ icon, label, value }: { icon: any; label: string; value: string | number | undefined | null }) => (
     <View style={styles.infoRow}>
       <View style={styles.iconContainer}>{icon}</View>
       <View style={styles.infoContent}>
         <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value || 'Chưa cập nhật'}</Text>
+        <Text style={styles.infoValue}>{value ? String(value) : 'Chưa cập nhật'}</Text>
       </View>
     </View>
   );
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <ChevronLeft size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Hồ sơ cá nhân</Text>
-        <View style={{ width: 40 }} />
-      </View>
+  const getGenderText = () => {
+    if (student?.gioiTinh === 'NAM' || student?.gioiTinh === true) return 'Nam';
+    if (student?.gioiTinh === 'NU' || student?.gioiTinh === false) return 'Nữ';
+    return 'Chưa cập nhật';
+  };
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Chưa cập nhật';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('vi-VN');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const gvcnName = student?.lop?.gvcn?.hoTen || student?.lop?.giaoVienChuNhiem?.hoTen;
+
+  return (
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Phần Avatar & Tên học sinh */}
         <View style={styles.avatarSection}>
-          {/* Avatar có nút camera */}
-          <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickAvatar} disabled={uploading}>
+          <TouchableOpacity 
+            style={styles.avatarWrapper} 
+            onPress={handlePickAvatar} 
+            disabled={uploading}
+            activeOpacity={0.85}
+          >
             {avatarUri && !imageError ? (
               <Image
                 source={{ uri: avatarUri }}
@@ -134,42 +156,119 @@ export default function ProfileScreen() {
               {uploading ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Camera size={18} color="#FFFFFF" />
+                <Camera size={16} color="#FFFFFF" />
               )}
             </View>
           </TouchableOpacity>
 
-          <Text style={styles.name}>{student?.hoTen}</Text>
-          <Text style={styles.className}>Lớp {student?.lop?.tenLop}</Text>
-          <TouchableOpacity style={styles.changeAvatarBtn} onPress={handlePickAvatar} disabled={uploading}>
-            <Text style={styles.changeAvatarText}>
-              {uploading ? 'Đang tải lên...' : 'Thay đổi ảnh đại diện'}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.name}>{student?.hoTen || 'Học sinh'}</Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.codeBadge}>
+              <Text style={styles.codeText}>Mã: {student?.maHocSinh || 'N/A'}</Text>
+            </View>
+            {student?.lop?.tenLop && (
+              <View style={styles.classBadge}>
+                <Text style={styles.classText}>Lớp {student.lop.tenLop}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
+        {/* 1. Thông tin học tập */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Thông tin liên hệ</Text>
-          <InfoItem icon={<Mail size={20} color="#3B82F6" />} label="Email" value={(student as any)?.email || ''} />
-          <InfoItem icon={<Phone size={20} color="#10B981" />} label="Số điện thoại" value={(student as any)?.sdt || student?.soDienThoai || ''} />
-          <InfoItem icon={<MapPin size={20} color="#F59E0B" />} label="Địa chỉ" value={student?.diaChi || ''} />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Thông tin cơ bản</Text>
+          <Text style={styles.cardTitle}>Thông tin học tập</Text>
           <InfoItem 
-            icon={<CalendarIcon size={20} color="#8B5CF6" />} 
-            label="Ngày sinh" 
-            value={student?.ngaySinh ? new Date(student.ngaySinh).toLocaleDateString('vi-VN') : ''} 
+            icon={<IdCard size={18} color="#2563EB" />} 
+            label="Mã số học sinh" 
+            value={student?.maHocSinh} 
           />
           <InfoItem 
-            icon={<UserIcon size={20} color="#EC4899" />} 
+            icon={<GraduationCap size={18} color="#059669" />} 
+            label="Lớp học hiện tại" 
+            value={student?.lop?.tenLop ? `Lớp ${student.lop.tenLop} (Khối ${student.lop.khoi || ''})` : 'Chưa phân lớp'} 
+          />
+          {student?.lop?.namHoc && (
+            <InfoItem 
+              icon={<CalendarIcon size={18} color="#D97706" />} 
+              label="Năm học" 
+              value={student.lop.namHoc} 
+            />
+          )}
+          {gvcnName && (
+            <InfoItem 
+              icon={<UserCheck size={18} color="#7C3AED" />} 
+              label="Giáo viên chủ nhiệm" 
+              value={gvcnName} 
+            />
+          )}
+          <InfoItem 
+            icon={<BookOpen size={18} color="#0891B2" />} 
+            label="Năm nhập học" 
+            value={student?.namNhapHoc ? `Năm ${student.namNhapHoc}` : ''} 
+          />
+          <InfoItem 
+            icon={<ShieldCheck size={18} color="#16A34A" />} 
+            label="Trạng thái học tập" 
+            value={student?.trangThai === 1 ? 'Đang học' : student?.trangThai === 0 ? 'Đã nghỉ học / Chuyển trường' : 'Đang học'} 
+          />
+        </View>
+
+        {/* 2. Thông tin cá nhân */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Thông tin cá nhân</Text>
+          <InfoItem 
+            icon={<CalendarIcon size={18} color="#8B5CF6" />} 
+            label="Ngày sinh" 
+            value={formatDate(student?.ngaySinh)} 
+          />
+          <InfoItem 
+            icon={<UserIcon size={18} color="#EC4899" />} 
             label="Giới tính" 
-            value={(student as any)?.gioiTinh === 'NAM' ? 'Nam' : (student as any)?.gioiTinh === 'NU' ? 'Nữ' : ((student as any)?.gioiTinh || '')} 
+            value={getGenderText()} 
+          />
+          <InfoItem 
+            icon={<UserCheck size={18} color="#6366F1" />} 
+            label="Dân tộc" 
+            value={student?.danToc || 'Kinh'} 
+          />
+          <InfoItem 
+            icon={<Heart size={18} color="#F43F5E" />} 
+            label="Tôn giáo" 
+            value={student?.tonGiao || 'Không'} 
+          />
+          <InfoItem 
+            icon={<ShieldCheck size={18} color="#0D9488" />} 
+            label="Mã thẻ BHYT" 
+            value={student?.maBhyt || 'Chưa cập nhật'} 
+          />
+          <InfoItem 
+            icon={<IdCard size={18} color="#EA580C" />} 
+            label="Diện chính sách" 
+            value={student?.dienChinhSach ? 'Thuộc diện chính sách' : 'Không'} 
+          />
+        </View>
+
+        {/* 3. Thông tin liên hệ */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Thông tin liên hệ</Text>
+          <InfoItem 
+            icon={<Phone size={18} color="#10B981" />} 
+            label="Số điện thoại" 
+            value={student?.sdt || student?.soDienThoai} 
+          />
+          <InfoItem 
+            icon={<Mail size={18} color="#3B82F6" />} 
+            label="Địa chỉ Email" 
+            value={student?.email} 
+          />
+          <InfoItem 
+            icon={<MapPin size={18} color="#F59E0B" />} 
+            label="Địa chỉ thường trú" 
+            value={student?.diaChi} 
           />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -178,73 +277,58 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  backBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0F172A',
-  },
   scrollContent: {
-    padding: 20,
-    gap: 20,
+    padding: 16,
+    paddingBottom: 36,
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   avatarWrapper: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   avatar: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: '#E2E8F0',
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: '#EFF6FF',
   },
   avatarFallback: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: '#2563EB',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#143872',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: '#EFF6FF',
   },
   avatarInitial: {
     color: '#FFFFFF',
-    fontSize: 42,
+    fontSize: 36,
     fontWeight: 'bold',
   },
   cameraOverlay: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
@@ -252,70 +336,87 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   name: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#0F172A',
-    marginBottom: 4,
+    marginBottom: 6,
+    textAlign: 'center',
   },
-  className: {
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '500',
-    marginBottom: 12,
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  changeAvatarBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
+  codeBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  changeAvatarText: {
-    color: '#2563EB',
-    fontSize: 14,
+  codeText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: '#475569',
+  },
+  classBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  classText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1D4ED8',
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
     elevation: 2,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#0F172A',
-    marginBottom: 20,
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 14,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   infoContent: {
     flex: 1,
   },
   infoLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     marginBottom: 2,
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#1E293B',
     fontWeight: '500',
   },

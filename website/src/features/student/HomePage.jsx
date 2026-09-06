@@ -2,6 +2,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { TrendingUp, CalendarDays, FileText, CheckCircle } from "lucide-react";
 import { getStudentDashboard } from "../../api/hocsinhApi";
+import { getNamHoc } from "../../api/namhocApi";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers";
 import { readCachedAvatar } from "../../utils/avatarCache";
 import { getCurrentUsernameFromToken } from "../../utils/teacherProfile";
 import StudentProfileWidget from "./dashboard/StudentProfileWidget";
@@ -28,6 +30,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+  const [systemYears, setSystemYears] = useState([]);
+  const [activeYearName, setActiveYearName] = useState("");
   const [avatarSrc, setAvatarSrc] = useState("");
   const [selectedHK, setSelectedHK] = useState(1);
   const [selectedNamHoc, setSelectedNamHoc] = useState("");
@@ -38,10 +42,31 @@ export default function HomePage() {
       try {
         setLoading(true);
         setError("");
-        const res = await getStudentDashboard();
+        const [dashboardRes, namHocRes] = await Promise.all([
+          getStudentDashboard(),
+          getNamHoc().catch(() => null)
+        ]);
         if (!active) return;
-        const dashboardData = res?.data?.data || null;
+        const dashboardData = dashboardRes?.data?.data || null;
         setData(dashboardData);
+
+        const rawYears = namHocRes?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        setSystemYears(visibleYears);
+
+        const activeYearObj = getActiveAcademicYear(visibleYears)
+          || visibleYears.find(y => y.tenNamHoc === dashboardData?.student?.lop?.namHoc)
+          || visibleYears[0];
+
+        const curActiveYear = activeYearObj?.tenNamHoc || dashboardData?.student?.lop?.namHoc || "";
+        setActiveYearName(curActiveYear);
+        setSelectedNamHoc(curActiveYear);
+
+        if (activeYearObj?.ngayBatDauHk2 && new Date().toISOString().slice(0, 10) >= activeYearObj.ngayBatDauHk2) {
+          setSelectedHK(2);
+        } else {
+          setSelectedHK(1);
+        }
 
         if (dashboardData?.student) {
           const username = getCurrentUsernameFromToken();
@@ -82,19 +107,18 @@ export default function HomePage() {
   }, [data?.subjects]);
 
   const namHocList = useMemo(() => {
-    if (!data?.scores?.length) return [];
-    const set = new Set();
-    for (const s of data.scores) {
-      if (s.namHoc) set.add(s.namHoc);
-    }
-    return [...set].sort((a, b) => b.localeCompare(a));
-  }, [data?.scores]);
+    const fromSystem = (systemYears || []).map(y => y.tenNamHoc).filter(Boolean);
+    const fromScores = (data?.scores || []).map(s => s.namHoc).filter(Boolean);
+    const fromClass = data?.student?.lop?.namHoc ? [data.student.lop.namHoc] : [];
+    const all = [...new Set([...fromSystem, ...fromScores, ...fromClass, activeYearName].filter(Boolean))];
+    return all.sort((a, b) => b.localeCompare(a));
+  }, [systemYears, data?.scores, data?.student?.lop?.namHoc, activeYearName]);
 
   useEffect(() => {
     if (namHocList.length > 0 && !selectedNamHoc) {
-      setSelectedNamHoc(namHocList[0]);
+      setSelectedNamHoc(activeYearName || namHocList[0]);
     }
-  }, [namHocList, selectedNamHoc]);
+  }, [namHocList, selectedNamHoc, activeYearName]);
 
   const dynamicSubjectScores = useMemo(() => {
     if (!data?.scores || !data?.subjects || !selectedNamHoc || !selectedHK) return data?.subjectScores || [];
@@ -179,7 +203,14 @@ export default function HomePage() {
 
   const todayDay = new Date().getDay() === 0 ? 8 : new Date().getDay() + 1;
   const currentMonth = new Date().getMonth() + 1;
-  const isSummerBreak = currentMonth === 6 || currentMonth === 7 || currentMonth === 8;
+  const activeYearObj = getActiveAcademicYear(systemYears) || systemYears[0];
+  
+  const now = new Date();
+  const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isNotStartedYet = Boolean(activeYearObj?.ngayBatDauHk1 && todayDateStr < activeYearObj.ngayBatDauHk1);
+  const isSummerBreak = activeYearObj?.ngayKetThucHk2 
+    ? todayDateStr > activeYearObj.ngayKetThucHk2 
+    : (currentMonth === 6 || currentMonth === 7 || currentMonth === 8);
 
   if (loading) {
     return (
@@ -215,6 +246,8 @@ export default function HomePage() {
           <TimetableWidget
             timetable={data?.timetable || []}
             isSummerBreak={isSummerBreak}
+            isNotStartedYet={isNotStartedYet}
+            schoolStartDate={activeYearObj?.ngayBatDauHk1}
             isExamWeek={data?.examWeek === true}
             todayDay={todayDay}
             subjectColorMap={subjectColorMap}
@@ -266,6 +299,7 @@ export default function HomePage() {
             subjectMap={subjectMap}
             subjectColorMap={subjectColorMap}
             namHocList={namHocList}
+            activeYearName={activeYearName}
             selectedNamHoc={selectedNamHoc}
             setSelectedNamHoc={setSelectedNamHoc}
             selectedHK={selectedHK}

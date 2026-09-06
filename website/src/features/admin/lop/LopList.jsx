@@ -13,6 +13,7 @@ import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { getToHopMon } from "../../../api/toHopMonApi.js";
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 import Pagination from "../../../components/common/Pagination.jsx";
 
 const getApiErrorMessage = (err, fallback) => {
@@ -454,11 +455,23 @@ export default function LopList() {
   const [studentListModalOpen, setStudentListModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
 
-  const activeNamHoc = useMemo(() => {
-    return allNamHoc.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || allNamHoc[0] || null;
+  const [selectedNamHoc, setSelectedNamHoc] = useState("");
+
+  const visibleNamHoc = useMemo(() => {
+    return getVisibleAcademicYears(allNamHoc);
   }, [allNamHoc]);
 
-  const currentAcademicYear = activeNamHoc?.tenNamHoc || "2025-2026";
+  const activeNamHoc = useMemo(() => {
+    return getActiveAcademicYear(allNamHoc);
+  }, [allNamHoc]);
+
+  const currentAcademicYear = activeNamHoc?.tenNamHoc || visibleNamHoc[0]?.tenNamHoc || "2025-2026";
+
+  useEffect(() => {
+    if (activeNamHoc?.tenNamHoc && !selectedNamHoc) {
+      setSelectedNamHoc(activeNamHoc.tenNamHoc);
+    }
+  }, [activeNamHoc, selectedNamHoc]);
   
   const [form, setForm] = useState({
     tenLop: "",
@@ -484,7 +497,15 @@ export default function LopList() {
       ]);
       setClasses(lopRes?.data?.data || []);
       setToHopList(toHopRes?.data?.data || []);
-      setAllNamHoc(namHocRes?.data?.data || []);
+      const rawYears = namHocRes?.data?.data || [];
+      setAllNamHoc(rawYears);
+      const visible = getVisibleAcademicYears(rawYears);
+      const active = getActiveAcademicYear(rawYears);
+      if (active?.tenNamHoc) {
+        setSelectedNamHoc((prev) => prev || active.tenNamHoc);
+      } else if (visible.length > 0) {
+        setSelectedNamHoc((prev) => prev || visible[0].tenNamHoc);
+      }
     } catch (err) {
       setError("Không thể tải dữ liệu.");
     } finally {
@@ -552,7 +573,18 @@ export default function LopList() {
 
   const filteredClasses = useMemo(() => {
     const lower = keyword.toLowerCase();
+    const allowedYears = new Set(visibleNamHoc.map((y) => y.tenNamHoc));
+
     const result = classes.filter((item) => {
+      // 1. Filter by school year
+      if (selectedNamHoc && selectedNamHoc !== "ALL") {
+        if (item.namHoc !== selectedNamHoc) return false;
+      } else {
+        // "ALL" or empty -> only show years <= current active year
+        if (allowedYears.size > 0 && item.namHoc && !allowedYears.has(item.namHoc)) return false;
+      }
+
+      // 2. Filter by search keyword
       if (!keyword.trim()) return true;
       return [item.tenLop, item.khoi]
         .filter(Boolean)
@@ -572,17 +604,17 @@ export default function LopList() {
       // 3. Tên lớp theo A-Z (10A1 -> 10A2)
       return String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { numeric: true, sensitivity: "base" });
     });
-  }, [keyword, classes]);
+  }, [keyword, classes, selectedNamHoc, visibleNamHoc]);
 
   const totalPages = Math.ceil(filteredClasses.length / itemsPerPage);
   const paginatedClasses = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredClasses.slice(start, start + itemsPerPage);
-  }, [filteredClasses, currentPage]);
+  }, [filteredClasses, currentPage, itemsPerPage]);
 
   const openCreate = () => {
     setEditingClass(null);
-    setForm({ tenLop: "", khoi: "10", namHoc: currentAcademicYear, toHopId: "" });
+    setForm({ tenLop: "", khoi: "10", namHoc: selectedNamHoc && selectedNamHoc !== "ALL" ? selectedNamHoc : currentAcademicYear, toHopId: "" });
     setModalOpen(true);
   };
 
@@ -671,10 +703,32 @@ export default function LopList() {
         </div>
         
         <div className="px-6 py-4 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button onClick={loadData} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors bg-white border border-slate-200 shadow-sm" title="Làm mới">
               <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin text-blue-500" : ""}`} />
             </button>
+            
+            {/* Year Selector Dropdown */}
+            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span className="font-bold text-slate-600 text-xs sm:text-sm">Năm học:</span>
+              <select
+                value={selectedNamHoc}
+                onChange={(e) => {
+                  setSelectedNamHoc(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent border-none text-blue-900 font-extrabold text-xs sm:text-sm focus:outline-none cursor-pointer"
+              >
+                {visibleNamHoc.map((nh) => (
+                  <option key={nh.id || nh.tenNamHoc} value={nh.tenNamHoc}>
+                    {nh.tenNamHoc}
+                  </option>
+                ))}
+                <option value="ALL">-- Tất cả các năm --</option>
+              </select>
+            </div>
+
             <div className="text-sm font-medium text-slate-500">
               Tổng số: <span className="text-slate-900 font-bold">{filteredClasses.length}</span> lớp
             </div>
@@ -829,18 +883,18 @@ export default function LopList() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Năm học <span className="text-red-500">*</span></label>
-                  {allNamHoc.length > 0 ? (
+                  {visibleNamHoc.length > 0 ? (
                     <select
                       value={form.namHoc}
                       onChange={e => setForm(p => ({ ...p, namHoc: e.target.value }))}
                       className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
                     >
-                      {allNamHoc.map(nh => (
+                      {visibleNamHoc.map(nh => (
                         <option key={nh.id || nh.tenNamHoc} value={nh.tenNamHoc}>
-                          {nh.tenNamHoc} {((nh.trangThai || nh.trang_thai) === "DANG_MO") ? "(Hiện hành)" : ""}
+                          {nh.tenNamHoc}
                         </option>
                       ))}
-                      {form.namHoc && !allNamHoc.some(nh => nh.tenNamHoc === form.namHoc) && (
+                      {form.namHoc && !visibleNamHoc.some(nh => nh.tenNamHoc === form.namHoc) && (
                         <option value={form.namHoc}>{form.namHoc}</option>
                       )}
                     </select>

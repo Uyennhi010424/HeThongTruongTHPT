@@ -22,8 +22,7 @@ public class AdminConfigService {
     }
 
     public AdminConfig getByKey(String key) {
-        return adminConfigRepository.findByConfigKey(key)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấu hình: " + key));
+        return adminConfigRepository.findByConfigKey(key).orElse(null);
     }
 
     @Transactional

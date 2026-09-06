@@ -6,6 +6,7 @@ import { tinhHocLucLop } from "../../../api/hocbaApi.js";
 import { ArrowLeft, Download, RefreshCw, Calculator, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 
 /* ── Hàm format ─────────────────────────────────────────── */
 const fmt = (score) => {
@@ -229,14 +230,15 @@ export default function AdminBangDiemLop() {
       try {
         const res = await getNamHoc();
         const list = res?.data?.data || [];
-        setNamHocList(list);
+        const visible = getVisibleAcademicYears(list);
+        setNamHocList(visible);
         
         let selectedNh = "";
-        const active = list.find((nh) => nh.trangThai === "DANG_MO");
+        const active = getActiveAcademicYear(visible);
         if (active) {
           selectedNh = active.tenNamHoc;
-        } else if (list.length > 0) {
-          selectedNh = list[0].tenNamHoc; // Chọn cái đầu tiên nếu không có cái nào active
+        } else if (visible.length > 0) {
+          selectedNh = visible[0].tenNamHoc; // Chọn cái đầu tiên nếu không có cái nào active
         }
         
         if (selectedNh) {

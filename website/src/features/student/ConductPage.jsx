@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { formatDate } from "../../utils/helpers.js";
+import { formatDate, getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
@@ -53,15 +53,16 @@ export default function ConductPage() {
         if (!active) return;
         setConducts(conductRes?.data?.data || []);
 
-        const years = (namHocRes?.data?.data || [])
+        const rawYears = namHocRes?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => {
-            const yearA = Number(String(a).match(/(\d{4})/)?.[1] || 0);
-            const yearB = Number(String(b).match(/(\d{4})/)?.[1] || 0);
-            return yearB - yearA;
-          });
+          .filter(Boolean);
         setNamHocList(years);
+        const activeYr = getActiveAcademicYear(visibleYears) || visibleYears[0];
+        if (activeYr?.tenNamHoc) {
+          setSelectedNamHoc(activeYr.tenNamHoc);
+        }
       } catch {
         if (!active) return;
         setError("Không thể tải hạnh kiểm.");

@@ -12,6 +12,7 @@ import {
 } from "../../api/giaoVienNghiApi.js";
 import { notifyError, notifySuccess } from "../../utils/notify.js";
 import { useConfirm } from "../../contexts/ConfirmContext.jsx";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 
 export default function TeacherLeaveRequestPage() {
   const { confirm } = useConfirm();
@@ -26,6 +27,7 @@ export default function TeacherLeaveRequestPage() {
 
   const [currentYear, setCurrentYear] = useState("2025-2026");
   const [targetYear, setTargetYear] = useState("2025-2026");
+  const [filterYear, setFilterYear] = useState("");
   const [targetSemester, setTargetSemester] = useState(1);
   const [allYears, setAllYears] = useState([]);
   const [detailTarget, setDetailTarget] = useState(null);
@@ -60,7 +62,7 @@ export default function TeacherLeaveRequestPage() {
     }
 
     // Nếu chưa chọn ngày, luôn ưu tiên năm học đang mở (DANG_MO)
-    const activeYear = allYears.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO") || allYears[0];
+    const activeYear = getActiveAcademicYear(allYears) || allYears[0];
     if (activeYear) {
       setTargetYear(activeYear.tenNamHoc);
     }
@@ -81,12 +83,14 @@ export default function TeacherLeaveRequestPage() {
         setTeacher(found);
 
         const years = namHocRes?.data?.data || [];
-        setAllYears(years);
-        if (years.length > 0) {
-          const activeYear = years.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO");
-          const yrName = activeYear ? activeYear.tenNamHoc : years[0]?.tenNamHoc || "2025-2026";
+        const visibleYears = getVisibleAcademicYears(years);
+        setAllYears(visibleYears);
+        if (visibleYears.length > 0) {
+          const activeYear = getActiveAcademicYear(visibleYears) || visibleYears[0];
+          const yrName = activeYear ? activeYear.tenNamHoc : visibleYears[0]?.tenNamHoc || "2025-2026";
           setCurrentYear(yrName);
           setTargetYear(yrName);
+          setFilterYear(yrName);
         }
       } catch {
         /* ignore */
@@ -109,10 +113,16 @@ export default function TeacherLeaveRequestPage() {
     }
   }, [location.state, requests]);
 
-  const loadRequests = async () => {
+  const loadRequests = async (selectedYearParam) => {
     if (!teacher?.id) return;
     try {
-      const res = await getNghiByGiaoVien(teacher.id);
+      const yr = selectedYearParam !== undefined ? selectedYearParam : filterYear;
+      const res = await getNghiByGiaoVien(
+        teacher.id,
+        null,
+        null,
+        yr && yr !== "ALL" ? yr : undefined
+      );
       const data = res?.data?.data || [];
       const sorted = [...data].sort((a, b) => new Date(b.ngay).getTime() - new Date(a.ngay).getTime());
       setRequests(sorted);
@@ -153,10 +163,10 @@ export default function TeacherLeaveRequestPage() {
   };
 
   useEffect(() => {
-    if (teacher?.id) {
-      loadRequests();
+    if (teacher?.id && filterYear !== "") {
+      loadRequests(filterYear);
     }
-  }, [teacher?.id]);
+  }, [teacher?.id, filterYear]);
 
   useEffect(() => {
     if (teacher?.id) {
@@ -233,7 +243,7 @@ export default function TeacherLeaveRequestPage() {
       notifySuccess("Đã gửi đơn xin nghỉ dạy. Vui lòng chờ BGH phê duyệt.");
       setDate("");
       setReason("");
-      await loadRequests();
+      await loadRequests(filterYear);
     } catch (err) {
       notifyError(err?.response?.data?.message || err?.response?.data?.error || "Gửi yêu cầu thất bại.");
     } finally {
@@ -246,7 +256,7 @@ export default function TeacherLeaveRequestPage() {
     try {
       await huyNghi(id);
       notifySuccess("Đã hủy đơn thành công.");
-      await loadRequests();
+      await loadRequests(filterYear);
     } catch {
       notifyError("Không thể hủy đơn.");
     }
@@ -443,11 +453,32 @@ export default function TeacherLeaveRequestPage() {
 
         {/* Lịch sử đơn báo nghỉ */}
         <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-            <h3 className="text-sm font-bold text-gray-800">Lịch sử đơn báo nghỉ</h3>
-            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
-              {filteredRequests.length} đơn
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-bold text-gray-800">Lịch sử đơn báo nghỉ</h3>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
+                {filteredRequests.length} đơn
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-500">Năm học:</label>
+              <select
+                value={filterYear}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterYear(val);
+                  loadRequests(val);
+                }}
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs focus:border-blue-500 focus:outline-none"
+              >
+                <option value="ALL">Tất cả các năm</option>
+                {allYears.map((y) => (
+                  <option key={y.id || y.tenNamHoc} value={y.tenNamHoc}>
+                    {y.tenNamHoc}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Tabs */}

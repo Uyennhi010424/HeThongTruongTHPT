@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getHocBa } from "../../api/hocbaApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
+import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import { getDiem } from "../../api/diemApi.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 
@@ -77,15 +78,16 @@ export default function HocBaPage() {
         setDiemList(diemRes?.data?.data || []);
         setHanhKiemList(hkRes?.data?.data || []);
 
-        const years = (namHocRes?.data?.data || [])
+        const rawYears = namHocRes?.data?.data || [];
+        const visibleYears = getVisibleAcademicYears(rawYears);
+        const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => Number(b.match(/(\d{4})/)?.[1] || 0) - Number(a.match(/(\d{4})/)?.[1] || 0));
+          .filter(Boolean);
         
-        setNamHocListObj(namHocRes?.data?.data || []);
+        setNamHocListObj(visibleYears);
         setNamHocList(years);
         if (years.length > 0) {
-          const activeYear = (namHocRes?.data?.data || []).find(y => y.trangThai === "DANG_MO")?.tenNamHoc;
+          const activeYear = getActiveAcademicYear(visibleYears)?.tenNamHoc;
           setSelectedNamHoc(activeYear || years[0]);
         }
       } catch {

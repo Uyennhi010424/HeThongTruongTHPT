@@ -55,8 +55,9 @@ public class TkbDayThayController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<TkbDayThayResponse>>> getAll() {
-        List<TkbDayThayResponse> res = dayThayService.getAll().stream()
+    public ResponseEntity<ApiResponse<List<TkbDayThayResponse>>> getAll(
+            @RequestParam(required = false) String namHoc) {
+        List<TkbDayThayResponse> res = dayThayService.getAll(namHoc).stream()
                 .map(TkbDayThayResponse::fromEntity).collect(Collectors.toList());
         return ResponseEntity.ok(ApiResponse.ok(res));
     }

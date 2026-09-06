@@ -29,6 +29,7 @@ public class DashboardService {
 
     private final NamHocRepository namHocRepository;
     private final ThoiKhoaBieuCrudService thoiKhoaBieuCrudService;
+    private final LichSuHocTapRepository lichSuHocTapRepository;
 
     public DashboardService(HocSinhService hocSinhService,
                             ThongBaoRepository thongBaoRepository,
@@ -40,7 +41,8 @@ public class DashboardService {
                             MonHocRepository monHocRepository,
                             DiemCalculationService diemCalculationService,
                             NamHocRepository namHocRepository,
-                            ThoiKhoaBieuCrudService thoiKhoaBieuCrudService) {
+                            ThoiKhoaBieuCrudService thoiKhoaBieuCrudService,
+                            LichSuHocTapRepository lichSuHocTapRepository) {
         this.hocSinhService = hocSinhService;
         this.thongBaoRepository = thongBaoRepository;
         this.thoiKhoaBieuRepository = thoiKhoaBieuRepository;
@@ -52,6 +54,7 @@ public class DashboardService {
         this.diemCalculationService = diemCalculationService;
         this.namHocRepository = namHocRepository;
         this.thoiKhoaBieuCrudService = thoiKhoaBieuCrudService;
+        this.lichSuHocTapRepository = lichSuHocTapRepository;
     }
 
     public DashboardDataDTO getStudentDashboard(String username) {
@@ -70,35 +73,100 @@ public class DashboardService {
     }
 
     private List<ThoiKhoaBieu> getTimetableForHocSinh(HocSinh hocSinh, LocalDate targetDate) {
-        if (hocSinh == null || hocSinh.getLop() == null) {
+        if (hocSinh == null) {
             return new ArrayList<>();
         }
 
         int curMonth = targetDate.getMonthValue();
-        String curNamHoc = curMonth >= 8
+        String calcNamHoc = curMonth >= 8
                 ? targetDate.getYear() + "-" + (targetDate.getYear() + 1)
                 : (targetDate.getYear() - 1) + "-" + targetDate.getYear();
-        int curHocKy = (curMonth >= 8 || curMonth <= 1) ? 1 : 2;
 
-        List<com.hethongtruongthpt.entity.NamHoc> activeNamHocs = namHocRepository.findByTrangThai("DANG_MO");
+        List<com.hethongtruongthpt.entity.NamHoc> allNamHocs = namHocRepository.findAll();
+        com.hethongtruongthpt.entity.NamHoc matchingNamHoc = null;
+
+        for (com.hethongtruongthpt.entity.NamHoc nh : allNamHocs) {
+            if (nh.getNgayBatDauHk1() != null && nh.getNgayKetThucHk2() != null) {
+                if (!targetDate.isBefore(nh.getNgayBatDauHk1()) && !targetDate.isAfter(nh.getNgayKetThucHk2())) {
+                    matchingNamHoc = nh;
+                    break;
+                }
+            }
+        }
+
+        if (matchingNamHoc == null) {
+            for (com.hethongtruongthpt.entity.NamHoc nh : allNamHocs) {
+                if (calcNamHoc.equals(nh.getTenNamHoc())) {
+                    matchingNamHoc = nh;
+                    break;
+                }
+            }
+        }
+
+        String targetNamHoc = matchingNamHoc != null ? matchingNamHoc.getTenNamHoc() : calcNamHoc;
+        int curHocKy = 1;
         int currentWeek = 1;
-        if (!activeNamHocs.isEmpty()) {
-            com.hethongtruongthpt.entity.NamHoc active = activeNamHocs.get(0);
-            curNamHoc = active.getTenNamHoc();
 
-            if (active.getNgayBatDauHk1() != null && targetDate.isBefore(active.getNgayBatDauHk1())) {
+        if (matchingNamHoc != null) {
+            // Nếu ngày xem trước ngày bắt đầu HK1 hoặc sau ngày kết thúc HK2 -> Chưa bắt đầu hoặc đã kết thúc năm học
+            if (matchingNamHoc.getNgayBatDauHk1() != null && targetDate.isBefore(matchingNamHoc.getNgayBatDauHk1())) {
+                return new ArrayList<>();
+            }
+            if (matchingNamHoc.getNgayKetThucHk2() != null && targetDate.isAfter(matchingNamHoc.getNgayKetThucHk2())) {
+                return new ArrayList<>();
+            }
+            if (matchingNamHoc.getNgayKetThucHk1() != null && matchingNamHoc.getNgayBatDauHk2() != null 
+                    && targetDate.isAfter(matchingNamHoc.getNgayKetThucHk1()) && targetDate.isBefore(matchingNamHoc.getNgayBatDauHk2())) {
                 return new ArrayList<>();
             }
 
-            if (active.getNgayBatDauHk2() != null && !targetDate.isBefore(active.getNgayBatDauHk2())) {
+            if (matchingNamHoc.getNgayBatDauHk2() != null && !targetDate.isBefore(matchingNamHoc.getNgayBatDauHk2())) {
                 curHocKy = 2;
-            } else if (active.getNgayBatDauHk1() != null && !targetDate.isBefore(active.getNgayBatDauHk1())) {
+            } else if (matchingNamHoc.getNgayBatDauHk1() != null && !targetDate.isBefore(matchingNamHoc.getNgayBatDauHk1())) {
+                curHocKy = 1;
+            } else {
                 curHocKy = 1;
             }
-            currentWeek = com.hethongtruongthpt.util.SchoolWeekUtils.weekNumber(active, targetDate);
+            currentWeek = com.hethongtruongthpt.util.SchoolWeekUtils.weekNumber(matchingNamHoc, targetDate);
+            if (currentWeek < 1) {
+                return new ArrayList<>();
+            }
+        } else {
+            curHocKy = (curMonth >= 8 || curMonth <= 1) ? 1 : 2;
+            currentWeek = 1;
         }
 
-        List<ThoiKhoaBieu> timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(hocSinh.getLop().getId(), curHocKy, curNamHoc, currentWeek);
+        // Tìm lớp của học sinh trong năm học targetNamHoc
+        Integer targetLopId = null;
+        List<LichSuHocTap> histories = lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinh.getId());
+        for (LichSuHocTap ls : histories) {
+            if (targetNamHoc.equals(ls.getNamHoc()) && ls.getLopHoc() != null) {
+                targetLopId = ls.getLopHoc().getId();
+                break;
+            }
+        }
+
+        if (targetLopId == null && hocSinh.getLop() != null) {
+            targetLopId = hocSinh.getLop().getId();
+        }
+
+        if (targetLopId == null) {
+            return new ArrayList<>();
+        }
+
+        // Nếu tuần này là tuần thi -> Không có lịch học (lịch học tạm dừng)
+        boolean isExamWeek = thoiKhoaBieuCrudService.isExamWeek(targetNamHoc, currentWeek);
+        if (isExamWeek) {
+            return new ArrayList<>();
+        }
+
+        List<ThoiKhoaBieu> timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(targetLopId, curHocKy, targetNamHoc, currentWeek);
+        if (timetable.isEmpty() && currentWeek > 1) {
+            List<ThoiKhoaBieu> week1Timetable = thoiKhoaBieuRepository.findByLopIdAndHocKyAndNamHocAndTuan(targetLopId, curHocKy, targetNamHoc, 1);
+            if (!week1Timetable.isEmpty()) {
+                timetable = week1Timetable;
+            }
+        }
         return timetable;
     }
 
@@ -154,17 +222,31 @@ public class DashboardService {
         }
         dashboardData.setTimetable(timetable);
 
-        // 3. Exams
+        // 3. Exams (Lấy tất cả các lớp của học sinh từ lớp hiện tại và lịch sử học tập)
         List<LichThi> exams = new ArrayList<>();
+        java.util.Set<Integer> studentLopIds = new java.util.HashSet<>();
         if (lopId != null) {
-            exams = lichThiRepository.findByLopId(lopId).stream()
-                .sorted((a, b) -> {
-                    if (a.getNgayThi() == null) return 1;
-                    if (b.getNgayThi() == null) return -1;
-                    return b.getNgayThi().compareTo(a.getNgayThi());
-                })
-                .collect(Collectors.toList());
+            studentLopIds.add(lopId);
         }
+        List<LichSuHocTap> studentHistories = lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinhId);
+        for (LichSuHocTap ls : studentHistories) {
+            if (ls.getLopHoc() != null) {
+                studentLopIds.add(ls.getLopHoc().getId());
+            }
+        }
+
+        for (Integer lId : studentLopIds) {
+            exams.addAll(lichThiRepository.findByLopId(lId));
+        }
+
+        exams = exams.stream()
+            .distinct()
+            .sorted((a, b) -> {
+                if (a.getNgayThi() == null) return 1;
+                if (b.getNgayThi() == null) return -1;
+                return b.getNgayThi().compareTo(a.getNgayThi());
+            })
+            .collect(Collectors.toList());
         dashboardData.setExams(exams);
 
         // 4. Subjects

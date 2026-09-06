@@ -8,7 +8,7 @@ import { getMonHoc } from "../../api/monhocApi.js";
 import { getDiem } from "../../api/diemApi.js";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { formatDate } from "../../utils/helpers.js";
+import { formatDate, getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
 import { webSocketService } from "../../utils/websocket.js";
@@ -137,7 +137,8 @@ export default function HomePage() {
   }, [currentStudent]);
 
   const { upcomingExams, recentActivities, subjectsTodayCount } = useMemo(() => {
-    const activeYearObj = (data.namHocs || []).find(y => (y.trangThai || y.trang_thai) === "DANG_MO") || data.namHocs?.[0];
+    const visibleYears = getVisibleAcademicYears(data.namHocs || []);
+    const activeYearObj = getActiveAcademicYear(visibleYears) || visibleYears[0];
     const curNamHoc = activeYearObj?.tenNamHoc || "";
 
     // Lọc chỉ lấy các kỳ thi chính thức (GK - Giữa kỳ, CK - Cuối kỳ), loại bỏ bài kiểm tra 15p (TP15)

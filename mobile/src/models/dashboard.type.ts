@@ -3,16 +3,30 @@ export interface StudentInfo {
   maHocSinh: string;
   hoTen: string;
   ngaySinh: string;
-  gioiTinh: boolean;
+  gioiTinh: string | boolean;
   diaChi: string;
-  soDienThoai: string;
+  soDienThoai?: string;
+  sdt?: string;
+  email?: string;
+  danToc?: string;
+  tonGiao?: string;
+  maBhyt?: string;
+  dienChinhSach?: boolean;
+  namNhapHoc?: number;
+  trangThai?: number;
   anhDaiDien: string | null;
   lop: {
     id: number;
     tenLop: string;
     khoi: number;
     namHoc?: string;
-    giaoVienChuNhiem: {
+    gvcn?: {
+      id: number;
+      hoTen: string;
+      email?: string;
+      sdt?: string;
+    } | null;
+    giaoVienChuNhiem?: {
       id: number;
       hoTen: string;
     } | null;
@@ -25,7 +39,7 @@ export interface Notice {
   noiDung: string;
   ngayGui: string;
   loaiThongBao: string;
-  daDoc?: boolean; // Mobile only or returned from unread mapping
+  daDoc?: boolean;
 }
 
 export interface TimetableEntry {
@@ -35,8 +49,8 @@ export interface TimetableEntry {
   soTiet: number;
   monHoc: {
     id: number;
-    tenMon: string;       // ✅ field đúng từ backend (MonHoc.tenMon)
-    tenMonHoc?: string;   // alias cũ, keep lại để không break
+    tenMon: string;
+    tenMonHoc?: string;
   } | null;
   phongHoc: string;
   giaoVien: {
@@ -48,7 +62,7 @@ export interface TimetableEntry {
 
 export interface ConductRecord {
   id: number;
-  xepLoai: string; // TOT, KHA, TRUNG_BINH, YEU
+  xepLoai: string;
   nhanXet: string;
   ngayDanhGia: string;
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { getThoiKhoaBieu } from "../../api/thoikhoabieuApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { getDayLabel, getCurrentSemesterWeek, getWeekDates, mapTimeToPeriod } from "../../utils/helpers.js";
+import { getDayLabel, getCurrentSemesterWeek, getWeekDates, mapTimeToPeriod, getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import { getLichThi, getLichThiByLop } from "../../api/lichthiApi.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
@@ -75,7 +75,9 @@ export default function TimetableFollow() {
         let activeYearObj = null;
         try {
           const namHocRes = await getNamHoc();
-          activeYearObj = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[0] || null;
+          const rawYears = namHocRes?.data?.data || [];
+          const visibleYears = getVisibleAcademicYears(rawYears);
+          activeYearObj = getActiveAcademicYear(visibleYears) || visibleYears[0] || null;
           if (activeYearObj) {
             curNamHoc = activeYearObj.tenNamHoc || "";
             if (activeYearObj.ngayBatDauHk2) {

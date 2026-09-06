@@ -5,6 +5,7 @@ import { getNamHoc } from "../api/namhocApi.js";
 import { getPhanCongDay } from "../api/phancongDayApi.js";
 import { getCurrentGiaoVien } from "../api/giaovienApi.js";
 import { getChuNhiem } from "../api/chunhiemApi.js";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../utils/helpers.js";
 
 /**
  * Custom hook to manage teacher filters across pages.
@@ -13,16 +14,16 @@ import { getChuNhiem } from "../api/chunhiemApi.js";
  */
 export function useTeacherFilters({ showSubject = true, showGrade = true, showClass = true, defaultSemester = "HK1", homeroomOnly = false, teachOnly = false } = {}) {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
 
   const [allClasses, setAllClasses] = useState([]);
   const [allSubjects, setAllSubjects] = useState([]);
-  const [allStudents, setAllStudents] = useState([]);
   const [allNamHoc, setAllNamHoc] = useState([]);
   const [namHocList, setNamHocList] = useState([]);
   const [phanCongData, setPhanCongData] = useState([]);
   const [chuNhiemData, setChuNhiemData] = useState([]);
   const [currentTeacher, setCurrentTeacher] = useState(null);
+  const [allStudents, setAllStudents] = useState([]);
 
   const [selectedNamHoc, setSelectedNamHoc] = useState("");
   const [selectedSemester, setSelectedSemester] = useState(defaultSemester);
@@ -30,73 +31,59 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
 
-  // Fetch base data
   useEffect(() => {
     let active = true;
-    const fetchData = async () => {
+
+    const fetchBaseData = async () => {
       try {
         setLoading(true);
-        setError("");
+        setError(null);
 
         const [
           lopRes,
-          monRes,
+          monHocRes,
           namHocRes,
           phanCongRes,
-          chuNhiemRes,
           teacherRes,
+          chuNhiemRes,
           hsRes
         ] = await Promise.all([
-          showClass ? getLop().catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
+          getLop().catch(() => ({ data: { data: [] } })),
           showSubject ? getMonHoc().catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } }),
           getNamHoc().catch(() => ({ data: { data: [] } })),
           getPhanCongDay().catch(() => ({ data: { data: [] } })),
+          getCurrentGiaoVien().catch(() => ({ data: { data: null } })),
           getChuNhiem().catch(() => ({ data: { data: [] } })),
-          getCurrentGiaoVien().catch(() => null),
-          import("../api/hocsinhApi.js").then(m => m.getHocSinh()).catch(() => ({ data: { data: [] } }))
+          import("../api/hocsinhApi.js").then(m => m.getHocSinh().catch(() => ({ data: { data: [] } }))).catch(() => ({ data: { data: [] } }))
         ]);
 
         if (!active) return;
 
-        if (showClass) setAllClasses(lopRes?.data?.data || []);
-        if (showSubject) {
-          const rawSubjects = monRes?.data?.data || [];
-          const filteredSubjects = rawSubjects.filter(s => {
-            const name = (s.tenMon || "").toLowerCase();
-            return !name.includes("shdc") && !name.includes("sinh hoạt lớp");
-          });
-          setAllSubjects(filteredSubjects);
-        }
+        setAllClasses(lopRes?.data?.data || []);
+        setAllSubjects(monHocRes?.data?.data || []);
         
         setPhanCongData(phanCongRes?.data?.data || []);
         setChuNhiemData(chuNhiemRes?.data?.data || []);
         setCurrentTeacher(teacherRes?.data?.data || null);
         setAllStudents(hsRes?.data?.data || []);
 
-        // Process academic years
+        // Process academic years (only visible years <= current active year)
         const rawNamHoc = namHocRes?.data?.data || [];
-        setAllNamHoc(rawNamHoc);
-        const years = rawNamHoc
+        const visibleYears = getVisibleAcademicYears(rawNamHoc);
+        setAllNamHoc(visibleYears);
+        const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
-          .filter(Boolean)
-          .sort((a, b) => {
-            const yearA = Number(String(a).match(/(\d{4})/)?.[1] || 0);
-            const yearB = Number(String(b).match(/(\d{4})/)?.[1] || 0);
-            return yearB - yearA;
-          });
+          .filter(Boolean);
         
         setNamHocList(years);
         
-        const now = new Date();
-        const currentYearValue = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-        const currentNamHocString = `${currentYearValue}-${currentYearValue + 1}`;
-        
-        // Priority 1: Check active academic year (DANG_MO)
-        const activeNamHoc = rawNamHoc.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO");
-        let targetNamHoc = activeNamHoc?.tenNamHoc || (years.includes(currentNamHocString) ? currentNamHocString : years[0] || "");
+        // Check active academic year (DANG_MO)
+        const activeNamHoc = getActiveAcademicYear(rawNamHoc);
+        let targetNamHoc = activeNamHoc?.tenNamHoc || years[0] || "";
         
         setSelectedNamHoc((prev) => prev || targetNamHoc);
 
+        const now = new Date();
         if (activeNamHoc?.ngayBatDauHk2) {
           const startHk2 = new Date(activeNamHoc.ngayBatDauHk2 + "T00:00:00");
           const endHk2 = activeNamHoc.ngayKetThucHk2 ? new Date(activeNamHoc.ngayKetThucHk2 + "T23:59:59") : null;
@@ -104,7 +91,6 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
             setSelectedSemester((prev) => prev || "HK2");
           }
         }
-
       } catch (err) {
         if (!active) return;
         setError("Không thể tải dữ liệu bộ lọc.");
@@ -113,7 +99,7 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
         if (active) setLoading(false);
       }
     };
-    fetchData();
+    fetchBaseData();
     return () => { active = false; };
   }, [showSubject, showClass]);
 
@@ -183,8 +169,8 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
   // Derived state: Filtered Classes by Grade
   const filteredClasses = useMemo(() => {
     if (!showClass) return [];
-    if (selectedGrade === "all" || !showGrade) return allowedClasses;
-    return allowedClasses.filter((item) => String(item?.khoi || "") === selectedGrade);
+    if (!selectedGrade || String(selectedGrade).toLowerCase() === "all" || !showGrade) return allowedClasses;
+    return allowedClasses.filter((item) => String(item?.khoi || "") === String(selectedGrade));
   }, [allowedClasses, selectedGrade, showGrade, showClass]);
 
   // Auto-select first class when grade/classes change

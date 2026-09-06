@@ -45,13 +45,18 @@ public class GiaoVienNghiController {
     public ResponseEntity<ApiResponse<List<GiaoVienNghi>>> getByGiaoVien(
             @PathVariable Integer id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(ApiResponse.ok(nghiService.getByGiaoVienAndRange(id, from, to)));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String namHoc) {
+        return ResponseEntity.ok(ApiResponse.ok(nghiService.getByGiaoVienAndRange(id, from, to, namHoc)));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<GiaoVienNghi>>> getAll() {
+    public ResponseEntity<ApiResponse<List<GiaoVienNghi>>> getAll(
+            @RequestParam(required = false) String namHoc) {
+        if (namHoc != null && !namHoc.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.ok(nghiService.getByNamHoc(namHoc)));
+        }
         return ResponseEntity.ok(ApiResponse.ok(nghiService.getAll()));
     }
 

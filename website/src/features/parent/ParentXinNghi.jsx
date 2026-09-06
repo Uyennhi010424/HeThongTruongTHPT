@@ -167,6 +167,19 @@ export default function ParentXinNghi() {
                   />
                 </div>
               </div>
+
+              {(() => {
+                const isSun = (dStr) => dStr ? new Date(dStr + "T00:00:00").getDay() === 0 : false;
+                if (isSun(formData.ngayBatDau) || isSun(formData.ngayKetThuc)) {
+                  return (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
+                      <span className="text-sm">⚠️</span>
+                      <span>Lưu ý: Ngày đã chọn là Chủ nhật (ngày nghỉ của trường).</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Lý do nghỉ</label>
                 <textarea 

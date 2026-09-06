@@ -6,10 +6,11 @@ export const getNghiByNgay = (ngay, namHoc) =>
 export const getNghiByNamHoc = (namHoc) =>
 	axiosClient.get("/giao-vien-nghi/nam-hoc", { params: { namHoc } });
 
-export const getNghiByGiaoVien = (id, from, to) =>
-	axiosClient.get(`/giao-vien-nghi/giao-vien/${id}`, { params: { from, to } });
+export const getNghiByGiaoVien = (id, from, to, namHoc) =>
+	axiosClient.get(`/giao-vien-nghi/giao-vien/${id}`, { params: { from, to, namHoc } });
 
-export const getAllNghi = () => axiosClient.get("/giao-vien-nghi/all");
+export const getAllNghi = (namHoc) =>
+	axiosClient.get("/giao-vien-nghi/all", { params: { namHoc } });
 
 export const dangKyNghi = (data) =>
 	axiosClient.post("/giao-vien-nghi", data);

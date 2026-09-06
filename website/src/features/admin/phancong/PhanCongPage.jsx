@@ -12,6 +12,7 @@ import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import { normalizeText } from "../../../utils/normalizeText.js";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import Pagination from "../../../components/common/Pagination.jsx";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 
 const formatHocKy = (value) => (Number(value) === 2 ? "Học kỳ 2" : "Học kỳ 1");
 
@@ -223,18 +224,20 @@ export default function PhanCongPage() {
       setClasses(classList);
 
       const rawNamHoc = nhRes?.data?.data || [];
-      const activeNamHoc = rawNamHoc.find((nh) => (nh.trangThai || nh.trang_thai) === "DANG_MO");
+      const visibleNamHoc = getVisibleAcademicYears(rawNamHoc);
+      const activeNamHoc = getActiveAcademicYear(visibleNamHoc);
       
-      const yearsFromNh = rawNamHoc.map(nh => nh.tenNamHoc).filter(Boolean);
+      const yearsFromNh = visibleNamHoc.map(nh => nh.tenNamHoc).filter(Boolean);
+      const visibleSet = new Set(yearsFromNh);
       const allYears = Array.from(new Set([
         ...yearsFromNh,
-        ...classList.map(l => l.namHoc).filter(Boolean),
-        ...(phanCong?.data?.data || []).map(p => p.namHoc).filter(Boolean)
+        ...classList.map(l => l.namHoc).filter(y => visibleSet.has(y)),
+        ...(phanCong?.data?.data || []).map(p => p.namHoc).filter(y => visibleSet.has(y))
       ])).sort().reverse();
       
       setAcademicYears(allYears);
 
-      const defaultNam = activeNamHoc?.tenNamHoc || allYears[0] || "2026-2027";
+      const defaultNam = activeNamHoc?.tenNamHoc || allYears[0] || "2025-2026";
       setAutoNamHoc(defaultNam);
       setFilter(p => ({ ...p, namHoc: p.namHoc || defaultNam }));
 

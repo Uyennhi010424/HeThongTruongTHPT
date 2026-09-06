@@ -26,8 +26,10 @@ public class BaiKiemTraService {
     private final HocSinhRepository hocSinhRepository;
     private final PhanCongDayRepository phanCongDayRepository;
     private final NotificationService notificationService;
+    private final LichSuHocTapRepository lichSuHocTapRepository;
+    private final NamHocRepository namHocRepository;
 
-    public BaiKiemTraService(BaiKiemTraRepository baiKiemTraRepository, CauHoiRepository cauHoiRepository, DapAnRepository dapAnRepository, BaiLamRepository baiLamRepository, ChiTietBaiLamRepository chiTietBaiLamRepository, LopHocRepository lopHocRepository, MonHocRepository monHocRepository, GiaoVienRepository giaoVienRepository, HocSinhRepository hocSinhRepository, PhanCongDayRepository phanCongDayRepository, NotificationService notificationService) {
+    public BaiKiemTraService(BaiKiemTraRepository baiKiemTraRepository, CauHoiRepository cauHoiRepository, DapAnRepository dapAnRepository, BaiLamRepository baiLamRepository, ChiTietBaiLamRepository chiTietBaiLamRepository, LopHocRepository lopHocRepository, MonHocRepository monHocRepository, GiaoVienRepository giaoVienRepository, HocSinhRepository hocSinhRepository, PhanCongDayRepository phanCongDayRepository, NotificationService notificationService, LichSuHocTapRepository lichSuHocTapRepository, NamHocRepository namHocRepository) {
         this.baiKiemTraRepository = baiKiemTraRepository;
         this.cauHoiRepository = cauHoiRepository;
         this.dapAnRepository = dapAnRepository;
@@ -39,6 +41,16 @@ public class BaiKiemTraService {
         this.hocSinhRepository = hocSinhRepository;
         this.phanCongDayRepository = phanCongDayRepository;
         this.notificationService = notificationService;
+        this.lichSuHocTapRepository = lichSuHocTapRepository;
+        this.namHocRepository = namHocRepository;
+    }
+
+    private String getActiveNamHoc() {
+        List<NamHoc> activeYears = namHocRepository.findByTrangThai("DANG_MO");
+        if (!activeYears.isEmpty()) {
+            return activeYears.get(0).getTenNamHoc();
+        }
+        return "2025-2026";
     }
     
     // --- API for Teacher: Manage Exams ---
@@ -54,7 +66,11 @@ public class BaiKiemTraService {
 
     @Transactional(readOnly = true)
     public List<BaiKiemTraDTO> getExamsByTeacher(Integer giaoVienId) {
-        return baiKiemTraRepository.findByGiaoVienIdOrderByNgayTaoDesc(giaoVienId).stream().map(this::mapToDTO).collect(Collectors.toList());
+        String activeNamHoc = getActiveNamHoc();
+        return baiKiemTraRepository.findByGiaoVienIdOrderByNgayTaoDesc(giaoVienId).stream()
+                .filter(exam -> exam.getLopHoc() == null || activeNamHoc.equals(exam.getLopHoc().getNamHoc()))
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -70,10 +86,42 @@ public class BaiKiemTraService {
     @Transactional(readOnly = true)
     public List<BaiKiemTraDTO> getExamsForStudent(String username) {
         HocSinh hs = hocSinhRepository.findByUserUsername(username).orElseThrow(() -> new ResourceNotFoundException("Học sinh không tồn tại"));
-        if (hs.getLop() == null) {
+        
+        String activeNamHoc = getActiveNamHoc();
+        
+        // Find lopId of student for activeNamHoc
+        Integer targetLopId = null;
+        if (hs.getLop() != null && activeNamHoc.equals(hs.getLop().getNamHoc())) {
+            targetLopId = hs.getLop().getId();
+        } else {
+            List<LichSuHocTap> histories = lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hs.getId());
+            for (LichSuHocTap ls : histories) {
+                if (activeNamHoc.equals(ls.getNamHoc()) && ls.getLopHoc() != null) {
+                    targetLopId = ls.getLopHoc().getId();
+                    break;
+                }
+            }
+        }
+        
+        // Fallback to hs.getLop() if not found in history
+        if (targetLopId == null && hs.getLop() != null) {
+            targetLopId = hs.getLop().getId();
+        }
+
+        if (targetLopId == null) {
             return new ArrayList<>();
         }
-        return baiKiemTraRepository.findByLopHocIdOrderByNgayTaoDesc(hs.getLop().getId()).stream()
+
+        List<BaiKiemTra> allExams = baiKiemTraRepository.findByLopHocIdOrderByNgayTaoDesc(targetLopId);
+
+        return allExams.stream()
+                .filter(exam -> exam.getLopHoc() != null && activeNamHoc.equals(exam.getLopHoc().getNamHoc()))
+                .distinct()
+                .sorted((a, b) -> {
+                    if (a.getNgayTao() == null) return 1;
+                    if (b.getNgayTao() == null) return -1;
+                    return b.getNgayTao().compareTo(a.getNgayTao());
+                })
                 .map(exam -> {
                     BaiKiemTraDTO dto = mapToDTO(exam);
                     List<BaiLam> existings = baiLamRepository.findByBaiKiemTraIdAndHocSinhId(exam.getId(), hs.getId());

@@ -116,6 +116,38 @@ public class DatabaseFixer {
             } catch (Exception e) {
                 System.out.println("[DatabaseFixer] Lỗi khi thêm đơn xin nghỉ mẫu: " + e.getMessage());
             }
+
+            try {
+                // Tự động kiểm tra và kết chuyển học sinh sang năm học 2026-2027 nếu các lớp 11, 12 của 2026-2027 chưa có học sinh
+                Integer hsIn2026Khoi11And12 = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM hoc_sinh WHERE lop_id IN (26,27,28,29,30,31,32,33,34,35)",
+                    Integer.class
+                );
+                if (hsIn2026Khoi11And12 == null || hsIn2026Khoi11And12 == 0) {
+                    // Chuyển khối 10 (2025-2026) -> khối 11 (2026-2027)
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 26 WHERE lop_id = 1");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 27 WHERE lop_id = 2");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 28 WHERE lop_id = 3");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 29 WHERE lop_id = 4");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 30 WHERE lop_id = 5");
+
+                    // Chuyển khối 11 (2025-2026) -> khối 12 (2026-2027)
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 31 WHERE lop_id = 6");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 32 WHERE lop_id = 7");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 33 WHERE lop_id = 8");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 34 WHERE lop_id = 9");
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = 35 WHERE lop_id = 10");
+
+                    // Tốt nghiệp khối 12 (2025-2026)
+                    jdbcTemplate.update("UPDATE hoc_sinh SET lop_id = NULL, trang_thai = 2 WHERE lop_id IN (11,12,13,14,15)");
+
+                    // Cập nhật sĩ số lớp
+                    jdbcTemplate.update("UPDATE lop SET si_so = (SELECT COUNT(*) FROM hoc_sinh WHERE hoc_sinh.lop_id = lop.id)");
+                    System.out.println("[DatabaseFixer] Đã tự động đồng bộ học sinh vào các lớp năm học 2026-2027 thành công.");
+                }
+            } catch (Exception e) {
+                System.out.println("[DatabaseFixer] Lỗi khi đồng bộ học sinh năm 2026-2027: " + e.getMessage());
+            }
         };
     }
 }

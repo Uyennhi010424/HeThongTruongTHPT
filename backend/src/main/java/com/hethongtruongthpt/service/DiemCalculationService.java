@@ -163,12 +163,22 @@ public class DiemCalculationService {
 
         List<HocSinh> hocSinhList = hocSinhRepository.findByLopId(lopId).stream()
                 .filter(hs -> hs.getTrangThai() == 1) // only active students
-                .sorted((a, b) -> {
-                    String[] nameA = a.getHoTen().split(" ");
-                    String[] nameB = b.getHoTen().split(" ");
-                    return nameA[nameA.length - 1].compareTo(nameB[nameB.length - 1]);
-                })
                 .collect(Collectors.toList());
+
+        if (hocSinhList.isEmpty()) {
+            List<Integer> hsIds = diemRepository.findDistinctHocSinhIdsByLopIdAndNamHoc(lopId, namHoc);
+            if (!hsIds.isEmpty()) {
+                hocSinhList = hocSinhRepository.findAllById(hsIds).stream()
+                        .filter(hs -> hs.getTrangThai() == 1)
+                        .collect(Collectors.toList());
+            }
+        }
+
+        hocSinhList.sort((a, b) -> {
+            String[] nameA = a.getHoTen().split(" ");
+            String[] nameB = b.getHoTen().split(" ");
+            return nameA[nameA.length - 1].compareTo(nameB[nameB.length - 1]);
+        });
 
         List<Diem> diemList = diemRepository.findByHocSinhLopIdAndHocKyAndNamHoc(lopId, hocKy, namHoc);
         Map<Integer, List<Diem>> diemByHs = diemList.stream().collect(Collectors.groupingBy(d -> d.getHocSinh().getId()));

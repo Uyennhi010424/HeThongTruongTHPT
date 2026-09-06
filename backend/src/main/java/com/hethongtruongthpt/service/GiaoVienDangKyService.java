@@ -292,7 +292,12 @@ public class GiaoVienDangKyService {
         int thu = ngay.getDayOfWeek().getValue() + 1;
         if (thu > 7) return Collections.emptyList();
         
-        List<GiaoVienNghi> nghiList = giaoVienNghiRepository.findByNgay(ngay);
+        List<GiaoVienNghi> rawNghiList = (namHoc != null && !namHoc.isBlank())
+                ? giaoVienNghiRepository.findByNgayAndNamHoc(ngay, namHoc)
+                : giaoVienNghiRepository.findByNgay(ngay);
+        List<GiaoVienNghi> nghiList = rawNghiList.stream()
+                .filter(n -> "APPROVED".equals(n.getTrangThai()))
+                .collect(Collectors.toList());
         if (nghiList.isEmpty()) return Collections.emptyList();
         Set<Integer> absentGvIds = nghiList.stream().map(n -> n.getGiaoVien().getId()).collect(Collectors.toSet());
         
@@ -300,7 +305,9 @@ public class GiaoVienDangKyService {
         List<ThoiKhoaBieu> allTkb = thoiKhoaBieuRepository.findByNamHocAndHocKyAndTuan(namHoc, hocKy, mappedTuan);
         if (allTkb == null) return Collections.emptyList();
         
-        List<TkbDayThay> dayThayList = tkbDayThayRepository.findByNgay(ngay);
+        List<TkbDayThay> dayThayList = (namHoc != null && !namHoc.isBlank())
+                ? tkbDayThayRepository.findByNgayAndNamHoc(ngay, namHoc)
+                : tkbDayThayRepository.findByNgay(ngay);
         Set<Integer> occupiedTkbIds = dayThayList.stream().map(d -> d.getThoiKhoaBieu().getId()).collect(Collectors.toSet());
         
         List<Map<String, Object>> result = new ArrayList<>();
@@ -398,7 +405,15 @@ public class GiaoVienDangKyService {
     public List<TkbDayThay> getLichDayThayCuaToi(LocalDate ngay, String namHoc) {
         GiaoVien gv = getCurrentTeacher();
         if (ngay != null) {
+            if (namHoc != null && !namHoc.isBlank()) {
+                return tkbDayThayRepository.findByGiaoVienThayIdAndNgay(gv.getId(), ngay).stream()
+                        .filter(dt -> dt.getThoiKhoaBieu() != null && namHoc.equals(dt.getThoiKhoaBieu().getNamHoc()))
+                        .collect(Collectors.toList());
+            }
             return tkbDayThayRepository.findByGiaoVienThayIdAndNgay(gv.getId(), ngay);
+        }
+        if (namHoc != null && !namHoc.isBlank()) {
+            return tkbDayThayRepository.findByGiaoVienThayIdAndNamHoc(gv.getId(), namHoc);
         }
         return tkbDayThayRepository.findAll().stream()
                 .filter(dt -> dt.getGiaoVienThay() != null && dt.getGiaoVienThay().getId().equals(gv.getId()))

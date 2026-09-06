@@ -110,9 +110,13 @@ export default function TimetablePage() {
       try {
         setLoading(true);
         setError("");
-        const studentRes = await getCurrentHocSinh();
+        const [studentRes, namHocRes] = await Promise.all([
+          getCurrentHocSinh(),
+          getNamHoc().catch(() => null)
+        ]);
         if (!active) return;
-        const sLopId = studentRes?.data?.data?.lop?.id;
+        const currentStudent = studentRes?.data?.data || null;
+        const sLopId = currentStudent?.lop?.id;
         if (!sLopId) {
           setError("Không tìm thấy lớp của học sinh.");
           setLoading(false);
@@ -120,23 +124,33 @@ export default function TimetablePage() {
         }
         setLopId(sLopId);
 
-        let currentNamHoc = "";
+        const rawYears = namHocRes?.data?.data || [];
+        const currentClassYear = currentStudent?.lop?.namHoc;
+        
+        // Tìm năm học hiện hành (DANG_MO, DANG_HOAT_DONG, hoặc trùng với năm học của lớp học sinh)
+        const activeYearObj = rawYears.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO" || (y.trangThai || y.trang_thai) === "DANG_HOAT_DONG" || y.trangThai === 1)
+          || rawYears.find(y => y.tenNamHoc === currentClassYear)
+          || rawYears[0]
+          || null;
+
+        let currentNamHoc = activeYearObj?.tenNamHoc || currentClassYear || "";
         let currentHocKy = 1;
-        let ngayBatDauHk1 = null;
-        try {
-          const namHocRes = await getNamHoc();
-          const years = namHocRes?.data?.data || [];
-          const currentYear = years.find((y) => (y.trangThai || y.trang_thai) === "DANG_MO") || years[0];
-          currentNamHoc = currentYear?.tenNamHoc || "";
-          ngayBatDauHk1 = currentYear?.ngayBatDauHk1 || null;
-          if (currentYear?.ngayBatDauHk2) {
-            const today = new Date().toISOString().slice(0, 10);
-            if (today >= currentYear.ngayBatDauHk2) currentHocKy = 2;
-          }
-        } catch { /* ignore */ }
+        let ngayBatDauHk1 = activeYearObj?.ngayBatDauHk1 || null;
+
+        if (activeYearObj?.ngayBatDauHk2) {
+          const today = new Date().toISOString().slice(0, 10);
+          if (today >= activeYearObj.ngayBatDauHk2) currentHocKy = 2;
+        }
+
+        // Đảm bảo namHocList chứa đầy đủ các năm học từ hệ thống
+        let yearsList = [...rawYears];
+        if (currentClassYear && !yearsList.some(y => y.tenNamHoc === currentClassYear)) {
+          yearsList.unshift({ tenNamHoc: currentClassYear, trangThai: "DANG_MO" });
+        }
+        setNamHocList(yearsList);
 
         let defaultTuan = getDefaultTuan(ngayBatDauHk1);
-        setYearInfo({ tenNamHoc: currentNamHoc, hocKy: currentHocKy });
+        setYearInfo({ tenNamHoc: currentNamHoc, hocKy: currentHocKy, activeYearObj });
         setSelectedTuan(defaultTuan);
 
         try {
@@ -433,10 +447,64 @@ export default function TimetablePage() {
       <div className="card tkb-card">
         {/* Toolbar */}
         <div className="tkb-toolbar">
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#00236f", marginLeft: 16 }}>
-              Năm học {yearInfo.tenNamHoc} - Học kỳ {yearInfo.hocKy === 1 ? 'I' : 'II'}
-            </span>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginLeft: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Năm học:</label>
+              <select
+                value={yearInfo.tenNamHoc}
+                onChange={(e) => {
+                  const newYear = e.target.value;
+                  const yearObj = namHocList.find(y => y.tenNamHoc === newYear) || null;
+                  let newHk = 1;
+                  if (yearObj?.ngayBatDauHk2 && new Date().toISOString().slice(0, 10) >= yearObj.ngayBatDauHk2) {
+                    newHk = 2;
+                  }
+                  setYearInfo({ tenNamHoc: newYear, hocKy: newHk, activeYearObj: yearObj });
+                  setSelectedTuan(getDefaultTuan(yearObj?.ngayBatDauHk1));
+                }}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#00236f",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  backgroundColor: "#ffffff",
+                  cursor: "pointer",
+                  outline: "none"
+                }}
+              >
+                {namHocList.map((y) => (
+                  <option key={y.tenNamHoc} value={y.tenNamHoc}>
+                    {y.tenNamHoc}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Học kỳ:</label>
+              <select
+                value={yearInfo.hocKy}
+                onChange={(e) => {
+                  setYearInfo(prev => ({ ...prev, hocKy: Number(e.target.value) }));
+                }}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#00236f",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  backgroundColor: "#ffffff",
+                  cursor: "pointer",
+                  outline: "none"
+                }}
+              >
+                <option value={1}>Học kỳ 1</option>
+                <option value={2}>Học kỳ 2</option>
+              </select>
+            </div>
           </div>
           <div className="tkb-toolbar-center">
             {FILTER_OPTIONS.map((opt) => (

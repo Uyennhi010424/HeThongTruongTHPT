@@ -7,6 +7,8 @@ interface DashboardState {
   isLoading: boolean;
   isRefreshing: boolean;
   error: string | null;
+  isMenuOpen: boolean;
+  setIsMenuOpen: (open: boolean) => void;
   fetchData: () => Promise<void>;
   refreshData: () => Promise<void>;
   clearData: () => void;
@@ -17,6 +19,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   isLoading: false,
   isRefreshing: false,
   error: null,
+  isMenuOpen: false,
+  setIsMenuOpen: (open: boolean) => set({ isMenuOpen: open }),
 
   fetchData: async () => {
     // Only show loading if we don't have data yet
@@ -41,5 +45,5 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  clearData: () => set({ data: null, error: null, isLoading: false, isRefreshing: false }),
+  clearData: () => set({ data: null, error: null, isLoading: false, isRefreshing: false, isMenuOpen: false }),
 }));
