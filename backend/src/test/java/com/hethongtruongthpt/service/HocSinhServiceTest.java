@@ -4,11 +4,9 @@ import com.hethongtruongthpt.entity.HocSinh;
 import com.hethongtruongthpt.entity.LopHoc;
 import com.hethongtruongthpt.entity.User;
 import com.hethongtruongthpt.enums.RoleEnum;
+import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
-import com.hethongtruongthpt.repository.HocSinhRepository;
-import com.hethongtruongthpt.repository.LopHocRepository;
-import com.hethongtruongthpt.repository.PhuHuynhHocSinhRepository;
-import com.hethongtruongthpt.repository.UserRepository;
+import com.hethongtruongthpt.repository.*;
 import com.hethongtruongthpt.util.DefaultAccountPasswordPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +16,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("HocSinhService")
 @SuppressWarnings("null")
 class HocSinhServiceTest {
@@ -47,10 +52,22 @@ class HocSinhServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
+    private PhuHuynhRepository phuHuynhRepository;
+
+    @Mock
     private PhuHuynhHocSinhRepository phuHuynhHocSinhRepository;
 
     @Mock
+    private LichSuHocTapRepository lichSuHocTapRepository;
+
+    @Mock
     private DefaultAccountPasswordPolicy passwordPolicy;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
 
     @InjectMocks
     private HocSinhService hocSinhService;
@@ -61,6 +78,9 @@ class HocSinhServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
+        when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+
         sampleLop = new LopHoc();
         sampleLop.setId(1);
         sampleLop.setTenLop("10A1");
@@ -92,9 +112,8 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should return all hoc sinh")
         void returnsAll() {
-            when(hocSinhRepository.findAll()).thenReturn(List.of(sampleHocSinh));
-            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
-                    .thenReturn(List.of());
+            when(hocSinhRepository.findAllWithLop()).thenReturn(List.of(sampleHocSinh));
+            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList())).thenReturn(List.of());
 
             List<HocSinh> result = hocSinhService.getAll();
 
@@ -109,9 +128,8 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should return hoc sinh when found")
         void returnsWhenFound() {
-            when(hocSinhRepository.findById(1)).thenReturn(Optional.of(sampleHocSinh));
-            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
-                    .thenReturn(List.of());
+            when(hocSinhRepository.findByIdWithLop(1)).thenReturn(Optional.of(sampleHocSinh));
+            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList())).thenReturn(List.of());
 
             HocSinh result = hocSinhService.getById(1);
 
@@ -121,7 +139,7 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should throw when not found")
         void throwsWhenNotFound() {
-            when(hocSinhRepository.findById(99)).thenReturn(Optional.empty());
+            when(hocSinhRepository.findByIdWithLop(99)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> hocSinhService.getById(99))
                     .isInstanceOf(ResourceNotFoundException.class);
@@ -172,7 +190,7 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should return list by lop id")
         void returnsByLopId() {
-            when(hocSinhRepository.findByLopId(1)).thenReturn(List.of(sampleHocSinh));
+            when(hocSinhRepository.findByLopIdAndTrangThai(1, 1)).thenReturn(List.of(sampleHocSinh));
             when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
                     .thenReturn(List.of());
 
@@ -226,7 +244,8 @@ class HocSinhServiceTest {
             newHs.setLop(lopRef);
 
             when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
-            when(hocSinhRepository.countByLopId(1)).thenReturn(10L);
+            when(hocSinhRepository.findActiveDuplicateInClass(anyString(), any(LocalDate.class), anyInt()))
+                    .thenReturn(List.of());
             when(passwordPolicy.getStudentDefaultPassword()).thenReturn("Abc1234@");
             when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
             when(passwordEncoder.encode(anyString())).thenReturn("encodedPwd");
@@ -242,8 +261,7 @@ class HocSinhServiceTest {
                 return hs;
             });
             when(hocSinhRepository.findById(50)).thenReturn(Optional.of(sampleHocSinh));
-            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
-                    .thenReturn(List.of());
+            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList())).thenReturn(List.of());
 
             HocSinh result = hocSinhService.create(newHs);
 
@@ -278,12 +296,46 @@ class HocSinhServiceTest {
         }
 
         @Test
-        @DisplayName("siSo is auto-synced (no capacity limit)")
-        void siSoAutoSynced() {
-            // siSo giờ là sĩ số thực tế, không phải giới hạn
-            // Nên hoc sinh vẫn được tạo ngay cả khi siSo = currentCount
-            assertThat(sampleLop.getSiSo()).isEqualTo(40);
-            // Không còn throw exception khi lớp "đầy"
+        @DisplayName("should throw when duplicate student in same class")
+        void throwsWhenDuplicateStudentInSameClass() {
+            HocSinh newHs = new HocSinh();
+            newHs.setHoTen("Nguyen Van A");
+            newHs.setNgaySinh(LocalDate.of(2008, 1, 15));
+            newHs.setGioiTinh("NAM");
+            newHs.setNamNhapHoc(2024);
+            LopHoc lopRef = new LopHoc();
+            lopRef.setId(1);
+            newHs.setLop(lopRef);
+
+            when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
+            when(hocSinhRepository.findActiveDuplicateInClass(eq("Nguyen Van A"), eq(LocalDate.of(2008, 1, 15)), eq(1)))
+                    .thenReturn(List.of(sampleHocSinh));
+
+            assertThatThrownBy(() -> hocSinhService.create(newHs))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("đã tồn tại trong lớp");
+        }
+
+        @Test
+        @DisplayName("should throw when duplicate ma bhyt")
+        void throwsWhenDuplicateMaBhyt() {
+            HocSinh newHs = new HocSinh();
+            newHs.setHoTen("Tran Thi C");
+            newHs.setNgaySinh(LocalDate.of(2008, 5, 20));
+            newHs.setGioiTinh("NU");
+            newHs.setNamNhapHoc(2024);
+            newHs.setMaBhyt("BHYT123456");
+            LopHoc lopRef = new LopHoc();
+            lopRef.setId(1);
+            newHs.setLop(lopRef);
+
+            when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
+            when(hocSinhRepository.findByMaBhytActive("BHYT123456"))
+                    .thenReturn(List.of(sampleHocSinh));
+
+            assertThatThrownBy(() -> hocSinhService.create(newHs))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("Mã BHYT");
         }
     }
 
@@ -293,9 +345,8 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should update existing hoc sinh")
         void updatesExisting() {
-            when(hocSinhRepository.findById(1)).thenReturn(Optional.of(sampleHocSinh));
-            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
-                    .thenReturn(List.of());
+            when(hocSinhRepository.findByIdWithLop(1)).thenReturn(Optional.of(sampleHocSinh));
+            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList())).thenReturn(List.of());
             when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
             when(hocSinhRepository.save(any(HocSinh.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -317,7 +368,7 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should throw when updating non-existent")
         void throwsWhenNotFound() {
-            when(hocSinhRepository.findById(99)).thenReturn(Optional.empty());
+            when(hocSinhRepository.findByIdWithLop(99)).thenReturn(Optional.empty());
 
             HocSinh updated = new HocSinh();
             updated.setHoTen("Test");
@@ -335,9 +386,8 @@ class HocSinhServiceTest {
             existing.setLop(sampleLop);
             existing.setUser(sampleUser);
 
-            when(hocSinhRepository.findById(1)).thenReturn(Optional.of(existing));
-            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
-                    .thenReturn(List.of());
+            when(hocSinhRepository.findByIdWithLop(1)).thenReturn(Optional.of(existing));
+            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList())).thenReturn(List.of());
             when(hocSinhRepository.save(any(HocSinh.class))).thenAnswer(inv -> inv.getArgument(0));
 
             HocSinh updated = new HocSinh();
@@ -357,9 +407,8 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should soft delete by setting trang thai to 0")
         void softDeletes() {
-            when(hocSinhRepository.findById(1)).thenReturn(Optional.of(sampleHocSinh));
-            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
-                    .thenReturn(List.of());
+            when(hocSinhRepository.findByIdWithLop(1)).thenReturn(Optional.of(sampleHocSinh));
+            when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList())).thenReturn(List.of());
             when(hocSinhRepository.save(any(HocSinh.class))).thenAnswer(inv -> inv.getArgument(0));
 
             hocSinhService.delete(1);
@@ -370,7 +419,7 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should throw when deleting non-existent")
         void throwsWhenNotFound() {
-            when(hocSinhRepository.findById(99)).thenReturn(Optional.empty());
+            when(hocSinhRepository.findByIdWithLop(99)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> hocSinhService.delete(99))
                     .isInstanceOf(ResourceNotFoundException.class);

@@ -17,8 +17,7 @@ export default function HocSinhExcelImportModal({ hooks }) {
     >
       <div className="excel-import-wrap">
         <div className="table-meta">
-          Dùng đúng biểu mẫu Việt hóa. Cột bắt buộc: Họ tên, Lớp. Các cột ID học bạ /
-          ID dân tộc / ID phụ huynh sẽ mặc định là 1 nếu để trống.
+          Dùng đúng biểu mẫu Việt hóa. Cột bắt buộc: Họ tên, Lớp. Hệ thống tự động kiểm tra và bỏ qua học sinh đã tồn tại trong lớp (trùng Họ tên &amp; Ngày sinh) để chống nhân đôi dữ liệu.
         </div>
 
         <div className="excel-actions">

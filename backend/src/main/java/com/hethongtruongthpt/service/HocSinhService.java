@@ -564,6 +564,33 @@ public class HocSinhService {
                 throw new ApiException("Độ tuổi " + age + " không phù hợp với Khối " + khoi + " (Năm sinh: " + hocSinh.getNgaySinh().getYear() + ", Năm hiện tại: " + currentYear + ")");
             }
         }
+
+        // Kiểm tra trùng lặp học sinh (Họ tên + Ngày sinh + Lớp)
+        if (hocSinh.getHoTen() != null && !hocSinh.getHoTen().isBlank()
+                && hocSinh.getNgaySinh() != null
+                && lop != null && lop.getId() != null) {
+            String trimmedName = hocSinh.getHoTen().trim();
+            List<HocSinh> dupes = hocSinhRepository.findActiveDuplicateInClass(trimmedName, hocSinh.getNgaySinh(), lop.getId());
+            for (HocSinh dupe : dupes) {
+                if (hocSinh.getId() == null || !hocSinh.getId().equals(dupe.getId())) {
+                    String className = (lop.getTenLop() != null && !lop.getTenLop().isBlank()) ? lop.getTenLop() : String.valueOf(lop.getId());
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                    String formattedDate = hocSinh.getNgaySinh().format(formatter);
+                    throw new ApiException("Học sinh '" + trimmedName + "' (sinh ngày " + formattedDate + ") đã tồn tại trong lớp " + className + "!");
+                }
+            }
+        }
+
+        // Kiểm tra trùng lặp Mã BHYT nếu có
+        if (hocSinh.getMaBhyt() != null && !hocSinh.getMaBhyt().isBlank()) {
+            String trimmedBhyt = hocSinh.getMaBhyt().trim();
+            List<HocSinh> bhytDupes = hocSinhRepository.findByMaBhytActive(trimmedBhyt);
+            for (HocSinh dupe : bhytDupes) {
+                if (hocSinh.getId() == null || !hocSinh.getId().equals(dupe.getId())) {
+                    throw new ApiException("Mã BHYT '" + trimmedBhyt + "' đã được sử dụng bởi học sinh '" + dupe.getHoTen() + "'!");
+                }
+            }
+        }
     }
 
     @Transactional

@@ -36,7 +36,9 @@ import {
   normalizeDateCell,
   formatDateInput,
   getStudentStatus,
-  validateStudentAgeAndYear
+  validateStudentAgeAndYear,
+  createStudentDuplicateKey,
+  isDuplicateStudent
 } from "./hocSinhUtils.js";
 
 
@@ -1134,6 +1136,9 @@ export function useHocSinhList() {
       const isMultiSheet = workbook.SheetNames.length > 1;
 
       // PRE-VALIDATION PASS
+      const seenInFileMap = new Map(); // key -> rowLabel
+      const fileDuplicates = [];
+
       for (const item of allCollectedRows) {
         const { row, rowNumber, sheetName } = item;
         const rowLabel = isMultiSheet ? `[${sheetName}] Dòng ${rowNumber}` : `Dòng ${rowNumber}`;
@@ -1169,6 +1174,18 @@ export function useHocSinhList() {
         if (ageError) {
           failedRows.push(`${rowLabel}: ${ageError}`);
         }
+
+        // Kiểm tra trùng lặp nội bộ trong file Excel
+        const fileKey = createStudentDuplicateKey(fullName, ngaySinhNormalized, classMatch.id);
+        if (seenInFileMap.has(fileKey)) {
+          fileDuplicates.push(`${rowLabel} trùng học sinh '${fullName}' (${ngaySinhNormalized || "không có ngày sinh"}) với ${seenInFileMap.get(fileKey)}`);
+        } else {
+          seenInFileMap.set(fileKey, rowLabel);
+        }
+      }
+
+      if (fileDuplicates.length > 0) {
+        failedRows.push(...fileDuplicates);
       }
 
       if (failedRows.length > 0) {
@@ -1179,6 +1196,9 @@ export function useHocSinhList() {
       }
 
       // EXECUTION PASS
+      let skippedDuplicatesCount = 0;
+      const skippedNames = [];
+
       for (const item of allCollectedRows) {
         const { row, rowNumber, sheetName } = item;
         const rowLabel = isMultiSheet ? `[${sheetName}] Dòng ${rowNumber}` : `Dòng ${rowNumber}`;
@@ -1200,8 +1220,25 @@ export function useHocSinhList() {
           findColumnValue(row, EXCEL_FIELD_ALIASES.hoTen) || ""
         ).trim();
 
-        // Không cần kiểm tra fullName và classMatch vì PRE-VALIDATION đã bắt lỗi
+        const ngaySinhRaw = findColumnValue(row, EXCEL_FIELD_ALIASES.ngaySinh);
+        const ngaySinhNormalized = normalizeDateCell(ngaySinhRaw);
+        const maBhyt = String(findColumnValue(row, EXCEL_FIELD_ALIASES.maBhyt) || "").trim() || null;
 
+        // ✅ BỎ QUA HỌC SINH ĐÃ TỒN TẠI TRONG DATABASE
+        const candidateStudent = {
+          hoTen: fullName,
+          ngaySinh: ngaySinhNormalized,
+          lopId: classMatch.id,
+          maBhyt: maBhyt
+        };
+
+        if (isDuplicateStudent(candidateStudent, students)) {
+          skippedDuplicatesCount += 1;
+          if (skippedNames.length < 5) {
+            skippedNames.push(fullName);
+          }
+          continue; // Bỏ qua học sinh này, không tạo trùng
+        }
 
         const hocBaId =
           parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.hocBaId)) ?? 1;
@@ -1318,10 +1355,6 @@ export function useHocSinhList() {
           phuHuynhId = parents[0]?.id ? Number(parents[0].id) : 1;
         }
 
-        // ✅ FIX: Dùng normalizeDateCell đã được fix để xử lý Date object
-        const ngaySinhRaw = findColumnValue(row, EXCEL_FIELD_ALIASES.ngaySinh);
-        const ngaySinhNormalized = normalizeDateCell(ngaySinhRaw);
-
         const payload = {
           hoTen: fullName,
           ngaySinh: ngaySinhNormalized,
@@ -1343,8 +1376,7 @@ export function useHocSinhList() {
           namNhapHoc: parseNullableNumber(
             findColumnValue(row, EXCEL_FIELD_ALIASES.namNhapHoc)
           ),
-          maBhyt:
-            String(findColumnValue(row, EXCEL_FIELD_ALIASES.maBhyt) || "").trim() || null,
+          maBhyt: maBhyt,
           tonGiao: null,
           dienChinhSach: parseBoolean(
             findColumnValue(row, EXCEL_FIELD_ALIASES.dienChinhSach),
@@ -1374,9 +1406,17 @@ export function useHocSinhList() {
 
       if (failedRows.length) {
         setExcelError(
-          `Nhập thành công ${createdStudents.length}/${totalNonEmptyRows || 0}. ${failedRows
+          `Nhập thành công ${createdStudents.length}/${totalNonEmptyRows || 0}${skippedDuplicatesCount ? ` (Đã bỏ qua ${skippedDuplicatesCount} học sinh trùng)` : ""}. ${failedRows
             .slice(0, 3)
             .join(" | ")}`
+        );
+      } else if (skippedDuplicatesCount > 0 && createdStudents.length === 0) {
+        setExcelError(
+          `Học sinh đã tồn tại trong hệ thống (toàn bộ ${skippedDuplicatesCount} học sinh đều đã có sẵn).`
+        );
+      } else if (skippedDuplicatesCount > 0) {
+        setExcelSuccess(
+          `Đã nhập thành công ${createdStudents.length} học sinh mới. Đã bỏ qua ${skippedDuplicatesCount} học sinh đã tồn tại.`
         );
       } else {
         setExcelSuccess(

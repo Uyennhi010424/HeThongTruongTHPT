@@ -26,6 +26,12 @@ public interface HocSinhRepository extends JpaRepository<HocSinh, Integer> {
     @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l WHERE h.namNhapHoc = :namNhapHoc")
     List<HocSinh> findByNamNhapHoc(@Param("namNhapHoc") Integer namNhapHoc);
 
+    @Query("SELECT h FROM HocSinh h WHERE LOWER(TRIM(h.hoTen)) = LOWER(TRIM(:hoTen)) AND h.ngaySinh = :ngaySinh AND h.lop.id = :lopId AND (h.trangThai IS NULL OR h.trangThai = 1)")
+    List<HocSinh> findActiveDuplicateInClass(@Param("hoTen") String hoTen, @Param("ngaySinh") java.time.LocalDate ngaySinh, @Param("lopId") Integer lopId);
+
+    @Query("SELECT h FROM HocSinh h WHERE h.maBhyt = :maBhyt AND (h.trangThai IS NULL OR h.trangThai = 1)")
+    List<HocSinh> findByMaBhytActive(@Param("maBhyt") String maBhyt);
+
     @Query("SELECT h FROM HocSinh h LEFT JOIN FETCH h.lop l LEFT JOIN FETCH l.gvcn g")
     List<HocSinh> findAllWithLop();
     

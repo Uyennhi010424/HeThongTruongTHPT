@@ -152,6 +152,44 @@ export const compareClassesByName = (a, b) => {
   return Number(a?.id || 0) - Number(b?.id || 0);
 };
 
+/**
+ * Tạo unique key để nhận diện học sinh: họ tên chuẩn hóa + ngày sinh + lớp ID
+ */
+export const createStudentDuplicateKey = (hoTen, ngaySinh, lopId) => {
+  const normName = normalizeStrict(hoTen || "");
+  const normDate = normalizeDateCell(ngaySinh) || "";
+  const classId = lopId ? String(lopId) : "";
+  return `${normName}|${normDate}|${classId}`;
+};
+
+/**
+ * Kiểm tra xem học sinh có bị trùng với danh sách học sinh hiện có trong lớp không
+ */
+export const isDuplicateStudent = (candidate, existingStudents = []) => {
+  if (!candidate || !candidate.hoTen || !candidate.ngaySinh) return false;
+  const candidateLopId = candidate.lopId || candidate.lop?.id;
+  const candidateKey = createStudentDuplicateKey(candidate.hoTen, candidate.ngaySinh, candidateLopId);
+  const candidateBhyt = candidate.maBhyt ? String(candidate.maBhyt).trim().toLowerCase() : "";
+
+  return existingStudents.some((s) => {
+    // Chỉ đối chiếu với học sinh đang học (active: trangThai = 1)
+    const status = Number(s?.trangThai ?? s?.trang_thai ?? 1);
+    if (status !== 1) return false;
+
+    // Trùng theo Họ tên + Ngày sinh + Lớp
+    const sLopId = s?.lop?.id || s?.lopHoc?.id || s?.lopId;
+    const sKey = createStudentDuplicateKey(s?.hoTen, s?.ngaySinh, sLopId);
+    if (candidateKey && sKey && candidateKey === sKey) return true;
+
+    // Trùng theo Mã BHYT (nếu có)
+    if (candidateBhyt && s?.maBhyt && String(s.maBhyt).trim().toLowerCase() === candidateBhyt) {
+      return true;
+    }
+
+    return false;
+  });
+};
+
 export const validateStudentAgeAndYear = (ngaySinh, namNhapHoc, khoi) => {
   const currentYear = new Date().getFullYear();
   let error = null;
