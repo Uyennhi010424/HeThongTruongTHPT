@@ -1,8 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, Modal, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Calendar as CalendarIcon, AlertCircle, CheckCircle2, XCircle, ChevronDown, Check } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { 
+  Calendar as CalendarIcon, 
+  AlertCircle, 
+  CheckCircle2, 
+  XCircle, 
+  ChevronDown, 
+  Check, 
+  FileText, 
+  User 
+} from 'lucide-react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import axiosClient from '../../api/axiosClient';
 import { useDashboardStore } from '../../store/useDashboardStore';
 
@@ -19,11 +27,45 @@ interface AttendanceStats {
   }>;
 }
 
+const formatConduct = (val: string) => {
+  if (val === 'TOT') return 'Tốt';
+  if (val === 'KHA') return 'Khá';
+  if (val === 'TRUNG_BINH') return 'Trung bình';
+  if (val === 'YEU') return 'Yếu';
+  return val || '--';
+};
+
+const getConductBadgeStyle = (val: string) => {
+  switch (val) {
+    case 'TOT':
+      return { color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
+    case 'KHA':
+      return { color: '#2563eb', bg: '#dbeafe', border: '#bfdbfe' };
+    case 'TRUNG_BINH':
+      return { color: '#d97706', bg: '#fef3c7', border: '#fde68a' };
+    case 'YEU':
+      return { color: '#dc2626', bg: '#fee2e2', border: '#fecaca' };
+    default:
+      return { color: '#64748b', bg: '#f1f5f9', border: '#e2e8f0' };
+  }
+};
+
 export default function AttendanceScreen() {
   const router = useRouter();
-  const { data } = useDashboardStore();
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const { data, refreshData } = useDashboardStore();
   const student = data?.student;
   const allScores = data?.scores || [];
+
+  const [activeTab, setActiveTab] = useState<'DIEM_DANH' | 'HANH_KIEM'>(
+    params.tab === 'hanhkiem' ? 'HANH_KIEM' : 'DIEM_DANH'
+  );
+
+  useEffect(() => {
+    if (params.tab === 'hanhkiem') {
+      setActiveTab('HANH_KIEM');
+    }
+  }, [params.tab]);
 
   const currentStudentNamHoc = data?.student?.lop?.namHoc || '2025-2026';
 
@@ -95,9 +137,13 @@ export default function AttendanceScreen() {
     }
   }, [student?.id, selectedYear]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchAttendance(selectedYear);
+    await Promise.all([
+      fetchAttendance(selectedYear),
+      refreshData()
+    ]);
+    setRefreshing(false);
   };
 
   const formatDate = (dateString: string) => {
@@ -105,6 +151,32 @@ export default function AttendanceScreen() {
     const [y, m, d] = dateString.split('-');
     return `${d}/${m}/${y}`;
   };
+
+  const groupedConducts = useMemo(() => {
+    const conducts = data?.conducts || [];
+    if (!conducts || conducts.length === 0) return [];
+
+    const groups: Record<string, any[]> = {};
+
+    conducts.forEach((record: any) => {
+      const yearName =
+        record.namHoc?.tenNamHoc ||
+        record.tenNamHoc ||
+        (typeof record.namHoc === 'string' ? record.namHoc : '') ||
+        'Năm học hiện tại';
+      if (!groups[yearName]) {
+        groups[yearName] = [];
+      }
+      groups[yearName].push(record);
+    });
+
+    const sortedYears = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+    return sortedYears.map((year) => ({
+      year,
+      records: groups[year].sort((a: any, b: any) => Number(b.hocKy || 0) - Number(a.hocKy || 0)),
+    }));
+  }, [data?.conducts]);
 
   const renderStatsCard = () => {
     if (!stats) return null;
@@ -182,9 +254,108 @@ export default function AttendanceScreen() {
     );
   };
 
+  const renderConductTab = () => {
+    return (
+      <View style={styles.conductWrapper}>
+        {groupedConducts.length === 0 ? (
+          <View style={styles.emptyConductContainer}>
+            <FileText size={48} color="#94A3B8" />
+            <Text style={styles.emptyConductTitle}>Chưa có dữ liệu đánh giá hạnh kiểm</Text>
+            <Text style={styles.emptyConductDesc}>
+              Kết quả hạnh kiểm sẽ được giáo viên chủ nhiệm cập nhật sau mỗi đợt sơ kết học kỳ hoặc tổng kết năm học.
+            </Text>
+          </View>
+        ) : (
+          groupedConducts.map((group) => (
+            <View key={group.year} style={styles.yearSection}>
+              <View style={styles.yearHeader}>
+                <View style={styles.yearHeaderLeft}>
+                  <CalendarIcon size={18} color="#1D4ED8" />
+                  <Text style={styles.yearTitle}>Năm học {group.year}</Text>
+                </View>
+                <View style={styles.yearBadge}>
+                  <Text style={styles.yearBadgeText}>{group.records.length} kỳ đánh giá</Text>
+                </View>
+              </View>
+
+              {group.records.map((record: any) => {
+                const badgeStyle = getConductBadgeStyle(record.xepLoai);
+                return (
+                  <View key={record.id || `${group.year}-${record.hocKy}`} style={styles.conductCard}>
+                    <View style={styles.conductCardHeader}>
+                      <View style={styles.semesterBox}>
+                        <Text style={styles.semesterTitle}>
+                          {record.hocKy ? `Học kỳ ${record.hocKy}` : 'Cả năm'}
+                        </Text>
+                        {record.ngayDanhGia && (
+                          <Text style={styles.dateText}>
+                            {new Date(record.ngayDanhGia).toLocaleDateString('vi-VN')}
+                          </Text>
+                        )}
+                      </View>
+                      <View
+                        style={[
+                          styles.badge,
+                          {
+                            backgroundColor: badgeStyle.bg,
+                            borderColor: badgeStyle.border,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.badgeText, { color: badgeStyle.color }]}>
+                          {formatConduct(record.xepLoai)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.conductCardBody}>
+                      <Text style={styles.commentLabel}>Nhận xét của giáo viên:</Text>
+                      <Text style={styles.contentText}>
+                        {record.nhanXet && record.nhanXet.trim() !== ''
+                          ? record.nhanXet
+                          : 'Chưa có nhận xét chi tiết.'}
+                      </Text>
+
+                      {record.giaoVien && (
+                        <View style={styles.teacherRow}>
+                          <User size={14} color="#64748B" />
+                          <Text style={styles.teacherText}>
+                            GV đánh giá: <Text style={{ fontWeight: '600', color: '#334155' }}>{record.giaoVien.hoTen}</Text>
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ))
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* Year Selection Modal */}
+      <View style={styles.topTabs}>
+        <TouchableOpacity
+          style={[styles.topTabBtn, activeTab === 'DIEM_DANH' && styles.topTabBtnActive]}
+          onPress={() => setActiveTab('DIEM_DANH')}
+        >
+          <Text style={[styles.topTabText, activeTab === 'DIEM_DANH' && styles.topTabTextActive]}>
+            Điểm danh
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.topTabBtn, activeTab === 'HANH_KIEM' && styles.topTabBtnActive]}
+          onPress={() => setActiveTab('HANH_KIEM')}
+        >
+          <Text style={[styles.topTabText, activeTab === 'HANH_KIEM' && styles.topTabTextActive]}>
+            Hạnh kiểm
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <Modal visible={showYearModal} transparent={true} animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setShowYearModal(false)}>
           <View style={styles.modalContent}>
@@ -225,20 +396,26 @@ export default function AttendanceScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />
           }
         >
-          {/* Year Selector */}
-          <View style={styles.filterWrapper}>
-            <TouchableOpacity 
-              style={styles.yearSelectorBtn} 
-              onPress={() => setShowYearModal(true)}
-              activeOpacity={0.8}
-            >
-              <CalendarIcon size={18} color="#2563EB" />
-              <Text style={styles.yearSelectorText}>Năm học: {selectedYear}</Text>
-            </TouchableOpacity>
-          </View>
+          {activeTab === 'DIEM_DANH' ? (
+            <>
+              <View style={styles.filterWrapper}>
+                <TouchableOpacity 
+                  style={styles.yearSelectorBtn} 
+                  onPress={() => setShowYearModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <CalendarIcon size={18} color="#2563EB" />
+                  <Text style={styles.yearSelectorText}>Năm học: {selectedYear}</Text>
+                  <ChevronDown size={16} color="#64748B" style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+              </View>
 
-          {renderStatsCard()}
-          {renderHistoryList()}
+              {renderStatsCard()}
+              {renderHistoryList()}
+            </>
+          ) : (
+            renderConductTab()
+          )}
         </ScrollView>
       )}
     </View>
@@ -250,25 +427,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
+  topTabs: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
     backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  backBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+  topTabBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  headerTitle: {
-    fontSize: 18,
+  topTabBtnActive: {
+    borderBottomColor: '#2563EB',
+  },
+  topTabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  topTabTextActive: {
+    color: '#2563EB',
     fontWeight: 'bold',
-    color: '#0F172A',
   },
   centerContainer: {
     flex: 1,
@@ -301,137 +484,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  statsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2,
-    marginBottom: 24,
-  },
-  statsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  titleWrapper: {
-    flex: 1,
-    marginRight: 12,
-  },
-  statsTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#0F172A',
-  },
-  statsSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  statBox: {
-    flex: 1,
-    minWidth: '40%',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statDesc: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#10B981',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyDesc: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  historyContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0F172A',
-    marginBottom: 16,
-  },
-  historyItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  historyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  historyContent: {
-    flex: 1,
-  },
-  historyDate: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  historyType: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  historyNote: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 18,
-  },
   filterWrapper: {
     marginBottom: 16,
   },
@@ -455,6 +507,275 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E3A8A',
     marginLeft: 8,
+  },
+  statsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  titleWrapper: {
+    flex: 1,
+  },
+  statsTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  statsSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statBox: {
+    flex: 1,
+    minWidth: '40%',
+    alignItems: 'center',
+    padding: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  statDesc: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 36,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#10B981',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  emptyDesc: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  historyContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  historyTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 14,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  historyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyDate: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 3,
+  },
+  historyType: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  historyNote: {
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18,
+  },
+  conductWrapper: {
+    flex: 1,
+  },
+  yearSection: {
+    marginBottom: 16,
+  },
+  yearHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  yearHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  yearTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E3A8A',
+  },
+  yearBadge: {
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  yearBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3730A3',
+  },
+  conductCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  conductCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  semesterBox: {
+    flexDirection: 'column',
+  },
+  semesterTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  conductCardBody: {
+    padding: 16,
+  },
+  commentLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  contentText: {
+    fontSize: 14,
+    color: '#1E293B',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  teacherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  teacherText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  emptyConductContainer: {
+    padding: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyConductTitle: {
+    marginTop: 14,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+  },
+  emptyConductDesc: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 19,
+    maxWidth: 290,
   },
   modalOverlay: {
     flex: 1,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, BookOpen, Calendar as CalendarIcon, ChevronDown, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { User, BookOpen, Calendar as CalendarIcon, ChevronDown, Check, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { getTimetableByDate } from '../../api/studentDashboardApi';
@@ -179,31 +179,40 @@ export default function CalendarScreen() {
 
   const isExamWeek = isDateInExamWeek(currentDate);
 
-  const renderClassItem = (item: any, index: number) => (
-    <View key={index} style={styles.classCard}>
-      <View style={styles.classTimeCol}>
-        <Text style={styles.tietText}>
-          Tiết {item.tietBatDau}{item.soTiet > 1 ? ` - ${item.tietBatDau + item.soTiet - 1}` : ''}
-        </Text>
-        <Text style={styles.timeText}>{getTietTimeStr(item.tietBatDau, item.soTiet || 1)}</Text>
-      </View>
-      <View style={styles.divider} />
-      <View style={styles.classInfoCol}>
-        <Text style={styles.subjectName}>{item.monHoc?.tenMon || item.monHoc?.tenMonHoc}</Text>
-        <View style={styles.detailRow}>
-          <User size={16} color="#64748B" />
-          <Text style={styles.detailText}>GV: {item.giaoVien?.hoTen}</Text>
+  const renderClassItem = (item: any, index: number) => {
+    const rawRoom = data?.student?.lop?.tenLop || item.lop?.tenLop || item.phongHoc || '';
+    const room = rawRoom.replace(/^Phòng\s*/i, '').replace(/^P\.\s*/i, '') || 'Chưa xếp';
+
+    return (
+      <View key={index} style={styles.classCard}>
+        <View style={styles.classTimeCol}>
+          <Text style={styles.tietText}>
+            Tiết {item.tietBatDau}{item.soTiet > 1 ? ` - ${item.tietBatDau + item.soTiet - 1}` : ''}
+          </Text>
+          <Text style={styles.timeText}>{getTietTimeStr(item.tietBatDau, item.soTiet || 1)}</Text>
         </View>
-        {item.ghiChu ? (
-          <View style={[styles.detailRow, { marginTop: 4 }]}>
-            <Text style={{ fontSize: 12, color: '#D97706', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>
-              📝 {item.ghiChu}
-            </Text>
+        <View style={styles.divider} />
+        <View style={styles.classInfoCol}>
+          <Text style={styles.subjectName}>{item.monHoc?.tenMon || item.monHoc?.tenMonHoc}</Text>
+          <View style={styles.detailRow}>
+            <User size={16} color="#64748B" />
+            <Text style={styles.detailText}>GV: {item.giaoVien?.hoTen || 'Đang cập nhật'}</Text>
           </View>
-        ) : null}
+          <View style={styles.detailRow}>
+            <MapPin size={16} color="#64748B" />
+            <Text style={styles.detailText}>Phòng: {room}</Text>
+          </View>
+          {item.ghiChu ? (
+            <View style={[styles.detailRow, { marginTop: 4 }]}>
+              <Text style={{ fontSize: 12, color: '#D97706', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }}>
+                📝 {item.ghiChu}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderNgàyView = () => {
     const todayClasses = isExamWeek

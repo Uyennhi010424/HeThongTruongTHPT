@@ -370,3 +370,30 @@ export const formatDate = (value) => {
   });
 };
 
+export const formatHocLuc = (val) => {
+  if (!val) return "--";
+  const str = String(val).toUpperCase();
+  if (str === "TOT") return "Tốt";
+  if (str === "GIOI") return "Giỏi";
+  if (str === "KHA") return "Khá";
+  if (str === "DAT") return "Đạt";
+  if (str === "TRUNG_BINH" || str === "TB") return "Trung bình";
+  if (str === "CHUA_DAT") return "Chưa đạt";
+  if (str === "YEU") return "Yếu";
+  if (str === "KEM") return "Kém";
+  return val;
+};
+
+export const formatHanhKiem = (val) => {
+  if (!val) return "--";
+  const str = String(val).toUpperCase();
+  if (str === "TOT") return "Tốt";
+  if (str === "KHA") return "Khá";
+  if (str === "DAT") return "Đạt";
+  if (str === "TRUNG_BINH" || str === "TB") return "Trung bình";
+  if (str === "CHUA_DAT") return "Chưa đạt";
+  if (str === "YEU") return "Yếu";
+  return val;
+};
+
+

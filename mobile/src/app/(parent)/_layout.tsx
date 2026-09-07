@@ -35,12 +35,27 @@ export default function ParentLayout() {
   useEffect(() => {
     const fetchChildren = async () => {
       try {
-        if (userData?.phuHuynhId) {
-          const res = await axiosClient.get(`/phuhuynh/${userData.phuHuynhId}/hocsinh`);
+        let parentId = userData?.phuHuynhId;
+        if (!parentId) {
+          const profileRes = await axiosClient.get('/phuhuynh/me');
+          if (profileRes.data?.data?.id) {
+            parentId = profileRes.data.data.id;
+            const updatedUser = { 
+              ...userData, 
+              phuHuynhId: parentId, 
+              id: parentId,
+              username: profileRes.data.data.hoTen || userData?.username 
+            };
+            useAuthStore.setState({ userData: updatedUser as any });
+          }
+        }
+        if (parentId) {
+          const res = await axiosClient.get(`/phuhuynh/${parentId}/hocsinh`);
           if (res.data?.success) {
-            setChildren(res.data.data);
-            if (res.data.data.length > 0 && !selectedChild) {
-              setSelectedChild(res.data.data[0]);
+            const list = res.data.data || [];
+            setChildren(list);
+            if (list.length > 0) {
+              setSelectedChild(list[0]);
             }
           }
         }

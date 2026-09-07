@@ -51,7 +51,7 @@ const WEEK_DAYS = [
 ];
 
 export default function ParentDashboard() {
-  const { selectedChild, dashboardData } = useParentStore();
+  const { children, selectedChild, dashboardData } = useParentStore();
   const router = useRouter();
   const [imgError, setImgError] = useState(false);
 
@@ -137,6 +137,49 @@ export default function ParentDashboard() {
     });
   }, [dashboardData?.timetable, monday, todayThu, isNotStartedYet, showPreview]);
 
+  // Calculate stats
+  const gpa = dashboardData?.gpa ?? '--';
+  const latestConduct = useMemo(() => {
+    const conducts = dashboardData?.conducts || [];
+    if (conducts.length === 0) return '--';
+
+    const now = new Date();
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+    const currentNamHoc = selectedChild?.lop?.namHoc || (curMonth >= 7 ? `${curYear}-${curYear + 1}` : `${curYear - 1}-${curYear}`);
+
+    const currentYearConducts = conducts.filter((c: any) => {
+      const yearStr = c.namHoc?.tenNamHoc || c.namHoc || c.tenNamHoc;
+      return yearStr === currentNamHoc;
+    });
+
+    if (currentYearConducts.length === 0) {
+      return '--';
+    }
+
+    const latest = currentYearConducts.sort((a: any, b: any) => Number(b.hocKy || 0) - Number(a.hocKy || 0))[0];
+    return formatConduct(latest?.xepLoai);
+  }, [dashboardData?.conducts, selectedChild?.lop?.namHoc]);
+
+  if (children.length === 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#f8fafc' }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 8, textAlign: 'center' }}>
+          Chưa có hồ sơ học sinh
+        </Text>
+        <Text style={{ fontSize: 14, color: '#64748b', textAlign: 'center', marginBottom: 24, lineHeight: 20 }}>
+          Tài khoản phụ huynh của bạn hiện chưa được liên kết với học sinh nào trong hệ thống. Vui lòng liên hệ nhà trường để được hỗ trợ.
+        </Text>
+        <TouchableOpacity 
+          onPress={() => useAuthStore.getState().signOut()} 
+          style={{ backgroundColor: '#fee2e2', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 }}
+        >
+          <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>Đăng xuất</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!selectedChild || !dashboardData) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -153,13 +196,6 @@ export default function ParentDashboard() {
   };
 
   const avatarUri = getAvatarUri();
-
-  // Calculate stats
-  const gpa = dashboardData.gpa ?? '--';
-  const latestConduct =
-    dashboardData.conducts && dashboardData.conducts.length > 0
-      ? formatConduct(dashboardData.conducts[dashboardData.conducts.length - 1].xepLoai)
-      : '--';
   const attendance = dashboardData.attendanceStats;
   const absentDays = attendance ? (attendance.vangPhep || 0) + (attendance.vangKhongPhep || 0) : 0;
 
@@ -313,12 +349,16 @@ export default function ParentDashboard() {
                                     <Text style={styles.metaText}>GV: {lesson.giaoVien.hoTen}</Text>
                                   </View>
                                 )}
-                                {lesson.phongHoc && (
-                                  <View style={styles.metaItem}>
-                                    <MapPin size={12} color="#64748b" />
-                                    <Text style={styles.metaText}>P. {lesson.phongHoc}</Text>
-                                  </View>
-                                )}
+                                {(() => {
+                                  const rawRoom = selectedChild?.lop?.tenLop || (lesson as any).lop?.tenLop || lesson.phongHoc || '';
+                                  const room = rawRoom.replace(/^Phòng\s*/i, '').replace(/^P\.\s*/i, '');
+                                  return room ? (
+                                    <View style={styles.metaItem}>
+                                      <MapPin size={12} color="#64748b" />
+                                      <Text style={styles.metaText}>P. {room}</Text>
+                                    </View>
+                                  ) : null;
+                                })()}
                               </View>
                             </View>
                           </View>

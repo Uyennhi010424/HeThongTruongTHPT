@@ -51,6 +51,7 @@ export default function TimetablePage() {
     }
   }, [location.search]);
   const [lopId, setLopId] = useState(null);
+  const [studentClass, setStudentClass] = useState("");
   const [namHocList, setNamHocList] = useState([]);
   const [displayedDate, setDisplayedDate] = useState(new Date());
   const dateInputRef = useRef(null);
@@ -123,6 +124,7 @@ export default function TimetablePage() {
           return;
         }
         setLopId(sLopId);
+        setStudentClass(currentStudent?.lop?.tenLop || "");
 
         const rawYears = namHocRes?.data?.data || [];
         const currentClassYear = currentStudent?.lop?.namHoc;
@@ -363,7 +365,8 @@ export default function TimetablePage() {
   const getSubjectLabel = (item) => item?.monHoc?.tenMon || "--";
   const getClassLabel = (item) => {
     const teacher = item?.giaoVien?.hoTen || "";
-    const room = item?.phongHoc || "";
+    const rawRoom = item?.phongHoc || studentClass || "";
+    const room = rawRoom ? `Phòng ${rawRoom.replace(/^Phòng\s*/i, "").replace(/^P\.\s*/i, "")}` : "";
     if (teacher && room) return `${teacher} · ${room}`;
     return teacher || room || "";
   };

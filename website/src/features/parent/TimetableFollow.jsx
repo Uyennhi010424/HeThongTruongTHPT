@@ -270,7 +270,8 @@ export default function TimetableFollow() {
   const getSubjectLabel = (item) => item?.monHoc?.tenMon || item?.tenMonHoc || "--";
   const getClassLabel = (item) => {
     const teacher = item?.giaoVien?.hoTen || "";
-    const room = item?.phongHoc || "";
+    const rawRoom = item?.phongHoc || currentStudent?.lop?.tenLop || "";
+    const room = rawRoom ? `P. ${rawRoom.replace(/^Phòng\s*/i, "").replace(/^P\.\s*/i, "")}` : "";
     if (teacher && room) return `${teacher} - ${room}`;
     return teacher || room || "";
   };

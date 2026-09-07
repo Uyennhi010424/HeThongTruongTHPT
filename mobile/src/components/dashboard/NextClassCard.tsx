@@ -1,80 +1,65 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Clock, MapPin, ChevronRight, Book, User } from 'lucide-react-native';
-import { DashboardData, TimetableEntry } from '../../models/dashboard.type';
+import { TimetableEntry } from '../../models/dashboard.type';
 import { useRouter } from 'expo-router';
 
 interface NextClassCardProps {
   timetable: TimetableEntry[];
+  studentClass?: string;
 }
 
-export const NextClassCard: React.FC<NextClassCardProps> = ({ timetable }) => {
+const getTietTimeStr = (tietBatDau: number, soTiet: number = 1) => {
+  const times: Record<number, string> = {
+    1: '07:00 - 07:45',
+    2: '07:50 - 08:35',
+    3: '08:50 - 09:35',
+    4: '09:40 - 10:25',
+    5: '10:30 - 11:15',
+    6: '13:00 - 13:45',
+    7: '13:50 - 14:35',
+    8: '14:50 - 15:35',
+    9: '15:40 - 16:25',
+    10: '16:30 - 17:15',
+  };
+  const startStr = times[tietBatDau]?.split(' - ')[0] || '07:00';
+  const endTiet = tietBatDau + Math.max(1, soTiet) - 1;
+  const endStr = times[endTiet]?.split(' - ')[1] || '11:15';
+  return `${startStr} - ${endStr}`;
+};
+
+export const NextClassCard: React.FC<NextClassCardProps> = ({ timetable, studentClass }) => {
   const router = useRouter();
 
-  const nextClass = useMemo(() => {
-    if (!timetable || timetable.length === 0) return null;
-    
+  const { isBeforeStart, todayClasses } = useMemo(() => {
     const now = new Date();
     // Ngày bắt đầu năm học 2026-2027: 07/09/2026
     const schoolStartDate = new Date(2026, 8, 7, 0, 0, 0);
-    if (now.getTime() < schoolStartDate.getTime()) {
-      return 'NOT_STARTED_YET';
+    const beforeStart = now.getTime() < schoolStartDate.getTime();
+
+    // Thu 2 -> 2, Thu 3 -> 3 ... Chu Nhat -> 8
+    let currentDay = now.getDay() + 1; // 0=Sun->1, 1=Mon->2
+    if (currentDay === 1) currentDay = 8;
+
+    if (!timetable || timetable.length === 0) {
+      return {
+        isBeforeStart: beforeStart,
+        todayClasses: [],
+      };
     }
 
-    // Thu 2 -> 2, Thu 3 -> 3. JavaScript getDay(): 0 is Sunday, 1 is Monday.
-    // In our system, Thu might be 2, 3, 4, 5, 6, 7, 8 (Sunday).
-    let currentDay = now.getDay() + 1; // getDay: 0=Sun->1, 1=Mon->2. So Sun is 1, Mon is 2.
-    if (currentDay === 1) currentDay = 8; // Adjust Sunday to 8 if system uses 8 for Sunday
-    
-    const todayClasses = timetable.filter(t => t.thu === currentDay);
-    if (todayClasses.length === 0) return 'DAY_OFF';
+    const filtered = timetable
+      .filter((t) => t.thu === currentDay)
+      .sort((a, b) => a.tietBatDau - b.tietBatDau);
 
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTotalMinutes = currentHour * 60 + currentMinute;
-
-    // Tiet 1: 7:00 -> 420
-    // Tiet 2: 7:45 -> 465
-    // Tiet 3: 8:40 -> 520
-    // Tiet 4: 9:25 -> 565
-    // Tiet 5: 10:10 -> 610
-    // Afternoon: Tiet 6: 13:00 -> 780 ...
-    const tietStartMinutes: Record<number, number> = {
-      1: 420, 2: 465, 3: 520, 4: 565, 5: 610,
-      6: 780, 7: 825, 8: 880, 9: 925, 10: 970
+    return {
+      isBeforeStart: beforeStart,
+      todayClasses: filtered,
     };
-
-    const upcomingClasses = todayClasses.filter(c => {
-      const startMin = tietStartMinutes[c.tietBatDau] || 0;
-      // Class duration is typically 45 mins. If current time is before the end of the class, it is ongoing/upcoming
-      return startMin + c.soTiet * 45 > currentTotalMinutes; 
-    });
-
-    if (upcomingClasses.length === 0) return 'NO_MORE_CLASSES';
-
-    // Sort by tietBatDau
-    upcomingClasses.sort((a, b) => a.tietBatDau - b.tietBatDau);
-    return upcomingClasses[0];
   }, [timetable]);
 
-  const getTietTimeStr = (tiet: number) => {
-    const times: Record<number, string> = {
-      1: '07:00 - 07:45',
-      2: '07:45 - 08:30',
-      3: '08:40 - 09:25',
-      4: '09:25 - 10:10',
-      5: '10:10 - 10:55',
-      6: '13:00 - 13:45',
-      7: '13:45 - 14:30',
-      8: '14:40 - 15:25',
-      9: '15:25 - 16:10',
-      10: '16:10 - 16:55'
-    };
-    return times[tiet] || `Tiết ${tiet}`;
-  };
-
   const renderContent = () => {
-    if (nextClass === 'NOT_STARTED_YET') {
+    if (isBeforeStart) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Năm học mới bắt đầu từ 07/09/2026. Chưa có tiết học.</Text>
@@ -82,76 +67,94 @@ export const NextClassCard: React.FC<NextClassCardProps> = ({ timetable }) => {
       );
     }
 
-    if (nextClass === 'DAY_OFF') {
+    if (todayClasses.length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Hôm nay nghỉ học.</Text>
+          <Text style={styles.emptyText}>Hôm nay không có tiết học.</Text>
         </View>
       );
     }
-    
-    if (nextClass === 'NO_MORE_CLASSES') {
-      return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Hôm nay không còn tiết học.</Text>
-        </View>
-      );
-    }
-
-    if (!nextClass) return null;
-
-    const classData = nextClass as TimetableEntry;
 
     return (
-      <TouchableOpacity 
-        style={styles.nextClassContainer}
-        onPress={() => router.push('/(student)/calendar' as any)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.nextClassHeader}>
-          <View style={styles.subjectTag}>
-            <Book size={14} color="#2563EB" />
-            <Text style={styles.subjectText}>{classData.monHoc?.tenMon || classData.monHoc?.tenMonHoc || 'Môn học'}</Text>
-          </View>
-          <Text style={styles.tietText}>Tiết {classData.tietBatDau}</Text>
-        </View>
-        <View style={styles.nextClassTeacher}>
-          <User size={16} color="#6B7280" />
-          <Text style={styles.teacherText}>GV: {classData.giaoVien?.hoTen || 'Đang cập nhật'}</Text>
-        </View>
-        <View style={styles.nextClassDetails}>
-          <View style={styles.nextClassDetailRow}>
-            <Clock size={16} color="#6B7280" />
-            <Text style={styles.nextClassDetailText}>{getTietTimeStr(classData.tietBatDau)}</Text>
-          </View>
-          <View style={styles.nextClassDetailRow}>
-            <MapPin size={16} color="#6B7280" />
-            <Text style={styles.nextClassDetailText}>Phòng {classData.phongHoc || 'Chưa xếp'}</Text>
-          </View>
-        </View>
-        {classData.ghiChu ? (
-          <View style={{ marginTop: 12, flexDirection: 'row' }}>
-            <Text style={{ fontSize: 13, color: '#D97706', backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, overflow: 'hidden', fontWeight: '500' }}>
-              📌 {classData.ghiChu}
-            </Text>
-          </View>
-        ) : null}
-      </TouchableOpacity>
+      <View style={styles.classList}>
+        {todayClasses.map((item, index) => {
+          const rawRoom = studentClass || (item as any).lop?.tenLop || item.phongHoc || '';
+          const room = rawRoom.replace(/^Phòng\s*/i, '').replace(/^P\.\s*/i, '') || 'Chưa xếp';
+          const isLast = index === todayClasses.length - 1;
+
+          return (
+            <View
+              key={item.id || `${item.thu}-${item.tietBatDau}-${index}`}
+              style={[styles.classItem, !isLast && styles.classItemBorder]}
+            >
+              <View style={styles.classHeader}>
+                <View style={styles.subjectTag}>
+                  <Book size={14} color="#2563EB" />
+                  <Text style={styles.subjectText}>
+                    {item.monHoc?.tenMon || item.monHoc?.tenMonHoc || 'Môn học'}
+                  </Text>
+                </View>
+                <View style={styles.tietBadge}>
+                  <Text style={styles.tietText}>
+                    Tiết {item.tietBatDau}
+                    {item.soTiet > 1 ? ` - ${item.tietBatDau + item.soTiet - 1}` : ''}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.classTeacher}>
+                <User size={15} color="#6B7280" />
+                <Text style={styles.teacherText}>
+                  GV: {item.giaoVien?.hoTen || 'Đang cập nhật'}
+                </Text>
+              </View>
+
+              <View style={styles.classDetails}>
+                <View style={styles.classDetailRow}>
+                  <Clock size={15} color="#6B7280" />
+                  <Text style={styles.classDetailText}>
+                    {getTietTimeStr(item.tietBatDau, item.soTiet || 1)}
+                  </Text>
+                </View>
+                <View style={styles.classDetailRow}>
+                  <MapPin size={15} color="#6B7280" />
+                  <Text style={styles.classDetailText}>Phòng {room}</Text>
+                </View>
+              </View>
+
+              {item.ghiChu ? (
+                <View style={styles.noteContainer}>
+                  <Text style={styles.noteText}>📌 {item.ghiChu}</Text>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
     );
   };
 
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Lịch học hôm nay</Text>
-        <TouchableOpacity style={styles.seeMoreBtn} onPress={() => router.push('/(student)/calendar' as any)}>
-          <Text style={styles.seeMoreText}>Xem thời khóa biểu</Text>
-          <ChevronRight size={16} color="#6B7280" />
+        <View style={styles.titleRow}>
+          <Text style={styles.sectionTitle}>Lịch học hôm nay</Text>
+          {todayClasses.length > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{todayClasses.length} tiết</Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.seeMoreBtn}
+          onPress={() => router.push('/(student)/calendar' as any)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.seeMoreText}>Xem TKB</Text>
+          <ChevronRight size={16} color="#2563EB" />
         </TouchableOpacity>
       </View>
-      <View style={styles.card}>
-        {renderContent()}
-      </View>
+      <View style={styles.card}>{renderContent()}</View>
     </View>
   );
 };
@@ -166,10 +169,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
+  },
+  countBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  countText: {
+    fontSize: 12,
+    color: '#2563EB',
+    fontWeight: '600',
   },
   seeMoreBtn: {
     flexDirection: 'row',
@@ -177,83 +198,111 @@ const styles = StyleSheet.create({
   },
   seeMoreText: {
     fontSize: 14,
-    color: '#6B7280',
-    marginRight: 4,
+    color: '#2563EB',
+    fontWeight: '600',
+    marginRight: 2,
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     shadowColor: '#64748B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   emptyContainer: {
-    paddingVertical: 16,
+    paddingVertical: 20,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#6B7280',
     fontStyle: 'italic',
   },
-  nextClassContainer: {},
-  nextClassHeader: {
+  classList: {
+    flexDirection: 'column',
+  },
+  classItem: {
+    paddingVertical: 12,
+  },
+  classItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  classHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   subjectTag: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   subjectText: {
     color: '#1D4ED8',
     fontWeight: 'bold',
     marginLeft: 6,
-    fontSize: 15,
-  },
-  tietText: {
-    color: '#EF4444',
-    fontWeight: 'bold',
     fontSize: 14,
+  },
+  tietBadge: {
     backgroundColor: '#FEF2F2',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  nextClassTeacher: {
+  tietText: {
+    color: '#EF4444',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  classTeacher: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   teacherText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#374151',
-    marginLeft: 8,
+    marginLeft: 6,
     fontWeight: '500',
   },
-  nextClassDetails: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 12,
-  },
-  nextClassDetailRow: {
+  classDetails: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 24,
+    paddingTop: 2,
   },
-  nextClassDetailText: {
+  classDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  classDetailText: {
     marginLeft: 6,
     color: '#6B7280',
-    fontSize: 14,
+    fontSize: 13,
+  },
+  noteContainer: {
+    marginTop: 8,
+    flexDirection: 'row',
+  },
+  noteText: {
+    fontSize: 12,
+    color: '#D97706',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: 'hidden',
+    fontWeight: '500',
   },
 });

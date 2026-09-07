@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { CalendarDays, User } from "lucide-react";
+import { CalendarDays, User, MapPin } from "lucide-react";
 
 import { formatDate } from "../../../utils/helpers.js";
 
@@ -10,6 +10,7 @@ const getDayLabel = (day) => {
 
 const TimetableWidget = ({ 
   timetable, 
+  studentClass,
   isSummerBreak, 
   isNotStartedYet, 
   schoolStartDate, 
@@ -66,6 +67,9 @@ const TimetableWidget = ({
               const mid = t.monHoc?.id || t.monHocId;
               const sName = mid ? getSubjectName(mid) : "Không có lịch học";
               const color = mid ? (subjectColorMap[mid] || "#2563EB") : "#94a3b8";
+              const rawRoom = studentClass || t.lop?.tenLop || t.phongHoc || "";
+              const room = rawRoom.replace(/^Phòng\s*/i, "").replace(/^P\.\s*/i, "") || "Chưa xếp";
+
               return (
                 <div key={idx} className="relative">
                   <div
@@ -82,10 +86,14 @@ const TimetableWidget = ({
                       <div className="font-bold text-slate-800 mb-1" style={{ color: color }}>
                         {sName}
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mt-2">
+                      <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mt-2 flex-wrap">
                         <span className="flex items-center gap-1.5 truncate">
                           <User size={14} className="text-slate-400" />
                           GV. {t.giaoVien?.hoTen || "--"}
+                        </span>
+                        <span className="flex items-center gap-1.5 truncate">
+                          <MapPin size={14} className="text-slate-400" />
+                          Phòng {room}
                         </span>
                       </div>
                       {t.ghiChu && (

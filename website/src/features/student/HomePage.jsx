@@ -179,13 +179,8 @@ export default function HomePage() {
       const matchHK = String(c.hocKy) === hkStr || c.hocKy === selectedHK;
       return matchNamHoc && matchHK;
     });
-    const approved = filtered.find((c) => c.trangThai === "APPROVED");
+    const approved = filtered.find((c) => c.trangThai === "APPROVED" || c.status === "APPROVED");
     const record = approved || filtered[filtered.length - 1];
-    if (!record && data.conducts.length > 0) {
-      const allApproved = data.conducts.find((c) => c.trangThai === "APPROVED");
-      const fallback = allApproved || data.conducts[data.conducts.length - 1];
-      return fallback?.xepLoai || fallback?.hanhKiem || null;
-    }
     return record?.xepLoai || record?.hanhKiem || null;
   }, [data?.conducts, selectedNamHoc, selectedHK]);
 
@@ -245,6 +240,7 @@ export default function HomePage() {
           />
           <TimetableWidget
             timetable={data?.timetable || []}
+            studentClass={data?.student?.lop?.tenLop}
             isSummerBreak={isSummerBreak}
             isNotStartedYet={isNotStartedYet}
             schoolStartDate={activeYearObj?.ngayBatDauHk1}

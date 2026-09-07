@@ -49,7 +49,10 @@ export default function StudentDashboard() {
         }
       >
         <QuickFunctions data={data} />
-        <NextClassCard timetable={data?.timetable || []} />
+        <NextClassCard 
+          timetable={data?.timetable || []} 
+          studentClass={data?.student?.lop?.tenLop} 
+        />
       </ScrollView>
     </View>
   );

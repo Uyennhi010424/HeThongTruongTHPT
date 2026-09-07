@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
-import { formatDate, getGenderLabel } from "./hocSinhUtils.js";
+import { formatDate, getGenderLabel, formatHocLuc, formatHanhKiem } from "./hocSinhUtils.js";
 import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
-import { getHocSinhLichSuHocTap } from "../../../api/hocSinhApi.js";
+import { getHocSinhLichSuHocTap } from "../../../api/hocsinhApi.js";
 
 export default function HocSinhViewModal({ hooks }) {
   const { viewModalOpen, setViewModalOpen, viewingStudent, parents } = hooks;
@@ -137,10 +137,10 @@ export default function HocSinhViewModal({ hooks }) {
                             <span>Điểm TB: <span className="font-semibold text-slate-700">{ls.diemTrungBinh}</span></span>
                           )}
                           {ls.hocLuc && (
-                            <span>Học lực: <span className="font-semibold text-slate-700">{ls.hocLuc}</span></span>
+                            <span>Học lực: <span className="font-semibold text-slate-700">{formatHocLuc(ls.hocLuc)}</span></span>
                           )}
                           {ls.hanhKiem && (
-                            <span>Hạnh kiểm: <span className="font-semibold text-slate-700">{ls.hanhKiem}</span></span>
+                            <span>Hạnh kiểm: <span className="font-semibold text-slate-700">{formatHanhKiem(ls.hanhKiem)}</span></span>
                           )}
                         </div>
                       )}

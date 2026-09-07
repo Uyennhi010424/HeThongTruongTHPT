@@ -45,7 +45,22 @@ public class PhuHuynhService {
 
     public PhuHuynh getByUsername(String username) {
         if (username == null || username.isBlank()) return null;
-        String normalized = username.trim().toLowerCase();
+        String raw = username.trim();
+        String normalized = raw.toLowerCase();
+
+        // 1. Try lookup by User.username (most reliable)
+        Optional<User> userOpt = userRepository.findByUsername(raw);
+        if (userOpt.isEmpty() && !raw.equals(normalized)) {
+            userOpt = userRepository.findByUsername(normalized);
+        }
+        if (userOpt.isPresent()) {
+            Optional<PhuHuynh> byUserId = phuHuynhRepository.findByUserId(userOpt.get().getId());
+            if (byUserId.isPresent()) {
+                return byUserId.get();
+            }
+        }
+
+        // 2. Fallback: lookup by email
         return phuHuynhRepository.findByEmailIgnoreCase(normalized).orElse(null);
     }
 

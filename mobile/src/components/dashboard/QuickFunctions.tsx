@@ -16,7 +16,24 @@ export const QuickFunctions: React.FC<QuickFunctionsProps> = ({ data }) => {
   
   const getConductText = () => {
     if (!data?.conducts || data.conducts.length === 0) return 'Chưa có';
-    const type = data.conducts[0].xepLoai;
+
+    const now = new Date();
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+    const currentNamHoc = data?.student?.lop?.namHoc || (curMonth >= 7 ? `${curYear}-${curYear + 1}` : `${curYear - 1}-${curYear}`);
+
+    const currentYearConducts = data.conducts.filter((c: any) => {
+      const yearStr = c.namHoc?.tenNamHoc || c.namHoc || c.tenNamHoc;
+      return yearStr === currentNamHoc;
+    });
+
+    if (currentYearConducts.length === 0) {
+      return 'Chưa có';
+    }
+
+    const latest = currentYearConducts.sort((a: any, b: any) => Number(b.hocKy || 0) - Number(a.hocKy || 0))[0];
+    const type = latest?.xepLoai;
+
     switch (type) {
       case 'TOT': return 'Tốt';
       case 'KHA': return 'Khá';
@@ -39,13 +56,13 @@ export const QuickFunctions: React.FC<QuickFunctionsProps> = ({ data }) => {
       icon: <CheckCircle size={28} color="#10B981" />, 
       name: 'Hạnh kiểm', 
       value: conduct,
-      onPress: () => router.push('/(student)/conduct' as any) 
+      onPress: () => router.push({ pathname: '/(student)/attendance', params: { tab: 'hanhkiem' } } as any) 
     },
     { 
       icon: <BarChart2 size={28} color="#F59E0B" />, 
       name: 'Học lực', 
       value: gpaNum === null ? 'Chưa có' : (gpaNum >= 8.0 ? 'Giỏi' : gpaNum >= 6.5 ? 'Khá' : gpaNum >= 5.0 ? 'TB' : 'Yếu'),
-      onPress: () => router.push('/(student)/academic' as any) 
+      onPress: () => router.push('/(student)/scores' as any) 
     }
   ];
 
