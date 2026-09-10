@@ -20,7 +20,7 @@ public class LichSuHocTap {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lop_id", nullable = false)
-    @JsonIgnoreProperties({"gvcn", "toHop", "hocSinhList"})
+    @JsonIgnoreProperties({"toHop", "hocSinhList"})
     private LopHoc lopHoc;
 
     @Column(name = "nam_hoc", length = 20, nullable = false)

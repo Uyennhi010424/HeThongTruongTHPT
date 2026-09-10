@@ -90,7 +90,7 @@ class HocSinhServiceTest {
 
         sampleUser = new User();
         sampleUser.setId(1);
-        sampleUser.setUsername("hocsinh@tdn.edu.vn");
+        sampleUser.setUsername("hocsinh@tdu.edu.vn");
         sampleUser.setRole(RoleEnum.HOC_SINH);
         sampleUser.setIsActive(true);
 
@@ -152,12 +152,12 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should return hoc sinh when email matches")
         void returnsWhenFound() {
-            when(hocSinhRepository.findByEmailIgnoreCase("hocsinh@tdn.edu.vn"))
+            when(hocSinhRepository.findByEmailIgnoreCase("hocsinh@tdu.edu.vn"))
                     .thenReturn(Optional.of(sampleHocSinh));
             when(phuHuynhHocSinhRepository.findByHocSinhIdIn(anyList()))
                     .thenReturn(List.of());
 
-            HocSinh result = hocSinhService.getByUsername("hocsinh@tdn.edu.vn");
+            HocSinh result = hocSinhService.getByUsername("hocsinh@tdu.edu.vn");
 
             assertThat(result).isNotNull();
             assertThat(result.getHoTen()).isEqualTo("Nguyen Van A");
@@ -175,10 +175,10 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should return null when not found")
         void returnsNullWhenNotFound() {
-            when(hocSinhRepository.findByEmailIgnoreCase("unknown@tdn.edu.vn"))
+            when(hocSinhRepository.findByEmailIgnoreCase("unknown@tdu.edu.vn"))
                     .thenReturn(Optional.empty());
 
-            HocSinh result = hocSinhService.getByUsername("unknown@tdn.edu.vn");
+            HocSinh result = hocSinhService.getByUsername("unknown@tdu.edu.vn");
 
             assertThat(result).isNull();
         }

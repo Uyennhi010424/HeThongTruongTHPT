@@ -38,6 +38,20 @@ export default function MainLayout({
     return () => window.removeEventListener("keydown", handleEscape);
   }, []);
 
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" ? window.innerWidth >= 1024 : true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const desktop = window.innerWidth >= 1024;
+      setIsDesktop(desktop);
+      if (!desktop) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const sidebarWidth = isPanelOpen ? 250 : 72; // Expanded (250px) or Collapsed (72px)
 
   return (
@@ -69,7 +83,7 @@ export default function MainLayout({
       <Toast />
       <main
         className="mt-16 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar transition-all duration-300 print:mt-0 print:h-auto print:overflow-visible print:ml-0 print:w-full print:p-0"
-        style={{ marginLeft: typeof window !== "undefined" && window.innerWidth >= 1024 ? sidebarWidth : 0 }}
+        style={{ marginLeft: isDesktop ? sidebarWidth : 0 }}
       >
         <div className="flex flex-col min-h-full">
           <div className="print-hidden">

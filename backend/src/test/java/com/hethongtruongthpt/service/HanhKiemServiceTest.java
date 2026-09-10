@@ -215,6 +215,7 @@ class HanhKiemServiceTest {
         @Test
         @DisplayName("should delete by id")
         void deletesById() {
+            when(hanhKiemRepository.findById(1)).thenReturn(Optional.of(sampleHanhKiem));
             doNothing().when(hanhKiemRepository).deleteById(1);
 
             hanhKiemService.delete(1);

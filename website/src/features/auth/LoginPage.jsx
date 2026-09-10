@@ -118,7 +118,7 @@ export default function LoginPage() {
       setCaptchaError("Vui lòng nhập mã CAPTCHA.");
       return;
     }
-    if (captchaInput !== captchaText) {
+    if (captchaInput.trim().toUpperCase() !== captchaText.trim().toUpperCase()) {
       const newAttempts = captchaAttempts + 1;
       setCaptchaAttempts(newAttempts);
       if (newAttempts >= 3) {
@@ -212,7 +212,7 @@ export default function LoginPage() {
             }}
           >
             <div className="mb-8">
-              <img src={themeLogo} alt="Logo" className="h-32 w-auto object-contain brightness-0 invert drop-shadow-md opacity-90" />
+              <img src={themeLogo} alt="Logo" className="h-20 sm:h-28 md:h-32 max-w-full w-auto object-contain brightness-0 invert drop-shadow-md opacity-90" />
             </div>
             <h2
               className="text-sm font-bold tracking-[0.2em] text-gray-300 uppercase mb-4"
@@ -221,13 +221,13 @@ export default function LoginPage() {
               HỆ THỐNG QUẢN LÝ
             </h2>
             <h1
-              className="text-4xl lg:text-5xl font-bold leading-[1.2] text-white mb-5 tracking-tight drop-shadow-lg whitespace-nowrap"
+              className="text-3xl lg:text-4xl xl:text-5xl font-bold leading-[1.2] text-white mb-5 tracking-tight drop-shadow-lg"
               style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}
             >
               Điểm học sinh THPT
             </h1>
             <p
-              className="text-gray-200 text-lg font-medium leading-relaxed"
+              className="text-gray-200 text-base lg:text-lg font-medium leading-relaxed"
               style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}
             >
               Nền tảng quản lý giáo dục hiện đại.
@@ -237,14 +237,14 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Form (40%) */}
-      <div className="w-full md:w-[40%] flex items-center justify-center px-8 sm:px-12 lg:px-16 bg-white relative z-10 h-full">
+      <div className="w-full md:w-[40%] flex items-center justify-center px-4 sm:px-8 md:px-10 lg:px-16 bg-white relative z-10 h-full">
         <div className="w-full max-w-[420px] py-4">
 
           {/* Header */}
           <div className="mb-6 text-center">
-            <img src={themeLogo} alt="Logo Edu Manager" className="h-32 w-auto object-contain mx-auto mb-4" />
-            <h2 className="text-[28px] font-bold text-gray-900 mb-1 tracking-tight">Đăng nhập hệ thống</h2>
-            <p className="text-gray-500 text-[15px]">Vui lòng đăng nhập để tiếp tục.</p>
+            <img src={themeLogo} alt="Logo Edu Manager" className="h-20 sm:h-24 md:h-28 max-w-full w-auto object-contain mx-auto mb-4" />
+            <h2 className="text-2xl sm:text-[28px] font-bold text-gray-900 mb-1 tracking-tight">Đăng nhập hệ thống</h2>
+            <p className="text-gray-500 text-sm sm:text-[15px]">Vui lòng đăng nhập để tiếp tục.</p>
           </div>
 
           <hr className="border-gray-100 mb-6" />
@@ -312,14 +312,14 @@ export default function LoginPage() {
                   type="text"
                   value={captchaInput}
                   onChange={(e) => {
-                    setCaptchaInput(e.target.value.slice(0, 4));
+                    setCaptchaInput(e.target.value.slice(0, 4).toUpperCase());
                     setCaptchaError("");
                   }}
-                  placeholder="CAPTCHA"
+                  placeholder="MÃ XÁC THỰC"
                   maxLength={4}
                   autoComplete="off"
                   disabled={captchaLocked || passwordLocked}
-                  className="block w-full sm:w-1/2 px-4 h-[52px] bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/20 focus:border-[#2563EB] transition-all disabled:opacity-50 text-base text-center tracking-widest font-semibold"
+                  className="block w-full sm:w-1/2 px-4 h-[52px] bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/20 focus:border-[#2563EB] transition-all disabled:opacity-50 text-base text-center tracking-widest font-semibold uppercase"
                 />
                 <div className="w-full sm:w-1/2 h-[52px]">
                   <Captcha
@@ -350,9 +350,9 @@ export default function LoginPage() {
                   setForgotMessage("");
                   setForgotModalOpen(true);
                 }}
-                className="text-sm font-semibold text-[#1D4ED8] hover:text-[#1e3a8a] transition-colors focus:outline-none"
+                className="text-sm font-semibold text-[#1D4ED8] hover:text-[#1e3a8a] transition-colors focus:outline-none cursor-pointer"
               >
-
+                Quên mật khẩu?
               </button>
             </div>
 
@@ -451,16 +451,16 @@ function ForgotPasswordModal({ onClose, username, setUsername }) {
         <form onSubmit={handleSend}>
           <div className="px-6 py-5">
             <p className="text-sm text-gray-500 mb-5 leading-relaxed">
-              Nhập tên đăng nhập để hệ thống gửi đường link xác thực đổi mật khẩu mới qua Email đã liên kết.
+              Nhập email hoặc tên đăng nhập để hệ thống gửi đường link xác thực đổi mật khẩu mới qua Email đã liên kết.
             </p>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-gray-700">Tên đăng nhập</label>
+              <label className="block text-sm font-semibold text-gray-700">Email hoặc Tên đăng nhập</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nhập tên đăng nhập của bạn"
+                placeholder="Nhập email hoặc tên đăng nhập (vd: lunhi-cntt17@tdu.edu.vn)"
                 className="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors sm:text-sm"
                 required
               />

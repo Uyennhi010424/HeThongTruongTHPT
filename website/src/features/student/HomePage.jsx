@@ -207,6 +207,51 @@ export default function HomePage() {
     ? todayDateStr > activeYearObj.ngayKetThucHk2 
     : (currentMonth === 6 || currentMonth === 7 || currentMonth === 8);
 
+  const attendanceRate = data?.attendanceStats
+    ? Math.max(0, 100 - (Number(data.attendanceStats.coPhep || 0) + Number(data.attendanceStats.khongPhep || 0)))
+    : 100;
+
+  // Lấy thông tin lớp tương ứng với năm học đang chọn
+  // PHẢI đặt trước early return để không vi phạm Rules of Hooks
+  const currentClassInfo = useMemo(() => {
+    if (!selectedNamHoc) return data?.student?.lop;
+    
+    // Nếu chọn năm học hiện tại của học sinh
+    if (data?.student?.lop?.namHoc === selectedNamHoc) {
+      return data?.student?.lop;
+    }
+    
+    // Tìm trong lịch sử học tập
+    const history = (data?.academicHistories || []).find(h => h.namHoc === selectedNamHoc);
+    if (history?.lopHoc) {
+      return history.lopHoc;
+    }
+    
+    // Fallback thông minh: Nếu chọn năm học trước năm hiện tại
+    const currentClassName = data?.student?.lop?.tenLop || "";
+    const match = currentClassName.match(/^(\d+)(.*)$/);
+    if (match) {
+      const currentGrade = parseInt(match[1], 10);
+      const suffix = match[2];
+      const curYearParts = (data?.student?.lop?.namHoc || activeYearName || "").split("-");
+      const selYearParts = selectedNamHoc.split("-");
+      if (curYearParts.length === 2 && selYearParts.length === 2) {
+        const diffYears = parseInt(curYearParts[0], 10) - parseInt(selYearParts[0], 10);
+        const targetGrade = currentGrade - diffYears;
+        if (targetGrade >= 10 && targetGrade <= 12) {
+          return {
+            ...data?.student?.lop,
+            tenLop: `${targetGrade}${suffix}`,
+            khoi: targetGrade,
+            namHoc: selectedNamHoc
+          };
+        }
+      }
+    }
+    
+    return data?.student?.lop;
+  }, [selectedNamHoc, data?.student?.lop, data?.academicHistories, activeYearName]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -223,20 +268,17 @@ export default function HomePage() {
     );
   }
 
-  const attendanceRate = data?.attendanceStats
-    ? Math.max(0, 100 - (Number(data.attendanceStats.coPhep || 0) + Number(data.attendanceStats.khongPhep || 0)))
-    : 100;
-
   return (
     <div className="min-h-screen bg-slate-50 p-6 pb-20">
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-5 flex flex-col gap-6 min-h-0 lg:h-full">
           <StudentProfileWidget
             student={data?.student}
+            classInfo={currentClassInfo}
             avatarSrc={avatarSrc}
             selectedNamHoc={selectedNamHoc}
             selectedHK={selectedHK}
-            homeroomTeacher={data?.student?.lop?.gvcn}
+            homeroomTeacher={currentClassInfo?.gvcn || data?.student?.lop?.gvcn}
           />
           <TimetableWidget
             timetable={data?.timetable || []}

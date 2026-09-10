@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { getThongBao, getThread, replyThongBao } from "../../api/thongbaoApi.js";
 import { notifySuccess, notifyError } from "../../utils/notify.js";
 import BaoCongThongBaoUI from "../../components/common/BaoCongThongBaoUI.jsx";
@@ -121,6 +122,7 @@ function ThreadModal({ notice, onClose, onRefresh }) {
 }
 
 export default function StudentThongBao() {
+  const location = useLocation();
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -145,6 +147,12 @@ export default function StudentThongBao() {
   useEffect(() => {
     fetchNotices();
   }, []);
+
+  useEffect(() => {
+    if (location.state?.selectedNotice) {
+      setSelectedNotice(location.state.selectedNotice);
+    }
+  }, [location.state]);
 
   const filteredNotices = useMemo(() => {
     if (!keyword.trim()) return notices;

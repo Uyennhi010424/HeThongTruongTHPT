@@ -12,6 +12,8 @@ public interface HanhKiemRepository extends JpaRepository<HanhKiem, Integer> {
 
     List<HanhKiem> findByHocSinhIdIn(List<Integer> hocSinhIds);
 
+    List<HanhKiem> findByHocSinhIdInAndNamHocId(List<Integer> hocSinhIds, Integer namHocId);
+
     List<HanhKiem> findByGiaoVienId(Integer giaoVienId);
 
     List<HanhKiem> findByHocSinhIdAndNamHocId(Integer hocSinhId, Integer namHocId);
@@ -20,7 +22,14 @@ public interface HanhKiemRepository extends JpaRepository<HanhKiem, Integer> {
 
     List<HanhKiem> findByHocSinhLopId(Integer lopId);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"hocSinh", "hocSinh.lop", "namHoc"})
+    List<HanhKiem> findByNamHocId(Integer namHocId);
+
     Optional<HanhKiem> findByHocSinhIdAndNamHocIdAndHocKy(Integer hocSinhId, Integer namHocId, Integer hocKy);
 
     boolean existsByNamHocId(Integer namHocId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM HanhKiem h WHERE h.namHoc.id = :namHocId")
+    void deleteByNamHocId(@org.springframework.data.repository.query.Param("namHocId") Integer namHocId);
 }

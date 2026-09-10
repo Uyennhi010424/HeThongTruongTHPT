@@ -23,8 +23,10 @@ public class HocSinhResponseDTO {
     private Boolean dienChinhSach;
     private Integer trangThai;
     private Integer phuHuynhId;
+    private com.hethongtruongthpt.dto.phuhuynh.PhuHuynhDTO phuHuynh;
     private String anhDaiDien;
     private String truongChuyenDen;
+    private java.util.List<String> namHocList;
     private LocalDateTime createdAt;
 
     public static HocSinhResponseDTO fromEntity(HocSinh hs) {
@@ -61,14 +63,32 @@ public class HocSinhResponseDTO {
         dto.setNamNhapHoc(hs.getNamNhapHoc());
         dto.setSdt(hs.getSdt());
         dto.setEmail(hs.getEmail());
-        dto.setDanToc(hs.getDanToc());
-        dto.setTonGiao(hs.getTonGiao());
+        dto.setDanToc(hs.getDanToc() != null && !hs.getDanToc().isBlank() ? hs.getDanToc() : "Kinh");
+        dto.setTonGiao(hs.getTonGiao() != null && !hs.getTonGiao().isBlank() ? hs.getTonGiao() : "Không");
         dto.setMaBhyt(hs.getMaBhyt());
         dto.setDienChinhSach(hs.getDienChinhSach());
         dto.setTrangThai(hs.getTrangThai());
         dto.setPhuHuynhId(hs.getPhuHuynhId());
+
+        if (hs.getPhuHuynh() != null) {
+            com.hethongtruongthpt.entity.PhuHuynh ph = hs.getPhuHuynh();
+            com.hethongtruongthpt.dto.phuhuynh.PhuHuynhDTO phDto = new com.hethongtruongthpt.dto.phuhuynh.PhuHuynhDTO();
+            phDto.setId(ph.getId());
+            if (ph.getUser() != null) {
+                phDto.setUserId(ph.getUser().getId());
+            }
+            phDto.setHoTen(ph.getHoTen());
+            phDto.setSoDienThoai(ph.getSoDienThoai());
+            phDto.setEmail(ph.getEmail());
+            phDto.setNgheNghiep(ph.getNgheNghiep());
+            phDto.setQuanHe(ph.getQuanHe());
+            phDto.setIsSmSActive(ph.getIsSmSActive());
+            dto.setPhuHuynh(phDto);
+        }
+
         dto.setAnhDaiDien(hs.getAnhDaiDien());
         dto.setTruongChuyenDen(hs.getTruongChuyenDen());
+        dto.setNamHocList(hs.getNamHocList());
         dto.setCreatedAt(hs.getCreatedAt());
         return dto;
     }
@@ -105,10 +125,14 @@ public class HocSinhResponseDTO {
     public void setTrangThai(Integer trangThai) { this.trangThai = trangThai; }
     public Integer getPhuHuynhId() { return phuHuynhId; }
     public void setPhuHuynhId(Integer phuHuynhId) { this.phuHuynhId = phuHuynhId; }
+    public com.hethongtruongthpt.dto.phuhuynh.PhuHuynhDTO getPhuHuynh() { return phuHuynh; }
+    public void setPhuHuynh(com.hethongtruongthpt.dto.phuhuynh.PhuHuynhDTO phuHuynh) { this.phuHuynh = phuHuynh; }
     public String getAnhDaiDien() { return anhDaiDien; }
     public void setAnhDaiDien(String anhDaiDien) { this.anhDaiDien = anhDaiDien; }
     public String getTruongChuyenDen() { return truongChuyenDen; }
     public void setTruongChuyenDen(String truongChuyenDen) { this.truongChuyenDen = truongChuyenDen; }
+    public java.util.List<String> getNamHocList() { return namHocList; }
+    public void setNamHocList(java.util.List<String> namHocList) { this.namHocList = namHocList; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

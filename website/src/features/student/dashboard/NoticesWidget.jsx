@@ -22,7 +22,7 @@ const NoticesWidget = ({ unreadNotices, attendanceRate, dtb }) => {
             <h3 className="text-base font-bold text-slate-800">Thông báo mới</h3>
           </div>
           <button
-            onClick={() => navigate("/student/notices")}
+            onClick={() => navigate("/student/thongbao")}
             className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
           >
             Xem tất cả
@@ -38,7 +38,7 @@ const NoticesWidget = ({ unreadNotices, attendanceRate, dtb }) => {
             {unreadNotices.slice(0, 5).map((notice, idx) => (
               <div
                 key={idx}
-                onClick={() => navigate("/student/notices")}
+                onClick={() => navigate("/student/thongbao", { state: { selectedNotice: notice } })}
                 className="group cursor-pointer flex gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
               >
                 <div className="mt-0.5">

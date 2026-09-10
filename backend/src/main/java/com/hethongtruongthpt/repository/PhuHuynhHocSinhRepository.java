@@ -10,7 +10,10 @@ import java.util.List;
 
 @Repository
 public interface PhuHuynhHocSinhRepository extends JpaRepository<PhuHuynhHocSinh, Integer> {
-    @Query("SELECT phs FROM PhuHuynhHocSinh phs JOIN FETCH phs.phuHuynh ph WHERE phs.hocSinh.id = :hocSinhId")
+    @Query("SELECT phs FROM PhuHuynhHocSinh phs " +
+           "JOIN FETCH phs.phuHuynh ph " +
+           "LEFT JOIN FETCH ph.user u " +
+           "WHERE phs.hocSinh.id = :hocSinhId")
     List<PhuHuynhHocSinh> findByHocSinhId(@Param("hocSinhId") Integer hocSinhId);
     
     @Query("SELECT phs FROM PhuHuynhHocSinh phs " +
@@ -19,6 +22,17 @@ public interface PhuHuynhHocSinhRepository extends JpaRepository<PhuHuynhHocSinh
            "LEFT JOIN FETCH l.gvcn " +
            "WHERE phs.phuHuynh.id = :phuHuynhId")
     List<PhuHuynhHocSinh> findByPhuHuynhId(@Param("phuHuynhId") Integer phuHuynhId);
-    List<PhuHuynhHocSinh> findByHocSinhIdAndLaNguoiLienHeChinhTrue(Integer hocSinhId);
-    List<PhuHuynhHocSinh> findByHocSinhIdIn(List<Integer> hocSinhIds);
+
+    @Query("SELECT phs FROM PhuHuynhHocSinh phs " +
+           "JOIN FETCH phs.phuHuynh ph " +
+           "LEFT JOIN FETCH ph.user u " +
+           "WHERE phs.hocSinh.id = :hocSinhId AND phs.laNguoiLienHeChinh = true")
+    List<PhuHuynhHocSinh> findByHocSinhIdAndLaNguoiLienHeChinhTrue(@Param("hocSinhId") Integer hocSinhId);
+
+    @Query("SELECT phs FROM PhuHuynhHocSinh phs " +
+           "JOIN FETCH phs.phuHuynh ph " +
+           "LEFT JOIN FETCH ph.user u " +
+           "JOIN FETCH phs.hocSinh hs " +
+           "WHERE hs.id IN :hocSinhIds")
+    List<PhuHuynhHocSinh> findByHocSinhIdIn(@Param("hocSinhIds") List<Integer> hocSinhIds);
 }

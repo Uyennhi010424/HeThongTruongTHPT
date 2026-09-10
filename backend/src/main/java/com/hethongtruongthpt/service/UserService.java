@@ -18,6 +18,10 @@ import org.springframework.stereotype.Service;
 import com.hethongtruongthpt.exception.ApiException;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.hethongtruongthpt.repository.GiaoVienRepository;
+import com.hethongtruongthpt.repository.HocSinhRepository;
+import com.hethongtruongthpt.repository.PhuHuynhRepository;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,12 +33,28 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final DefaultAccountPasswordPolicy passwordPolicy;
     private final UserAuditLogService auditLogService;
+    private final EmailResetPasswordService emailResetPasswordService;
+    private final GiaoVienRepository giaoVienRepository;
+    private final HocSinhRepository hocSinhRepository;
+    private final PhuHuynhRepository phuHuynhRepository;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, DefaultAccountPasswordPolicy passwordPolicy, UserAuditLogService auditLogService) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            DefaultAccountPasswordPolicy passwordPolicy,
+            UserAuditLogService auditLogService,
+            EmailResetPasswordService emailResetPasswordService,
+            GiaoVienRepository giaoVienRepository,
+            HocSinhRepository hocSinhRepository,
+            PhuHuynhRepository phuHuynhRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
         this.auditLogService = auditLogService;
+        this.emailResetPasswordService = emailResetPasswordService;
+        this.giaoVienRepository = giaoVienRepository;
+        this.hocSinhRepository = hocSinhRepository;
+        this.phuHuynhRepository = phuHuynhRepository;
     }
 
     public void resetPasswordToDefault(Integer id) {
@@ -54,9 +74,46 @@ public class UserService {
             existing.setMustChangePassword(true);
             userRepository.save(existing);
             auditLogService.logAction(existing.getId(), "RESET_PASSWORD", "Đặt lại mật khẩu về mặc định", null);
+
+            // Gửi email thông báo mật khẩu mới
+            String recipientEmail = resolveUserEmail(existing);
+            if (recipientEmail != null && !recipientEmail.isBlank()) {
+                emailResetPasswordService.sendAdminResetPasswordNotification(existing, newRaw, recipientEmail);
+            } else {
+                log.warn("Tài khoản {} (id: {}) không có email hợp lệ để gửi thông báo mật khẩu mới", existing.getUsername(), existing.getId());
+            }
         } catch (Exception ex) {
             throw new ApiException("Không thể đặt lại mật khẩu: " + ex.getMessage());
         }
+    }
+
+    private String resolveUserEmail(User user) {
+        if (user == null) return null;
+        if (user.getEmail() != null && user.getEmail().contains("@")) {
+            return user.getEmail().trim();
+        }
+        if (user.getUsername() != null && user.getUsername().contains("@")) {
+            return user.getUsername().trim();
+        }
+        if (user.getId() != null) {
+            if (user.getRole() == RoleEnum.GIAO_VIEN) {
+                var gv = giaoVienRepository.findByUserId(user.getId());
+                if (gv.isPresent() && gv.get().getEmail() != null && gv.get().getEmail().contains("@")) {
+                    return gv.get().getEmail().trim();
+                }
+            } else if (user.getRole() == RoleEnum.HOC_SINH) {
+                var hs = hocSinhRepository.findByUserId(user.getId());
+                if (hs.isPresent() && hs.get().getEmail() != null && hs.get().getEmail().contains("@")) {
+                    return hs.get().getEmail().trim();
+                }
+            } else if (user.getRole() == RoleEnum.PHU_HUYNH) {
+                var ph = phuHuynhRepository.findByUserId(user.getId());
+                if (ph.isPresent() && ph.get().getEmail() != null && ph.get().getEmail().contains("@")) {
+                    return ph.get().getEmail().trim();
+                }
+            }
+        }
+        return null;
     }
 
     public void changePassword(Integer id, String oldPassword, String newPassword) {

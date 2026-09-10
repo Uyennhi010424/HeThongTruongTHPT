@@ -19,6 +19,12 @@ import java.util.List;
 @RequestMapping("/api/giao-vien-nghi")
 public class GiaoVienNghiController {
 
+    /** Normalize namHoc: "2025 - 2026" → "2025-2026" */
+    private static String normalizeNamHoc(String namHoc) {
+        if (namHoc == null) return null;
+        return namHoc.trim().replaceAll("\\s*-\\s*", "-");
+    }
+
     private final GiaoVienNghiService nghiService;
 
     public GiaoVienNghiController(GiaoVienNghiService nghiService) {
@@ -30,14 +36,14 @@ public class GiaoVienNghiController {
     public ResponseEntity<ApiResponse<List<GiaoVienNghi>>> getByNgay(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate ngay,
             @RequestParam(required = false) String namHoc) {
-        return ResponseEntity.ok(ApiResponse.ok(nghiService.getByNgayAndNamHoc(ngay, namHoc)));
+        return ResponseEntity.ok(ApiResponse.ok(nghiService.getByNgayAndNamHoc(ngay, normalizeNamHoc(namHoc))));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
     @GetMapping("/nam-hoc")
     public ResponseEntity<ApiResponse<List<GiaoVienNghi>>> getByNamHoc(
             @RequestParam String namHoc) {
-        return ResponseEntity.ok(ApiResponse.ok(nghiService.getByNamHoc(namHoc)));
+        return ResponseEntity.ok(ApiResponse.ok(nghiService.getByNamHoc(normalizeNamHoc(namHoc))));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
@@ -54,8 +60,9 @@ public class GiaoVienNghiController {
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<GiaoVienNghi>>> getAll(
             @RequestParam(required = false) String namHoc) {
-        if (namHoc != null && !namHoc.isBlank()) {
-            return ResponseEntity.ok(ApiResponse.ok(nghiService.getByNamHoc(namHoc)));
+        String normalized = normalizeNamHoc(namHoc);
+        if (normalized != null && !normalized.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.ok(nghiService.getByNamHoc(normalized)));
         }
         return ResponseEntity.ok(ApiResponse.ok(nghiService.getAll()));
     }

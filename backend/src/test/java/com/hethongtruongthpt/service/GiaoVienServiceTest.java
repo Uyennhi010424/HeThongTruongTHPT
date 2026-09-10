@@ -35,6 +35,7 @@ class GiaoVienServiceTest {
     @Mock private MonHocRepository monHocRepository;
     @Mock private com.hethongtruongthpt.util.DefaultAccountPasswordPolicy passwordPolicy;
     @Mock private UserService userService;
+    @Mock private LopHocRepository lopHocRepository;
 
     @InjectMocks
     private GiaoVienService giaoVienService;
@@ -46,13 +47,13 @@ class GiaoVienServiceTest {
     void setUp() {
         sampleUser = new User();
         sampleUser.setId(1);
-        sampleUser.setUsername("tienntc3@tdn.edu.vn");
+        sampleUser.setUsername("tienntc3@tdu.edu.vn");
 
         sampleGiaoVien = new GiaoVien();
         sampleGiaoVien.setId(1);
         sampleGiaoVien.setMaGiaoVien("GV0001");
         sampleGiaoVien.setHoTen("Nguyễn Thị Cẩm Tiên");
-        sampleGiaoVien.setEmail("tienntc3@tdn.edu.vn");
+        sampleGiaoVien.setEmail("tienntc3@tdu.edu.vn");
         sampleGiaoVien.setSoDienThoai("0901234567");
         sampleGiaoVien.setBoMon("Ngữ văn");
         sampleGiaoVien.setTrinhDo("Cử nhân");
@@ -73,7 +74,7 @@ class GiaoVienServiceTest {
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getHoTen()).isEqualTo("Nguyễn Thị Cẩm Tiên");
-            assertThat(result.get(0).getUsername()).isEqualTo("tienntc3@tdn.edu.vn");
+            assertThat(result.get(0).getUsername()).isEqualTo("tienntc3@tdu.edu.vn");
             verify(giaoVienRepository).findAll();
         }
     }
@@ -169,7 +170,7 @@ class GiaoVienServiceTest {
         @DisplayName("should reject invalid phone number")
         void rejectsInvalidPhone() {
             GiaoVien input = new GiaoVien();
-            input.setHoTen("Test");
+            input.setHoTen("Nguyễn Test");
             input.setSoDienThoai("123");
 
             assertThatThrownBy(() -> giaoVienService.create(input))
@@ -181,7 +182,7 @@ class GiaoVienServiceTest {
         @DisplayName("should reject future birth date")
         void rejectsFutureBirthDate() {
             GiaoVien input = new GiaoVien();
-            input.setHoTen("Test");
+            input.setHoTen("Nguyễn Test");
             input.setNgaySinh(java.time.LocalDate.now().plusDays(1));
 
             assertThatThrownBy(() -> giaoVienService.create(input))

@@ -1,4 +1,5 @@
 import { Filter } from "lucide-react";
+import { sortClasses } from "../../../utils/helpers.js";
 
 export default function HocSinhFilters({ hooks }) {
   const {
@@ -95,11 +96,7 @@ export default function HocSinhFilters({ hooks }) {
                 <option value="all">Tất cả lớp</option>
                 {filteredClasses
                   .slice()
-                  .sort((a, b) => {
-                    const cmpLop = String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { sensitivity: "base" });
-                    if (cmpLop !== 0) return cmpLop;
-                    return String(b.namHoc || "").localeCompare(String(a.namHoc || ""));
-                  })
+                  .sort(sortClasses)
                   .map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.tenLop} {item.namHoc ? `(${item.namHoc})` : ""}

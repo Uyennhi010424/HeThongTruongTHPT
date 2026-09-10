@@ -434,25 +434,25 @@ export default function TeacherDashboard() {
   }, [weekDates]);
 
   return (
-    <div style={{ maxWidth: "100%", padding: "24px 32px", display: "flex", flexDirection: "column", gap: 32 }}>
+    <div className="w-full max-w-full p-4 sm:p-6 lg:p-8 flex flex-col gap-6 sm:gap-8">
       {/* Teacher strip header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 20, paddingBottom: 24, borderBottom: "1px solid #e2e8f0" }}>
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 pb-6 border-b border-slate-200 text-center sm:text-left">
         <CachedAvatar
           username={currentUsername}
           role="teacher"
           fallback={getInitials(currentTeacher?.hoTen)}
-          className="teacher-strip-avatar"
-          fallbackClassName="teacher-strip-avatar"
+          className="teacher-strip-avatar shrink-0 aspect-square object-cover"
+          fallbackClassName="teacher-strip-avatar shrink-0 aspect-square"
         />
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div className="teacher-strip-name">
+        <div className="flex flex-col gap-1 items-center sm:items-start">
+          <div className="teacher-strip-name flex flex-wrap items-center justify-center sm:justify-start gap-2">
             {currentTeacher?.hoTen || "Giáo viên"}
             {homeroomAssignment && <span className="teacher-strip-badge">GVCN</span>}
           </div>
-          <div className="teacher-strip-subject">
+          <div className="teacher-strip-subject text-xs sm:text-sm text-slate-500">
             {getTeacherSubjectLabel(currentTeacher)} · {formatDate(new Date())}
           </div>
-          <div className="teacher-strip-stats">
+          <div className="teacher-strip-stats flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm mt-1 text-slate-600">
             <span className="teacher-strip-stat">
               <strong>{loading ? "…" : stats.classes}</strong> lớp
             </span>

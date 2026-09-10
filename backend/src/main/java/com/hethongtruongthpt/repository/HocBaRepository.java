@@ -15,4 +15,8 @@ public interface HocBaRepository extends JpaRepository<HocBa, Integer> {
     List<HocBa> findByHocSinhLopId(Integer lopId);
 
     boolean existsByNamHocId(Integer namHocId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM HocBa h WHERE h.namHoc.id = :namHocId")
+    void deleteByNamHocId(@org.springframework.data.repository.query.Param("namHocId") Integer namHocId);
 }

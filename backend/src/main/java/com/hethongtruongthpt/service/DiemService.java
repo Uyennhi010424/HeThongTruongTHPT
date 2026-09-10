@@ -82,6 +82,10 @@ public class DiemService {
         return diemCalculationService.getAvgByGrade(namHoc);
     }
 
+    public List<Map<String, Object>> getSubjectAvg(String namHoc, Integer hocKy) {
+        return diemCalculationService.getSubjectAvg(namHoc, hocKy);
+    }
+
     public Map<String, Object> getDistribution(String namHoc, Integer hocKy, Integer khoi) {
         return diemCalculationService.getDistribution(namHoc, hocKy, khoi);
     }

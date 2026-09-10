@@ -3,7 +3,8 @@ import {
   Users, UserPlus, BookOpen, Search, MoreVertical, 
   Trash2, Edit, Save, X, Settings, RefreshCw, 
   Plus, Check, Building2, Calendar, FileText,
-  UserCheck, AlertCircle, TrendingUp, Filter, GraduationCap, ArrowUpCircle, Eye, Shield
+  UserCheck, AlertCircle, TrendingUp, Filter, GraduationCap, ArrowUpCircle, Eye, Shield,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 import { createLop, createLopBulk, deleteLop, getLop, syncSiSo, updateLop, assignGvcn, promoteStudents } from "../../../api/lopApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
@@ -30,6 +31,12 @@ const formatDate = (value) => {
     month: "2-digit",
     year: "numeric"
   });
+};
+
+const formatGender = (value) => {
+  if (value === false || value === "false" || value === "NU" || value === "Nu" || value === "nu" || value === "Nữ" || value === "nữ") return "Nữ";
+  if (value === true || value === "true" || value === "NAM" || value === "Nam" || value === "nam") return "Nam";
+  return "--";
 };
 
 const extractGradeFromClassName = (tenLop) => {
@@ -310,6 +317,7 @@ const AssignTeacherModal = ({ item, classes, onClose, onAssignSuccess }) => {
 // --- Modal Xem danh sách học sinh ---
 const StudentListModal = ({ item, onClose }) => {
   const [students, setStudents] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -355,6 +363,16 @@ const StudentListModal = ({ item, onClose }) => {
     if (item?.id) fetchStudents();
   }, [item]);
 
+  const filteredStudents = useMemo(() => {
+    if (!searchTerm.trim()) return students;
+    const term = searchTerm.toLowerCase();
+    return students.filter(
+      (s) =>
+        (s.hoTen || "").toLowerCase().includes(term) ||
+        (s.maHocSinh || "").toLowerCase().includes(term)
+    );
+  }, [students, searchTerm]);
+
   return (
     <>
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity" onClick={onClose} />
@@ -367,11 +385,33 @@ const StudentListModal = ({ item, onClose }) => {
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
             <div>
               <h2 className="text-lg font-bold text-blue-900">Danh sách học sinh</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Lớp: {item?.tenLop} - Sĩ số: {item?.siSo || 0}</p>
+              <p className="text-sm text-slate-500 mt-0.5">Lớp: {item?.tenLop} - Sĩ số: {item?.siSo || 0} học sinh</p>
             </div>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
               <X className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* Search bar inside modal */}
+          <div className="px-5 pt-3 pb-1">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm nhanh học sinh theo họ tên hoặc mã HS..."
+                className="w-full pl-9 pr-4 py-2 text-xs font-medium border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Content */}
@@ -383,6 +423,10 @@ const StudentListModal = ({ item, onClose }) => {
             ) : students.length === 0 ? (
               <div className="text-center py-12 text-slate-500">
                 Lớp này chưa có học sinh nào.
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 text-sm">
+                Không tìm thấy học sinh nào phù hợp với từ khóa &ldquo;{searchTerm}&rdquo;.
               </div>
             ) : (
               <div className="border border-slate-200 rounded-lg overflow-hidden">
@@ -397,13 +441,13 @@ const StudentListModal = ({ item, onClose }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {students.map((hs, index) => (
+                    {filteredStudents.map((hs, index) => (
                       <tr key={hs.id} className="hover:bg-slate-50/50">
                         <td className="px-4 py-3 text-sm text-slate-500">{index + 1}</td>
                         <td className="px-4 py-3 text-sm font-medium text-slate-900">{hs.maHocSinh}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-slate-900">{hs.hoTen}</td>
                         <td className="px-4 py-3 text-sm text-slate-500">{formatDate(hs.ngaySinh)}</td>
-                        <td className="px-4 py-3 text-sm text-slate-500">{hs.gioiTinh ? "Nam" : "Nữ"}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500">{formatGender(hs.gioiTinh)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -454,6 +498,7 @@ export default function LopList() {
   const [assignTeacherModalOpen, setAssignTeacherModalOpen] = useState(false);
   const [studentListModalOpen, setStudentListModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
+  const [expandedClassId, setExpandedClassId] = useState(null);
 
   const [selectedNamHoc, setSelectedNamHoc] = useState("");
 
@@ -750,86 +795,202 @@ export default function LopList() {
         {error ? (
           <div className="p-8 text-center text-red-500">{error}</div>
         ) : (
-          <div className="overflow-visible">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tên lớp</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Khối</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tổ hợp môn</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sĩ số</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">GVCN</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20 text-center">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
-                        <td key={j} className="px-6 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>
-                      ))}
-                    </tr>
-                  ))
-                ) : paginatedClasses.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
-                      Không tìm thấy dữ liệu lớp học phù hợp.
-                    </td>
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto min-w-[750px]">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tên lớp</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Khối</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tổ hợp môn</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sĩ số</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">GVCN</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20 text-center">Thao tác</th>
                   </tr>
-                ) : (
-                  paginatedClasses.map((item, index) => {
-                    const toHop = toHopList.find((th) => th.id === item.toHopId);
-                    const toHopStyle = getToHopStyle(toHop);
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer" onClick={() => { setSelectedClass(item); setDetailModalOpen(true); }}>
-                        <td className="px-6 py-4 text-sm text-slate-500 font-medium text-center">
-                          {(currentPage - 1) * itemsPerPage + index + 1}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-slate-900">{item.tenLop}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{item.namHoc}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">
-                            Khối {item.khoi}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 8 }).map((_, j) => (
+                          <td key={j} className="px-6 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : paginatedClasses.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
+                        Không tìm thấy dữ liệu lớp học phù hợp.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedClasses.map((item, index) => {
+                      const toHop = toHopList.find((th) => th.id === item.toHopId);
+                      const toHopStyle = getToHopStyle(toHop);
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer" onClick={() => { setSelectedClass(item); setDetailModalOpen(true); }}>
+                          <td className="px-6 py-4 text-sm text-slate-500 font-medium text-center">
+                            {(currentPage - 1) * itemsPerPage + index + 1}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-slate-900">{item.tenLop}</div>
+                            <div className="text-xs text-slate-500 mt-0.5">{item.namHoc}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">
+                              Khối {item.khoi}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${toHopStyle.bg} ${toHopStyle.text}`} title={toHopStyle.full}>
+                              {toHopStyle.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm font-semibold text-slate-700">
+                            {item.siSo || 0}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-medium text-slate-700">{item.gvcn?.hoTen || item.gvcnTen || <span className="text-slate-400 italic">Chưa phân công</span>}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200/60">
+                              Hoạt động
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 border-l border-slate-100 bg-slate-50/30">
+                            <div className="transition-opacity flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                              <ActionDropdown 
+                                item={item} 
+                                onEdit={openEdit} 
+                                onDelete={handleDelete}
+                                onAssignTeacher={(it) => { setSelectedClass(it); setAssignTeacherModalOpen(true); }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile / Tablet Collapsible Accordion Card View */}
+            <div className="block lg:hidden divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="p-4 space-y-3">
+                    <div className="h-5 bg-slate-100 rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-slate-100 rounded w-2/3 animate-pulse" />
+                  </div>
+                ))
+              ) : paginatedClasses.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  Không tìm thấy dữ liệu lớp học phù hợp.
+                </div>
+              ) : (
+                paginatedClasses.map((item, index) => {
+                  const isExpanded = expandedClassId === item.id;
+                  const toHop = toHopList.find((th) => th.id === item.toHopId);
+                  const toHopStyle = getToHopStyle(toHop);
+                  return (
+                    <div key={item.id} className="p-4 hover:bg-slate-50/70 transition-colors">
+                      {/* Compact Header Summary */}
+                      <div
+                        className="flex items-center justify-between cursor-pointer gap-2"
+                        onClick={() => setExpandedClassId(isExpanded ? null : item.id)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xs font-bold text-slate-400 w-6 text-center shrink-0">
+                            {(currentPage - 1) * itemsPerPage + index + 1}
                           </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${toHopStyle.bg} ${toHopStyle.text}`} title={toHopStyle.full}>
+                          <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-sm">
+                            {item.tenLop?.substring(0, 3) || "Lớp"}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-slate-900 truncate">{item.tenLop}</h4>
+                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded font-medium">Khối {item.khoi}</span>
+                              <span>•</span>
+                              <span>{item.siSo || 0} HS</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${toHopStyle.bg} ${toHopStyle.text}`}>
                             {toHopStyle.label}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-semibold text-slate-700">
-                          {item.siSo || 0}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm font-medium text-slate-700">{item.gvcn?.hoTen || item.gvcnTen || <span className="text-slate-400 italic">Chưa phân công</span>}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200/60">
-                            Hoạt động
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 border-l border-slate-100 bg-slate-50/30">
-                          <div className="transition-opacity flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                            <ActionDropdown 
-                              item={item} 
-                              onEdit={openEdit} 
-                              onDelete={handleDelete}
-                              onAssignTeacher={(it) => { setSelectedClass(it); setAssignTeacherModalOpen(true); }}
-                            />
+                          <button
+                            type="button"
+                            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                            aria-label="Toggle details"
+                          >
+                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expandable Details Section */}
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-2.5 animate-in fade-in-50 duration-200">
+                          <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl">
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Năm học:</span>
+                              <span className="font-semibold text-slate-800">{item.namHoc}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Sĩ số:</span>
+                              <span className="font-semibold text-slate-800">{item.siSo || 0} học sinh</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Tổ hợp môn:</span>
+                              <span className="font-semibold text-slate-800">{toHop ? `${toHop.maToHop} - ${toHop.tenToHop}` : "Chưa gán"}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">GVCN:</span>
+                              <span className="font-semibold text-slate-800">{item.gvcn?.hoTen || item.gvcnTen || "Chưa phân công"}</span>
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              onClick={() => { setSelectedClass(item); setDetailModalOpen(true); }}
+                              className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold flex items-center gap-1"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Chi tiết
+                            </button>
+                            <button
+                              onClick={() => { setSelectedClass(item); setAssignTeacherModalOpen(true); }}
+                              className="px-2.5 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-semibold flex items-center gap-1"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" /> Phân GVCN
+                            </button>
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1"
+                            >
+                              <Edit className="w-3.5 h-3.5" /> Sửa
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="px-2.5 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-semibold flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Xóa
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
         )}
 
         {/* Pagination */}

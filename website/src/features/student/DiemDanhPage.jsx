@@ -236,26 +236,59 @@ export default function StudentDiemDanhPage() {
                   <div className="panel-title">Chi tiết điểm danh</div>
                   <div className="panel-subtitle">Lịch sử điểm danh gần đây</div>
                 </div>
+                <div className="panel-pill">{statistics.details.length} buổi ghi nhận</div>
               </div>
-              <div className="table-grid">
-                <div className="table-row table-head">
-                  <div>Ngày</div>
-                  <div>Trạng thái</div>
-                  <div>Ghi chú</div>
-                </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto min-w-[500px]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/50">
+                      <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-14 text-center">STT</th>
+                      <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Ngày</th>
+                      <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                      <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {statistics.details.map((item, idx) => {
+                      const status = STATUS_MAP[item.trangThai] || STATUS_MAP.CO_MAT;
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3 text-sm text-slate-500 text-center font-medium">{idx + 1}</td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">
+                            {item.ngayDiemDanh ? new Date(item.ngayDiemDanh).toLocaleDateString("vi-VN") : "--"}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-semibold ${status.color}`}>
+                              {status.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{item.ghiChu || "--"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="block md:hidden divide-y divide-slate-100">
                 {statistics.details.map((item, idx) => {
                   const status = STATUS_MAP[item.trangThai] || STATUS_MAP.CO_MAT;
                   return (
-                    <div key={idx} className="table-row">
-                      <div className="table-title">
-                        {item.ngayDiemDanh ? new Date(item.ngayDiemDanh).toLocaleDateString("vi-VN") : "--"}
+                    <div key={idx} className="p-4 hover:bg-slate-50/70 transition-colors flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-slate-900">
+                          {item.ngayDiemDanh ? new Date(item.ngayDiemDanh).toLocaleDateString("vi-VN") : "--"}
+                        </div>
+                        {item.ghiChu && (
+                          <div className="text-xs text-slate-500 mt-0.5">{item.ghiChu}</div>
+                        )}
                       </div>
-                      <div>
-                        <span className={status.color} style={{ padding: "2px 8px", borderRadius: 4 }}>
-                          {status.label}
-                        </span>
-                      </div>
-                      <div>{item.ghiChu || "--"}</div>
+                      <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-semibold shrink-0 ${status.color}`}>
+                        {status.label}
+                      </span>
                     </div>
                   );
                 })}

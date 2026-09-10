@@ -45,7 +45,7 @@ export default function ImageUpload({ label, value, onChange, placeholder = "Chá
             <img 
               src={value.startsWith("http") ? value : `http://localhost:8080${value}`} 
               alt={label} 
-              className="h-24 w-auto object-contain rounded-lg bg-white shadow-sm"
+              className="h-24 w-auto max-w-full object-contain rounded-lg bg-white shadow-sm"
               onError={(e) => {
                 // If it fails, fallback to local path (for default /logo.png etc)
                 if (e.target.src !== value && value.startsWith('/')) {

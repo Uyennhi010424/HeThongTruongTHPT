@@ -15,6 +15,7 @@ import {
   getUserAuditLogs
 } from "../../../api/userApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
+import { getCurrentUsernameFromToken } from "../../../utils/teacherProfile.js";
 
 // --- Tiện ích định dạng ---
 const formatDate = (value) => {
@@ -252,9 +253,9 @@ const UserDetailDrawer = ({ user, activeTab: initialTab, onClose }) => {
             <div className="space-y-6">
               <div className="flex items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200/60">
                 {user.anhDaiDien ? (
-                  <img src={user.anhDaiDien} alt={user.username} className="w-16 h-16 rounded-full object-cover border-2 border-slate-100 shadow-sm" />
+                  <img src={user.anhDaiDien} alt={user.username} className="w-16 h-16 shrink-0 aspect-square rounded-full object-cover border-2 border-slate-100 shadow-sm" />
                 ) : (
-                  <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl font-bold">
+                  <div className="w-16 h-16 shrink-0 aspect-square rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl font-bold">
                     {user.username.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -334,6 +335,7 @@ export default function UserList() {
   
   const { searchQuery, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
   const keyword = searchQuery;
+  const currentUsername = useMemo(() => getCurrentUsernameFromToken(), []);
 
   // Modals state
   const [modalOpen, setModalOpen] = useState(false);
@@ -377,7 +379,19 @@ export default function UserList() {
   }, [setSearchPlaceholder, setIsSearchVisible]);
 
   const filteredUsers = useMemo(() => {
-    let result = [...users];
+    let result = users.filter(u => {
+      // Ẩn tài khoản của chính người đang đăng nhập
+      if (currentUsername) {
+        const curr = currentUsername.trim().toLowerCase();
+        const uname = String(u.username || "").trim().toLowerCase();
+        const email = String(u.email || "").trim().toLowerCase();
+        if (uname === curr || (email && email === curr)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
     if (filterRole) result = result.filter(u => u.role === filterRole);
     if (filterStatus !== "") result = result.filter(u => u.status === Number(filterStatus));
     if (keyword.trim()) {
@@ -399,7 +413,7 @@ export default function UserList() {
     result.sort((a, b) => (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99));
     
     return result;
-  }, [users, filterRole, filterStatus, keyword]);
+  }, [users, currentUsername, filterRole, filterStatus, keyword]);
 
   const pagedUsers = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -438,12 +452,12 @@ export default function UserList() {
       });
       setModalOpen(true);
     } else if (action === "RESET_PASSWORD") {
-      if (!(await confirm(`Đặt lại mật khẩu cho ${user.username} về mặc định?`))) return;
+      if (!(await confirm(`Đặt lại mật khẩu cho ${user.username} về mặc định và gửi email thông báo kèm mật khẩu mới?`))) return;
       try {
         await resetPassword(user.id);
-        notifySuccess("Đặt lại mật khẩu thành công");
+        notifySuccess("Đặt lại mật khẩu thành công và đã gửi email thông báo");
       } catch (e) {
-        notifyError("Không thể đặt lại mật khẩu");
+        notifyError(e?.response?.data?.message || "Không thể đặt lại mật khẩu");
       }
     } else if (action === "LOCK") {
       setLockingUser(user);
@@ -537,6 +551,7 @@ export default function UserList() {
             <option value="GIAO_VIEN">Giáo viên</option>
             <option value="HOC_SINH">Học sinh</option>
             <option value="PHU_HUYNH">Phụ huynh</option>
+            <option value="VAN_THU">Văn thư</option>
           </select>
 
           <select 
@@ -593,9 +608,9 @@ export default function UserList() {
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
                         {user.anhDaiDien ? (
-                          <img src={user.anhDaiDien} alt={user.username} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                          <img src={user.anhDaiDien} alt={user.username} className="w-9 h-9 shrink-0 aspect-square rounded-full object-cover" />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0 text-sm">
+                          <div className="w-9 h-9 shrink-0 aspect-square rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
                             {user.username.charAt(0).toUpperCase()}
                           </div>
                         )}

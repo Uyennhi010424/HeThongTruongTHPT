@@ -24,8 +24,10 @@ import static org.mockito.Mockito.*;
 @SuppressWarnings("null")
 class NamHocServiceTest {
 
-    @Mock
-    private NamHocRepository namHocRepository;
+    @Mock private NamHocRepository namHocRepository;
+    @Mock private com.hethongtruongthpt.repository.HocKyRepository hocKyRepository;
+    @Mock private com.hethongtruongthpt.repository.HanhKiemRepository hanhKiemRepository;
+    @Mock private com.hethongtruongthpt.repository.HocBaRepository hocBaRepository;
 
     @InjectMocks
     private NamHocService namHocService;
@@ -82,34 +84,22 @@ class NamHocServiceTest {
     @DisplayName("create()")
     class Create {
         @Test
-        @DisplayName("should auto-generate ID when null")
-        void autoGeneratesId() {
+        @DisplayName("should create new nam hoc")
+        void createsNamHoc() {
             NamHoc newNamHoc = new NamHoc();
             newNamHoc.setTenNamHoc("2025-2026");
 
-            when(namHocRepository.findMaxId()).thenReturn(5);
-            when(namHocRepository.save(any(NamHoc.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(namHocRepository.save(any(NamHoc.class))).thenAnswer(inv -> {
+                NamHoc saved = inv.getArgument(0);
+                saved.setId(6);
+                return saved;
+            });
 
             NamHoc result = namHocService.create(newNamHoc);
 
             assertThat(result.getId()).isEqualTo(6);
             assertThat(result.getTenNamHoc()).isEqualTo("2025-2026");
             verify(namHocRepository).save(any(NamHoc.class));
-        }
-
-        @Test
-        @DisplayName("should keep existing ID when provided")
-        void keepsExistingId() {
-            NamHoc newNamHoc = new NamHoc();
-            newNamHoc.setId(10);
-            newNamHoc.setTenNamHoc("2025-2026");
-
-            when(namHocRepository.save(any(NamHoc.class))).thenAnswer(inv -> inv.getArgument(0));
-
-            NamHoc result = namHocService.create(newNamHoc);
-
-            assertThat(result.getId()).isEqualTo(10);
-            verify(namHocRepository, never()).findMaxId();
         }
     }
 
@@ -123,12 +113,12 @@ class NamHocServiceTest {
             when(namHocRepository.save(any(NamHoc.class))).thenAnswer(inv -> inv.getArgument(0));
 
             NamHoc updated = new NamHoc();
-            updated.setTenNamHoc("2024-2025 (updated)");
+            updated.setTenNamHoc("2024-2025-updated");
 
             NamHoc result = namHocService.update(1, updated);
 
             assertThat(result.getId()).isEqualTo(1);
-            assertThat(result.getTenNamHoc()).isEqualTo("2024-2025 (updated)");
+            assertThat(result.getTenNamHoc()).isEqualTo("2024-2025-updated");
         }
 
         @Test
@@ -145,8 +135,11 @@ class NamHocServiceTest {
     @DisplayName("delete()")
     class Delete {
         @Test
-        @DisplayName("should delete by id")
+        @DisplayName("should delete by id when status is not DANG_MO and has no data")
         void deletesById() {
+            sampleNamHoc.setTrangThai("DA_DONG");
+            when(namHocRepository.findById(1)).thenReturn(Optional.of(sampleNamHoc));
+            when(hocKyRepository.existsByNamHocId(1)).thenReturn(false);
             doNothing().when(namHocRepository).deleteById(1);
 
             namHocService.delete(1);

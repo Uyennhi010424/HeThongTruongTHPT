@@ -9,6 +9,7 @@ public class DiemProgressDTO {
     private Integer totalEnteredScores;
     private Double progressPercentage;
     private Boolean hasScores;
+    private Boolean isCompleted;
 
     public DiemProgressDTO() {}
 
@@ -21,7 +22,11 @@ public class DiemProgressDTO {
         this.totalEnteredScores = totalEnteredScores;
         this.progressPercentage = progressPercentage;
         this.hasScores = hasScores;
+        this.isCompleted = totalExpectedScores != null && totalExpectedScores > 0 && totalEnteredScores != null && totalEnteredScores >= totalExpectedScores;
     }
+
+    public Boolean getIsCompleted() { return isCompleted; }
+    public void setIsCompleted(Boolean isCompleted) { this.isCompleted = isCompleted; }
 
     public Boolean getHasScores() { return hasScores; }
     public void setHasScores(Boolean hasScores) { this.hasScores = hasScores; }

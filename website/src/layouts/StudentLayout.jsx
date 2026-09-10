@@ -62,7 +62,7 @@ export default function StudentLayout() {
         navLinks={links}
       />
       <Toast />
-      <main className="mt-16 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar app-main-bg transition-all duration-200">
+      <main className="mt-[112px] lg:mt-16 h-[calc(100vh-112px)] lg:h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar app-main-bg transition-all duration-200">
         <div className="flex flex-col min-h-full">
           <PasswordChangeBanner />
           <div className="w-full flex-grow">

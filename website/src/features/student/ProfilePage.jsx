@@ -173,14 +173,14 @@ export default function ProfilePage() {
   return (
     <div className="w-full min-h-screen bg-slate-50">
       {/* Profile Header Block */}
-      <div className="bg-white border-b border-slate-200 pt-8 pb-0 px-6 md:px-12">
+      <div className="bg-white border-b border-slate-200 pt-6 sm:pt-8 pb-0 px-4 sm:px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6">
-            <div className="flex items-center gap-6">
-              <div className="relative group cursor-pointer" onClick={() => document.getElementById('avatar-upload').click()}>
-                <div className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-slate-100 shadow-sm overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.02]">
+          <div className="flex flex-col md:flex-row items-center md:items-center justify-between gap-6 pb-6 text-center md:text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="relative group cursor-pointer shrink-0" onClick={() => document.getElementById('avatar-upload').click()}>
+                <div className="w-24 h-24 md:w-28 md:h-28 shrink-0 aspect-square rounded-full border-4 border-slate-100 shadow-sm overflow-hidden bg-slate-50 flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.02]">
                   {avatarPreview ? (
-                    <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover" />
+                    <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover shrink-0 aspect-square" />
                   ) : (
                     <User className="w-12 h-12 text-slate-300" />
                   )}
@@ -198,13 +198,13 @@ export default function ProfilePage() {
               </div>
               
               <div>
-                <div className="flex items-center gap-3 mb-1">
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-1">
                   <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{student?.hoTen || "Chưa cập nhật"}</h1>
                   <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full border border-green-200">
                     {getFieldValue('trangThai')}
                   </span>
                 </div>
-                <div className="text-sm font-medium text-slate-500 flex flex-wrap items-center gap-4 mt-2">
+                <div className="text-sm font-medium text-slate-500 flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-4 mt-2">
                   <span className="flex items-center gap-1.5"><Shield className="w-4 h-4" /> {getFieldValue('maHocSinh')}</span>
                   <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
                   <span className="flex items-center gap-1.5"><GraduationCap className="w-4 h-4" /> Lớp {getFieldValue('lop')}</span>

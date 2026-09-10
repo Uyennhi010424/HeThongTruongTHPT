@@ -12,6 +12,7 @@ import com.hethongtruongthpt.repository.DiemRepository;
 import com.hethongtruongthpt.repository.GiaoVienRepository;
 import com.hethongtruongthpt.repository.HanhKiemRepository;
 import com.hethongtruongthpt.repository.MonHocRepository;
+import com.hethongtruongthpt.repository.NamHocRepository;
 import com.hethongtruongthpt.repository.PhanCongDayRepository;
 import com.hethongtruongthpt.repository.ThoiKhoaBieuRepository;
 import com.hethongtruongthpt.repository.UserRepository;
@@ -36,7 +37,7 @@ import java.util.regex.Pattern;
 @Transactional
 public class GiaoVienService {
     private static final Logger log = LoggerFactory.getLogger(GiaoVienService.class);
-    private static final String DEFAULT_ACCOUNT_SUFFIX = "c3@edu.vn";
+    private static final String DEFAULT_ACCOUNT_SUFFIX = "c3@tdu.edu.vn";
     private static final Pattern MOJIBAKE_PATTERN = Pattern.compile("(Ã|Â|á»|áº|Ä|Å|ð|ñ|ß)");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^0\\d{9}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
@@ -55,6 +56,7 @@ public class GiaoVienService {
     private final DefaultAccountPasswordPolicy passwordPolicy;
     private final MonHocRepository monHocRepository;
     private final com.hethongtruongthpt.repository.LopHocRepository lopHocRepository;
+    private final NamHocRepository namHocRepository;
 
     public GiaoVienService(
             GiaoVienRepository giaoVienRepository,
@@ -67,7 +69,8 @@ public class GiaoVienService {
             DiemRepository diemRepository,
             DefaultAccountPasswordPolicy passwordPolicy,
             MonHocRepository monHocRepository,
-            com.hethongtruongthpt.repository.LopHocRepository lopHocRepository
+            com.hethongtruongthpt.repository.LopHocRepository lopHocRepository,
+            NamHocRepository namHocRepository
     ) {
         this.giaoVienRepository = giaoVienRepository;
         this.userService = userService;
@@ -80,6 +83,7 @@ public class GiaoVienService {
         this.passwordPolicy = passwordPolicy;
         this.monHocRepository = monHocRepository;
         this.lopHocRepository = lopHocRepository;
+        this.namHocRepository = namHocRepository;
     }
 
     public List<GiaoVienDTO> getAll() {
@@ -270,6 +274,16 @@ public class GiaoVienService {
         }
     }
 
+    private String getActiveNamHocName() {
+        if (namHocRepository != null) {
+            java.util.List<com.hethongtruongthpt.entity.NamHoc> active = namHocRepository.findByTrangThai("DANG_MO");
+            if (!active.isEmpty()) {
+                return active.get(0).getTenNamHoc();
+            }
+        }
+        return "2026-2027";
+    }
+
     private GiaoVienDTO toDto(GiaoVien giaoVien) {
         if (giaoVien == null) return null;
         GiaoVienDTO dto = new GiaoVienDTO();
@@ -288,18 +302,18 @@ public class GiaoVienService {
             dto.setUsername(giaoVien.getUser().getUsername());
         }
 
-        // Map GVCN info from LopHoc
-        java.util.List<com.hethongtruongthpt.entity.LopHoc> lopHocs = lopHocRepository.findByGvcnId(giaoVien.getId());
+        // Map GVCN info from LopHoc cho năm học hiện hành (DANG_MO)
+        String activeNamHoc = getActiveNamHocName();
+        java.util.List<com.hethongtruongthpt.entity.LopHoc> lopHocs = lopHocRepository.findByGvcnIdAndNamHoc(giaoVien.getId(), activeNamHoc);
         if (lopHocs != null && !lopHocs.isEmpty()) {
             dto.setIsGvcn(true);
-            String classNames = lopHocs.stream()
-                .map(com.hethongtruongthpt.entity.LopHoc::getTenLop)
-                .collect(java.util.stream.Collectors.joining(", "));
-            dto.setTenLopChuNhiem(classNames);
-            dto.setLopChuNhiemId(lopHocs.get(0).getId());
+            com.hethongtruongthpt.entity.LopHoc lop = lopHocs.get(0);
+            dto.setTenLopChuNhiem(lop.getTenLop());
+            dto.setLopChuNhiemId(lop.getId());
         } else {
             dto.setIsGvcn(false);
             dto.setTenLopChuNhiem(null);
+            dto.setLopChuNhiemId(null);
         }
 
         return dto;

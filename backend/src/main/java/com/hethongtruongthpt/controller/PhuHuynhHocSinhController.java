@@ -27,7 +27,8 @@ public class PhuHuynhHocSinhController {
         this.repository = repository;
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @GetMapping("/{id}/phuhuynh")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getParentsForStudent(@PathVariable("id") Integer id) {
         List<PhuHuynhHocSinh> links = repository.findByHocSinhId(id);
@@ -35,6 +36,7 @@ public class PhuHuynhHocSinhController {
             .map(link -> {
                 try {
                     PhuHuynh ph = link.getPhuHuynh();
+                    if (ph == null) return null;
                     Map<String, Object> map = new java.util.HashMap<>();
                     map.put("id", ph.getId() != null ? ph.getId() : 0);
                     map.put("userId", (ph.getUser() != null && ph.getUser().getId() != null) ? ph.getUser().getId() : null);
@@ -42,7 +44,8 @@ public class PhuHuynhHocSinhController {
                     map.put("soDienThoai", ph.getSoDienThoai() != null ? ph.getSoDienThoai() : "");
                     map.put("email", ph.getEmail() != null ? ph.getEmail() : "");
                     map.put("ngheNghiep", ph.getNgheNghiep() != null ? ph.getNgheNghiep() : "");
-                    map.put("quanHe", link.getQuanHe() != null ? link.getQuanHe() : "");
+                    map.put("quanHe", link.getQuanHe() != null ? link.getQuanHe() : (ph.getQuanHe() != null ? ph.getQuanHe() : "CHA"));
+                    map.put("laNguoiLienHeChinh", link.getLaNguoiLienHeChinh());
                     return map;
                 } catch (Exception e) {
                     return null;

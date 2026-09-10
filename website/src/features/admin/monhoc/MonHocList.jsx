@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Filter, RefreshCw, Plus, X, Edit, Trash2, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Filter, RefreshCw, Plus, X, Edit, Trash2, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import Pagination from "../../../components/common/Pagination.jsx";
@@ -63,6 +63,7 @@ export default function MonHocList() {
   const [pageSize, setPageSize] = useState(15);
   
   const [filterEvaluation, setFilterEvaluation] = useState("");
+  const [expandedSubjectId, setExpandedSubjectId] = useState(null);
   
   const { searchQuery, setSearchPlaceholder, setIsSearchVisible } = useAdminSearch();
   const keyword = searchQuery;
@@ -173,39 +174,25 @@ export default function MonHocList() {
     const tenMon = form.tenMon.trim();
     if (!tenMon) { notifyError("Vui lòng nhập tên môn."); return; }
 
-    const validNamePattern = /^[A-ZÀ-Ỹa-zà-ỹ0-9\s&().,]+$/;
+    const validNamePattern = /^[A-ZÀ-Ỹa-zà-ỹ0-9\s&().,\-]+$/;
     if (!validNamePattern.test(tenMon)) {
       notifyError("Tên môn chỉ được chứa chữ cái, số và ký tự &().,");
       return;
     }
 
-    const words = tenMon.split(/\s+/).filter(Boolean);
-    if (words.length < 1) {
-      notifyError("Vui lòng nhập tên môn.");
+    // Chỉ cần chữ cái đầu tiên viết hoa
+    if (!/^[A-ZÀ-Ỹ]/.test(tenMon)) {
+      notifyError("Tên môn phải bắt đầu bằng chữ hoa (vd: Toán, Ngữ văn).");
       return;
     }
 
-    const vietnameseDiacritics = /[àáảãạăắằẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
-    if (!vietnameseDiacritics.test(tenMon)) {
-      notifyError("Tên môn phải có dấu tiếng Việt (vd: Toán, Ngữ văn, Địa lí).");
-      return;
-    }
-
-    if (words.length === 1) {
-      if (words[0].length < 4) { notifyError("Tên môn phải có ít nhất 4 chữ cái (vd: Toán, Sinh)."); return; }
-      if (!/^[A-ZÀ-Ỹ]/.test(words[0])) { notifyError("Tên môn phải bắt đầu bằng chữ hoa (vd: Toán)."); return; }
-    } else {
-      for (const w of words) {
-        if (w.length < 2) { notifyError("Mỗi từ phải có ít nhất 2 chữ cái."); return; }
-        if (!/^[A-ZÀ-Ỹ]/.test(w)) { notifyError("Mỗi từ phải bắt đầu bằng chữ hoa (vd: Ngữ văn, Tiếng Anh)."); return; }
-      }
-    }
-
-    const normalizedName = normalizeStrict(tenMon);
+    // Kiểm tra trùng tên (bỏ qua space thừa, không phân biệt hoa thường)
+    const normalizedInput = tenMon.replace(/\s+/g, " ").trim().toLowerCase();
     const isDuplicate = subjects.some(
-      (s) => normalizeStrict(s.tenMon) === normalizedName && s.id !== editingSubject?.id
+      (s) => (s.tenMon || "").replace(/\s+/g, " ").trim().toLowerCase() === normalizedInput
+        && s.id !== editingSubject?.id
     );
-    if (isDuplicate) { notifyError(`Môn học "${tenMon}" đã tồn tại.`); return; }
+    if (isDuplicate) { notifyError(`Môn học "${tenMon}" đã tồn tại. Vui lòng kiểm tra lại tên môn.`); return; }
 
     if (!form.nhomDanhGia) { notifyError("Vui lòng chọn nhóm đánh giá."); return; }
 
@@ -215,6 +202,7 @@ export default function MonHocList() {
     }
 
     if (!form.khoiApDung.length) { notifyError("Vui lòng chọn ít nhất 1 khối áp dụng."); return; }
+
 
     const payload = {
       tenMon: tenMon,
@@ -276,57 +264,150 @@ export default function MonHocList() {
         {error && <div className="p-4 m-4 bg-red-50 text-red-600 rounded-xl text-sm font-semibold shrink-0">{error}</div>}
 
         <div className="overflow-auto flex-1">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-slate-50/90 backdrop-blur z-10">
-              <tr className="border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">STT</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[240px]">Tên môn</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hình thức đánh giá</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={4} className="px-6 py-12 text-center text-sm font-medium text-slate-500">Đang tải dữ liệu...</td></tr>
-              ) : pagedSubjects.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-16 text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-4">
-                       <Search className="w-8 h-8 text-slate-300" />
-                    </div>
-                    <h3 className="text-sm font-bold text-blue-900">Không tìm thấy môn học</h3>
-                    <p className="text-sm text-slate-500 mt-1">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
-                  </td>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block">
+            <table className="w-full text-left border-collapse min-w-[650px]">
+              <thead className="sticky top-0 bg-slate-50/90 backdrop-blur z-10">
+                <tr className="border-b border-slate-200">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">STT</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[240px]">Tên môn</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hình thức đánh giá</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
                 </tr>
-              ) : (
-                pagedSubjects.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors duration-150 group">
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-500">
-                      {(page - 1) * pageSize + index + 1}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-bold text-slate-900">{item.tenMon}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ring-1 ring-inset ${getEvaluationColor(getEvaluationLabel(item))}`}>
-                        {getEvaluationLabel(item)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Chỉnh sửa">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(item)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa môn học">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr><td colSpan={4} className="px-6 py-12 text-center text-sm font-medium text-slate-500">Đang tải dữ liệu...</td></tr>
+                ) : pagedSubjects.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-16 text-center">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-4">
+                         <Search className="w-8 h-8 text-slate-300" />
                       </div>
+                      <h3 className="text-sm font-bold text-blue-900">Không tìm thấy môn học</h3>
+                      <p className="text-sm text-slate-500 mt-1">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  pagedSubjects.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors duration-150 group">
+                      <td className="px-6 py-4 text-sm font-semibold text-slate-500">
+                        {(page - 1) * pageSize + index + 1}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-bold text-slate-900">{item.tenMon}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ring-1 ring-inset ${getEvaluationColor(getEvaluationLabel(item))}`}>
+                          {getEvaluationLabel(item)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => openEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Chỉnh sửa">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(item)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa môn học">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile / Tablet Collapsible Accordion Card View */}
+          <div className="block lg:hidden divide-y divide-slate-100">
+            {loading ? (
+              <div className="p-6 text-center text-sm text-slate-500">Đang tải dữ liệu...</div>
+            ) : pagedSubjects.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">Không tìm thấy môn học.</div>
+            ) : (
+              pagedSubjects.map((item, index) => {
+                const isExpanded = expandedSubjectId === item.id;
+                const evalLabel = getEvaluationLabel(item);
+                return (
+                  <div key={item.id} className="p-4 hover:bg-slate-50/70 transition-colors">
+                    {/* Summary Header */}
+                    <div
+                      className="flex items-center justify-between cursor-pointer gap-2"
+                      onClick={() => setExpandedSubjectId(isExpanded ? null : item.id)}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs font-bold text-slate-400 w-6 text-center shrink-0">
+                          {(page - 1) * pageSize + index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-slate-900 truncate">{item.tenMon}</h4>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold mt-1 ring-1 ring-inset ${getEvaluationColor(evalLabel)}`}>
+                            {evalLabel}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+                          aria-label="Toggle details"
+                        >
+                          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expandable Section */}
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-2.5 animate-in fade-in-50 duration-200">
+                        <div className="bg-slate-50 p-3 rounded-xl space-y-1.5">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Hình thức đánh giá:</span>
+                            <span className="font-semibold text-slate-800">{evalLabel}</span>
+                          </div>
+                          {item.nhomDanhGia === "DIEM_SO" && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Số bài ĐTX:</span>
+                              <span className="font-semibold text-slate-800">{item.soDtxHocKy || 3} bài/học kỳ</span>
+                            </div>
+                          )}
+                          {item.khoiApDung && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Khối áp dụng:</span>
+                              <span className="font-semibold text-slate-800">{item.khoiApDung}</span>
+                            </div>
+                          )}
+                          {item.moTa && (
+                            <div>
+                              <span className="text-slate-400 block mb-0.5">Mô tả:</span>
+                              <span className="text-slate-700">{item.moTa}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            onClick={() => openEdit(item)}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                          >
+                            <Edit className="w-3.5 h-3.5" /> Chỉnh sửa
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item)}
+                            className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Xóa môn
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
         <div className="shrink-0">

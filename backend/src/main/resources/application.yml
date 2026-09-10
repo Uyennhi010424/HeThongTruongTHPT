@@ -53,8 +53,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${SMTP_USERNAME:c3truongthptabc@gmail.com}
-    password: ${SMTP_PASSWORD:your-gmail-app-password}
+    username: ${SMTP_USERNAME:kyucnhanloai0104@gmail.com}
+    password: ${SMTP_PASSWORD:gqkquydxuabdzsvc}
     properties:
       mail:
         smtp:
@@ -83,7 +83,7 @@ app:
 # Default passwords for new accounts (must be set in .env)
 student-default-password: ${STUDENT_DEFAULT_PASSWORD:Abc1234@}
 parent-default-password: ${PARENT_DEFAULT_PASSWORD:Abc1234@}
-teacher-default-suffix: ${TEACHER_DEFAULT_SUFFIX:gv123@}
+teacher-default-suffix: ${TEACHER_DEFAULT_SUFFIX:@123}
 
 management:
   endpoints:

@@ -1,9 +1,6 @@
 import { useRef, useEffect, useCallback } from "react";
 
-const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-const LOWER = "abcdefghjkmnpqrstuvwxyz";
-const DIGITS = "23456789";
-const CHARS = UPPER + LOWER + DIGITS;
+const CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // Loại bỏ các ký tự dễ nhầm lẫn (0, O, 1, I, L)
 const CAPTCHA_LENGTH = 4;
 const WIDTH = 160;
 const HEIGHT = 52;
@@ -12,31 +9,16 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function randomColor(min, max) {
-  return `rgb(${randomInt(min, max)},${randomInt(min, max)},${randomInt(min, max)})`;
-}
-
 function generateCaptchaText() {
-  // Ensure at least 1 uppercase, 1 lowercase, 1 digit
-  const mandatory = [
-    UPPER[randomInt(0, UPPER.length - 1)],
-    LOWER[randomInt(0, LOWER.length - 1)],
-    DIGITS[randomInt(0, DIGITS.length - 1)]
-  ];
-  // Fill remaining with random chars
-  while (mandatory.length < CAPTCHA_LENGTH) {
-    mandatory.push(CHARS[randomInt(0, CHARS.length - 1)]);
+  let result = "";
+  for (let i = 0; i < CAPTCHA_LENGTH; i++) {
+    result += CHARS[randomInt(0, CHARS.length - 1)];
   }
-  // Shuffle
-  for (let i = mandatory.length - 1; i > 0; i--) {
-    const j = randomInt(0, i);
-    [mandatory[i], mandatory[j]] = [mandatory[j], mandatory[i]];
-  }
-  return mandatory.join("");
+  return result;
 }
 
 /**
- * Captcha component renders a distorted canvas CAPTCHA.
+ * Captcha component renders a clean, readable canvas CAPTCHA.
  * Props:
  * - onGenerate(text): called when a new CAPTCHA is generated
  * - disabled: disable refresh
@@ -49,85 +31,74 @@ export default function Captcha({ onGenerate, disabled }) {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    // Background gradient
+    // 1. Nền sáng nhẹ nhàng, chuyên nghiệp
     const gradient = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-    gradient.addColorStop(0, randomColor(230, 255));
-    gradient.addColorStop(1, randomColor(230, 255));
+    gradient.addColorStop(0, "#F8FAFC");
+    gradient.addColorStop(1, "#EFF6FF");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    // Noise dots
-    for (let i = 0; i < 60; i++) {
-      ctx.fillStyle = randomColor(80, 200);
+    // 2. Họa tiết lưới nhẹ nhàng tinh tế (không làm rối mắt)
+    ctx.strokeStyle = "rgba(203, 213, 225, 0.4)";
+    ctx.lineWidth = 1;
+    for (let x = 15; x < WIDTH; x += 20) {
       ctx.beginPath();
-      ctx.arc(randomInt(0, WIDTH), randomInt(0, HEIGHT), randomInt(1, 3), 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, HEIGHT);
+      ctx.stroke();
+    }
+    for (let y = 10; y < HEIGHT; y += 15) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(WIDTH, y);
+      ctx.stroke();
     }
 
-    // Noise lines
-    for (let i = 0; i < 6; i++) {
-      ctx.strokeStyle = randomColor(100, 200);
-      ctx.lineWidth = randomInt(1, 2);
+    // 3. Một vài đường lượn sóng mỏng mềm mại bảo mật
+    for (let i = 0; i < 2; i++) {
+      ctx.strokeStyle = i === 0 ? "rgba(59, 130, 246, 0.25)" : "rgba(99, 102, 241, 0.2)";
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(randomInt(0, WIDTH), randomInt(0, HEIGHT));
+      ctx.moveTo(0, randomInt(15, HEIGHT - 15));
       ctx.bezierCurveTo(
-        randomInt(0, WIDTH), randomInt(0, HEIGHT),
-        randomInt(0, WIDTH), randomInt(0, HEIGHT),
-        randomInt(0, WIDTH), randomInt(0, HEIGHT)
+        WIDTH * 0.33, randomInt(5, HEIGHT - 5),
+        WIDTH * 0.66, randomInt(5, HEIGHT - 5),
+        WIDTH, randomInt(15, HEIGHT - 15)
       );
       ctx.stroke();
     }
 
-    // Draw each character with distortion
-    const startX = 16;
-    const charWidth = (WIDTH - 32) / CAPTCHA_LENGTH;
+    // 4. Vẽ từng ký tự rõ ràng, nét đậm, góc nghiêng nhẹ
+    const colors = ["#1E3A8A", "#1D4ED8", "#0F172A", "#312E81", "#1E40AF"];
+    const startX = 20;
+    const charWidth = (WIDTH - 40) / CAPTCHA_LENGTH;
 
     for (let i = 0; i < text.length; i++) {
       const x = startX + i * charWidth + charWidth / 2;
-      const y = HEIGHT / 2 + randomInt(-4, 8);
+      const y = HEIGHT / 2 + 2;
 
       ctx.save();
       ctx.translate(x, y);
 
-      // Random rotation (heavy distortion)
-      const angle = (randomInt(-40, 40) * Math.PI) / 180;
+      // Góc nghiêng vừa phải (-10 đến +10 độ) để vẫn bảo mật nhưng cực kỳ dễ đọc
+      const angle = (randomInt(-10, 10) * Math.PI) / 180;
       ctx.rotate(angle);
 
-      // Random scale
-      const scaleX = 0.7 + Math.random() * 0.6;
-      const scaleY = 0.7 + Math.random() * 0.6;
-      ctx.scale(scaleX, scaleY);
-
-      // Random font
-      const fonts = ["bold", "italic bold", "italic"];
-      const fontSize = randomInt(22, 30);
-      ctx.font = `${fonts[randomInt(0, fonts.length - 1)]} ${fontSize}px 'Courier New', monospace`;
-
-      // Text color (dark but varied)
-      ctx.fillStyle = randomColor(0, 80);
+      // Font chữ to, đậm, rõ ràng
+      const fontSize = 28;
+      ctx.font = `bold ${fontSize}px 'Segoe UI', -apple-system, Roboto, sans-serif`;
+      ctx.fillStyle = colors[i % colors.length];
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // Shadow for depth
-      ctx.shadowColor = randomColor(100, 180);
-      ctx.shadowBlur = randomInt(1, 3);
-      ctx.shadowOffsetX = randomInt(-2, 2);
-      ctx.shadowOffsetY = randomInt(-2, 2);
+      // Đổ bóng nhẹ làm nổi bật chữ
+      ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
 
       ctx.fillText(text[i], 0, 0);
       ctx.restore();
-    }
-
-    // Extra noise lines crossing text
-    for (let i = 0; i < 3; i++) {
-      ctx.strokeStyle = randomColor(80, 160);
-      ctx.lineWidth = randomInt(1, 2);
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(randomInt(0, 30), randomInt(0, HEIGHT));
-      ctx.lineTo(randomInt(WIDTH - 30, WIDTH), randomInt(0, HEIGHT));
-      ctx.stroke();
-      ctx.globalAlpha = 1;
     }
   }, []);
 
@@ -148,7 +119,7 @@ export default function Captcha({ onGenerate, disabled }) {
           ref={canvasRef}
           width={WIDTH}
           height={HEIGHT}
-          className={`w-full h-full object-cover cursor-pointer transition-opacity ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
+          className={`w-full h-full object-contain cursor-pointer transition-opacity ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
           onClick={() => !disabled && generateCaptcha()}
           title="Nhấn để tạo CAPTCHA mới"
         />

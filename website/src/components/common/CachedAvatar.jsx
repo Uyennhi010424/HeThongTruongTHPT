@@ -43,15 +43,15 @@ export default function CachedAvatar({
     return (
       <img
         src={avatar}
-        alt="avatar"
-        className={className}
+        alt={username || "avatar"}
+        className={`shrink-0 aspect-square object-cover ${className}`}
         onError={() => setError(true)}
       />
     );
   }
 
   return (
-    <div className={fallbackClassName}>
+    <div className={`shrink-0 aspect-square flex items-center justify-center ${fallbackClassName}`}>
       {fallback}
     </div>
   );

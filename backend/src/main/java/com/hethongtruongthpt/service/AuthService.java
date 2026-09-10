@@ -59,8 +59,10 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        String username = request.getUsername();
+        String username = request.getUsername() != null ? request.getUsername().trim() : "";
         User user = userRepository.findByUsername(username)
+                .or(() -> userRepository.findByUsernameIgnoreCase(username))
+                .or(() -> userRepository.findByEmailIgnoreCase(username))
                 .orElseThrow(() -> {
                     log.warn("Đăng nhập thất bại: tài khoản '{}' không tồn tại", username);
                     return new ApiException("Sai tài khoản hoặc mật khẩu");

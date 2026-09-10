@@ -21,7 +21,6 @@ const LopList = lazy(() => import("../features/admin/lop/LopList.jsx"));
 const MonHocList = lazy(() => import("../features/admin/monhoc/MonHocList.jsx"));
 const NamHocHocKyPage = lazy(() => import("../features/admin/namhoc-hocky/NamHocHocKyPage.jsx"));
 const ThongBaoManager = lazy(() => import("../features/admin/thongbao/ThongBaoManager.jsx"));
-const ReportPage = lazy(() => import("../features/admin/report/ReportPage.jsx"));
 const SettingsPage = lazy(() => import("../features/admin/settings/SettingsPage.jsx"));
 const PhanCongPage = lazy(() => import("../features/admin/phancong/PhanCongPage.jsx"));
 const LichThiAdminPage = lazy(() => import("../features/admin/lichthi/LichThiAdminPage.jsx"));
@@ -157,7 +156,7 @@ const routes = [
       { path: "lichthi", element: withSuspense(LichThiAdminPage) },
       { path: "users", element: withSuspense(UserList) },
       { path: "settings", element: withSuspense(SettingsPage) },
-      { path: "report", element: withSuspense(ReportPage) },
+      { path: "report", element: <Navigate to="/admin/dashboard" replace /> },
       { path: "thongbao", element: withSuspense(ThongBaoManager) }
     ]
   },
@@ -209,6 +208,7 @@ const routes = [
       // { path: "khen-thuong", element: withSuspense(KhenThuongPage) },
       // { path: "conduct", element: withSuspense(ConductPage) },
       { path: "thongbao", element: withSuspense(StudentThongBao) },
+      { path: "notices", element: <Navigate to="/student/thongbao" replace /> },
       { path: "lichthi", element: <Navigate to="/student/timetable?filter=exams" replace /> },
       { path: "baikiemtra", element: withSuspense(lazy(() => import("../features/student/baikiemtra/StudentBaiKiemTra.jsx"))) },
       { path: "profile", element: withSuspense(ProfilePage) },

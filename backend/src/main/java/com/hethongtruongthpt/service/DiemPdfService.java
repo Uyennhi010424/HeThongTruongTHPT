@@ -45,7 +45,7 @@ public class DiemPdfService {
     private final HocSinhRepository hocSinhRepository;
     private final DiemRepository diemRepository;
     private final AdminConfigRepository adminConfigRepository;
-
+    private final com.hethongtruongthpt.repository.LichSuHocTapRepository lichSuHocTapRepository;
 
     private com.itextpdf.text.pdf.BaseFont getBaseFont() {
         try {
@@ -63,12 +63,14 @@ public class DiemPdfService {
                           MonHocRepository monHocRepository,
                           HocSinhRepository hocSinhRepository,
                           DiemRepository diemRepository,
-                          AdminConfigRepository adminConfigRepository) {
+                          AdminConfigRepository adminConfigRepository,
+                          com.hethongtruongthpt.repository.LichSuHocTapRepository lichSuHocTapRepository) {
         this.lopHocRepository = lopHocRepository;
         this.monHocRepository = monHocRepository;
         this.hocSinhRepository = hocSinhRepository;
         this.diemRepository = diemRepository;
         this.adminConfigRepository = adminConfigRepository;
+        this.lichSuHocTapRepository = lichSuHocTapRepository;
     }
 
     private String getSchoolName() {
@@ -131,9 +133,9 @@ public class DiemPdfService {
         String hkLabel = hocKy == 1 ? "Học kỳ I" : "Học kỳ II";
         Paragraph sub = new Paragraph(
                 "Lớp: " + lopHoc.getTenLop()
-                        + "    |    Mon: " + monHoc.getTenMon()
+                        + "    |    Môn: " + monHoc.getTenMon()
                         + "    |    " + hkLabel
-                        + "    |    Nam hoc: " + namHoc, subFont);
+                        + "    |    Năm học: " + namHoc, subFont);
         sub.setAlignment(Element.ALIGN_CENTER);
         sub.setSpacingAfter(16);
         document.add(sub);
@@ -277,7 +279,20 @@ public class DiemPdfService {
         HocSinh hocSinh = hocSinhRepository.findById(hocSinhId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy học sinh với id: " + hocSinhId));
         LopHoc lopHoc = hocSinh.getLop();
-        String tenLop = lopHoc != null ? lopHoc.getTenLop() : "Chua xep lop";
+        String tenLop = lopHoc != null ? lopHoc.getTenLop() : "Chưa xếp lớp";
+
+        // Nếu năm học của bảng điểm khác năm học lớp hiện tại, lấy lớp tương ứng trong lịch sử học tập
+        if (lopHoc != null && lopHoc.getNamHoc() != null && !lopHoc.getNamHoc().equals(namHoc)) {
+            try {
+                List<com.hethongtruongthpt.entity.LichSuHocTap> lsList = lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinhId);
+                for (com.hethongtruongthpt.entity.LichSuHocTap ls : lsList) {
+                    if (namHoc.equals(ls.getNamHoc()) && ls.getLopHoc() != null) {
+                        tenLop = ls.getLopHoc().getTenLop();
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
 
         List<Diem> diemList = diemRepository.findByHocSinhIdAndHocKyAndNamHoc(hocSinhId, hocKy, namHoc);
         Map<MonHoc, List<Diem>> diemByMonHoc = diemList.stream()
@@ -304,9 +319,9 @@ public class DiemPdfService {
 
         Font infoFont = new Font(getBaseFont(), 12);
         String hkLabel = hocKy == 1 ? "Học kỳ I" : "Học kỳ II";
-        Paragraph info1 = new Paragraph("Họ tên: " + hocSinh.getHoTen() + "    |    Ma HS: " + hocSinh.getMaHocSinh(), infoFont);
+        Paragraph info1 = new Paragraph("Họ tên: " + hocSinh.getHoTen() + "    |    Mã HS: " + hocSinh.getMaHocSinh(), infoFont);
         info1.setAlignment(Element.ALIGN_CENTER);
-        Paragraph info2 = new Paragraph("Lớp: " + tenLop + "    |    " + hkLabel + "    |    Nam hoc: " + namHoc, infoFont);
+        Paragraph info2 = new Paragraph("Lớp: " + tenLop + "    |    " + hkLabel + "    |    Năm học: " + namHoc, infoFont);
         info2.setAlignment(Element.ALIGN_CENTER);
         info2.setSpacingAfter(16);
         document.add(info1);

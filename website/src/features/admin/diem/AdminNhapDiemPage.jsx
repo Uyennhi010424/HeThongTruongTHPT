@@ -5,12 +5,13 @@ import { getDiemProgressSummary, guiBangDiemTuDong } from "../../../api/diemApi.
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
+import { notifySuccess, notifyError } from "../../../utils/notify.js";
 import DiemProgressTable from "./DiemProgressTable.jsx";
 
 
 export default function AdminNhapDiemPage() {
   const currentSemester = 1;
-  const [namHoc, setNamHoc] = useState("2025-2026"); // Default to 2025-2026 since we have sample data there
+  const [namHoc, setNamHoc] = useState("");
   const [hocKy, setHocKy] = useState(currentSemester);
   const [sendHocKy, setSendHocKy] = useState(currentSemester);
   const [progressData, setProgressData] = useState([]);
@@ -65,6 +66,7 @@ export default function AdminNhapDiemPage() {
       const res = await getDiemProgressSummary({ namHoc, hocKy });
       setProgressData(res?.data?.data || []);
     } catch (err) {
+      setProgressData([]);
       if (!err.response) {
         console.error("[AdminNhapDiemPage] Lỗi kết nối khi lấy tiến độ:", err.message);
         setServerError(true);
@@ -86,9 +88,13 @@ export default function AdminNhapDiemPage() {
       setSendError("");
       setSendSuccessMsg("");
       const res = await guiBangDiemTuDong(sendHocKy);
-      setSendSuccessMsg(res?.data?.message || "Hệ thống đang tiến hành gửi điểm...");
+      const msg = res?.data?.message || "Hệ thống đang tiến hành gửi điểm...";
+      setSendSuccessMsg(msg);
+      notifySuccess(msg);
     } catch (err) {
-      setSendError(err?.response?.data?.message || "Lỗi kết nối máy chủ");
+      const errorMsg = err?.response?.data?.message || "Lỗi kết nối máy chủ";
+      setSendError(errorMsg);
+      notifyError(errorMsg);
     } finally {
       setSending(false);
     }

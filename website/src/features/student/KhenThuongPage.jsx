@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { getKhenThuong, getViPham } from "../../api/khenThuongViPhamApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 
@@ -15,6 +16,7 @@ export default function KhenThuongPage() {
   const [khenThuong, setKhenThuong] = useState([]);
   const [viPham, setViPham] = useState([]);
   const [activeTab, setActiveTab] = useState("khen-thuong");
+  const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -76,7 +78,7 @@ export default function KhenThuongPage() {
               key={tab.value}
               type="button"
               className={`semester-pill ${activeTab === tab.value ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.value)}
+              onClick={() => { setActiveTab(tab.value); setExpandedId(null); }}
             >
               {tab.label}
             </button>
@@ -104,36 +106,113 @@ export default function KhenThuongPage() {
             </div>
             <div className="panel-pill">{currentList.length} bản ghi</div>
           </div>
-          <div className="table-grid">
-            <div className="table-row table-head">
-              <div>STT</div>
-              <div>Nội dung</div>
-              {activeTab === "vi-pham" && <div>Mức độ</div>}
-              <div>Ngày</div>
-            </div>
-            {currentList.map((item, idx) => (
-              <div key={item.id} className="table-row">
-                <div>{idx + 1}</div>
-                <div className="table-title">{item.noiDung || "--"}</div>
-                {activeTab === "vi-pham" && (
-                  <div>
-                    {item.mucDo ? (
-                      <span
-                        className={MUC_DO_MAP[item.mucDo]?.color || "text-gray-700 bg-gray-50"}
-                        style={{ padding: "2px 8px", borderRadius: 4 }}
-                      >
-                        {MUC_DO_MAP[item.mucDo]?.label || item.mucDo}
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto min-w-[600px]">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/50">
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-14 text-center">STT</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nội dung</th>
+                  {activeTab === "vi-pham" && (
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-36">Mức độ</th>
+                  )}
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-36">Ngày</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {currentList.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-3 text-sm text-slate-500 text-center font-medium">{idx + 1}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-800">{item.noiDung || "--"}</td>
+                    {activeTab === "vi-pham" && (
+                      <td className="px-4 py-3 text-sm">
+                        {item.mucDo ? (
+                          <span
+                            className={`inline-flex px-2.5 py-1 rounded-md text-xs font-semibold ${MUC_DO_MAP[item.mucDo]?.color || "text-gray-700 bg-gray-50"}`}
+                          >
+                            {MUC_DO_MAP[item.mucDo]?.label || item.mucDo}
+                          </span>
+                        ) : "--"}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {(item.ngayKhen || item.ngayViPham)
+                        ? new Date(item.ngayKhen || item.ngayViPham).toLocaleDateString("vi-VN")
+                        : "--"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Collapsible Accordion View */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {currentList.map((item, idx) => {
+              const isExpanded = expandedId === item.id;
+              const dateStr = (item.ngayKhen || item.ngayViPham)
+                ? new Date(item.ngayKhen || item.ngayViPham).toLocaleDateString("vi-VN")
+                : "--";
+              return (
+                <div key={item.id} className="p-4 hover:bg-slate-50/70 transition-colors">
+                  <div
+                    className="flex items-center justify-between cursor-pointer gap-2"
+                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xs font-bold text-slate-400 w-6 text-center shrink-0">
+                        {idx + 1}
                       </span>
-                    ) : "--"}
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 line-clamp-1">
+                          {item.noiDung || "--"}
+                        </h4>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {dateStr}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {activeTab === "vi-pham" && item.mucDo && (
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${MUC_DO_MAP[item.mucDo]?.color || "text-gray-700 bg-gray-50"}`}>
+                          {MUC_DO_MAP[item.mucDo]?.label || item.mucDo}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                        aria-label="Toggle details"
+                      >
+                        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
-                )}
-                <div>
-                  {(item.ngayKhen || item.ngayViPham)
-                    ? new Date(item.ngayKhen || item.ngayViPham).toLocaleDateString("vi-VN")
-                    : "--"}
+
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-2 animate-in fade-in-50 duration-200">
+                      <div className="bg-slate-50 p-3 rounded-xl space-y-1.5">
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">Nội dung chi tiết:</span>
+                          <span className="font-medium text-slate-800">{item.noiDung || "--"}</span>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                          <span className="text-slate-400">Ngày ghi nhận:</span>
+                          <span className="font-semibold text-slate-800">{dateStr}</span>
+                        </div>
+                        {activeTab === "vi-pham" && item.mucDo && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Mức độ xử lý:</span>
+                            <span className="font-semibold text-slate-800">{MUC_DO_MAP[item.mucDo]?.label || item.mucDo}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

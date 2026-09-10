@@ -10,10 +10,12 @@ import { getStudentClass, getStudentClassId, sortStudentsByGivenName } from "../
 import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
 import Pagination from "../../../components/common/Pagination.jsx";
 import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
+import { useDragScroll } from "../../../hooks/useDragScroll.js";
 
 const TERM_MAP = { KI1: 1, KI2: 2, CA_NAM: 0 };
 
 export default function HanhKiemPage() {
+  const dragScroll = useDragScroll();
   const filters = useTeacherFilters({ showSubject: false, showGrade: false, homeroomOnly: true });
   const {
     loading: filterLoading,
@@ -51,23 +53,35 @@ export default function HanhKiemPage() {
       try {
         setLoading(true);
         const hocKy = TERM_MAP[selectedTerm];
-        const res = await getHanhKiem({ lopId: selectedClassId });
+        const currentNamHocObj = (filters.namHocList || filters.allNamHoc || []).find(
+          (y) => y.tenNamHoc === selectedNamHoc
+        );
+        const namHocId = currentNamHocObj?.id;
+
+        const res = namHocId
+          ? await getHanhKiem({ lopId: selectedClassId, namHocId })
+          : await getHanhKiem({ lopId: selectedClassId });
         if (!active) return;
 
         const records = res?.data?.data || [];
-        // Filter by hocKy if not CA_NAM
-        const filtered = hocKy === 0
-          ? records
-          : records.filter((r) => r.hocKy === hocKy);
+        // Filter strictly by hocKy and namHoc
+        const filtered = records.filter((r) => {
+          const rHocKy = r.hocKy ?? r.hoc_ky;
+          const matchHocKy = hocKy === 0 || rHocKy === hocKy;
+          const rNamHocId = r?.namHoc?.id ?? r?.idNamHoc ?? r?.id_namhoc;
+          const rNamHocTen = r?.namHoc?.tenNamHoc ?? r?.namHoc?.ten_nam_hoc;
+          const matchNamHoc = !namHocId || rNamHocId === namHocId || rNamHocTen === selectedNamHoc;
+          return matchHocKy && matchNamHoc;
+        });
 
-        // Build lookup: { studentId: { id, xepLoai, nhanXet } }
+        // Build lookup: { studentId: { id, xepLoai, nhanXet, status } }
         const lookup = {};
         filtered.forEach((r) => {
-          const sid = r?.hocSinh?.id;
+          const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
           if (sid) {
             lookup[sid] = {
               id: r.id,
-              xepLoai: r.xepLoai || "TOT",
+              xepLoai: r.xepLoai || null,
               nhanXet: r.nhanXet || "",
               status: r.status || "DRAFT"
             };
@@ -274,7 +288,18 @@ export default function HanhKiemPage() {
 
           {/* Class tabs */}
           {classes.length > 1 && (
-            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
+            <div 
+              ref={dragScroll.ref}
+              {...dragScroll.events}
+              style={{
+                display: "flex",
+                gap: 12,
+                overflowX: "auto",
+                paddingBottom: 4,
+                cursor: dragScroll.isDragging ? "grabbing" : "grab",
+                userSelect: dragScroll.isDragging ? "none" : "auto"
+              }}
+            >
               {classes.map((item) => {
                 const isActive = String(item.id) === selectedClassId;
                 return (
@@ -282,10 +307,11 @@ export default function HanhKiemPage() {
                     key={item.id}
                     type="button"
                     style={{
-                      padding: "8px 16px", borderRadius: 20, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
+                      padding: "8px 16px", borderRadius: 20, fontSize: 14, fontWeight: 600, border: "none", cursor: dragScroll.isDragging ? "grabbing" : "pointer",
                       whiteSpace: "nowrap", transition: "all 0.2s",
                       background: isActive ? "#2563eb" : "#f1f5f9",
-                      color: isActive ? "#fff" : "#475569"
+                      color: isActive ? "#fff" : "#475569",
+                      userSelect: "none"
                     }}
                     onClick={() => { setSelectedClassId(String(item.id)); setSaveMessage(""); }}
                   >

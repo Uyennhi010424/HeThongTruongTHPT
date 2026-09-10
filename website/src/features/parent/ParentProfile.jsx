@@ -135,7 +135,7 @@ export default function ParentProfile() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
-                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={currentStudent.gioiTinh || "--"} disabled />
+                  <input className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700" value={(currentStudent.gioiTinh === "NU" || currentStudent.gioiTinh === "false" || currentStudent.gioiTinh === false || currentStudent.gioiTinh === "Nữ") ? "Nữ" : (currentStudent.gioiTinh ? "Nam" : "--")} disabled />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Dân tộc / Tôn giáo</label>

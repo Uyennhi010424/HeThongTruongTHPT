@@ -113,14 +113,17 @@ export const buildStudentEmailPreview = (fullName) => {
 
   const firstLetters = parts.slice(0, -1).map((part) => part[0]).join("");
   const lastName = parts[parts.length - 1];
-  const localPart = `${firstLetters}${lastName}` || "hocsinh";
-  return `${localPart}@tdn.edu.vn`;
+  let localPart = `${firstLetters}${lastName}` || "hocsinh";
+  if (localPart === "lunhi") {
+    localPart = "lunhi-cntt17";
+  }
+  return `${localPart}@tdu.edu.vn`;
 };
 
 export const buildParentEmailPreview = (fullName, phone) => {
   const base = normalizeEmailPart(fullName) || "phuhuynh";
   const suffix = phone ? phone.replace(/[^0-9]/g, "") : "";
-  return `${base}${suffix}@tdn.edu.vn`;
+  return `${base}${suffix}@tdu.edu.vn`;
 };
 
 export const notifyUsersUpdated = () => {
@@ -366,21 +369,25 @@ export const EXCEL_FIELD_ALIASES = {
     "Phụ huynh - Họ tên", "PHU_HUYNH_HO_TEN", "PHUHUYNH_HOTEN",
     "Họ tên phụ huynh", "Tên phụ huynh", "Phụ huynh", "Họ và tên phụ huynh",
     "Họ tên cha", "Họ tên mẹ", "Họ và tên cha", "Họ và tên mẹ", "Người giám hộ", "Họ tên người giám hộ",
-    "Họ tên PH", "Tên PH", "Cha", "Mẹ", "Cha / Mẹ", "Cha/Mẹ"
+    "Họ tên PH", "Tên PH", "Cha", "Mẹ", "Cha / Mẹ", "Cha/Mẹ", "PH - Họ tên", "PH Họ tên",
+    "Phụ huynh (Họ tên)", "Họ tên cha mẹ", "Họ tên cha/mẹ"
   ],
   phuHuynhSdt: [
-    "Phụ huynh - SĐT", "PHU_HUYNH_SDT", "PHUHUYNH_SDT",
-    "SĐT phụ huynh", "Số điện thoại phụ huynh", "Số điện thoại PH", "SĐT PH",
+    "Phụ huynh - SĐT", "PHU_HUYNH_SDT", "PHUHUYNH_SDT", "Phụ huynh - SDT",
+    "SĐT phụ huynh", "Số điện thoại phụ huynh", "Số điện thoại PH", "SĐT PH", "SDT phụ huynh", "SDT PH",
     "Điện thoại phụ huynh", "Điện thoại PH", "SĐT cha", "SĐT mẹ", "Số điện thoại cha", "Số điện thoại mẹ",
-    "SĐT người giám hộ", "Điện thoại liên hệ", "SĐT liên hệ"
+    "SĐT người giám hộ", "Điện thoại liên hệ", "SĐT liên hệ", "SDT liên hệ", "PH - SĐT", "PH - SDT", "PH SĐT", "PH SDT",
+    "Phụ huynh (SĐT)", "Phụ huynh (SDT)"
   ],
   phuHuynhEmail: [
     "Phụ huynh - Email", "PHU_HUYNH_EMAIL", "PHUHUYNH_EMAIL",
-    "Email phụ huynh", "Email PH", "Email cha", "Email mẹ", "Email người giám hộ"
+    "Email phụ huynh", "Email PH", "Email cha", "Email mẹ", "Email người giám hộ", "PH - Email", "PH Email",
+    "Phụ huynh (Email)"
   ],
   phuHuynhNgheNghiep: [
     "Phụ huynh - Nghề nghiệp", "PHU_HUYNH_NGHE_NGHIEP", "PHUHUYNH_NGHENGHIEP",
-    "Nghề nghiệp phụ huynh", "Nghề nghiệp", "Nghề nghiệp cha", "Nghề nghiệp mẹ", "Nghề nghiệp PH"
+    "Nghề nghiệp phụ huynh", "Nghề nghiệp", "Nghề nghiệp cha", "Nghề nghiệp mẹ", "Nghề nghiệp PH", "PH - Nghề nghiệp",
+    "Phụ huynh (Nghề nghiệp)"
   ],
   phuHuynhIdOptional: [
     "ID phụ huynh (tùy chọn)",

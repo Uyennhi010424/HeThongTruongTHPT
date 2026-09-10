@@ -34,4 +34,5 @@ public interface LichThiRepository extends JpaRepository<LichThi, Integer> {
 
     // Tìm tất cả lịch thi trong năm học
     List<LichThi> findByNamHocAndHocKy(String namHoc, Integer hocKy);
+    boolean existsByNamHoc(String namHoc);
 }

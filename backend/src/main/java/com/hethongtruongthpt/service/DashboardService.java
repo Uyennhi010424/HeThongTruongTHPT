@@ -201,9 +201,10 @@ public class DashboardService {
         Integer lopId = hocSinh.getLop() != null ? hocSinh.getLop().getId() : null;
         Integer hocSinhId = hocSinh.getId();
 
-        // 1. Notices
+        // 1. Notices (Chỉ lấy thông báo dành cho học sinh hoặc toàn trường)
         List<ThongBao> notices = thongBaoRepository.findAll().stream()
-                .filter(tb -> "HOC_SINH".equals(tb.getLoai()) || "ALL".equals(tb.getLoai()))
+                .filter(tb -> "HOC_SINH".equalsIgnoreCase(tb.getLoai()) || "ALL".equalsIgnoreCase(tb.getLoai()))
+                .filter(tb -> tb.getRecipientId() == null || (hocSinh.getUser() != null && hocSinh.getUser().getId().equals(tb.getRecipientId())))
                 .sorted((a, b) -> b.getNgayDang().compareTo(a.getNgayDang()))
                 .collect(Collectors.toList());
         dashboardData.setNotices(notices);
@@ -222,13 +223,14 @@ public class DashboardService {
         }
         dashboardData.setTimetable(timetable);
 
-        // 3. Exams (Lấy tất cả các lớp của học sinh từ lớp hiện tại và lịch sử học tập)
+        // 3. Exams & Academic History (Lấy tất cả các lớp của học sinh từ lớp hiện tại và lịch sử học tập)
         List<LichThi> exams = new ArrayList<>();
         java.util.Set<Integer> studentLopIds = new java.util.HashSet<>();
         if (lopId != null) {
             studentLopIds.add(lopId);
         }
         List<LichSuHocTap> studentHistories = lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinhId);
+        dashboardData.setAcademicHistories(studentHistories);
         for (LichSuHocTap ls : studentHistories) {
             if (ls.getLopHoc() != null) {
                 studentLopIds.add(ls.getLopHoc().getId());

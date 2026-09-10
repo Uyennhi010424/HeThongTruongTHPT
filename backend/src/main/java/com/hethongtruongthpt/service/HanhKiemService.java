@@ -1,20 +1,31 @@
 package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.entity.HanhKiem;
+import com.hethongtruongthpt.entity.HocSinh;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.HanhKiemRepository;
+import com.hethongtruongthpt.repository.HocSinhRepository;
+import com.hethongtruongthpt.repository.LichSuHocTapRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class HanhKiemService {
     private final HanhKiemRepository hanhKiemRepository;
+    private final LichSuHocTapRepository lichSuHocTapRepository;
+    private final HocSinhRepository hocSinhRepository;
 
-    public HanhKiemService(HanhKiemRepository hanhKiemRepository) {
+    public HanhKiemService(HanhKiemRepository hanhKiemRepository,
+                          LichSuHocTapRepository lichSuHocTapRepository,
+                          HocSinhRepository hocSinhRepository) {
         this.hanhKiemRepository = hanhKiemRepository;
+        this.lichSuHocTapRepository = lichSuHocTapRepository;
+        this.hocSinhRepository = hocSinhRepository;
     }
 
     public List<HanhKiem> getAll() {
@@ -40,11 +51,51 @@ public class HanhKiemService {
     }
 
     public List<HanhKiem> getByLopAndNamHoc(Integer lopId, Integer namHocId) {
-        return hanhKiemRepository.findByHocSinhLopIdAndNamHocId(lopId, namHocId);
+        List<HocSinh> current = hocSinhRepository.findByLopId(lopId);
+        List<com.hethongtruongthpt.entity.LichSuHocTap> histories = lichSuHocTapRepository.findByLopHocId(lopId);
+
+        Set<Integer> sIds = new HashSet<>();
+        if (current != null) {
+            for (HocSinh hs : current) {
+                if (hs != null && hs.getId() != null) sIds.add(hs.getId());
+            }
+        }
+        if (histories != null) {
+            for (com.hethongtruongthpt.entity.LichSuHocTap ls : histories) {
+                if (ls != null && ls.getHocSinh() != null && ls.getHocSinh().getId() != null) {
+                    sIds.add(ls.getHocSinh().getId());
+                }
+            }
+        }
+
+        if (sIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return hanhKiemRepository.findByHocSinhIdInAndNamHocId(new ArrayList<>(sIds), namHocId);
     }
 
     public List<HanhKiem> getByLop(Integer lopId) {
-        return hanhKiemRepository.findByHocSinhLopId(lopId);
+        List<HocSinh> current = hocSinhRepository.findByLopId(lopId);
+        List<com.hethongtruongthpt.entity.LichSuHocTap> histories = lichSuHocTapRepository.findByLopHocId(lopId);
+
+        Set<Integer> sIds = new HashSet<>();
+        if (current != null) {
+            for (HocSinh hs : current) {
+                if (hs != null && hs.getId() != null) sIds.add(hs.getId());
+            }
+        }
+        if (histories != null) {
+            for (com.hethongtruongthpt.entity.LichSuHocTap ls : histories) {
+                if (ls != null && ls.getHocSinh() != null && ls.getHocSinh().getId() != null) {
+                    sIds.add(ls.getHocSinh().getId());
+                }
+            }
+        }
+
+        if (sIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return hanhKiemRepository.findByHocSinhIdIn(new ArrayList<>(sIds));
     }
 
     public HanhKiem create(HanhKiem hanhKiem) {
@@ -52,8 +103,7 @@ public class HanhKiemService {
         // Upsert: tìm bản ghi trùng (học sinh + năm học + học kỳ) → cập nhật thay vì tạo mới
         HanhKiem existing = findExisting(hanhKiem);
         if (existing != null) {
-            boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities()
-                .stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            boolean isAdmin = isCurrentUserAdmin();
             if ("APPROVED".equals(existing.getStatus()) && !isAdmin) {
                 throw new com.hethongtruongthpt.exception.ApiException("Đánh giá hạnh kiểm đã được duyệt và khóa, không thể sửa đổi.");
             }
@@ -70,8 +120,7 @@ public class HanhKiemService {
     public HanhKiem update(Integer id, HanhKiem hanhKiem) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
         HanhKiem existing = getById(id);
-        boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities()
-            .stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = isCurrentUserAdmin();
         if ("APPROVED".equals(existing.getStatus()) && !isAdmin) {
             throw new com.hethongtruongthpt.exception.ApiException("Đánh giá hạnh kiểm đã được duyệt và khóa, không thể sửa đổi.");
         }
@@ -82,8 +131,7 @@ public class HanhKiemService {
     public void delete(Integer id) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
         HanhKiem existing = getById(id);
-        boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities()
-            .stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = isCurrentUserAdmin();
         if ("APPROVED".equals(existing.getStatus()) && !isAdmin) {
             throw new com.hethongtruongthpt.exception.ApiException("Đánh giá hạnh kiểm đã được duyệt và khóa, không thể xóa.");
         }
@@ -92,8 +140,7 @@ public class HanhKiemService {
 
     @Transactional
     public List<HanhKiem> saveAll(List<HanhKiem> hanhKiemList) {
-        boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities()
-            .stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = isCurrentUserAdmin();
         List<HanhKiem> results = new ArrayList<>();
         for (HanhKiem hk : hanhKiemList) {
             // Nếu có id → cập nhật bản ghi hiện có
@@ -127,6 +174,14 @@ public class HanhKiemService {
             }
         }
         return results;
+    }
+
+    private boolean isCurrentUserAdmin() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 
     /**

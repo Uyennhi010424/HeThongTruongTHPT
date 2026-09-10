@@ -23,6 +23,12 @@ public class GiaoVienNghiService {
     private static final Logger logger = LoggerFactory.getLogger(GiaoVienNghiService.class);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    /** Normalize namHoc: "2025 - 2026" → "2025-2026" */
+    private static String normalizeNamHoc(String namHoc) {
+        if (namHoc == null) return null;
+        return namHoc.trim().replaceAll("\\s*-\\s*", "-");
+    }
+
     private final GiaoVienNghiRepository nghiRepo;
     private final GiaoVienRepository gvRepo;
     private final LeaveNotificationService notificationService;
@@ -38,16 +44,18 @@ public class GiaoVienNghiService {
     @Transactional(readOnly = true)
     public List<GiaoVienNghi> getByNgayAndNamHoc(LocalDate ngay, String namHoc) {
         if (ngay == null) throw new ApiException("Thiếu ngày");
-        if (namHoc != null && !namHoc.isBlank()) {
-            return nghiRepo.findByNgayAndNamHoc(ngay, namHoc);
+        String norm = normalizeNamHoc(namHoc);
+        if (norm != null && !norm.isBlank()) {
+            return nghiRepo.findByNgayAndNamHoc(ngay, norm);
         }
         return nghiRepo.findByNgay(ngay);
     }
 
     @Transactional(readOnly = true)
     public List<GiaoVienNghi> getByNamHoc(String namHoc) {
-        if (namHoc == null || namHoc.isBlank()) return nghiRepo.findAll();
-        return nghiRepo.findByNamHoc(namHoc);
+        String norm = normalizeNamHoc(namHoc);
+        if (norm == null || norm.isBlank()) return nghiRepo.findAll();
+        return nghiRepo.findByNamHoc(norm);
     }
 
     @Transactional(readOnly = true)

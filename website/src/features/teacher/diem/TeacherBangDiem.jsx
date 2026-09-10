@@ -4,6 +4,8 @@ import { getStudentClass, sortStudentsByGivenName } from "../../../utils/helpers
 import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
 import Pagination from "../../../components/common/Pagination.jsx";
 import { useTeacherFilters } from "../../../hooks/useTeacherFilters.js";
+import { useDragScroll } from "../../../hooks/useDragScroll.js";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 
 const toScore = (value) => {
@@ -70,19 +72,16 @@ export default function TeacherBangDiem() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const tabsRef = useRef(null);
+  const dragScroll = useDragScroll();
 
+  // Auto-scroll active subject tab into view
   useEffect(() => {
-    const el = tabsRef.current;
-    if (!el) return;
-    const handleWheel = (e) => {
-      if (e.deltaY === 0) return;
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-  }, [allowedSubjects]);
+    if (!selectedSubjectId || !dragScroll.ref.current) return;
+    const activeBtn = dragScroll.ref.current.querySelector(`[data-subject-id="${selectedSubjectId}"]`);
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [selectedSubjectId]);
 
   // Load scores when filters change
   useEffect(() => {
@@ -349,37 +348,109 @@ export default function TeacherBangDiem() {
       </div>
 
       {/* Tabs chọn môn học ngang */}
-      <style>{`.hide-scroll-tabs::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; } .hide-scroll-tabs { scrollbar-width: none !important; -ms-overflow-style: none !important; }`}</style>
+      <style>{`
+        .hide-scroll-tabs::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+        .hide-scroll-tabs { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+      `}</style>
       {allowedSubjects && allowedSubjects.length > 0 && (
-        <div 
-          ref={tabsRef}
-          className="hide-scroll-tabs" 
-          style={{ display: "flex", gap: 32, overflowX: "auto", borderBottom: "1px solid #e2e8f0", marginBottom: 16 }}
-        >
-          {allowedSubjects.map(s => {
-            const isActive = String(selectedSubjectId) === String(s.id);
-            return (
-              <button
-                key={s.id}
-                onClick={() => setSelectedSubjectId(String(s.id))}
-                style={{
-                  padding: "12px 4px",
-                  fontSize: 15,
-                  fontWeight: isActive ? 600 : 500,
-                  whiteSpace: "nowrap",
-                  border: "none",
-                  borderBottom: isActive ? "2px solid #2563eb" : "2px solid transparent",
-                  background: "transparent",
-                  color: isActive ? "#2563eb" : "#64748b",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  marginBottom: "-1px"
-                }}
-              >
-                {s.tenMon}
-              </button>
-            );
-          })}
+        <div style={{ position: "relative", marginBottom: 16, display: "flex", alignItems: "center" }}>
+          {dragScroll.canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => dragScroll.scrollLeft(250)}
+              style={{
+                position: "absolute",
+                left: 0,
+                zIndex: 10,
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background: "rgba(255, 255, 255, 0.95)",
+                border: "1px solid #cbd5e1",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#1e293b",
+                transition: "all 0.2s"
+              }}
+              aria-label="Cuộn sang trái"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
+
+          <div 
+            ref={dragScroll.ref}
+            className="hide-scroll-tabs" 
+            {...dragScroll.events}
+            style={{
+              display: "flex",
+              gap: 32,
+              overflowX: "auto",
+              borderBottom: "1px solid #e2e8f0",
+              width: "100%",
+              padding: "0 4px",
+              cursor: dragScroll.isDragging ? "grabbing" : "grab",
+              userSelect: dragScroll.isDragging ? "none" : "auto",
+              scrollBehavior: dragScroll.isDragging ? "auto" : "smooth"
+            }}
+          >
+            {allowedSubjects.map(s => {
+              const isActive = String(selectedSubjectId) === String(s.id);
+              return (
+                <button
+                  key={s.id}
+                  data-subject-id={s.id}
+                  onClick={() => setSelectedSubjectId(String(s.id))}
+                  style={{
+                    padding: "12px 4px",
+                    fontSize: 15,
+                    fontWeight: isActive ? 600 : 500,
+                    whiteSpace: "nowrap",
+                    border: "none",
+                    borderBottom: isActive ? "2px solid #2563eb" : "2px solid transparent",
+                    background: "transparent",
+                    color: isActive ? "#2563eb" : "#64748b",
+                    cursor: dragScroll.isDragging ? "grabbing" : "pointer",
+                    transition: "color 0.2s, border-color 0.2s",
+                    marginBottom: "-1px",
+                    userSelect: "none"
+                  }}
+                >
+                  {s.tenMon}
+                </button>
+              );
+            })}
+          </div>
+
+          {dragScroll.canScrollRight && (
+            <button
+              type="button"
+              onClick={() => dragScroll.scrollRight(250)}
+              style={{
+                position: "absolute",
+                right: 0,
+                zIndex: 10,
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background: "rgba(255, 255, 255, 0.95)",
+                border: "1px solid #cbd5e1",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#1e293b",
+                transition: "all 0.2s"
+              }}
+              aria-label="Cuộn sang phải"
+            >
+              <ChevronRight size={18} />
+            </button>
+          )}
         </div>
       )}
 

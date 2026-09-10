@@ -178,13 +178,13 @@ export default function NamHocHocKyPage() {
     event.preventDefault();
     setCreateError("");
 
-    const trimmedName = createYearName.trim();
-    if (!trimmedName) { setCreateError("Vui lòng nhập tên năm học."); return; }
+    const rawName = createYearName.trim();
+    if (!rawName) { setCreateError("Vui lòng nhập tên năm học."); return; }
 
-    const yearPattern = /^(\d{4})-(\d{4})$/;
-    const yearMatch = trimmedName.match(yearPattern);
+    const yearPattern = /^(\d{4})\s*[-/]\s*(\d{4})$/;
+    const yearMatch = rawName.match(yearPattern);
     if (!yearMatch) {
-      setCreateError("Năm học phải có định dạng YYYY-YYYY (vd: 2025-2026).");
+      setCreateError("Năm học phải có định dạng YYYY-YYYY (vd: 2025-2026 hoặc 2025 - 2026).");
       return;
     }
     const startYear = Number(yearMatch[1]);
@@ -198,15 +198,17 @@ export default function NamHocHocKyPage() {
       return;
     }
 
+    const normalizedName = `${startYear}-${endYear}`;
+
     const duplicate = years.some(
-      (y) => (y.tenNamHoc || "").trim().toLowerCase() === trimmedName.toLowerCase(),
+      (y) => (y.tenNamHoc || "").trim().toLowerCase() === normalizedName.toLowerCase(),
     );
     if (duplicate) { setCreateError("Năm học đã tồn tại."); return; }
 
     const configError = validateConfig(createForm);
     if (configError) { setCreateError(configError); return; }
 
-    const payload = buildPayload({ tenNamHoc: trimmedName, form: createForm, trangThai: "DANG_MO" });
+    const payload = buildPayload({ tenNamHoc: normalizedName, form: createForm, trangThai: "DANG_MO" });
 
     try {
       setCreating(true);
@@ -322,6 +324,11 @@ export default function NamHocHocKyPage() {
 
   const handleDeleteClick = (targetYear, e) => {
     e.stopPropagation();
+    const isOngoing = targetYear.trangThai === "DANG_MO" || targetYear.trang_thai === "DANG_MO";
+    if (isOngoing) {
+      notifyError("Không thể xóa năm học đang là năm học hiện hành.");
+      return;
+    }
     setDeleteModal({ open: true, year: targetYear });
   };
 
@@ -338,7 +345,7 @@ export default function NamHocHocKyPage() {
       }
       notifySuccess(`Đã xóa năm học ${targetYear.tenNamHoc}.`);
     } catch (err) {
-      const msg = err?.response?.data?.message || "Không thể xóa năm học.";
+      const msg = err?.response?.data?.message || "Năm học đã có dữ liệu nên không thể xóa được.";
       notifyError(msg);
     } finally {
       setSaving(false);
@@ -392,6 +399,7 @@ export default function NamHocHocKyPage() {
                 {years.map((y) => {
                   const isActive = selectedYear?.id === y.id;
                   const badgeInfo = getBadgeStatus(y);
+                  const isOngoing = badgeInfo.type === 'success';
                   const countHk = hocKyList.filter(hk => hk.namHoc?.id === y.id || hk.nam_hoc_id === y.id).length || 2; // default 2
 
                   return (
@@ -403,14 +411,23 @@ export default function NamHocHocKyPage() {
                         : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
                         }`}
                     >
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteClick(y, e)}
-                        className="absolute right-3 top-3 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Xóa năm học"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isOngoing ? (
+                        <div
+                          className="absolute right-3 top-3 p-1.5 text-slate-300 cursor-not-allowed rounded-lg"
+                          title="Năm học hiện hành không thể xóa"
+                        >
+                          <Lock className="w-4 h-4" />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteClick(y, e)}
+                          className="absolute right-3 top-3 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Xóa năm học"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
 
                       <div className={`text-base font-bold ${isActive ? "text-blue-700" : "text-slate-800"}`}>
                         {y.tenNamHoc}

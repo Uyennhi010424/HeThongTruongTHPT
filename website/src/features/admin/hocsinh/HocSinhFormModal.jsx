@@ -105,20 +105,23 @@ export default function HocSinhFormModal({ hooks }) {
         <label className="form-field">
           <span>Tôn giáo</span>
           <select
-            value={form.tonGiao}
+            value={form.tonGiao || "Không"}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, tonGiao: event.target.value }))
             }
           >
-            <option value="">-- Chọn tôn giáo --</option>
             <option value="Không">Không</option>
             <option value="Phật giáo">Phật giáo</option>
             <option value="Công giáo">Công giáo</option>
+            <option value="Thiên Chúa giáo">Thiên Chúa giáo</option>
             <option value="Cao Đài">Cao Đài</option>
             <option value="Hòa Hảo">Hòa Hảo</option>
             <option value="Tin Lành">Tin Lành</option>
             <option value="Hồi giáo">Hồi giáo</option>
             <option value="Khác">Khác</option>
+            {form.tonGiao && !["Không", "Phật giáo", "Công giáo", "Thiên Chúa giáo", "Cao Đài", "Hòa Hảo", "Tin Lành", "Hồi giáo", "Khác"].includes(form.tonGiao) && (
+              <option value={form.tonGiao}>{form.tonGiao}</option>
+            )}
           </select>
         </label>
         <label className="form-field">

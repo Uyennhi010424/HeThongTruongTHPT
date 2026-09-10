@@ -20,6 +20,7 @@ public class DashboardDataDTO {
     private List<HanhKiem> conducts;
     private Map<String, Object> attendanceStats;
     private List<SubjectScoreDTO> subjectScores;
+    private List<com.hethongtruongthpt.entity.LichSuHocTap> academicHistories;
     private Double gpa;
     private Integer baiKiemTraCount;
     private boolean examWeek;
@@ -188,6 +189,14 @@ public class DashboardDataDTO {
 
     public void setBaiKiemTraCount(Integer baiKiemTraCount) {
         this.baiKiemTraCount = baiKiemTraCount;
+    }
+
+    public List<com.hethongtruongthpt.entity.LichSuHocTap> getAcademicHistories() {
+        return academicHistories;
+    }
+
+    public void setAcademicHistories(List<com.hethongtruongthpt.entity.LichSuHocTap> academicHistories) {
+        this.academicHistories = academicHistories;
     }
 
     public boolean isExamWeek() {

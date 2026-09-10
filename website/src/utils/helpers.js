@@ -206,3 +206,13 @@ export const getVisibleAcademicYears = (allNamHoc) => {
     .sort((a, b) => getAcademicYearStart(b) - getAcademicYearStart(a));
 };
 
+export const sortClasses = (a, b) => {
+  const ga = Number(a?.khoi || 0);
+  const gb = Number(b?.khoi || 0);
+  if (ga !== gb) return ga - gb;
+  return String(a?.tenLop || "").localeCompare(String(b?.tenLop || ""), "vi", {
+    sensitivity: "base",
+    numeric: true,
+  });
+};
+

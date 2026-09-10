@@ -12,7 +12,7 @@ public class DefaultAccountPasswordPolicy {
     @Value("${parent-default-password:}")
     private String parentDefaultPassword;
 
-    @Value("${teacher-default-suffix:@tdn.edu.vn}")
+    @Value("${teacher-default-suffix:@123}")
     private String teacherDefaultSuffix;
 
     public String getStudentDefaultPassword() {
@@ -34,19 +34,15 @@ public class DefaultAccountPasswordPolicy {
     }
 
     public String getTeacherDefaultPassword(String username) {
-        if (teacherDefaultSuffix == null || teacherDefaultSuffix.isBlank()) {
-            throw new IllegalStateException(
-                "TEACHER_DEFAULT_SUFFIX chưa được cấu hình! Hãy set env TEACHER_DEFAULT_SUFFIX."
-            );
-        }
+        String suffix = (teacherDefaultSuffix != null && !teacherDefaultSuffix.isBlank()) ? teacherDefaultSuffix : "@123";
         if (username == null || username.isBlank()) {
-            return teacherDefaultSuffix;
+            return "gv" + suffix;
         }
         String localPart = username.trim();
         int atIndex = localPart.indexOf('@');
         if (atIndex >= 0) {
             localPart = localPart.substring(0, atIndex);
         }
-        return localPart + teacherDefaultSuffix;
+        return localPart + suffix;
     }
 }

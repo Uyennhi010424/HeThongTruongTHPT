@@ -6,6 +6,7 @@ import com.hethongtruongthpt.dto.statistics.ConductStatistics;
 import com.hethongtruongthpt.dto.statistics.OverviewStatistics;
 import com.hethongtruongthpt.entity.HanhKiem;
 import com.hethongtruongthpt.entity.HocBa;
+import com.hethongtruongthpt.entity.LichSuHocTap;
 import com.hethongtruongthpt.entity.LopHoc;
 import com.hethongtruongthpt.entity.NamHoc;
 import com.hethongtruongthpt.exception.ApiException;
@@ -17,7 +18,9 @@ import com.hethongtruongthpt.repository.HocSinhRepository;
 import com.hethongtruongthpt.repository.LopHocRepository;
 import com.hethongtruongthpt.repository.NamHocRepository;
 import com.hethongtruongthpt.repository.LichNamHocRepository;
+import com.hethongtruongthpt.repository.LichSuHocTapRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -31,6 +34,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional(readOnly = true)
 public class StatisticsService {
 
     private final HocSinhRepository hocSinhRepository;
@@ -41,6 +45,7 @@ public class StatisticsService {
     private final HanhKiemRepository hanhKiemRepository;
     private final NamHocRepository namHocRepository;
     private final LichNamHocRepository lichNamHocRepository;
+    private final LichSuHocTapRepository lichSuHocTapRepository;
 
     public StatisticsService(HocSinhRepository hocSinhRepository,
                              GiaoVienRepository giaoVienRepository,
@@ -49,7 +54,8 @@ public class StatisticsService {
                              DiemDanhRepository diemDanhRepository,
                              HanhKiemRepository hanhKiemRepository,
                              NamHocRepository namHocRepository,
-                             LichNamHocRepository lichNamHocRepository) {
+                             LichNamHocRepository lichNamHocRepository,
+                             LichSuHocTapRepository lichSuHocTapRepository) {
         this.hocSinhRepository = hocSinhRepository;
         this.giaoVienRepository = giaoVienRepository;
         this.lopHocRepository = lopHocRepository;
@@ -58,12 +64,14 @@ public class StatisticsService {
         this.hanhKiemRepository = hanhKiemRepository;
         this.namHocRepository = namHocRepository;
         this.lichNamHocRepository = lichNamHocRepository;
+        this.lichSuHocTapRepository = lichSuHocTapRepository;
     }
 
     // ----------------------------------------------------------------
     //  OVERVIEW
     // ----------------------------------------------------------------
 
+    @org.springframework.cache.annotation.Cacheable(value = "dashboardStats", key = "'overview_' + #namHoc")
     public OverviewStatistics getOverview(String namHoc) {
         if (namHoc == null || namHoc.isBlank()) {
             throw new ApiException("Năm học không được để trống");
@@ -111,24 +119,44 @@ public class StatisticsService {
         NamHoc nh = namHocRepository.findByTenNamHoc(namHoc)
                 .orElseThrow(() -> new ApiException("Không tìm thấy năm học: " + namHoc));
 
-        List<HocBa> hocBaList;
+        String cleanYear = namHoc.replace(" ", "");
 
-        if (lopId != null) {
-            // Filter by specific class
-            hocBaList = hocBaRepository.findByHocSinhLopId(lopId).stream()
-                    .filter(hb -> hb.getNamHoc() != null && hb.getNamHoc().getId().equals(nh.getId()))
-                    .collect(Collectors.toList());
-        } else if (khoi != null) {
-            // Filter by grade across all classes
-            hocBaList = hocBaRepository.findByNamHocId(nh.getId()).stream()
-                    .filter(hb -> hb.getHocSinh().getLop() != null
-                            && hb.getHocSinh().getLop().getKhoi() != null
-                            && hb.getHocSinh().getLop().getKhoi().equals(khoi))
-                    .collect(Collectors.toList());
-        } else {
-            // All students for this school year
-            hocBaList = hocBaRepository.findByNamHocId(nh.getId());
-        }
+        // Build a map of student ID to LopHoc for this school year from LichSuHocTap
+        Map<Integer, LopHoc> studentClassMap = new HashMap<>();
+        try {
+            List<LichSuHocTap> histories = lichSuHocTapRepository.findByNamHoc(cleanYear);
+            if (histories == null || histories.isEmpty()) {
+                histories = lichSuHocTapRepository.findByNamHoc(namHoc);
+            }
+            if (histories != null) {
+                for (LichSuHocTap ls : histories) {
+                    if (ls.getHocSinh() != null && ls.getLopHoc() != null) {
+                        studentClassMap.put(ls.getHocSinh().getId(), ls.getLopHoc());
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        List<HocBa> allHocBa = hocBaRepository.findByNamHocId(nh.getId());
+
+        // Filter based on resolved LopHoc (from LichSuHocTap, falling back to HocSinh.getLop())
+        List<HocBa> hocBaList = allHocBa.stream()
+                .filter(hb -> {
+                    if (hb.getHocSinh() == null) return false;
+                    Integer sId = hb.getHocSinh().getId();
+                    LopHoc resolvedLop = (sId != null && studentClassMap.containsKey(sId))
+                            ? studentClassMap.get(sId)
+                            : hb.getHocSinh().getLop();
+
+                    if (lopId != null) {
+                        return resolvedLop != null && resolvedLop.getId() != null && resolvedLop.getId().equals(lopId);
+                    }
+                    if (khoi != null) {
+                        return resolvedLop != null && resolvedLop.getKhoi() != null && resolvedLop.getKhoi().equals(khoi);
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
 
         AcademicStatistics stats = new AcademicStatistics();
         stats.setTongHocSinh(hocBaList.size());
@@ -159,10 +187,21 @@ public class StatisticsService {
                 .filter(hb -> hb.getDiemTBCaNam() != null && hb.getHocSinh() != null)
                 .sorted(Comparator.comparing((HocBa hb) -> hb.getDiemTBCaNam()).reversed())
                 .limit(10)
-                .map(hb -> new AcademicStatistics.TopStudent(
-                        hb.getHocSinh().getHoTen(),
-                        hb.getHocSinh().getLop() != null ? hb.getHocSinh().getLop().getTenLop() : "",
-                        hb.getDiemTBCaNam().setScale(2, RoundingMode.HALF_UP).doubleValue()))
+                .map(hb -> {
+                    Integer sId = hb.getHocSinh().getId();
+                    String tenLop = "";
+                    if (sId != null && studentClassMap.containsKey(sId) && studentClassMap.get(sId) != null) {
+                        tenLop = studentClassMap.get(sId).getTenLop();
+                    }
+                    if ((tenLop == null || tenLop.isBlank()) && hb.getHocSinh().getLop() != null) {
+                        tenLop = hb.getHocSinh().getLop().getTenLop();
+                    }
+                    return new AcademicStatistics.TopStudent(
+                            hb.getHocSinh().getHoTen(),
+                            tenLop != null ? tenLop : "",
+                            hb.getDiemTBCaNam().setScale(2, RoundingMode.HALF_UP).doubleValue()
+                    );
+                })
                 .collect(Collectors.toList());
         stats.setTopStudents(topStudents);
 
@@ -276,15 +315,19 @@ public class StatisticsService {
     //  CONDUCT
     // ----------------------------------------------------------------
 
+    @org.springframework.cache.annotation.Cacheable(value = "dashboardStats", key = "'conduct_' + #namHoc + '_' + #hocKy")
     public ConductStatistics getConductStats(String namHoc, Integer hocKy) {
         if (namHoc == null || namHoc.isBlank()) {
             throw new ApiException("Năm học không được để trống");
         }
 
-        NamHoc nh = namHocRepository.findByTenNamHoc(namHoc)
-                .orElseThrow(() -> new ApiException("Không tìm thấy năm học: " + namHoc));
-
-        List<LopHoc> lopList = lopHocRepository.findByNamHoc(namHoc);
+        String cleanYear = namHoc.replaceAll("\\s+", "");
+        NamHoc nh = namHocRepository.findByTenNamHoc(cleanYear)
+                .or(() -> namHocRepository.findByTenNamHoc(namHoc))
+                .orElseGet(() -> namHocRepository.findAll().stream()
+                        .filter(n -> n.getTenNamHoc() != null && n.getTenNamHoc().replaceAll("\\s+", "").equalsIgnoreCase(cleanYear))
+                        .findFirst()
+                        .orElseThrow(() -> new ApiException("Không tìm thấy năm học: " + namHoc)));
 
         // Overall conduct distribution
         Map<String, Long> phanBo = new HashMap<>();
@@ -294,70 +337,117 @@ public class StatisticsService {
         phanBo.put("YEU", 0L);
 
         // Per-class conduct tracking
-        // Key: tenLop, Value: [totCount, khaiCount, trungBinhCount, yeuCount, totalCount]
+        // Key: tenLop, Value: [totCount, khaCount, trungBinhCount, yeuCount, totalCount]
         Map<String, long[]> classConductMap = new HashMap<>();
+
+        // Map student ID to class name for this school year
+        Map<Integer, String> studentClassMap = new HashMap<>();
+        try {
+            List<com.hethongtruongthpt.entity.LichSuHocTap> histories = lichSuHocTapRepository.findByNamHoc(cleanYear);
+            if (histories == null || histories.isEmpty()) {
+                histories = lichSuHocTapRepository.findByNamHoc(namHoc);
+            }
+            if (histories != null) {
+                for (com.hethongtruongthpt.entity.LichSuHocTap ls : histories) {
+                    if (ls.getHocSinh() != null && ls.getLopHoc() != null && ls.getLopHoc().getTenLop() != null) {
+                        studentClassMap.put(ls.getHocSinh().getId(), ls.getLopHoc().getTenLop());
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        List<HanhKiem> allHkList = hanhKiemRepository.findByNamHocId(nh.getId());
 
         // Track unique students to avoid double counting across classes/semesters
         Map<Integer, HanhKiem> globalLatestHkMap = new HashMap<>();
 
-        for (LopHoc lop : lopList) {
-            List<HanhKiem> hkList = hanhKiemRepository
-                    .findByHocSinhLopIdAndNamHocId(lop.getId(), nh.getId());
-
-            // Filter by hocKy if specified; otherwise use ALL semesters for deduplication
-            Map<Integer, HanhKiem> latestHkMap = new HashMap<>();
-            for (HanhKiem hk : hkList) {
+        if (allHkList != null && !allHkList.isEmpty()) {
+            for (HanhKiem hk : allHkList) {
                 if (hk.getHocSinh() == null) continue;
                 // If hocKy filter is set, only include matching semester
-                if (hocKy != null && hk.getHocKy() != null && !hk.getHocKy().equals(hocKy)) {
+                if (hocKy != null && hocKy != 0 && hk.getHocKy() != null && !hk.getHocKy().equals(hocKy)) {
                     continue;
                 }
                 Integer studentId = hk.getHocSinh().getId();
-                HanhKiem existing = latestHkMap.get(studentId);
-                // Keep latest semester (or the specific one if filtered)
-                if (existing == null || hk.getHocKy() > existing.getHocKy()) {
-                    latestHkMap.put(studentId, hk);
-                }
-            }
-
-            // Merge into global map to deduplicate across classes (student may have moved)
-            for (Map.Entry<Integer, HanhKiem> entry : latestHkMap.entrySet()) {
-                Integer studentId = entry.getKey();
-                HanhKiem hk = entry.getValue();
-                HanhKiem existingGlobal = globalLatestHkMap.get(studentId);
-                if (existingGlobal == null || hk.getHocKy() > existingGlobal.getHocKy()) {
+                HanhKiem existing = globalLatestHkMap.get(studentId);
+                if (existing == null || (hk.getHocKy() != null && existing.getHocKy() != null && hk.getHocKy() > existing.getHocKy())) {
                     globalLatestHkMap.put(studentId, hk);
                 }
+
+                // Per-class counts
+                String className = studentClassMap.get(studentId);
+                if (className == null) {
+                    try {
+                        LopHoc lop = hk.getHocSinh().getLop();
+                        className = (lop != null && lop.getTenLop() != null) ? lop.getTenLop() : "Khác";
+                    } catch (Exception e) {
+                        className = "Khác";
+                    }
+                }
+
+                long[] counts = classConductMap.computeIfAbsent(className, k -> new long[5]);
+                if (hk.getXepLoai() != null) {
+                    switch (hk.getXepLoai()) {
+                        case TOT: counts[0]++; counts[4]++; break;
+                        case KHA: counts[1]++; counts[4]++; break;
+                        case TRUNG_BINH: counts[2]++; counts[4]++; break;
+                        case YEU: counts[3]++; counts[4]++; break;
+                        default: break;
+                    }
+                }
             }
 
-            // Per-class counts for best/worst class tracking
-            long totCount = 0, khaiCount = 0, trungBinhCount = 0, yeuCount = 0;
-            for (HanhKiem hk : latestHkMap.values()) {
+            // Build global distribution from deduplicated student map
+            for (HanhKiem hk : globalLatestHkMap.values()) {
                 if (hk.getXepLoai() == null) continue;
                 switch (hk.getXepLoai()) {
-                    case TOT: totCount++; break;
-                    case KHA: khaiCount++; break;
-                    case TRUNG_BINH: trungBinhCount++; break;
-                    case YEU: yeuCount++; break;
+                    case TOT: phanBo.merge("TOT", 1L, Long::sum); break;
+                    case KHA: phanBo.merge("KHA", 1L, Long::sum); break;
+                    case TRUNG_BINH: phanBo.merge("TRUNG_BINH", 1L, Long::sum); break;
+                    case YEU: phanBo.merge("YEU", 1L, Long::sum); break;
                     default: break;
                 }
             }
-            long total = totCount + khaiCount + trungBinhCount + yeuCount;
-            if (total > 0) {
-                classConductMap.put(lop.getTenLop(),
-                        new long[]{totCount, khaiCount, trungBinhCount, yeuCount, total});
-            }
         }
 
-        // Build global distribution from deduplicated student map
-        for (HanhKiem hk : globalLatestHkMap.values()) {
-            if (hk.getXepLoai() == null) continue;
-            switch (hk.getXepLoai()) {
-                case TOT: phanBo.merge("TOT", 1L, Long::sum); break;
-                case KHA: phanBo.merge("KHA", 1L, Long::sum); break;
-                case TRUNG_BINH: phanBo.merge("TRUNG_BINH", 1L, Long::sum); break;
-                case YEU: phanBo.merge("YEU", 1L, Long::sum); break;
-                default: break;
+        // Fallback to HocBa if no HanhKiem distribution exists
+        long totalConductCount = phanBo.values().stream().mapToLong(Long::longValue).sum();
+        if (totalConductCount == 0) {
+            List<HocBa> hocBaList = hocBaRepository.findByNamHocId(nh.getId());
+            if (hocBaList != null) {
+                for (HocBa hb : hocBaList) {
+                    if (hb.getHocSinh() == null || hb.getHanhKiem() == null) continue;
+                    Integer studentId = hb.getHocSinh().getId();
+                    String hkStr = hb.getHanhKiem().trim().toUpperCase();
+
+                    String normKey = null;
+                    if (hkStr.contains("TOT") || hkStr.contains("TỐT")) normKey = "TOT";
+                    else if (hkStr.contains("KHA") || hkStr.contains("KHÁ")) normKey = "KHA";
+                    else if (hkStr.contains("TRUNG_BINH") || hkStr.contains("TRUNG BÌNH") || hkStr.contains("DAT") || hkStr.contains("ĐẠT")) normKey = "TRUNG_BINH";
+                    else if (hkStr.contains("YEU") || hkStr.contains("YẾU") || hkStr.contains("CHUA_DAT") || hkStr.contains("CHƯA ĐẠT")) normKey = "YEU";
+
+                    if (normKey != null) {
+                        phanBo.merge(normKey, 1L, Long::sum);
+
+                        String className = studentClassMap.get(studentId);
+                        if (className == null) {
+                            try {
+                                LopHoc lop = hb.getHocSinh().getLop();
+                                className = (lop != null && lop.getTenLop() != null) ? lop.getTenLop() : "Khác";
+                            } catch (Exception e) {
+                                className = "Khác";
+                            }
+                        }
+
+                        long[] counts = classConductMap.computeIfAbsent(className, k -> new long[5]);
+                        switch (normKey) {
+                            case "TOT": counts[0]++; counts[4]++; break;
+                            case "KHA": counts[1]++; counts[4]++; break;
+                            case "TRUNG_BINH": counts[2]++; counts[4]++; break;
+                            case "YEU": counts[3]++; counts[4]++; break;
+                        }
+                    }
+                }
             }
         }
 

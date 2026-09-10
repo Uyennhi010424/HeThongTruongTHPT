@@ -5,7 +5,7 @@ import { getNamHoc } from "../api/namhocApi.js";
 import { getPhanCongDay } from "../api/phancongDayApi.js";
 import { getCurrentGiaoVien } from "../api/giaovienApi.js";
 import { getChuNhiem } from "../api/chunhiemApi.js";
-import { getVisibleAcademicYears, getActiveAcademicYear } from "../utils/helpers.js";
+import { getVisibleAcademicYears, getActiveAcademicYear, sortClasses } from "../utils/helpers.js";
 
 /**
  * Custom hook to manage teacher filters across pages.
@@ -169,8 +169,11 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
   // Derived state: Filtered Classes by Grade
   const filteredClasses = useMemo(() => {
     if (!showClass) return [];
-    if (!selectedGrade || String(selectedGrade).toLowerCase() === "all" || !showGrade) return allowedClasses;
-    return allowedClasses.filter((item) => String(item?.khoi || "") === String(selectedGrade));
+    let list = allowedClasses;
+    if (selectedGrade && String(selectedGrade).toLowerCase() !== "all" && showGrade) {
+      list = allowedClasses.filter((item) => String(item?.khoi || "") === String(selectedGrade));
+    }
+    return list.slice().sort(sortClasses);
   }, [allowedClasses, selectedGrade, showGrade, showClass]);
 
   // Auto-select first class when grade/classes change

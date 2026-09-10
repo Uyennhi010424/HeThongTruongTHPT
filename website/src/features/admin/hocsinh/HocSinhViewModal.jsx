@@ -1,25 +1,59 @@
 import React, { useState, useEffect } from "react";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
-import { formatDate, getGenderLabel, formatHocLuc, formatHanhKiem } from "./hocSinhUtils.js";
+import { formatDate, getGenderLabel, formatHocLuc, formatHanhKiem, formatPhoneDisplay } from "./hocSinhUtils.js";
 import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
 import { getHocSinhLichSuHocTap } from "../../../api/hocsinhApi.js";
+import { getParentsForStudent } from "../../../api/phuhuynhHocSinhApi.js";
 
 export default function HocSinhViewModal({ hooks }) {
   const { viewModalOpen, setViewModalOpen, viewingStudent, parents } = hooks;
   const [lichSu, setLichSu] = useState([]);
   const [loadingLichSu, setLoadingLichSu] = useState(false);
+  const [parentInfo, setParentInfo] = useState(null);
+  const [loadingParent, setLoadingParent] = useState(false);
 
   useEffect(() => {
     if (viewModalOpen && viewingStudent) {
+      // 1. Initial parent info from viewingStudent or local parents cache
+      const initialParent = viewingStudent.phuHuynh ||
+        (viewingStudent.phuHuynhId ? (parents || []).find(p => Number(p.id) === Number(viewingStudent.phuHuynhId)) : null);
+      
+      setParentInfo(initialParent || null);
+
+      // 2. Fetch linked parent from API for 100% guarantee
+      if (viewingStudent.id) {
+        setLoadingParent(true);
+        getParentsForStudent(viewingStudent.id)
+          .then((res) => {
+            const fetched = res?.data?.data || [];
+            if (fetched.length > 0) {
+              setParentInfo(fetched[0]);
+            } else if (initialParent) {
+              setParentInfo(initialParent);
+            } else if (viewingStudent.phuHuynhId) {
+              const matched = (parents || []).find(p => Number(p.id) === Number(viewingStudent.phuHuynhId));
+              if (matched) setParentInfo(matched);
+            }
+          })
+          .catch((err) => {
+            console.error("Error fetching parent for student:", err);
+          })
+          .finally(() => {
+            setLoadingParent(false);
+          });
+      }
+
+      // 3. Load study history
       setLoadingLichSu(true);
       getHocSinhLichSuHocTap(viewingStudent.id)
         .then(res => setLichSu(res.data?.data || []))
         .catch(err => console.error("Error loading lịch sử:", err))
         .finally(() => setLoadingLichSu(false));
     } else {
+      setParentInfo(null);
       setLichSu([]);
     }
-  }, [viewModalOpen, viewingStudent]);
+  }, [viewModalOpen, viewingStudent, parents]);
 
   return (
     <SimpleModal
@@ -98,20 +132,46 @@ export default function HocSinhViewModal({ hooks }) {
 
           <div className="pt-4 mt-2 border-t border-slate-100">
             <h4 className="text-sm font-bold text-blue-900 mb-3">Thông tin phụ huynh</h4>
-            {viewingStudent.phuHuynh || viewingStudent.phuHuynhId ? (
-              <div className="grid grid-cols-2 gap-4">
+            {loadingParent && !parentInfo ? (
+              <p className="text-sm font-medium text-slate-500 italic">Đang tải thông tin phụ huynh...</p>
+            ) : parentInfo ? (
+              <div className="grid grid-cols-2 gap-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-100">
                 <div>
                   <span className="block text-xs font-semibold text-slate-400 uppercase">Họ tên phụ huynh</span>
-                  <span className="text-sm font-medium text-slate-900">
-                    {viewingStudent.phuHuynh?.hoTen || (parents.find(p => Number(p.id) === Number(viewingStudent.phuHuynhId))?.hoTen) || "--"}
+                  <span className="text-sm font-bold text-slate-900">
+                    {parentInfo.hoTen || "--"}
                   </span>
                 </div>
                 <div>
                   <span className="block text-xs font-semibold text-slate-400 uppercase">SĐT phụ huynh</span>
                   <span className="text-sm font-medium text-slate-900">
-                    {viewingStudent.phuHuynh?.soDienThoai || (parents.find(p => Number(p.id) === Number(viewingStudent.phuHuynhId))?.soDienThoai) || "--"}
+                    {formatPhoneDisplay(parentInfo.soDienThoai || parentInfo.sdt || "") || "--"}
                   </span>
                 </div>
+                {parentInfo.email && (
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-400 uppercase">Email phụ huynh</span>
+                    <span className="text-sm font-medium text-slate-900 break-all">
+                      {parentInfo.email}
+                    </span>
+                  </div>
+                )}
+                {parentInfo.quanHe && (
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-400 uppercase">Quan hệ</span>
+                    <span className="text-sm font-medium text-slate-900">
+                      {parentInfo.quanHe === "ME" ? "Mẹ" : parentInfo.quanHe === "CHA" ? "Cha" : parentInfo.quanHe === "NGUOI_GIAM_HO" ? "Người giám hộ" : parentInfo.quanHe}
+                    </span>
+                  </div>
+                )}
+                {parentInfo.ngheNghiep && (
+                  <div className="col-span-2">
+                    <span className="block text-xs font-semibold text-slate-400 uppercase">Nghề nghiệp</span>
+                    <span className="text-sm font-medium text-slate-900">
+                      {parentInfo.ngheNghiep}
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm font-medium text-slate-500 italic">Chưa có thông tin phụ huynh</p>

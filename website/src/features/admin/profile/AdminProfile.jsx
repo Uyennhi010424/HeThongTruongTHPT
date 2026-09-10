@@ -132,23 +132,23 @@ export default function AdminProfile() {
   const initials = (form.hoTen || form.username || "A").charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] p-8 md:p-12 font-sans text-stone-800 selection:bg-stone-200">
+    <div className="min-h-screen bg-[#FDFBF7] p-4 sm:p-8 md:p-12 font-sans text-stone-800 selection:bg-stone-200">
       <div className="mx-auto max-w-[840px] overflow-hidden rounded-[20px] bg-white shadow-xl border border-stone-200/80">
         
         {/* ── Header ── */}
-        <div className="flex h-[80px] items-center border-b border-stone-200 bg-white px-8 md:px-10">
-          <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Hồ sơ quản trị viên</h1>
+        <div className="flex h-[80px] items-center border-b border-stone-200 bg-white px-6 sm:px-8 md:px-10">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-blue-900 tracking-tight">Hồ sơ quản trị viên</h1>
         </div>
 
         {/* ── Body ── */}
-        <div className="p-8 md:p-10">
+        <div className="p-5 sm:p-8 md:p-10">
           <div className="max-w-[680px] mx-auto">
             {/* Avatar Section */}
-            <div className="mb-10 flex items-center gap-6 sm:gap-8 border-b border-stone-100 pb-8">
+            <div className="mb-8 sm:mb-10 flex flex-col sm:flex-row items-center gap-6 sm:gap-8 border-b border-stone-100 pb-8 text-center sm:text-left">
               <div className="relative shrink-0">
-                <div className="h-20 w-20 overflow-hidden rounded-full bg-stone-100 border border-stone-200 shadow-sm">
+                <div className="h-20 w-20 shrink-0 aspect-square overflow-hidden rounded-full bg-stone-100 border border-stone-200 shadow-sm">
                   {avatarPreview ? (
-                    <img src={avatarPreview} alt="avatar" className="h-full w-full object-cover" />
+                    <img src={avatarPreview} alt="avatar" className="h-full w-full object-cover shrink-0 aspect-square" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-stone-200">
                       <span className="text-2xl font-semibold text-stone-600">{initials}</span>
@@ -156,8 +156,8 @@ export default function AdminProfile() {
                   )}
                 </div>
               </div>
-              <div className="flex flex-col gap-2.5">
-                <div className="flex gap-3">
+              <div className="flex flex-col items-center sm:items-start gap-2.5">
+                <div className="flex flex-wrap justify-center sm:justify-start gap-3">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}

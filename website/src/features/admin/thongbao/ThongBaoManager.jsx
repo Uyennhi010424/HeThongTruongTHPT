@@ -12,6 +12,7 @@ import {
 } from "../../../api/thongbaoApi.js";
 import Pagination from "../../../components/common/Pagination.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ChevronDown, Edit, Trash2, Calendar, Users } from "lucide-react";
 
 const formatDateTime = (value) => {
   if (!value) return "";
@@ -55,6 +56,7 @@ export default function ThongBaoManager() {
   const [pageSize, setPageSize] = useState(5);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNotice, setEditingNotice] = useState(null);
+  const [expandedNoticeId, setExpandedNoticeId] = useState(null);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
     tieuDe: "",
@@ -215,8 +217,9 @@ export default function ThongBaoManager() {
 
   return (
     <div className="page users-page">
-      <PageHeader 
-        title="Thông báo nhà trường" 
+      <PageHeader
+        title="Quản lý thông báo"
+        description="Đăng và quản lý thông báo toàn trường hoặc theo đối tượng."
         actions={
           <button className="btn-primary" onClick={openCreate}>
             Thêm thông báo
@@ -224,89 +227,198 @@ export default function ThongBaoManager() {
         }
       />
 
-      <div className="card users-table">
-        <div className="table-header">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col p-4 sm:p-6">
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
           <div>
-            <div className="panel-title">Danh sách thông báo</div>
+            <div className="text-base font-bold text-blue-900">Danh sách thông báo</div>
           </div>
-          <div className="panel-pill">{filteredNotices.length} thông báo</div>
+          <div className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">{filteredNotices.length} thông báo</div>
         </div>
-        {error && <div className="table-empty">{error}</div>}
+        {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-xl text-sm font-semibold">{error}</div>}
         {!error && !loading && filteredNotices.length === 0 && (
-          <div className="table-empty">Không tìm thấy thông báo phù hợp.</div>
+          <div className="p-8 text-center text-slate-500 font-medium">Không tìm thấy thông báo phù hợp.</div>
         )}
-        <div className="table-grid">
-          <div className="table-row table-head">
-            <div>STT</div>
-            <div>Thông báo</div>
-            <div>Đối tượng</div>
-            <div>Ngày đăng</div>
-            <div>Trạng thái</div>
-            <div>Thao tác</div>
-          </div>
-          {loading
-            ? Array.from({ length: 4 }).map((_, index) => (
-                <div className="table-row" key={`skeleton-${index}`}>
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                </div>
-              ))
-            : pagedNotices.map((notice, index) => (
-                <div className="table-row" key={notice.id}>
-                  <div className="table-id">{(page - 1) * pageSize + index + 1}</div>
-                  <div className="table-main">
-                    <div className="table-title">{notice.tieuDe}</div>
-                    <div className="table-meta">{notice.noiDung}</div>
-                  </div>
-                  <div>
-                    <span className="role-pill">{getTargetLabel(notice.doiTuong || notice.loai)}</span>
-                  </div>
-                  <div className="table-date">
-                    {formatDateTime(notice.ngayDang) || "--"}
-                  </div>
-                  <div>
-                    <span
-                      className={`status-pill ${
-                        notice.trangThai === 1 ? "status-active" : "status-locked"
-                      }`}
-                    >
-                      {getStatusLabel(notice.trangThai)}
-                    </span>
-                  </div>
-                  <div className="table-actions">
-                    <button
-                      className="btn-outline btn-sm"
-                      onClick={() => openEdit(notice)}
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      className="rounded-lg p-sm text-outline hover:bg-red-50 hover:text-red-600"
-                      onClick={() => handleDelete(notice)}
-                      title="Xóa"
-                    >
-                      <MaterialIcon name="delete" className="text-[20px]" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+
+        {/* ── Desktop Full Table View (>= 1024px) ── */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[750px]">
+            <thead>
+              <tr className="bg-slate-50/70 border-b border-slate-200">
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[240px]">Thông báo</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-32">Đối tượng</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Ngày đăng</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-28 text-center">Trạng thái</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-24">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <tr key={`skeleton-${index}`}>
+                    <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded w-6 mx-auto animate-pulse" /></td>
+                    <td className="px-4 py-4 space-y-1.5">
+                      <div className="h-4 bg-slate-100 rounded w-48 animate-pulse" />
+                      <div className="h-3 bg-slate-50 rounded w-32 animate-pulse" />
+                    </td>
+                    <td className="px-4 py-4"><div className="h-6 bg-slate-100 rounded-full w-20 animate-pulse" /></td>
+                    <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-28 animate-pulse" /></td>
+                    <td className="px-4 py-4 text-center"><div className="h-6 bg-slate-100 rounded-full w-16 mx-auto animate-pulse" /></td>
+                    <td className="px-4 py-4 text-right"><div className="h-8 bg-slate-100 rounded w-16 ml-auto animate-pulse" /></td>
+                  </tr>
+                ))
+              ) : (
+                pagedNotices.map((notice, index) => (
+                  <tr key={notice.id} className="hover:bg-slate-50/70 transition-colors group">
+                    <td className="px-4 py-4 text-center text-sm font-bold text-slate-400">
+                      {(page - 1) * pageSize + index + 1}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{notice.tieuDe}</div>
+                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-1 max-w-[320px]">{notice.noiDung}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-block px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold">
+                        {getTargetLabel(notice.doiTuong || notice.loai)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-xs font-semibold text-slate-600">
+                      {formatDateTime(notice.ngayDang) || "--"}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        notice.trangThai === 1
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                      }`}>
+                        {getStatusLabel(notice.trangThai)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => openEdit(notice)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Chỉnh sửa"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(notice)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Xóa"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          totalItems={filteredNotices.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={(sz) => {
-            setPageSize(sz);
-            setPage(1);
-          }}
-          pageSizeOptions={[5, 10, 20, 50]}
-        />
+
+        {/* ── Mobile / Tablet Accordion Card View (< 1024px) ── */}
+        <div className="block lg:hidden space-y-3">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, idx) => (
+              <div key={`m-skeleton-${idx}`} className="p-4 rounded-xl border border-slate-200 bg-slate-50 animate-pulse space-y-2">
+                <div className="h-4 bg-slate-200 rounded w-40" />
+                <div className="h-3 bg-slate-200 rounded w-24" />
+              </div>
+            ))
+          ) : (
+            pagedNotices.map((notice, index) => {
+              const isExpanded = expandedNoticeId === notice.id;
+              return (
+                <div
+                  key={notice.id}
+                  className={`rounded-xl border transition-all duration-200 bg-white overflow-hidden ${
+                    isExpanded ? "border-blue-300 shadow-sm" : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {/* Collapsed Header */}
+                  <div
+                    className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none"
+                    onClick={() => setExpandedNoticeId(isExpanded ? null : notice.id)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-400">#{(page - 1) * pageSize + index + 1}</span>
+                        <span className="text-sm font-bold text-slate-900 truncate">{notice.tieuDe}</span>
+                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold">
+                          {getTargetLabel(notice.doiTuong || notice.loai)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-2">
+                        <span>{formatDateTime(notice.ngayDang) || "--"}</span>
+                        <span>•</span>
+                        <span className={notice.trangThai === 1 ? "text-emerald-600 font-semibold" : "text-slate-500"}>
+                          {getStatusLabel(notice.trangThai)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => openEdit(notice)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Chỉnh sửa"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(notice)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Xóa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedNoticeId(isExpanded ? null : notice.id)}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-1"
+                        aria-label="Xem chi tiết"
+                      >
+                        <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-blue-600" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded Details ("Show xuống") */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/60 space-y-2 text-xs">
+                      <div className="p-3 bg-white rounded-lg border border-slate-200/80 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                        {notice.noiDung || "Không có nội dung chi tiết."}
+                      </div>
+                      <div className="flex items-center justify-between text-slate-500 text-[11px] pt-1">
+                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-blue-500" /> Đối tượng: {getTargetLabel(notice.doiTuong || notice.loai)}</span>
+                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-indigo-500" /> Đăng lúc: {formatDateTime(notice.ngayDang)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Pagination */}
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={filteredNotices.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(sz) => {
+              setPageSize(sz);
+              setPage(1);
+            }}
+            pageSizeOptions={[5, 10, 20, 50]}
+          />
+        </div>
       </div>
 
       <SimpleModal

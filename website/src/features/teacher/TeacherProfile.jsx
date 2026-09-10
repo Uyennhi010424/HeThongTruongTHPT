@@ -210,9 +210,9 @@ export default function TeacherProfile() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200">
           <div className="flex items-center gap-5">
             <div className="relative group shrink-0">
-              <label className="block h-[84px] w-[84px] rounded-2xl overflow-hidden border border-slate-200 cursor-pointer relative bg-slate-50 shadow-sm">
+              <label className="block h-[84px] w-[84px] shrink-0 aspect-square rounded-2xl overflow-hidden border border-slate-200 cursor-pointer relative bg-slate-50 shadow-sm">
                 {avatarPreview ? (
-                  <img src={avatarPreview} alt="avatar" className="h-full w-full object-cover" />
+                  <img src={avatarPreview} alt="avatar" className="h-full w-full object-cover shrink-0 aspect-square" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-slate-400">
                     <span className="material-symbols-outlined text-[42px]">person</span>

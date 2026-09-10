@@ -205,15 +205,44 @@ export default function DiemProgressTable({ progressData = [], loading, onRefres
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{item?.tenGvcn}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{item?.siSo}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
-                    {item?.hasScores || (item?.totalEnteredScores && item?.totalEnteredScores > 0) ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                        Đã nhập
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                        Chưa nhập
-                      </span>
-                    )}
+                    {(() => {
+                      const entered = item?.totalEnteredScores || 0;
+                      const expected = item?.totalExpectedScores || 0;
+                      const pct = item?.progressPercentage || 0;
+                      const isComplete = item?.isCompleted || (expected > 0 && entered >= expected) || pct >= 100;
+                      const isPartial = !isComplete && (entered > 0 || pct > 0);
+
+                      if (isComplete) {
+                        return (
+                          <span
+                            title={`Đã nhập đủ 100% (${entered}/${expected} điểm)`}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                          >
+                            Đã nhập
+                          </span>
+                        );
+                      }
+
+                      if (isPartial) {
+                        return (
+                          <span
+                            title={`Đang nhập: ${entered}/${expected} điểm (${Math.round(pct)}%)`}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
+                          >
+                            Đang nhập
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <span
+                          title="Chưa nhập điểm nào"
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200"
+                        >
+                          Chưa nhập
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link

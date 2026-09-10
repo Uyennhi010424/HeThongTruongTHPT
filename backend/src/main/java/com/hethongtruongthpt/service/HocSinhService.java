@@ -29,22 +29,19 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import java.text.Normalizer;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import com.hethongtruongthpt.repository.LichSuHocTapRepository;
-import com.hethongtruongthpt.entity.LichSuHocTap;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.time.Year;
 
+import com.hethongtruongthpt.repository.LichSuHocTapRepository;
+import com.hethongtruongthpt.entity.LichSuHocTap;
 import com.hethongtruongthpt.repository.PhuHuynhRepository;
 
 @Service
 @Transactional
 public class HocSinhService {
     private static final Logger log = LoggerFactory.getLogger(HocSinhService.class);
-    private static final String DEFAULT_ACCOUNT_DOMAIN = "@tdn.edu.vn";
+    private static final String DEFAULT_ACCOUNT_DOMAIN = "@tdu.edu.vn";
 
     private final HocSinhRepository hocSinhRepository;
     private final LopHocRepository lopHocRepository;
@@ -104,6 +101,7 @@ public class HocSinhService {
     public List<HocSinh> getAll() {
         List<HocSinh> list = hocSinhRepository.findAllWithLop();
         assignParentIds(list);
+        assignNamHocs(list);
         return list;
     }
 
@@ -141,13 +139,28 @@ public class HocSinhService {
             throw new RuntimeException("Lỗi tìm kiếm học sinh: " + e.getMessage(), e);
         }
         assignParentIds(result.getContent());
+        assignNamHocs(result.getContent());
         return result;
     }
 
     @Cacheable(value = "hocSinhList", key = "#lopId")
     public List<HocSinh> getByLopId(Integer lopId) {
-        List<HocSinh> list = hocSinhRepository.findByLopIdAndTrangThai(lopId, 1);
+        List<LichSuHocTap> histories = lichSuHocTapRepository.findByLopHocId(lopId);
+        List<HocSinh> list;
+        if (histories != null && !histories.isEmpty()) {
+            java.util.Map<Integer, HocSinh> studentMap = new java.util.LinkedHashMap<>();
+            for (LichSuHocTap ls : histories) {
+                if (ls != null && ls.getHocSinh() != null && ls.getHocSinh().getId() != null) {
+                    studentMap.putIfAbsent(ls.getHocSinh().getId(), ls.getHocSinh());
+                }
+            }
+            list = new java.util.ArrayList<>(studentMap.values());
+        } else {
+            list = hocSinhRepository.findByLopIdAndTrangThai(lopId, 1);
+            if (list == null) list = new java.util.ArrayList<>();
+        }
         assignParentIds(list);
+        assignNamHocs(list);
         return list;
     }
 
@@ -213,18 +226,20 @@ public class HocSinhService {
                     hs.setNamNhapHoc(hocSinh.getNamNhapHoc());
                     hs.setSdt(hocSinh.getSdt());
                     hs.setEmail(hocSinh.getEmail());
-                    hs.setDanToc(hocSinh.getDanToc());
-                    hs.setTonGiao(hocSinh.getTonGiao());
+                    hs.setDanToc(hocSinh.getDanToc() != null && !hocSinh.getDanToc().isBlank() ? hocSinh.getDanToc() : "Kinh");
+                    hs.setTonGiao(hocSinh.getTonGiao() != null && !hocSinh.getTonGiao().isBlank() ? hocSinh.getTonGiao() : "Không");
                     hs.setMaBhyt(hocSinh.getMaBhyt());
                     hs.setDienChinhSach(hocSinh.getDienChinhSach());
                     hs.setTrangThai(hocSinh.getTrangThai());
                     HocSinh result = hocSinhRepository.save(hs);
 
                     // 4. Link phụ huynh (nếu có)
+                    PhuHuynh linkedPhuHuynh = null;
                     if (phuHuynhId != null) {
                         try {
                             PhuHuynh ph = phuHuynhRepository.findById(phuHuynhId).orElse(null);
                             if (ph != null) {
+                                linkedPhuHuynh = ph;
                                 PhuHuynhHocSinh link = new PhuHuynhHocSinh();
                                 link.setPhuHuynh(ph);
                                 link.setHocSinh(result);
@@ -242,10 +257,39 @@ public class HocSinhService {
                     HocSinh fetched = hocSinhRepository.findById(result.getId())
                             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh"));
                     assignParentId(fetched);
+                    if (phuHuynhId != null && fetched.getPhuHuynhId() == null) {
+                        fetched.setPhuHuynhId(phuHuynhId);
+                        if (linkedPhuHuynh != null) {
+                            fetched.setPhuHuynh(linkedPhuHuynh);
+                        }
+                    }
                     return fetched;
                 });
 
                 if (saved == null) throw new ApiException("Tạo học sinh thất bại");
+                
+                // Guarantee parent link outside tx if needed
+                if (phuHuynhId != null) {
+                    try {
+                        List<PhuHuynhHocSinh> existingLinks = phuHuynhHocSinhRepository.findByHocSinhIdIn(List.of(saved.getId()));
+                        if (existingLinks.isEmpty()) {
+                            PhuHuynh ph = phuHuynhRepository.findById(phuHuynhId).orElse(null);
+                            if (ph != null) {
+                                PhuHuynhHocSinh link = new PhuHuynhHocSinh();
+                                link.setPhuHuynh(ph);
+                                link.setHocSinh(saved);
+                                link.setQuanHe(ph.getQuanHe() != null ? ph.getQuanHe() : "CHA");
+                                link.setLaNguoiLienHeChinh(Boolean.TRUE);
+                                phuHuynhHocSinhRepository.save(link);
+                                saved.setPhuHuynhId(phuHuynhId);
+                                saved.setPhuHuynh(ph);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("Post-tx parent link fallback: {}", e.getMessage());
+                    }
+                }
+
                 // Auto-sync sĩ số lớp
                 refreshSiSo(lopRef.getId());
                 return saved;
@@ -278,7 +322,7 @@ public class HocSinhService {
         if (hocSinh.getNgaySinh() != null) existing.setNgaySinh(hocSinh.getNgaySinh());
         if (hocSinh.getGioiTinh() != null) existing.setGioiTinh(hocSinh.getGioiTinh());
         if (hocSinh.getDanToc() != null) existing.setDanToc(hocSinh.getDanToc());
-        if (hocSinh.getTonGiao() != null) existing.setTonGiao(hocSinh.getTonGiao());
+        if (hocSinh.getTonGiao() != null) existing.setTonGiao(hocSinh.getTonGiao().isBlank() ? "Không" : hocSinh.getTonGiao().trim());
         if (hocSinh.getSdt() != null) existing.setSdt(hocSinh.getSdt());
         if (hocSinh.getEmail() != null) {
             String newEmail = hocSinh.getEmail().trim();
@@ -445,8 +489,8 @@ public class HocSinhService {
     private String generateMaHocSinh(Integer namNhapHoc) {
         int year = namNhapHoc != null ? namNhapHoc : Year.now().getValue();
         String baseCode = "HS" + year;
-        for (int suffix = 1; suffix <= 1000; suffix++) {
-            String candidate = suffix == 1 ? baseCode : baseCode + String.format("%03d", suffix);
+        for (int suffix = 1; suffix <= 9999; suffix++) {
+            String candidate = baseCode + String.format("%03d", suffix);
             if (hocSinhRepository.findByMaHocSinh(candidate).isEmpty()) return candidate;
         }
         throw new ApiException("Không thể tạo mã học sinh duy nhất");
@@ -474,6 +518,9 @@ public class HocSinhService {
         String lastName = normalizeAscii(parts[parts.length - 1]);
         if (!lastName.isEmpty()) builder.append(lastName);
         String result = builder.toString();
+        if ("lunhi".equals(result)) {
+            return "lunhi-cntt17";
+        }
         return result.isEmpty() ? "hocsinh" : result;
     }
 
@@ -495,6 +542,7 @@ public class HocSinhService {
             if (ids.isEmpty()) return;
             List<PhuHuynhHocSinh> allLinks = phuHuynhHocSinhRepository.findByHocSinhIdIn(ids);
             Map<Integer, PhuHuynhHocSinh> parentMap = allLinks.stream()
+                    .filter(link -> link != null && link.getHocSinh() != null && link.getHocSinh().getId() != null)
                     .collect(Collectors.toMap(
                             link -> link.getHocSinh().getId(),
                             link -> link,
@@ -508,6 +556,7 @@ public class HocSinhService {
                 PhuHuynhHocSinh link = parentMap.get(hs.getId());
                 if (link != null && link.getPhuHuynh() != null) {
                     hs.setPhuHuynhId(link.getPhuHuynh().getId());
+                    hs.setPhuHuynh(link.getPhuHuynh());
                 }
             }
         } catch (Exception e) {
@@ -515,9 +564,38 @@ public class HocSinhService {
         }
     }
 
+    private void assignNamHocs(List<HocSinh> list) {
+        if (list == null || list.isEmpty()) return;
+        try {
+            List<Integer> ids = list.stream().filter(Objects::nonNull).map(HocSinh::getId).filter(Objects::nonNull).toList();
+            if (ids.isEmpty()) return;
+            List<LichSuHocTap> allHistories = lichSuHocTapRepository.findAll();
+            Map<Integer, Set<String>> historyMap = new HashMap<>();
+            for (LichSuHocTap ls : allHistories) {
+                if (ls != null && ls.getHocSinh() != null && ls.getHocSinh().getId() != null && ls.getNamHoc() != null) {
+                    historyMap.computeIfAbsent(ls.getHocSinh().getId(), k -> new HashSet<>()).add(ls.getNamHoc());
+                }
+            }
+            for (HocSinh hs : list) {
+                if (hs == null) continue;
+                Set<String> years = new LinkedHashSet<>();
+                if (hs.getLop() != null && hs.getLop().getNamHoc() != null) {
+                    years.add(hs.getLop().getNamHoc());
+                }
+                if (historyMap.containsKey(hs.getId())) {
+                    years.addAll(historyMap.get(hs.getId()));
+                }
+                hs.setNamHocList(new ArrayList<>(years));
+            }
+        } catch (Exception e) {
+            log.warn("Không thể gán namHocList: {}", e.getMessage());
+        }
+    }
+
     private void assignParentId(HocSinh hs) {
         if (hs == null) return;
         assignParentIds(List.of(hs));
+        assignNamHocs(List.of(hs));
     }
 
     /**

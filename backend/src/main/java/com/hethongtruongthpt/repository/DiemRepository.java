@@ -35,6 +35,7 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
 
     @EntityGraph(attributePaths = {"hocSinh", "hocSinh.lop", "monHoc", "giaoVienNhap"})
     List<Diem> findByNamHoc(String namHoc);
+    boolean existsByNamHoc(String namHoc);
     @EntityGraph(attributePaths = {"hocSinh", "hocSinh.lop", "monHoc", "giaoVienNhap"})
     List<Diem> findByStatus(String status);
     boolean existsByGiaoVienNhapId(Integer giaoVienNhapId);
@@ -55,14 +56,6 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
 
     // Không dùng AS aliases — để tên cột gốc (snake_case).
     // getVal() trong DiemService dùng equalsIgnoreCase nên match được cả camelCase lẫn snake_case.
-    
-    // TODO: [TỐI ƯU HIỆU NĂNG - QUAN TRỌNG] Các truy vấn Native Query dưới đây (findSummary*) 
-    // trả về toàn bộ dữ liệu dưới dạng List<Map<String, Object>>. Nếu triển khai thực tế với quy mô
-    // toàn trường học, điều này có thể gây lỗi tràn bộ nhớ (Out Of Memory - OOM).
-    // Giải pháp tương lai: Truyền thêm tham số Pageable và đổi kiểu trả về thành Page<Map<String, Object>>,
-    // hoặc sử dụng Materialized View / Redis để cache kết quả thống kê.
-    // Tạm thời giữ nguyên List để không làm gãy (break) kiến trúc hiển thị Grid của React Frontend trong phạm vi khóa luận.
-
     @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, COALESCE(ls.lop_id, hs.lop_id) as lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = d.nam_hoc LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) WHERE d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL AND (l.is_deleted = false OR l.is_deleted IS NULL)", nativeQuery = true)
     List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryByNamHoc(@Param("namHoc") String namHoc);
 
@@ -74,6 +67,90 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
 
     @Query(value = "SELECT d.hoc_sinh_id, d.mon_hoc_id, d.loai_diem, d.so_thu_tu, d.hoc_ky, d.nam_hoc, d.gia_tri as gia_tri, d.nhan_xet, COALESCE(ls.lop_id, hs.lop_id) as lop_id, l.khoi FROM diem d INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = d.nam_hoc LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) WHERE d.gia_tri IS NOT NULL AND (l.is_deleted = false OR l.is_deleted IS NULL)", nativeQuery = true)
     List<com.hethongtruongthpt.dto.DiemSummaryDTO> findSummaryAll();
+
+    /**
+     * Tính ĐTB theo khối trực tiếp trong DB (aggregation at DB level).
+     * Trả về [{khoi, avgScore, studentCount}] thay vì kéo toàn bộ raw data lên Java.
+     * Logic: Tính ĐTB từng học sinh theo môn -> ĐTB từng học sinh -> ĐTB theo khối.
+     */
+    @Query(value = "SELECT subq.khoi, COUNT(*) as studentCount, ROUND(AVG(subq.avg_per_student), 2) as avgScore " +
+            "FROM ( " +
+            "  SELECT d.hoc_sinh_id, AVG(d.gia_tri) as avg_per_student, l.khoi " +
+            "  FROM diem d " +
+            "  INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id " +
+            "  LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = :namHoc " +
+            "  LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) " +
+            "  WHERE d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL " +
+            "  AND (l.is_deleted = false OR l.is_deleted IS NULL) " +
+            "  GROUP BY d.hoc_sinh_id, l.khoi " +
+            ") subq " +
+            "WHERE subq.khoi IS NOT NULL " +
+            "GROUP BY subq.khoi " +
+            "ORDER BY subq.khoi", nativeQuery = true)
+    List<Map<String, Object>> findAvgScoreByGradeNative(@Param("namHoc") String namHoc);
+
+    /**
+     * Lấy GPA từng học sinh (chỉ cần avg_score và khoi) để phân bố điểm trong dashboard.
+     * Trả về số rows = số học sinh, không phải số lượng điểm.
+     */
+    @Query(value = "SELECT " +
+            "  d.hoc_sinh_id, " +
+            "  ROUND(AVG(d.gia_tri), 2) as avg_score, " +
+            "  l.khoi " +
+            "FROM diem d " +
+            "INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id " +
+            "LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = :namHoc " +
+            "LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) " +
+            "WHERE d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL " +
+            "AND (l.is_deleted = false OR l.is_deleted IS NULL) " +
+            "GROUP BY d.hoc_sinh_id, l.khoi", nativeQuery = true)
+    List<Map<String, Object>> findStudentGPAsForDistribution(@Param("namHoc") String namHoc);
+
+    /**
+     * Lấy GPA từng học sinh theo học kỳ cụ thể để phân bố điểm.
+     */
+    @Query(value = "SELECT " +
+            "  d.hoc_sinh_id, " +
+            "  ROUND(AVG(d.gia_tri), 2) as avg_score, " +
+            "  l.khoi " +
+            "FROM diem d " +
+            "INNER JOIN hoc_sinh hs ON hs.id = d.hoc_sinh_id " +
+            "LEFT JOIN lich_su_hoc_tap ls ON ls.hoc_sinh_id = d.hoc_sinh_id AND ls.nam_hoc = :namHoc " +
+            "LEFT JOIN lop l ON l.id = COALESCE(ls.lop_id, hs.lop_id) " +
+            "WHERE d.nam_hoc = :namHoc AND d.hoc_ky = :hocKy AND d.gia_tri IS NOT NULL " +
+            "AND (l.is_deleted = false OR l.is_deleted IS NULL) " +
+            "GROUP BY d.hoc_sinh_id, l.khoi", nativeQuery = true)
+    List<Map<String, Object>> findStudentGPAsForDistributionByHocKy(@Param("namHoc") String namHoc, @Param("hocKy") Integer hocKy);
+
+    /**
+     * Tính ĐTB theo môn học trực tiếp trong DB.
+     * Trả về ~15-20 rows (1 per subject) thay vì 47,880 records raw.
+     */
+    @Query(value = "SELECT " +
+            "  d.mon_hoc_id, " +
+            "  mh.ten_mon, " +
+            "  mh.nhom_danh_gia, " +
+            "  ROUND(AVG(d.gia_tri), 2) as avg_score, " +
+            "  COUNT(DISTINCT d.hoc_sinh_id) as student_count " +
+            "FROM diem d " +
+            "INNER JOIN mon_hoc mh ON mh.id = d.mon_hoc_id AND (mh.is_deleted = false OR mh.is_deleted IS NULL) " +
+            "WHERE d.nam_hoc = :namHoc AND d.gia_tri IS NOT NULL " +
+            "GROUP BY d.mon_hoc_id, mh.ten_mon, mh.nhom_danh_gia " +
+            "ORDER BY mh.ten_mon", nativeQuery = true)
+    List<Map<String, Object>> findSubjectAvgByNamHoc(@Param("namHoc") String namHoc);
+
+    @Query(value = "SELECT " +
+            "  d.mon_hoc_id, " +
+            "  mh.ten_mon, " +
+            "  mh.nhom_danh_gia, " +
+            "  ROUND(AVG(d.gia_tri), 2) as avg_score, " +
+            "  COUNT(DISTINCT d.hoc_sinh_id) as student_count " +
+            "FROM diem d " +
+            "INNER JOIN mon_hoc mh ON mh.id = d.mon_hoc_id AND (mh.is_deleted = false OR mh.is_deleted IS NULL) " +
+            "WHERE d.nam_hoc = :namHoc AND d.hoc_ky = :hocKy AND d.gia_tri IS NOT NULL " +
+            "GROUP BY d.mon_hoc_id, mh.ten_mon, mh.nhom_danh_gia " +
+            "ORDER BY mh.ten_mon", nativeQuery = true)
+    List<Map<String, Object>> findSubjectAvgByNamHocAndHocKy(@Param("namHoc") String namHoc, @Param("hocKy") Integer hocKy);
 
     @Query(value = "SELECT hs.lop_id as classId, l.ten_lop as tenLop, l.khoi as khoi, l.si_so as siSo, " +
             "COUNT(d.id) as totalScores, " +
@@ -90,11 +167,6 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
             "GROUP BY hs.lop_id, l.ten_lop, l.khoi, l.si_so", nativeQuery = true)
     List<Map<String, Object>> findTeacherReportStats(@Param("namHoc") String namHoc, @Param("giaoVienId") Integer giaoVienId);
 
-    /**
-     * Lấy tất cả điểm LOCKED (đã khóa sổ) chưa được gửi trong kỳ kyGui.
-     * Dùng NOT IN với tập sentIds để tránh gửi trùng.
-     * Eager load hocSinh, lop, monHoc để tránh N+1 query khi sinh nội dung tin nhắn.
-     */
     @Query("SELECT d FROM Diem d " +
            "JOIN FETCH d.hocSinh hs " +
            "LEFT JOIN FETCH hs.lop l " +
@@ -103,11 +175,6 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
            "AND d.id NOT IN :sentIds")
     List<Diem> findDiemChuaGuiByHocKyAndNamHoc(@Param("hocKy") Integer hocKy, @Param("namHoc") String namHoc, @Param("sentIds") java.util.Collection<Integer> sentIds);
 
-
-
-    /**
-     * Lấy tất cả điểm LOCKED — dùng khi chưa có điểm nào được gửi (sentIds rỗng).
-     */
     @Query("SELECT d FROM Diem d " +
            "JOIN FETCH d.hocSinh hs " +
            "LEFT JOIN FETCH hs.lop l " +
@@ -115,13 +182,23 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
            "WHERE d.hocKy = :hocKy AND d.namHoc = :namHoc")
     List<Diem> findAllDiemByHocKyAndNamHoc(@Param("hocKy") Integer hocKy, @Param("namHoc") String namHoc);
 
-
+    @Query("SELECT d FROM Diem d " +
+           "JOIN FETCH d.hocSinh hs " +
+           "LEFT JOIN FETCH hs.lop l " +
+           "JOIN FETCH d.monHoc mh " +
+           "WHERE d.namHoc = :namHoc AND d.hocKy = :hocKy " +
+           "AND d.status = 'LOCKED' " +
+           "AND d.id NOT IN :sentIds " +
+           "AND (d.giaTriDiem IS NOT NULL OR d.nhanXet IS NOT NULL)")
+    List<Diem> findPendingDiemWithRelations(@Param("namHoc") String namHoc,
+                                            @Param("hocKy") Integer hocKy,
+                                            @Param("sentIds") List<Integer> sentIds);
 
     @Query(value = "SELECT " +
             "l.id as lopId, " +
             "l.ten_lop as tenLop, " +
-            "g.ho_ten as tenGvcn, " +
-            "COALESCE(NULLIF(hs_agg.siSo, 0), NULLIF(d_hs_agg.siSo, 0), NULLIF(l.si_so, 0), 0) as siSo, " +
+            "COALESCE(g.ho_ten, 'Chưa gán') as tenGvcn, " +
+            "COALESCE(hs_agg.siSo, d_hs_agg.siSo, l.si_so, 0) as siSo, " +
             "CASE WHEN d_agg.enteredScores > 0 THEN 1 ELSE 0 END as hasScores, " +
             "COALESCE(pcd_agg.expectedScoresPerStudent, 0) as expectedScoresPerStudent, " +
             "COALESCE(d_agg.enteredScores, 0) as enteredScores " +

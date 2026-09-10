@@ -41,4 +41,6 @@ public interface ThoiKhoaBieuRepository extends JpaRepository<ThoiKhoaBieu, Inte
 
     // Delete by filter
     void deleteByNamHocAndHocKy(String namHoc, Integer hocKy);
+
+    boolean existsByNamHoc(String namHoc);
 }

@@ -7,7 +7,7 @@ import { getLop } from "../../../api/lopApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { getHanhKiem, saveAllHanhKiem } from "../../../api/hanhkiemApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
-import { getStudentClass } from "../../../utils/helpers.js";
+import { getStudentClass, getVisibleAcademicYears, getActiveAcademicYear, sortClasses, sortStudentsByGivenName } from "../../../utils/helpers.js";
 
 export default function AdminHanhKiemPage() {
   const [students, setStudents] = useState([]);
@@ -41,10 +41,13 @@ export default function AdminHanhKiemPage() {
         setClasses(rawLop);
 
         const rawNamHoc = resNamHoc?.data?.data || [];
-        setNamHocList(rawNamHoc);
+        const visibleYears = getVisibleAcademicYears(rawNamHoc);
+        const yearsToUse = visibleYears.length > 0 ? visibleYears : rawNamHoc;
+        setNamHocList(yearsToUse);
 
         // Chọn năm học hiện tại
-        const currentYear = rawNamHoc.find((y) => y.trangThai === "DANG_MO" || y.trangThai === "DANG_HOAT_DONG") || rawNamHoc[0];
+        const activeYear = getActiveAcademicYear(yearsToUse);
+        const currentYear = activeYear || yearsToUse[0];
         if (currentYear) {
           setSelectedNamHoc(currentYear.tenNamHoc);
         }
@@ -58,14 +61,20 @@ export default function AdminHanhKiemPage() {
     return () => { active = false; };
   }, []);
 
-  // Lọc danh sách lớp theo khối
+  // Lọc và sắp xếp danh sách lớp theo năm học, khối (10 -> 11 -> 12) và tên lớp
   const filteredClasses = useMemo(() => {
-    if (selectedGrade === "all") return classes;
-    const gradeNum = parseInt(selectedGrade, 10);
-    return classes.filter((c) => c.khoi === gradeNum);
-  }, [classes, selectedGrade]);
+    let list = classes;
+    if (selectedNamHoc) {
+      list = list.filter((c) => (c.namHoc || c.tenNamHoc) === selectedNamHoc);
+    }
+    if (selectedGrade !== "all") {
+      const gradeNum = parseInt(selectedGrade, 10);
+      list = list.filter((c) => c.khoi === gradeNum);
+    }
+    return list.slice().sort(sortClasses);
+  }, [classes, selectedGrade, selectedNamHoc]);
 
-  // Reset lớp đã chọn nếu không nằm trong khối lọc
+  // Reset lớp đã chọn nếu không nằm trong danh sách lớp lọc
   useEffect(() => {
     if (filteredClasses.length > 0) {
       const exists = filteredClasses.some((c) => String(c.id) === String(selectedClassId));
@@ -87,46 +96,37 @@ export default function AdminHanhKiemPage() {
         setLoading(true);
         setError("");
 
-        // Tải học sinh trong lớp
+        // Tải học sinh trong lớp và sắp xếp theo bảng chữ cái A-Z
         const resHocSinh = await getHocSinh({ lopId: selectedClassId });
         if (!active) return;
-        const hocSinhs = resHocSinh?.data?.data || [];
+        const rawHocSinhs = resHocSinh?.data?.data || [];
+        const hocSinhs = sortStudentsByGivenName(rawHocSinhs);
         setStudents(hocSinhs);
 
-        // Tải hạnh kiểm đã có
+        // Tải hạnh kiểm đã có theo đúng năm học
         const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
         const namHocId = currentNamHocObj?.id;
         const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
 
-        let resHK = await getHanhKiemData({ lopId: selectedClassId, namHocId });
-        if (!resHK || resHK.length === 0) {
-          resHK = await getHanhKiemData({ lopId: selectedClassId });
+        let resHK = [];
+        if (namHocId) {
+          resHK = await getHanhKiemData({ lopId: selectedClassId, namHocId });
         }
         if (!active) return;
 
         const studentIdSet = new Set(hocSinhs.map((s) => s.id));
 
-        // Lọc hạnh kiểm thuộc lớp, năm học và học kỳ hiện tại
-        let filteredHk = resHK.filter((r) => {
+        // Lọc hạnh kiểm thuộc đúng học sinh, đúng năm học và đúng học kỳ (tuyệt đối không lấy nhầm năm khác)
+        const filteredHk = (resHK || []).filter((r) => {
           const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
           const matchStudent = studentIdSet.has(sid);
           const rHocKy = r?.hocKy ?? r?.hoc_ky;
           const matchHocKy = !targetHocKy || rHocKy === targetHocKy;
           const rNamHocId = r?.namHoc?.id ?? r?.idNamHoc ?? r?.id_namhoc;
           const rNamHocTen = r?.namHoc?.tenNamHoc ?? r?.namHoc?.ten_nam_hoc;
-          const matchNamHoc = !namHocId || rNamHocId === namHocId || rNamHocTen === selectedNamHoc;
+          const matchNamHoc = (namHocId && rNamHocId === namHocId) || (selectedNamHoc && rNamHocTen === selectedNamHoc);
           return matchStudent && matchHocKy && matchNamHoc;
         });
-
-        // Nếu lọc theo namHoc bị trống, thử nới lỏng điều kiện namHoc
-        if (filteredHk.length === 0 && resHK.length > 0) {
-          filteredHk = resHK.filter((r) => {
-            const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
-            const matchStudent = studentIdSet.has(sid);
-            const rHocKy = r?.hocKy ?? r?.hoc_ky;
-            return matchStudent && (!targetHocKy || rHocKy === targetHocKy);
-          });
-        }
 
         // Tạo lookup: { studentId: { id, xepLoai, nhanXet, status, giaoVien } }
         const lookup = {};
@@ -196,12 +196,12 @@ export default function AdminHanhKiemPage() {
         else if (record.xepLoai === "KHA") kha += 1;
         else if (record.xepLoai === "TRUNG_BINH") tb += 1;
         else if (record.xepLoai === "YEU") yeu += 1;
-      }
 
-      if (record?.status === "APPROVED") {
-        daDuyet += 1;
-      } else {
-        choDuyet += 1;
+        if (record.status === "APPROVED") {
+          daDuyet += 1;
+        } else {
+          choDuyet += 1;
+        }
       }
     });
 
@@ -246,19 +246,26 @@ export default function AdminHanhKiemPage() {
     const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
     const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
 
-    const payload = students.map((s) => {
-      const server = serverRecords[s.id];
-      return {
-        id: server?.id || null,
-        hocSinh: { id: s.id },
-        namHoc: { id: currentNamHocObj?.id },
-        hocKy: targetHocKy,
-        xepLoai: server?.xepLoai || "TOT",
-        nhanXet: server?.nhanXet || "",
-        giaoVien: server?.giaoVien ? { id: server.giaoVien.id } : null,
-        status: "APPROVED"
-      };
-    });
+    const payload = students
+      .filter((s) => serverRecords[s.id]?.xepLoai) // Chỉ duyệt những em đã có đánh giá
+      .map((s) => {
+        const server = serverRecords[s.id];
+        return {
+          id: server?.id || null,
+          hocSinh: { id: s.id },
+          namHoc: { id: currentNamHocObj?.id },
+          hocKy: targetHocKy,
+          xepLoai: server?.xepLoai || "TOT",
+          nhanXet: server?.nhanXet || "",
+          giaoVien: server?.giaoVien ? { id: server.giaoVien.id } : null,
+          status: "APPROVED"
+        };
+      });
+
+    if (payload.length === 0) {
+      notifyError("Chưa có học sinh nào được GVCN đánh giá hạnh kiểm để duyệt.");
+      return;
+    }
 
     await executeSave(payload, "Đã phê duyệt và khóa toàn bộ hạnh kiểm của lớp.");
   };
@@ -269,19 +276,21 @@ export default function AdminHanhKiemPage() {
     const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
     const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
 
-    const payload = students.map((s) => {
-      const server = serverRecords[s.id];
-      return {
-        id: server?.id || null,
-        hocSinh: { id: s.id },
-        namHoc: { id: currentNamHocObj?.id },
-        hocKy: targetHocKy,
-        xepLoai: server?.xepLoai || "TOT",
-        nhanXet: server?.nhanXet || "",
-        giaoVien: server?.giaoVien ? { id: server.giaoVien.id } : null,
-        status: "DRAFT"
-      };
-    });
+    const payload = students
+      .filter((s) => serverRecords[s.id]?.xepLoai)
+      .map((s) => {
+        const server = serverRecords[s.id];
+        return {
+          id: server?.id || null,
+          hocSinh: { id: s.id },
+          namHoc: { id: currentNamHocObj?.id },
+          hocKy: targetHocKy,
+          xepLoai: server?.xepLoai || "TOT",
+          nhanXet: server?.nhanXet || "",
+          giaoVien: server?.giaoVien ? { id: server.giaoVien.id } : null,
+          status: "DRAFT"
+        };
+      });
 
     await executeSave(payload, "Đã mở khóa đánh giá hạnh kiểm cho lớp.");
   };
@@ -291,6 +300,10 @@ export default function AdminHanhKiemPage() {
     const currentNamHocObj = namHocList.find((y) => y.tenNamHoc === selectedNamHoc);
     const targetHocKy = selectedSemester === "HK2" ? 2 : 1;
     const server = serverRecords[studentId];
+    if (!server || !server.xepLoai) {
+      notifyError("Học sinh này chưa có đánh giá hạnh kiểm từ GVCN.");
+      return;
+    }
     const isApproved = server?.status === "APPROVED";
     const nextStatus = isApproved ? "DRAFT" : "APPROVED";
 
@@ -313,8 +326,16 @@ export default function AdminHanhKiemPage() {
     );
   };
 
-  const getStatusBadge = (status) => {
-    if (status === "APPROVED") {
+  const getStatusBadge = (record) => {
+    if (!record || !record.xepLoai) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          Chưa gửi duyệt
+        </span>
+      );
+    }
+    if (record.status === "APPROVED") {
       return (
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -455,15 +476,26 @@ export default function AdminHanhKiemPage() {
           )}
 
           <button
-            className="btn btn-emerald flex items-center gap-2 py-2.5 px-4 font-semibold text-sm rounded-xl transition duration-200 shadow-sm"
-            disabled={saving || loading || students.length === 0}
+            className="btn btn-emerald flex items-center gap-2 py-2.5 px-4 font-semibold text-sm rounded-xl transition duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={saving || loading || students.length === 0 || stats.chuaDanhGia === stats.total}
             onClick={handleApproveAll}
+            title={stats.chuaDanhGia === stats.total ? "Chưa có đánh giá hạnh kiểm để duyệt" : ""}
           >
             <MaterialIcon icon="done_all" />
             Duyệt tất cả lớp
           </button>
         </div>
       </div>
+
+      {/* Thông báo năm học chưa có đợt đánh giá */}
+      {!loading && students.length > 0 && stats.chuaDanhGia === stats.total && (
+        <div className="flex items-center gap-3 p-4 mb-6 rounded-2xl bg-blue-50/90 border border-blue-200 text-blue-800 text-sm">
+          <MaterialIcon icon="info" className="text-blue-500" />
+          <span>
+            Năm học <strong>{selectedNamHoc}</strong> ({selectedSemester === "HK2" ? "Học kỳ II" : "Học kỳ I"}): Chưa đến đợt đánh giá hoặc Giáo viên chủ nhiệm chưa gửi bảng đánh giá hạnh kiểm cho lớp này.
+          </span>
+        </div>
+      )}
 
       {/* Thanh thống kê nhanh */}
       {!loading && students.length > 0 && (
@@ -583,19 +615,22 @@ export default function AdminHanhKiemPage() {
 
                     {/* Trạng thái duyệt */}
                     <div className="flex justify-center">
-                      {getStatusBadge(record.status)}
+                      {getStatusBadge(record)}
                     </div>
 
                     {/* Nút phê duyệt */}
                     <div className="flex justify-center">
                       <button
-                        className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg border transition duration-200 cursor-pointer ${
-                          record.status === "APPROVED"
-                            ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-                            : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                        className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg border transition duration-200 ${
+                          !record?.xepLoai
+                            ? "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                            : record.status === "APPROVED"
+                            ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 cursor-pointer"
+                            : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 cursor-pointer"
                         }`}
-                        disabled={saving}
-                        onClick={() => toggleApproveSingle(student.id)}
+                        disabled={saving || !record?.xepLoai}
+                        onClick={() => record?.xepLoai && toggleApproveSingle(student.id)}
+                        title={!record?.xepLoai ? "Chưa có đánh giá từ GVCN" : ""}
                       >
                         <MaterialIcon icon={record.status === "APPROVED" ? "lock_open" : "check"} size="16px" />
                         {record.status === "APPROVED" ? "Mở khóa" : "Duyệt"}

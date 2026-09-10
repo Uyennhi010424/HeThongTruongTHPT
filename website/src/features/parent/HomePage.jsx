@@ -259,11 +259,11 @@ export default function HomePage() {
         ) : (
           <>
             {/* 2. Thông tin học sinh - Ngang */}
-            <div className="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col md:flex-row items-center gap-6">
+            <div className="bg-white rounded-[16px] p-4 sm:p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col md:flex-row items-center gap-4 sm:gap-6">
               <img 
                 src={currentStudent.anhDaiDien || "https://ui-avatars.com/api/?name=" + (currentStudent.hoTen || "HS") + "&background=random"} 
                 alt="Avatar" 
-                className="w-20 h-20 rounded-full object-cover border-2 border-slate-100"
+                className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 aspect-square rounded-full object-cover border-2 border-slate-100"
               />
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-xl font-bold text-slate-900">{currentStudent.hoTen}</h2>

@@ -52,9 +52,33 @@ public class ThongBaoController {
 			allNotices = thongBaoService.getAll();
 		}
 
-		// Filter out notifications that are private to other users
+		// Filter out notifications by role & privacy
 		java.util.List<ThongBao> filtered = allNotices.stream()
-				.filter(n -> n.getRecipientId() == null || (currentUser != null && currentUser.getId().equals(n.getRecipientId())))
+				.filter(n -> {
+					if (currentUser == null) return false;
+					String userRole = currentUser.getRole() != null ? currentUser.getRole().name() : "";
+					if ("ADMIN".equals(userRole)) return true;
+
+					// If private notice (sent to specific recipient)
+					if (n.getRecipientId() != null) {
+						return currentUser.getId().equals(n.getRecipientId());
+					}
+
+					// Role-based target filtering
+					String target = n.getLoai();
+					if (target == null || "ALL".equalsIgnoreCase(target)) return true;
+					
+					if ("HOC_SINH".equals(userRole)) {
+						return "HOC_SINH".equalsIgnoreCase(target);
+					}
+					if ("PHU_HUYNH".equals(userRole)) {
+						return "PHU_HUYNH".equalsIgnoreCase(target);
+					}
+					if ("GIAO_VIEN".equals(userRole)) {
+						return "GIAO_VIEN".equalsIgnoreCase(target);
+					}
+					return false;
+				})
 				.collect(java.util.stream.Collectors.toList());
 
 		if (page != null && size != null) {

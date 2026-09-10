@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, ChevronDown, Phone, Mail, GraduationCap, Calendar, User } from "lucide-react";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
@@ -77,7 +77,7 @@ const buildTeacherEmailPreview = (fullName) => {
   const firstLetters = parts.slice(0, -1).map((part) => part[0]).join("");
   const lastName = parts[parts.length - 1];
   const localPart = `${firstLetters}${lastName}` || "giaovien";
-  return `${localPart}c3@tdn.edu.vn`;
+  return `${localPart}c3@tdu.edu.vn`;
 };
 
 const notifyUsersUpdated = () => {
@@ -328,6 +328,8 @@ export default function GiaoVienList() {
     }
   };
 
+  const [expandedTeacherId, setExpandedTeacherId] = useState(null);
+
   return (
     <div className="page users-page">
       <PageHeader
@@ -342,105 +344,246 @@ export default function GiaoVienList() {
         }
       />
 
-
-      <div className="card users-table">
-        {error && <div className="table-empty">{error}</div>}
-        {!error && successMessage && <div className="table-success">{successMessage}</div>}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col p-4 sm:p-6">
+        {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-xl text-sm font-semibold">{error}</div>}
+        {!error && successMessage && <div className="p-4 mb-4 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-semibold">{successMessage}</div>}
         {!error && !loading && filteredTeachers.length === 0 && (
-          <div className="table-empty">Không tìm thấy giáo viên phù hợp.</div>
+          <div className="p-8 text-center text-slate-500 font-medium">Không tìm thấy giáo viên phù hợp.</div>
         )}
-        <div className="table-grid">
-          <div className="table-row table-head">
-            <div>STT</div>
-            <div>Giáo viên</div>
-            <div>Bộ môn</div>
-            <div>Trình độ</div>
-            <div>Liên hệ</div>
-            <div>Chủ nhiệm</div>
-            <div>Thao tác</div>
-          </div>
-          {loading
-            ? Array.from({ length: 5 }).map((_, index) => (
-                <div
-                  className="table-row"
-                  key={`skeleton-${index}`}
-                  style={{ gridTemplateColumns: "80px 1.2fr 1fr 1fr 1.2fr 140px 160px" }}
-                >
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
+
+        {/* ── Desktop Full Table View (>= 1024px) ── */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[850px]">
+            <thead>
+              <tr className="bg-slate-50/70 border-b border-slate-200">
+                <th className="py-3.5 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
+                <th className="py-3.5 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[220px]">Giáo viên</th>
+                <th className="py-3.5 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-32">Bộ môn</th>
+                <th className="py-3.5 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-36">Trình độ</th>
+                <th className="py-3.5 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[180px]">Liên hệ</th>
+                <th className="py-3.5 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-28 text-center">Chủ nhiệm</th>
+                <th className="py-3.5 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <tr key={`skeleton-${index}`}>
+                    <td className="py-4 px-4 text-center"><div className="h-4 bg-slate-100 rounded w-6 mx-auto animate-pulse" /></td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 animate-pulse shrink-0 aspect-square" />
+                        <div className="space-y-1.5 w-full">
+                          <div className="h-4 bg-slate-100 rounded w-32 animate-pulse" />
+                          <div className="h-3 bg-slate-50 rounded w-20 animate-pulse" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4"><div className="h-4 bg-slate-100 rounded w-20 animate-pulse" /></td>
+                    <td className="py-4 px-4"><div className="h-4 bg-slate-100 rounded w-24 animate-pulse" /></td>
+                    <td className="py-4 px-4"><div className="h-4 bg-slate-100 rounded w-32 animate-pulse" /></td>
+                    <td className="py-4 px-4 text-center"><div className="h-6 bg-slate-100 rounded-full w-14 mx-auto animate-pulse" /></td>
+                    <td className="py-4 px-4 text-right"><div className="h-8 bg-slate-100 rounded w-16 ml-auto animate-pulse" /></td>
+                  </tr>
+                ))
+              ) : (
+                pagedTeachers.map((teacher, index) => (
+                  <tr key={teacher.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <td className="py-4 px-4 text-center text-sm font-bold text-slate-400">
+                      {(page - 1) * pageSize + index + 1}
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <CachedAvatar
+                          username={teacher.username || teacher.email}
+                          role="teacher"
+                          src={teacher.anhDaiDien}
+                          fallback={(() => {
+                            const parts = (teacher.hoTen || "G").trim().split(" ");
+                            return parts[parts.length - 1].charAt(0).toUpperCase();
+                          })()}
+                          className="w-10 h-10 rounded-full object-cover shrink-0 aspect-square border border-indigo-100"
+                          fallbackClassName="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 aspect-square"
+                        />
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{teacher.hoTen}</div>
+                          <div className="text-xs text-slate-500 mt-0.5 font-medium">
+                            {formatDate(teacher.ngaySinh) || "--"} • {getGenderLabel(teacher.gioiTinh)}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">
+                        {teacher.boMon || "--"}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-sm font-semibold text-slate-700">
+                      {teacher.trinhDo || "--"}
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-bold text-slate-800">{teacher.sdt || "--"}</div>
+                      <div className="text-xs text-slate-500 font-medium truncate max-w-[180px]">{teacher.email || ""}</div>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        isHomeroomTeacher(teacher)
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                      }`}>
+                        {isHomeroomTeacher(teacher) ? "Có" : "Không"}
+                      </span>
+                      {isHomeroomTeacher(teacher) && teacher.tenLopChuNhiem && (
+                        <div className="text-[11px] font-bold text-emerald-700 mt-1">
+                          Lớp {teacher.tenLopChuNhiem}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => openEdit(teacher)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Chỉnh sửa"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(teacher)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Xóa"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Mobile / Tablet Accordion Card View (< 1024px) ── */}
+        <div className="block lg:hidden space-y-3">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, idx) => (
+              <div key={`m-skeleton-${idx}`} className="p-4 rounded-xl border border-slate-200 bg-slate-50 animate-pulse space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0 aspect-square" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-4 bg-slate-200 rounded w-32" />
+                    <div className="h-3 bg-slate-200 rounded w-20" />
+                  </div>
                 </div>
-              ))
-            : pagedTeachers.map((teacher, index) => (
+              </div>
+            ))
+          ) : (
+            pagedTeachers.map((teacher, index) => {
+              const isExpanded = expandedTeacherId === teacher.id;
+              return (
                 <div
-                  className="table-row"
                   key={teacher.id}
-                  style={{ gridTemplateColumns: "80px 1.2fr 1fr 1fr 1.2fr 140px 160px" }}
+                  className={`rounded-xl border transition-all duration-200 bg-white overflow-hidden ${
+                    isExpanded ? "border-blue-300 shadow-sm" : "border-slate-200 hover:border-slate-300"
+                  }`}
                 >
-                  <div className="table-id">{(page - 1) * pageSize + index + 1}</div>
-                  <div className="flex items-center gap-3">
-                    <CachedAvatar
-                      username={teacher.username || teacher.email}
-                      role="teacher"
-                      src={teacher.anhDaiDien}
-                      fallback={(() => {
-                        const parts = (teacher.hoTen || "G").trim().split(" ");
-                        return parts[parts.length - 1].charAt(0).toUpperCase();
-                      })()}
-                      className="w-10 h-10 rounded-full object-cover shrink-0 border border-indigo-100"
-                      fallbackClassName="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0"
-                    />
-                    <div className="table-main" style={{ margin: 0, padding: 0 }}>
-                      <div className="table-title">{teacher.hoTen}</div>
-                      <div className="table-meta">
-                        {formatDate(teacher.ngaySinh) || "--"} • {getGenderLabel(teacher.gioiTinh)}
+                  {/* Collapsed Card Header */}
+                  <div
+                    className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none"
+                    onClick={() => setExpandedTeacherId(isExpanded ? null : teacher.id)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-400 w-5 text-center shrink-0">
+                        {(page - 1) * pageSize + index + 1}
+                      </div>
+                      <CachedAvatar
+                        username={teacher.username || teacher.email}
+                        role="teacher"
+                        src={teacher.anhDaiDien}
+                        fallback={(() => {
+                          const parts = (teacher.hoTen || "G").trim().split(" ");
+                          return parts[parts.length - 1].charAt(0).toUpperCase();
+                        })()}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 aspect-square border border-indigo-100"
+                        fallbackClassName="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 aspect-square"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-slate-900 truncate">{teacher.hoTen}</span>
+                          {teacher.boMon && (
+                            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold">
+                              {teacher.boMon}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium mt-0.5 truncate">
+                          {teacher.sdt || teacher.email || (isHomeroomTeacher(teacher) ? `GVCN Lớp ${teacher.tenLopChuNhiem || ""}` : "Giáo viên")}
+                        </div>
                       </div>
                     </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => openEdit(teacher)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Chỉnh sửa"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(teacher)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Xóa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedTeacherId(isExpanded ? null : teacher.id)}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-1"
+                        aria-label="Xem chi tiết"
+                      >
+                        <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-blue-600" : ""}`} />
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <div className="table-title">{teacher.boMon || "--"}</div>
-                  </div>
-                  <div>
-                    <div className="table-title">{teacher.trinhDo || "--"}</div>
-                  </div>
-                  <div className="table-email">
-                    {teacher.sdt || "--"}
-                    <div className="table-meta">{teacher.email || ""}</div>
-                  </div>
-                  <div>
-                    <span className={`status-pill ${isHomeroomTeacher(teacher) ? "status-active" : ""}`}>
-                      {isHomeroomTeacher(teacher) ? "Có" : "Không"}
-                    </span>
-                    {isHomeroomTeacher(teacher) && (
-                      <div className="table-meta">
-                        {teacher.tenLopChuNhiem || "--"}
+
+                  {/* Expanded Card Details ("Show xuống") */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/60 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <GraduationCap className="w-4 h-4 text-blue-500 shrink-0" />
+                        <span>Trình độ: <strong className="text-slate-800">{teacher.trinhDo || "--"}</strong></span>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEdit(teacher)}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
-                      title="Chỉnh sửa"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(teacher)}
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Xóa"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span>Ngày sinh: <strong className="text-slate-800">{formatDate(teacher.ngaySinh) || "--"}</strong> ({getGenderLabel(teacher.gioiTinh)})</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span>SĐT: {teacher.sdt ? <a href={`tel:${teacher.sdt}`} className="font-bold text-blue-600 hover:underline">{teacher.sdt}</a> : <strong className="text-slate-800">--</strong>}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-600 truncate">
+                        <Mail className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span className="truncate">Email: {teacher.email ? <a href={`mailto:${teacher.email}`} className="font-bold text-blue-600 hover:underline">{teacher.email}</a> : <strong className="text-slate-800">--</strong>}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-600 sm:col-span-2">
+                        <User className="w-4 h-4 text-purple-500 shrink-0" />
+                        <span>Chủ nhiệm: <strong className={isHomeroomTeacher(teacher) ? "text-emerald-700 font-bold" : "text-slate-700"}>
+                          {isHomeroomTeacher(teacher) ? `Có (Lớp ${teacher.tenLopChuNhiem || "--"})` : "Không"}
+                        </strong></span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+              );
+            })
+          )}
         </div>
-        <div className="mt-4">
+
+        {/* ── Pagination ── */}
+        <div className="mt-4 pt-3 border-t border-slate-100">
           <Pagination
             currentPage={page}
             totalPages={totalPages}
@@ -540,7 +683,7 @@ export default function GiaoVienList() {
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, email: event.target.value }))
               }
-              placeholder="vd: nvanc3@tdn.edu.vn"
+              placeholder="vd: nvanc3@tdu.edu.vn"
               readOnly={!editingTeacher}
             />
           </label>

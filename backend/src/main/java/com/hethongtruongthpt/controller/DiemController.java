@@ -161,6 +161,18 @@ public class DiemController {
 	}
 
 	/**
+	 * API nhanh: tính ĐTB theo từng môn học trực tiếp trên server.
+	 * Trả về [{monHocId, tenMon, avgScore, studentCount}] thay vì toàn bộ raw records.
+	 */
+	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")
+	@GetMapping("/subject-avg")
+	public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getSubjectAvg(
+			@RequestParam(required = false) String namHoc,
+			@RequestParam(required = false) Integer hocKy) {
+		return ResponseEntity.ok(ApiResponse.ok(diemService.getSubjectAvg(namHoc, hocKy)));
+	}
+
+	/**
 	 * API nhanh: phân bố xếp loại (Giỏi/Khá/TB/Yếu/Kém).
 	 */
 	@PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN')")

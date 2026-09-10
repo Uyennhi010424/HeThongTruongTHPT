@@ -1,13 +1,13 @@
 import React from "react";
 import { User, Calendar, MapPin } from "lucide-react";
 
-const StudentProfileWidget = ({ student, avatarSrc, selectedNamHoc, selectedHK, homeroomTeacher }) => {
+const StudentProfileWidget = ({ student, classInfo, avatarSrc, selectedNamHoc, selectedHK, homeroomTeacher }) => {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col gap-6 border border-slate-100 flex-shrink-0">
       <div className="flex items-start gap-4">
-        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 border border-slate-200 overflow-hidden">
+        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center shrink-0 aspect-square border border-slate-200 overflow-hidden">
           {avatarSrc ? (
-            <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
+            <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover shrink-0 aspect-square" />
           ) : (
             <User size={32} className="text-slate-400" />
           )}
@@ -27,7 +27,7 @@ const StudentProfileWidget = ({ student, avatarSrc, selectedNamHoc, selectedHK, 
       <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
         <div>
           <div className="text-slate-400 text-xs font-medium mb-1">Lớp</div>
-          <div className="text-slate-700 font-semibold">{student?.lop?.tenLop || "--"}</div>
+          <div className="text-slate-700 font-semibold">{classInfo?.tenLop || student?.lop?.tenLop || "--"}</div>
         </div>
         <div>
           <div className="text-slate-400 text-xs font-medium mb-1">GVCN</div>

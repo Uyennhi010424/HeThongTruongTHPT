@@ -4,7 +4,6 @@ import {
   GraduationCap,
   BookOpen,
   Settings,
-  BarChart3,
   School,
   User,
   UsersRound,
@@ -72,9 +71,9 @@ export const ADMIN_NAV = [
     group: "Hệ thống",
     icon: Settings,
     children: [
-      { path: "/admin/report", label: "Báo cáo - Thống kê", icon: BarChart3 },
       { path: "/admin/thongbao", label: "Thông báo", icon: BellRing },
       { path: "/admin/settings", label: "Cài đặt", icon: Settings }
     ]
   }
 ];
+

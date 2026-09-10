@@ -209,7 +209,7 @@ public class SampleDataSeeder implements CommandLineRunner {
                 // 1. Sinh học sinh
                 String fullName = generateRandomName(true);
                 String maHs = String.format("HS2025%04d", totalStudents + 1);
-                String username = buildLocalPart(fullName) + (totalStudents + 1) + "@tdn.edu.vn";
+                String username = buildLocalPart(fullName) + (totalStudents + 1) + "@tdu.edu.vn";
 
                 User uHs = new User();
                 uHs.setUsername(username);
@@ -296,7 +296,7 @@ public class SampleDataSeeder implements CommandLineRunner {
             for (int i = 1; i <= 10; i++) {
                 String fullName = generateRandomName(false);
                 String maGv = String.format("GV%04d", totalTeachers + 1);
-                String username = buildLocalPart(fullName) + (totalTeachers + 1) + "c3@edu.vn";
+                String username = buildLocalPart(fullName) + (totalTeachers + 1) + "c3@tdu.edu.vn";
                 String defaultPw = passwordEncoder.encode(username.split("@")[0] + "@123");
 
                 User u = new User();

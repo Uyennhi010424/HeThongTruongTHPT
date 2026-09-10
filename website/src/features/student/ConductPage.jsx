@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { formatDate, getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
@@ -28,6 +29,7 @@ export default function ConductPage() {
   const [selectedHocKy, setSelectedHocKy] = useState("all");
   const [selectedNamHoc, setSelectedNamHoc] = useState("all");
   const [namHocList, setNamHocList] = useState([]);
+  const [expandedConductId, setExpandedConductId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -174,44 +176,119 @@ export default function ConductPage() {
         {!error && !loading && filteredConducts.length === 0 && (
           <div className="table-empty">Chưa có đánh giá hạnh kiểm.</div>
         )}
-        <div className="table-grid">
-          <div className="table-row table-head">
-            <div>STT</div>
-            <div>Học kỳ</div>
-            <div>Xếp loại</div>
-            <div>Nhận xét</div>
-            <div>Ngày đánh giá</div>
-          </div>
-          {loading
-            ? Array.from({ length: 4 }).map((_, index) => (
-                <div className="table-row" key={`skeleton-${index}`}>
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                  <div className="skeleton" />
-                </div>
-              ))
-            : filteredConducts.map((item, index) => (
-                <div className="table-row" key={item.id}>
-                  <div className="table-id">{index + 1}</div>
-                  <div className="table-title">{getTermLabel(item.hocKy)}</div>
-                  <div>
-                    <span
-                      className="status-pill"
-                      style={{
-                        backgroundColor: getXepLoaiBg(item.xepLoai),
-                        color: getXepLoaiColor(item.xepLoai),
-                        border: `1px solid ${getXepLoaiColor(item.xepLoai)}20`
-                      }}
-                    >
-                      {getXepLoaiLabel(item.xepLoai)}
-                    </span>
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto min-w-[600px]">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/50">
+                <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-14 text-center">STT</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Học kỳ</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Xếp loại</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nhận xét</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Ngày đánh giá</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <tr key={`skeleton-${index}`}>
+                    {Array.from({ length: 5 }).map((_, col) => (
+                      <td key={col} className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                filteredConducts.map((item, index) => (
+                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-3 text-sm text-slate-500 text-center font-medium">{index + 1}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-800">{getTermLabel(item.hocKy)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className="inline-flex px-2.5 py-1 rounded-md text-xs font-semibold"
+                        style={{
+                          backgroundColor: getXepLoaiBg(item.xepLoai),
+                          color: getXepLoaiColor(item.xepLoai),
+                          border: `1px solid ${getXepLoaiColor(item.xepLoai)}20`
+                        }}
+                      >
+                        {getXepLoaiLabel(item.xepLoai)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">{item.nhanXet || "--"}</td>
+                    <td className="px-4 py-3 text-sm text-slate-500">{formatDate(item.ngayDanhGia) || "--"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Collapsible Accordion View */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {loading ? (
+            <div className="p-4 text-center text-sm text-slate-500">Đang tải dữ liệu...</div>
+          ) : (
+            filteredConducts.map((item, index) => {
+              const isExpanded = expandedConductId === item.id;
+              return (
+                <div key={item.id} className="p-4 hover:bg-slate-50/70 transition-colors">
+                  <div
+                    className="flex items-center justify-between cursor-pointer gap-2"
+                    onClick={() => setExpandedConductId(isExpanded ? null : item.id)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xs font-bold text-slate-400 w-6 text-center shrink-0">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 truncate">
+                          {getTermLabel(item.hocKy)}
+                        </h4>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {formatDate(item.ngayDanhGia) || "--"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className="inline-flex px-2.5 py-0.5 rounded text-xs font-bold"
+                        style={{
+                          backgroundColor: getXepLoaiBg(item.xepLoai),
+                          color: getXepLoaiColor(item.xepLoai),
+                          border: `1px solid ${getXepLoaiColor(item.xepLoai)}20`
+                        }}
+                      >
+                        {getXepLoaiLabel(item.xepLoai)}
+                      </span>
+                      <button
+                        type="button"
+                        className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                        aria-label="Toggle details"
+                      >
+                        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
-                  <div className="table-title">{item.nhanXet || "--"}</div>
-                  <div className="table-date">{formatDate(item.ngayDanhGia) || "--"}</div>
+
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-2 animate-in fade-in-50 duration-200">
+                      <div className="bg-slate-50 p-3 rounded-xl space-y-1.5">
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">Nhận xét đánh giá:</span>
+                          <span className="font-medium text-slate-800">{item.nhanXet || "Không có nhận xét."}</span>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                          <span className="text-slate-400">Ngày đánh giá:</span>
+                          <span className="font-semibold text-slate-800">{formatDate(item.ngayDanhGia) || "--"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+              );
+            })
+          )}
         </div>
       </div>
     </div>

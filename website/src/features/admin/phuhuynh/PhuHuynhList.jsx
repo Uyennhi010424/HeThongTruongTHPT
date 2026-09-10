@@ -9,9 +9,9 @@ import {
 } from "../../../api/phuhuynhApi.js";
 import { getLop } from "../../../api/lopApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
-import { getActiveAcademicYear, getVisibleAcademicYears } from "../../../utils/helpers.js";
+import { getActiveAcademicYear, getVisibleAcademicYears, sortClasses } from "../../../utils/helpers.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
-import { Filter, RefreshCw, Plus, Edit, Eye } from "lucide-react";
+import { Filter, RefreshCw, Plus, Edit, Eye, ChevronDown, Phone, Mail, Briefcase, User } from "lucide-react";
 import Pagination from "../../../components/common/Pagination.jsx";
 
 const FEMALE_MIDDLE_NAMES = new Set([
@@ -61,6 +61,7 @@ export default function PhuHuynhList() {
   const keyword = searchQuery;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [expandedParentId, setExpandedParentId] = useState(null);
 
   // Academic year & Class filter
   const [namHocList, setNamHocList] = useState([]);
@@ -214,7 +215,7 @@ export default function PhuHuynhList() {
       const matchYear = yearFilter === "all" ? true : String(item?.namHoc || "") === yearFilter;
       const matchGrade = gradeFilter === "all" ? true : String(item?.khoi || "") === gradeFilter;
       return matchYear && matchGrade;
-    });
+    }).slice().sort(sortClasses);
   }, [classes, yearFilter, gradeFilter]);
 
   const handleYearSelect = (year) => {
@@ -538,54 +539,55 @@ export default function PhuHuynhList() {
       </div>
 
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-        {error && <div className="p-4 m-6 bg-red-50 text-red-600 rounded-xl text-sm font-semibold">{error}</div>}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col p-4 sm:p-6">
+        {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-xl text-sm font-semibold">{error}</div>}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        {/* ── Desktop Full Table View (>= 1024px) ── */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[750px]">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">STT</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Họ tên</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/5">SĐT</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Email</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-32">Quan hệ</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-24">Thao tác</th>
+              <tr className="bg-slate-50/70 border-b border-slate-200">
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Họ tên</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/5">SĐT</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Email</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-32">Quan hệ</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-24">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <tr key={`skeleton-${idx}`}>
-                    <td className="px-6 py-5"><div className="h-4 bg-slate-100 rounded w-8 animate-pulse"></div></td>
-                    <td className="px-6 py-5">
-                      <div className="space-y-2 w-full">
+                    <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded w-6 mx-auto animate-pulse"></div></td>
+                    <td className="px-4 py-4">
+                      <div className="space-y-1.5 w-full">
                         <div className="h-4 bg-slate-100 rounded w-32 animate-pulse"></div>
                         <div className="h-3 bg-slate-50 rounded w-24 animate-pulse"></div>
                       </div>
                     </td>
-                    <td className="px-6 py-5"><div className="h-4 bg-slate-100 rounded w-24 animate-pulse"></div></td>
-                    <td className="px-6 py-5"><div className="h-4 bg-slate-100 rounded w-32 animate-pulse"></div></td>
-                    <td className="px-6 py-5"><div className="h-4 bg-slate-100 rounded w-16 mx-auto animate-pulse"></div></td>
-                    <td className="px-6 py-5"><div className="h-8 bg-slate-100 rounded w-16 ml-auto animate-pulse"></div></td>
+                    <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-24 animate-pulse"></div></td>
+                    <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-32 animate-pulse"></div></td>
+                    <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-16 mx-auto animate-pulse"></div></td>
+                    <td className="px-4 py-4 text-right"><div className="h-8 bg-slate-100 rounded w-16 ml-auto animate-pulse"></div></td>
                   </tr>
                 ))
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-500 font-medium">
+                  <td colSpan="6" className="px-6 py-12 text-center text-slate-500 font-medium">
                     Không tìm thấy phụ huynh phù hợp.
                   </td>
                 </tr>
               ) : (
                 paged.map((parent, index) => (
                   <tr key={parent.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4 text-sm text-slate-500 font-medium">
+                    <td className="px-4 py-4 text-sm text-slate-400 font-bold text-center">
                       {(page - 1) * pageSize + index + 1}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0 cursor-pointer"
+                          className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0 aspect-square cursor-pointer"
                           onClick={() => openDetail(parent)}
                         >
                           {parent.hoTen ? parent.hoTen.charAt(0).toUpperCase() : "P"}
@@ -605,24 +607,30 @@ export default function PhuHuynhList() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-slate-700">
+                    <td className="px-4 py-4">
+                      <div className="text-sm font-bold text-slate-800">
                         {parent.soDienThoai ? String(parent.soDienThoai).replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3") : "--"}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-600 truncate max-w-[200px]" title={parent.email}>
+                    <td className="px-4 py-4">
+                      <div className="text-sm text-slate-600 font-medium truncate max-w-[200px]" title={parent.email}>
                         {parent.email || "--"}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md">
+                    <td className="px-4 py-4 text-center">
+                      <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-md">
                         {getQuanHeLabel(parent.quanHe)}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-1 transition-opacity">
-
+                    <td className="px-4 py-4 text-right">
+                      <div className="inline-flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openDetail(parent)}
+                          className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          title="Xem chi tiết con em"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => openEdit(parent)}
                           className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
@@ -639,8 +647,123 @@ export default function PhuHuynhList() {
           </table>
         </div>
 
+        {/* ── Mobile / Tablet Accordion Card View (< 1024px) ── */}
+        <div className="block lg:hidden space-y-3">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, idx) => (
+              <div key={`m-skeleton-${idx}`} className="p-4 rounded-xl border border-slate-200 bg-slate-50 animate-pulse space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0 aspect-square" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-4 bg-slate-200 rounded w-32" />
+                    <div className="h-3 bg-slate-200 rounded w-20" />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : paged.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 font-medium">Không tìm thấy phụ huynh phù hợp.</div>
+          ) : (
+            paged.map((parent, index) => {
+              const isExpanded = expandedParentId === parent.id;
+              return (
+                <div
+                  key={parent.id}
+                  className={`rounded-xl border transition-all duration-200 bg-white overflow-hidden ${
+                    isExpanded ? "border-blue-300 shadow-sm" : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {/* Collapsed Header */}
+                  <div
+                    className="p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer select-none"
+                    onClick={() => setExpandedParentId(isExpanded ? null : parent.id)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-400 w-5 text-center shrink-0">
+                        {(page - 1) * pageSize + index + 1}
+                      </div>
+                      <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0 aspect-square">
+                        {parent.hoTen ? parent.hoTen.charAt(0).toUpperCase() : "P"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-slate-900 truncate">{parent.hoTen}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-bold">
+                            {getQuanHeLabel(parent.quanHe)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium mt-0.5 truncate">
+                          {parent.soDienThoai || parent.email || parent.ngheNghiep || "Phụ huynh"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => openDetail(parent)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Xem chi tiết"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openEdit(parent)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Chỉnh sửa"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedParentId(isExpanded ? null : parent.id)}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg ml-1"
+                        aria-label="Xem chi tiết"
+                      >
+                        <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-blue-600" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded Details ("Show xuống") */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/60 space-y-2.5 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>SĐT: {parent.soDienThoai ? <a href={`tel:${parent.soDienThoai}`} className="font-bold text-blue-600 hover:underline">{parent.soDienThoai}</a> : <strong className="text-slate-800">--</strong>}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-600 truncate">
+                          <Mail className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span className="truncate">Email: {parent.email ? <a href={`mailto:${parent.email}`} className="font-bold text-blue-600 hover:underline">{parent.email}</a> : <strong className="text-slate-800">--</strong>}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Briefcase className="w-4 h-4 text-indigo-500 shrink-0" />
+                          <span>Nghề nghiệp: <strong className="text-slate-800">{parent.ngheNghiep || "--"}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <User className="w-4 h-4 text-purple-500 shrink-0" />
+                          <span>Quan hệ: <strong className="text-slate-800">{getQuanHeLabel(parent.quanHe)}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                        <button
+                          onClick={() => openDetail(parent)}
+                          className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 transition-colors inline-flex items-center gap-1.5"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Xem danh sách con em
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
         {/* Pagination */}
-        <div className="mt-auto">
+        <div className="mt-4 pt-3 border-t border-slate-100">
           <Pagination
             currentPage={page}
             totalPages={totalPages}

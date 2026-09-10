@@ -55,13 +55,13 @@ public class GiaoVienDangKyService {
     public GiaoVien getCurrentTeacher() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null || auth.getName().equals("anonymousUser")) {
-            throw new ApiException("ChÃÂ°ÃÂ¡ng trÃÂ¬nh yÃÂªu cÃ¡ÂºÂ§u ÃÂÃÂng nhÃ¡ÂºÂ­p");
+            throw new ApiException("Chương trình yêu cầu đăng nhập");
         }
         String username = auth.getName();
         User user = userRepository.findByUsername(username.trim())
-                .orElseThrow(() -> new ApiException("KhÃÂ´ng tÃÂ¬m thÃ¡ÂºÂ¥y tÃÂ i khoÃ¡ÂºÂ£n: " + username));
+                .orElseThrow(() -> new ApiException("Không tìm thấy tài khoản: " + username));
         return giaoVienRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new ApiException("TÃÂ i khoÃ¡ÂºÂ£n khÃÂ´ng liÃÂªn kÃ¡ÂºÂ¿t vÃ¡Â»Âi giÃÂ¡o viÃÂªn"));
+                .orElseThrow(() -> new ApiException("Tài khoản không liên kết với giáo viên"));
     }
 
     @Transactional(readOnly = true)

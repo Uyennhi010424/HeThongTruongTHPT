@@ -77,6 +77,12 @@ public class HocSinh {
     @Transient
     private Integer phuHuynhId; // populated at service layer when available
 
+    @Transient
+    private PhuHuynh phuHuynh; // populated at service layer when available
+
+    @Transient
+    private java.util.List<String> namHocList; // All academic years the student has attended
+
     @Column(name = "anh_dai_dien", columnDefinition = "TEXT")
     private String anhDaiDien;
 
@@ -243,15 +249,16 @@ public class HocSinh {
     @com.fasterxml.jackson.annotation.JsonProperty("tonGiao")
     public void setTonGiaoFromJson(com.fasterxml.jackson.databind.JsonNode node) {
         if (node == null || node.isNull()) {
-            this.tonGiao = null;
+            this.tonGiao = "Không";
         } else if (node.isObject()) {
             if (node.has("tenTonGiao")) this.tonGiao = node.get("tenTonGiao").asText();
             else if (node.has("ten_tongiao")) this.tonGiao = node.get("ten_tongiao").asText();
             else this.tonGiao = "Không";
         } else if (node.isTextual()) {
-            this.tonGiao = node.asText();
+            String text = node.asText();
+            this.tonGiao = (text == null || text.trim().isEmpty() || text.trim().equals("-- Chọn tôn giáo --")) ? "Không" : text.trim();
         } else if (node.isNumber()) {
-            this.tonGiao = node.asInt() == 2 ? "Phật giáo" : (node.asInt() == 3 ? "Thiên Chúa giáo" : (node.asInt() == 4 ? "Tin Lành" : (node.asInt() == 5 ? "Cao Đài" : "Không")));
+            this.tonGiao = node.asInt() == 2 ? "Phật giáo" : (node.asInt() == 3 ? "Công giáo" : (node.asInt() == 4 ? "Tin Lành" : (node.asInt() == 5 ? "Cao Đài" : "Không")));
         }
     }
 
@@ -294,6 +301,14 @@ public class HocSinh {
         this.phuHuynhId = phuHuynhId;
     }
 
+    public PhuHuynh getPhuHuynh() {
+        return phuHuynh;
+    }
+
+    public void setPhuHuynh(PhuHuynh phuHuynh) {
+        this.phuHuynh = phuHuynh;
+    }
+
     public String getFcmToken() {
         return fcmToken;
     }
@@ -316,5 +331,13 @@ public class HocSinh {
 
     public void setTruongChuyenDen(String truongChuyenDen) {
         this.truongChuyenDen = truongChuyenDen;
+    }
+
+    public java.util.List<String> getNamHocList() {
+        return namHocList;
+    }
+
+    public void setNamHocList(java.util.List<String> namHocList) {
+        this.namHocList = namHocList;
     }
 }

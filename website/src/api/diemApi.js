@@ -5,6 +5,7 @@ export const getDiemSummary = (params = {}) => axiosClient.get("/diem/summary", 
 export const getTeacherSummary = (params = {}) => axiosClient.get("/diem/teacher-summary", { params, timeout: 30000 });
 export const getDiemAvgByGrade = (params = {}) => axiosClient.get("/diem/avg-by-grade", { params, timeout: 60000 });
 export const getDiemDistribution = (params = {}) => axiosClient.get("/diem/distribution", { params, timeout: 300000 });
+export const getDiemSubjectAvg = (params = {}) => axiosClient.get("/diem/subject-avg", { params, timeout: 15000 });
 export const createDiem = (data) => axiosClient.post("/diem", data);
 export const updateDiem = (id, data) => axiosClient.put(`/diem/${id}`, data);
 export const deleteDiem = (id) => axiosClient.delete(`/diem/${id}`);
