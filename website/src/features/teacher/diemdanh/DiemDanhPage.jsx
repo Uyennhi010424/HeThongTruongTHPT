@@ -8,6 +8,7 @@ import { getDiemDanh, saveAllDiemDanh, checkDiemDanhLock, getDiemDanhStatistics 
 import { getThoiKhoaBieu } from "../../../api/thoikhoabieuApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { getStudentClass, getStudentClassId, formatDate, sortStudentsByGivenName } from "../../../utils/helpers.js";
+import { getWeekNumber } from "../../../utils/schoolWeek.js";
 import { getCurrentUsernameFromToken, findTeacherByUsername } from "../../../utils/teacherProfile.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import TeacherFilter from "../../../components/common/TeacherFilter.jsx";
@@ -85,7 +86,7 @@ export default function DiemDanhPage() {
   const [draftRecords, setDraftRecords] = useState({});
   const [locks, setLocks] = useState({});
   const [selectedDate, setSelectedDate] = useState(getToday());
-  const [selectedTiet, setSelectedTiet] = useState(1);
+  const [selectedTiet, setSelectedTiet] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -279,12 +280,19 @@ export default function DiemDanhPage() {
     return filters.allNamHoc.find(y => y.tenNamHoc === filters.selectedNamHoc);
   }, [filters.allNamHoc, filters.selectedNamHoc]);
 
-  // Cac ngay giao vien co lich day (theo lop dang chon)
+  // Tinh so tuan tuong ung voi tuan dang xem
+  const currentTuan = useMemo(() => {
+    if (!currentYearObj || !weekDates[2]) return 1;
+    return getWeekNumber(currentYearObj, weekDates[2]);
+  }, [currentYearObj, weekDates]);
+
+  // Cac ngay giao vien co lich day (theo lop va tuan dang chon)
   const availableDays = useMemo(() => {
     if (!teacherSchedule.length) return [];
     const days = new Set();
     teacherSchedule.forEach((item) => {
-      if (selectedClassId && String(item?.lop?.id ?? item?.lopId) !== selectedClassId) return;
+      if (selectedClassId && String(item?.lop?.id ?? item?.lopId) !== String(selectedClassId)) return;
+      if (currentTuan != null && item.tuan != null && Number(item.tuan) !== Number(currentTuan)) return;
       const thu = Number(item.thu);
       if (thu >= 2 && thu <= 7) days.add(thu);
     });
@@ -304,44 +312,83 @@ export default function DiemDanhPage() {
       }
       return true;
     });
-  }, [teacherSchedule, selectedClassId, weekDates, holidays, currentYearObj, selectedSemester]);
+  }, [teacherSchedule, selectedClassId, currentTuan, weekDates, holidays, currentYearObj, selectedSemester]);
 
-  // Cac tiet giao vien co lich day ngay dang chon (theo lop dang chon)
+  // Cac tiet giao vien co lich day ngay dang chon (theo lop va tuan dang chon)
   const availablePeriods = useMemo(() => {
     if (!teacherSchedule.length || !selectedDate) return [];
-    // Tim thu tuong ung voi selectedDate
     const thuOfDate = Object.entries(weekDates).find(([, dateStr]) => dateStr === selectedDate);
     if (!thuOfDate) return [];
     const thu = Number(thuOfDate[0]);
+    const selectedDateTuan = currentYearObj ? getWeekNumber(currentYearObj, selectedDate) : currentTuan;
+
     const periods = new Set();
     teacherSchedule.forEach((item) => {
-      if (selectedClassId && String(item?.lop?.id ?? item?.lopId) !== selectedClassId) return;
+      if (selectedClassId && String(item?.lop?.id ?? item?.lopId) !== String(selectedClassId)) return;
+      if (selectedDateTuan != null && item.tuan != null && Number(item.tuan) !== Number(selectedDateTuan)) return;
       if (Number(item.thu) !== thu) return;
       const start = Number(item.tietBatDau);
       const count = Math.max(1, Number(item.soTiet || 1));
       for (let p = start; p < start + count; p++) periods.add(p);
     });
     return Array.from(periods).sort((a, b) => a - b);
-  }, [teacherSchedule, selectedClassId, selectedDate, weekDates]);
+  }, [teacherSchedule, selectedClassId, selectedDate, weekDates, currentYearObj, currentTuan]);
 
-  // Tu dong chon ngay va tiet phu hop khi doi lop hoac tuan
+  // Map tiet hoc voi ten mon hoc
+  const periodSubjectMap = useMemo(() => {
+    if (!teacherSchedule.length || !selectedDate) return {};
+    const thuOfDate = Object.entries(weekDates).find(([, dateStr]) => dateStr === selectedDate);
+    if (!thuOfDate) return {};
+    const thu = Number(thuOfDate[0]);
+    const selectedDateTuan = currentYearObj ? getWeekNumber(currentYearObj, selectedDate) : currentTuan;
+
+    const map = {};
+    teacherSchedule.forEach((item) => {
+      if (selectedClassId && String(item?.lop?.id ?? item?.lopId) !== String(selectedClassId)) return;
+      if (selectedDateTuan != null && item.tuan != null && Number(item.tuan) !== Number(selectedDateTuan)) return;
+      if (Number(item.thu) !== thu) return;
+      const start = Number(item.tietBatDau);
+      const count = Math.max(1, Number(item.soTiet || 1));
+      const monName = item?.monHoc?.tenMon || "";
+      for (let p = start; p < start + count; p++) {
+        map[p] = monName;
+      }
+    });
+    return map;
+  }, [teacherSchedule, selectedClassId, selectedDate, weekDates, currentYearObj, currentTuan]);
+
+  // Tu dong chon ngay phu hop khi doi lop hoac tuan
   useEffect(() => {
     if (!availableDays.length) return;
-    const firstDay = availableDays[0];
-    const dateForDay = weekDates[firstDay];
-    if (dateForDay && dateForDay !== selectedDate) {
-      setSelectedDate(dateForDay);
-      setIsDirty(false);
+    const isSelectedValid = availableDays.some(d => weekDates[d] === selectedDate);
+    if (!isSelectedValid) {
+      const firstDay = availableDays[0];
+      const dateForDay = weekDates[firstDay];
+      if (dateForDay) {
+        setSelectedDate(dateForDay);
+        setIsDirty(false);
+      }
     }
-  }, [availableDays, weekDates]);
+  }, [availableDays, weekDates, selectedDate]);
 
+  // Tu dong chon tiet hop le
   useEffect(() => {
-    if (!availablePeriods.length) return;
-    if (!availablePeriods.includes(selectedTiet)) {
+    if (!availablePeriods.length) {
+      if (selectedTiet !== null) setSelectedTiet(null);
+      return;
+    }
+    if (selectedTiet === null || !availablePeriods.includes(selectedTiet)) {
       setSelectedTiet(availablePeriods[0]);
       setIsDirty(false);
     }
   }, [availablePeriods, selectedTiet]);
+
+  const hasValidPeriodSelected = Boolean(
+    selectedClassId &&
+    availablePeriods.length > 0 &&
+    selectedTiet !== null &&
+    availablePeriods.includes(selectedTiet)
+  );
 
   const isAlreadySaved = useMemo(() => {
     if (!selectedDate || !selectedClassId || !selectedTiet) return false;
@@ -352,6 +399,7 @@ export default function DiemDanhPage() {
   const attendanceLocked = isNotToday || isAlreadySaved;
 
   const stats = useMemo(() => {
+    if (!hasValidPeriodSelected) return { present: 0, absentAllowed: 0, absentUnallowed: 0, over45: 0 };
     let present = 0, absentAllowed = 0, absentUnallowed = 0, over45 = 0;
     filteredStudents.forEach((student) => {
       const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, student.id);
@@ -362,10 +410,10 @@ export default function DiemDanhPage() {
       if ((record.soNgayVang || 0) > 45) over45++;
     });
     return { present, absentAllowed, absentUnallowed, over45 };
-  }, [draftRecords, filteredStudents, selectedDate, selectedClassId, selectedTiet]);
+  }, [hasValidPeriodSelected, draftRecords, filteredStudents, selectedDate, selectedClassId, selectedTiet]);
 
   const updateRecord = (studentId, patch) => {
-    if (!selectedClassId || attendanceLocked) return;
+    if (!hasValidPeriodSelected || attendanceLocked) return;
     const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, studentId);
     setDraftRecords((prev) => {
       const current = prev[key] || { loaiVang: "CO_MAT", soNgayVang: 0, ghiChu: "" };
@@ -379,7 +427,7 @@ export default function DiemDanhPage() {
   };
 
   const handleSave = async () => {
-    if (!selectedClassId || attendanceLocked || !currentTeacher?.id) return;
+    if (!hasValidPeriodSelected || attendanceLocked || !currentTeacher?.id) return;
     setSaving(true);
     setError("");
     setSaveMessage("");
@@ -529,6 +577,10 @@ export default function DiemDanhPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, justifyContent: "center" }}>
               <button type="button" onClick={() => setWeekOffset((p) => p - 1)} style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "1px solid transparent", background: "transparent", cursor: "pointer", color: "#64748b", transition: "all 0.15s", flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_left</span></button>
               
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe", padding: "6px 12px", borderRadius: 8, whiteSpace: "nowrap", flexShrink: 0 }}>
+                Tuần {currentTuan}
+              </span>
+
               <div style={{ display: "flex", gap: 4, alignItems: "center", overflowX: "auto", minWidth: 0 }}>
                 {availableDays.map((thu) => {
                   const dateStr = weekDates[thu];
@@ -553,7 +605,7 @@ export default function DiemDanhPage() {
                   );
                 })}
                 {availableDays.length === 0 && !loading && (
-                  <span style={{ fontSize: 14, color: "#9ca3af", fontStyle: "italic", whiteSpace: "nowrap" }}>Không có lịch dạy</span>
+                  <span style={{ fontSize: 14, color: "#9ca3af", fontStyle: "italic", whiteSpace: "nowrap", padding: "0 8px" }}>Không có lịch dạy trong tuần này</span>
                 )}
               </div>
 
@@ -564,19 +616,36 @@ export default function DiemDanhPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 8, margin: 0, whiteSpace: "nowrap" }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>Tiết:</span>
-                <select value={selectedTiet} onChange={(e) => { setSelectedTiet(Number(e.target.value)); setIsDirty(false); }} style={{ height: 40, padding: "0 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14, background: "#fff", outline: "none", cursor: "pointer", color: "#0f172a" }}>
-                  {availablePeriods.map((p) => <option key={p} value={p}>Tiết {p}</option>)}
+                <select
+                  value={selectedTiet || ""}
+                  onChange={(e) => { setSelectedTiet(e.target.value ? Number(e.target.value) : null); setIsDirty(false); }}
+                  disabled={!availablePeriods.length}
+                  style={{
+                    height: 40, padding: "0 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 14,
+                    background: !availablePeriods.length ? "#f1f5f9" : "#fff", outline: "none",
+                    cursor: !availablePeriods.length ? "not-allowed" : "pointer", color: "#0f172a"
+                  }}
+                >
+                  {availablePeriods.length === 0 ? (
+                    <option value="">Không có tiết</option>
+                  ) : (
+                    availablePeriods.map((p) => (
+                      <option key={p} value={p}>
+                        Tiết {p}{periodSubjectMap[p] ? ` (${periodSubjectMap[p]})` : ""}
+                      </option>
+                    ))
+                  )}
                 </select>
               </label>
 
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={!isDirty || !selectedClassId || attendanceLocked || saving || !availablePeriods.length}
+                disabled={!isDirty || !hasValidPeriodSelected || attendanceLocked || saving}
                 style={{
-                  height: 40, padding: "0 20px", borderRadius: 8, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
-                  background: (!isDirty || !selectedClassId || attendanceLocked || saving || !availablePeriods.length) ? "#f1f5f9" : "#2563eb",
-                  color: (!isDirty || !selectedClassId || attendanceLocked || saving || !availablePeriods.length) ? "#94a3b8" : "#fff",
+                  height: 40, padding: "0 20px", borderRadius: 8, fontSize: 14, fontWeight: 600, border: "none", cursor: (!isDirty || !hasValidPeriodSelected || attendanceLocked || saving) ? "not-allowed" : "pointer",
+                  background: (!isDirty || !hasValidPeriodSelected || attendanceLocked || saving) ? "#f1f5f9" : "#2563eb",
+                  color: (!isDirty || !hasValidPeriodSelected || attendanceLocked || saving) ? "#94a3b8" : "#fff",
                   display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", whiteSpace: "nowrap"
                 }}
               >
@@ -585,156 +654,174 @@ export default function DiemDanhPage() {
             </div>
           </div>
 
-          {/* Stats Summary */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 32, padding: "8px 0 24px 0" }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Có mặt:</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#16a34a" }}>{loading ? "..." : stats.present}</span>
+          {!selectedClassId ? (
+            <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>
+              Vui lòng chọn lớp học để thực hiện điểm danh.
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Vắng có phép:</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#ca8a04" }}>{loading ? "..." : stats.absentAllowed}</span>
+          ) : !hasValidPeriodSelected ? (
+            <div style={{ padding: "48px 24px", textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1", margin: "16px 0" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 44, color: "#94a3b8", display: "block", margin: "0 auto 12px" }}>event_busy</span>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#334155" }}>Không có tiết dạy theo thời khóa biểu</div>
+              <div style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>
+                Giáo viên không có lịch dạy lớp {selectedClass?.tenLop || ""} vào {selectedDate ? formatDate(selectedDate) : "ngày này"}{currentTuan ? ` (Tuần ${currentTuan})` : ""}. Chỉ điểm danh cho các tiết có trong thời khóa biểu.
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Vắng không phép:</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#dc2626" }}>{loading ? "..." : stats.absentUnallowed}</span>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Nghỉ quá 45 ngày:</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#475569" }}>{loading ? "..." : stats.over45}</span>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Stats Summary */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 32, padding: "8px 0 24px 0" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Có mặt:</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#16a34a" }}>{loading ? "..." : stats.present}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Vắng có phép:</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#ca8a04" }}>{loading ? "..." : stats.absentAllowed}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Vắng không phép:</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#dc2626" }}>{loading ? "..." : stats.absentUnallowed}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>Nghỉ quá 45 ngày:</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#475569" }}>{loading ? "..." : stats.over45}</span>
+                </div>
+              </div>
 
-          {/* Table */}
-          <div style={{ background: "#F8FAFC", borderTop: "1px solid #e5e7eb", overflow: "hidden" }}>
-            <div style={{ padding: "16px 0", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Bảng điểm danh {selectedClass?.tenLop || ""} · {formatDate(selectedDate)} · Tiết {selectedTiet}</div>
-                <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Chọn trạng thái: Có mặt / Vắng có phép / Vắng không phép</div>
-              </div>
-              <div style={{ background: "#e2e8f0", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "#475569" }}>
-                {filteredStudents.length} học sinh
-              </div>
-            </div>
+              {/* Table */}
+              <div style={{ background: "#F8FAFC", borderTop: "1px solid #e5e7eb", overflow: "hidden" }}>
+                <div style={{ padding: "16px 0", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+                      Bảng điểm danh {selectedClass?.tenLop || ""} · {formatDate(selectedDate)} · Tiết {selectedTiet}{periodSubjectMap[selectedTiet] ? ` (${periodSubjectMap[selectedTiet]})` : ""}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Chọn trạng thái: Có mặt / Vắng có phép / Vắng không phép</div>
+                  </div>
+                  <div style={{ background: "#e2e8f0", padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "#475569" }}>
+                    {filteredStudents.length} học sinh
+                  </div>
+                </div>
 
-            {error && <div style={{ padding: 16, background: "#fee2e2", color: "#dc2626" }}>{error}</div>}
-            {!error && saveMessage && <div style={{ padding: 16, background: "#dcfce7", color: "#16a34a", fontWeight: 500 }}>{saveMessage}</div>}
-            {!error && !loading && selectedClassId && filteredStudents.length === 0 && (
-              <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Lớp này chưa có học sinh.</div>
-            )}
-            {selectedClassId && attendanceLocked && (
-              <div style={{ padding: "12px 0", color: "#1d4ed8", fontWeight: 500, fontSize: 14 }}>
-                {isAlreadySaved 
-                  ? `Lớp ${selectedClass?.tenLop || "--"} đã được điểm danh tiết ${selectedTiet} ngày ${formatDate(selectedDate)} và không thể sửa lại.`
-                  : "Chỉ được phép điểm danh cho ngày hôm nay."}
-              </div>
-            )}
+                {error && <div style={{ padding: 16, background: "#fee2e2", color: "#dc2626" }}>{error}</div>}
+                {!error && saveMessage && <div style={{ padding: 16, background: "#dcfce7", color: "#16a34a", fontWeight: 500 }}>{saveMessage}</div>}
+                {!error && !loading && filteredStudents.length === 0 && (
+                  <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Lớp này chưa có học sinh.</div>
+                )}
+                {attendanceLocked && (
+                  <div style={{ padding: "12px 0", color: "#1d4ed8", fontWeight: 500, fontSize: 14 }}>
+                    {isAlreadySaved 
+                      ? `Lớp ${selectedClass?.tenLop || "--"} đã được điểm danh tiết ${selectedTiet} ngày ${formatDate(selectedDate)} và không thể sửa lại.`
+                      : "Chỉ được phép điểm danh cho ngày hôm nay."}
+                  </div>
+                )}
 
-            {!!selectedClassId && filteredStudents.length > 0 && (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                  <thead style={{ background: "#F8FAFC", position: "sticky", top: 0, zIndex: 10 }}>
-                    <tr>
-                      <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Học sinh</th>
-                      <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Trạng thái</th>
-                      <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb", width: 140 }}>Số ngày vắng</th>
-                      <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Ghi chú</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading
-                      ? Array.from({ length: 5 }).map((_, i) => (
-                          <tr key={`skel-${i}`}>
-                            <td colSpan={4} style={{ padding: 16 }}>Đang tải...</td>
-                          </tr>
-                        ))
-                      : paginatedStudents.map((student, idx) => {
-                          const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, student.id);
-                          const record = draftRecords[key] || { loaiVang: "CO_MAT", soNgayVang: 0, ghiChu: "" };
-                          const isEven = idx % 2 === 0;
-                          return (
-                            <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
-                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
-                                <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
-                                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
-                              </td>
-                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
-                                <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-                                  {LOAI_VANG_OPTIONS.map((opt) => {
-                                    const isSelected = record.loaiVang === opt.value;
-                                    return (
-                                      <label
-                                        key={opt.value}
-                                        style={{
-                                          display: "flex", alignItems: "center", gap: 6, cursor: attendanceLocked ? "default" : "pointer",
-                                          color: isSelected ? (opt.value === "CO_MAT" ? "#16a34a" : opt.value === "CO_PHEP" ? "#ca8a04" : "#dc2626") : "#64748b",
-                                          fontWeight: isSelected ? 600 : 400, fontSize: 13, transition: "color 0.15s"
-                                        }}
-                                      >
-                                        <input
-                                          type="radio"
-                                          name={`loaiVang_${student.id}`}
-                                          value={opt.value}
-                                          checked={isSelected}
-                                          disabled={attendanceLocked}
-                                          onChange={() => updateRecord(student.id, { loaiVang: opt.value, soNgayVang: opt.value === "CO_MAT" ? 0 : record.soNgayVang || 1 })}
-                                          style={{ cursor: attendanceLocked ? "default" : "pointer", accentColor: opt.value === "CO_MAT" ? "#16a34a" : opt.value === "CO_PHEP" ? "#ca8a04" : "#dc2626", width: 14, height: 14 }}
-                                        />
-                                        {opt.label}
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </td>
-                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={record.soNgayVang}
-                                  disabled={attendanceLocked || record.loaiVang === "CO_MAT"}
-                                  onChange={(e) => updateRecord(student.id, { soNgayVang: e.target.value })}
-                                  style={{
-                                    width: 60, padding: "6px 8px", borderRadius: 6, border: "1px solid #cbd5e1",
-                                    textAlign: "center", fontSize: 13, background: (attendanceLocked || record.loaiVang === "CO_MAT") ? "#f1f5f9" : "#fff",
-                                    color: (attendanceLocked || record.loaiVang === "CO_MAT") ? "#94a3b8" : "#0f172a"
-                                  }}
-                                />
-                              </td>
-                              <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
-                                <input
-                                  value={record.ghiChu}
-                                  disabled={attendanceLocked}
-                                  onChange={(e) => updateRecord(student.id, { ghiChu: e.target.value })}
-                                  placeholder="Nhận xét / Lý do..."
-                                  style={{
-                                    width: "100%", padding: "6px 12px", borderRadius: 6, border: "1px solid #cbd5e1",
-                                    fontSize: 13, background: attendanceLocked ? "#f1f5f9" : "#fff"
-                                  }}
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                {filteredStudents.length > 0 && (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                      <thead style={{ background: "#F8FAFC", position: "sticky", top: 0, zIndex: 10 }}>
+                        <tr>
+                          <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Học sinh</th>
+                          <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Trạng thái</th>
+                          <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb", width: 140 }}>Số ngày vắng</th>
+                          <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#475569", borderBottom: "1px solid #e5e7eb" }}>Ghi chú</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loading
+                          ? Array.from({ length: 5 }).map((_, i) => (
+                              <tr key={`skel-${i}`}>
+                                <td colSpan={4} style={{ padding: 16 }}>Đang tải...</td>
+                              </tr>
+                            ))
+                          : paginatedStudents.map((student, idx) => {
+                              const key = getRecordKey(selectedDate, selectedClassId, selectedTiet, student.id);
+                              const record = draftRecords[key] || { loaiVang: "CO_MAT", soNgayVang: 0, ghiChu: "" };
+                              const isEven = idx % 2 === 0;
+                              return (
+                                <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
+                                  <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                                    <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
+                                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
+                                  </td>
+                                  <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                                    <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                                      {LOAI_VANG_OPTIONS.map((opt) => {
+                                        const isSelected = record.loaiVang === opt.value;
+                                        return (
+                                          <label
+                                            key={opt.value}
+                                            style={{
+                                              display: "flex", alignItems: "center", gap: 6, cursor: attendanceLocked ? "default" : "pointer",
+                                              color: isSelected ? (opt.value === "CO_MAT" ? "#16a34a" : opt.value === "CO_PHEP" ? "#ca8a04" : "#dc2626") : "#64748b",
+                                              fontWeight: isSelected ? 600 : 400, fontSize: 13, transition: "color 0.15s"
+                                            }}
+                                          >
+                                            <input
+                                              type="radio"
+                                              name={`loaiVang_${student.id}`}
+                                              value={opt.value}
+                                              checked={isSelected}
+                                              disabled={attendanceLocked}
+                                              onChange={() => updateRecord(student.id, { loaiVang: opt.value, soNgayVang: opt.value === "CO_MAT" ? 0 : record.soNgayVang || 1 })}
+                                              style={{ cursor: attendanceLocked ? "default" : "pointer", accentColor: opt.value === "CO_MAT" ? "#16a34a" : opt.value === "CO_PHEP" ? "#ca8a04" : "#dc2626", width: 14, height: 14 }}
+                                            />
+                                            {opt.label}
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={record.soNgayVang}
+                                      disabled={attendanceLocked || record.loaiVang === "CO_MAT"}
+                                      onChange={(e) => updateRecord(student.id, { soNgayVang: e.target.value })}
+                                      style={{
+                                        width: 60, padding: "6px 8px", borderRadius: 6, border: "1px solid #cbd5e1",
+                                        textAlign: "center", fontSize: 13, background: (attendanceLocked || record.loaiVang === "CO_MAT") ? "#f1f5f9" : "#fff",
+                                        color: (attendanceLocked || record.loaiVang === "CO_MAT") ? "#94a3b8" : "#0f172a"
+                                      }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                                    <input
+                                      value={record.ghiChu}
+                                      disabled={attendanceLocked}
+                                      onChange={(e) => updateRecord(student.id, { ghiChu: e.target.value })}
+                                      placeholder="Nhận xét / Lý do..."
+                                      style={{
+                                        width: "100%", padding: "6px 12px", borderRadius: 6, border: "1px solid #cbd5e1",
+                                        fontSize: 13, background: attendanceLocked ? "#f1f5f9" : "#fff"
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-            {/* Attendance Pagination */}
-            {!loading && filteredStudents.length > 0 && (
-              <div className="p-4 border-t border-slate-200 bg-slate-50">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={filteredStudents.length}
-                  pageSize={pageSize}
-                  onPageChange={setCurrentPage}
-                  onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
-                  pageSizeOptions={[10, 20, 30, 50, 100]}
-                />
+                {/* Attendance Pagination */}
+                {!loading && filteredStudents.length > 0 && (
+                  <div className="p-4 border-t border-slate-200 bg-slate-50">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={filteredStudents.length}
+                      pageSize={pageSize}
+                      onPageChange={setCurrentPage}
+                      onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                      pageSizeOptions={[10, 20, 30, 50, 100]}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       )}
 

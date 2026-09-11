@@ -27,7 +27,7 @@ export default function LichThiAdminPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({
     namHoc: "",
-    hocKy: "Học kỳ II",
+    hocKy: "Học kỳ I",
     khoi: "",
     lop: "",
     monThi: "",
@@ -50,7 +50,7 @@ export default function LichThiAdminPage() {
     gioBatDau: "08:00",
     thoiGianLamBai: 90,
     phong: "",
-    hocKy: 2,
+    hocKy: 1,
     namHoc: "",
     giamThi1Id: "",
     giamThi2Id: "",
@@ -59,8 +59,8 @@ export default function LichThiAdminPage() {
   const [autoModalOpen, setAutoModalOpen] = useState(false);
   const [autoForm, setAutoForm] = useState({
     namHoc: "",
-    hocKy: 2,
-    tuan: 27, 
+    hocKy: 1,
+    tuan: 9, 
     loaiKiemTra: "GK"
   });
 
@@ -72,7 +72,7 @@ export default function LichThiAdminPage() {
         ...p,
         namHoc: filter.namHoc || namHocList[0] || "",
         hocKy: hk,
-        tuan: hk === 1 ? 9 : 27
+        tuan: hk === 1 ? (p.loaiKiemTra === "GK" ? 9 : 18) : (p.loaiKiemTra === "GK" ? 27 : 36)
       }));
     }
   }, [autoModalOpen]);
@@ -308,12 +308,13 @@ export default function LichThiAdminPage() {
         gioBatDau: row.gioBatDau ? String(row.gioBatDau).slice(0, 5) : "08:00",
         thoiGianLamBai: row.thoiGianLamBai || 90,
         phong: row.phongThi || "",
-        hocKy: row.hocKy || 2,
-        namHoc: row.namHoc || filter.namHoc,
+        hocKy: Number(row.hocKy) || (filter.hocKy?.includes("II") ? 2 : 1),
+        namHoc: row.namHoc || filter.namHoc || namHocList[0] || "",
         giamThi1Id: row.giamThi1?.id || "",
         giamThi2Id: row.giamThi2?.id || "",
       });
     } else {
+      const defaultHk = filter.hocKy?.includes("II") ? 2 : 1;
       setForm({
         lopId: "",
         monHocId: "",
@@ -322,7 +323,7 @@ export default function LichThiAdminPage() {
         gioBatDau: "08:00",
         thoiGianLamBai: 90,
         phong: "",
-        hocKy: 2,
+        hocKy: defaultHk,
         namHoc: filter.namHoc || namHocList[0] || "",
         giamThi1Id: "",
         giamThi2Id: "",
@@ -613,11 +614,11 @@ export default function LichThiAdminPage() {
 
               let startDate, endDate;
               if (hocKy === 1) {
-                startDate = new Date(startYear, 8, 1);
-                endDate = new Date(startYear, 11, 31);
+                startDate = new Date(startYear, 7, 1); // 01/08
+                endDate = new Date(startYear + 1, 0, 15); // 15/01
               } else {
-                startDate = new Date(startYear + 1, 0, 1);
-                endDate = new Date(startYear + 1, 4, 31);
+                startDate = new Date(startYear + 1, 0, 1); // 01/01
+                endDate = new Date(startYear + 1, 6, 31); // 31/07
               }
 
               if (ngayThi < startDate || ngayThi > endDate) {
@@ -660,6 +661,33 @@ export default function LichThiAdminPage() {
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 text-sm font-semibold text-slate-700 uppercase tracking-wider pb-2 border-b border-slate-100">Thông tin lịch thi</div>
+            
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Năm học <span className="text-red-500">*</span></label>
+              <select
+                value={form.namHoc}
+                onChange={(e) => setForm(p => ({ ...p, namHoc: e.target.value }))}
+                required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Chọn năm học</option>
+                {namHocList.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Học kỳ <span className="text-red-500">*</span></label>
+              <select
+                value={form.hocKy}
+                onChange={(e) => setForm(p => ({ ...p, hocKy: Number(e.target.value) }))}
+                required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value={1}>Học kỳ I</option>
+                <option value={2}>Học kỳ II</option>
+              </select>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Lớp <span className="text-red-500">*</span></label>
               <select
@@ -762,7 +790,20 @@ export default function LichThiAdminPage() {
               <input
                 type="date"
                 value={form.ngayThi}
-                onChange={(e) => setForm(p => ({ ...p, ngayThi: e.target.value }))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  let autoHk = form.hocKy;
+                  if (val) {
+                    const dateObj = new Date(val);
+                    const month = dateObj.getMonth();
+                    if (month >= 7 && month <= 11) {
+                      autoHk = 1;
+                    } else if (month >= 0 && month <= 6) {
+                      autoHk = 2;
+                    }
+                  }
+                  setForm(p => ({ ...p, ngayThi: val, hocKy: autoHk }));
+                }}
                 required
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />

@@ -131,12 +131,30 @@ public class LichThiService {
 
         // Render lịch thi: Khối thi chung môn trong ngày, 2 môn/ngày
         for (int khoi = 10; khoi <= 12; khoi++) {
+            final int currentKhoi = khoi;
+            List<LopHoc> lopsOfKhoi = allLop.stream()
+                    .filter(l -> l.getKhoi() != null && l.getKhoi() == currentKhoi)
+                    .toList();
+            if (lopsOfKhoi.isEmpty()) continue;
+
             List<MonHoc> monHocKhoi = new ArrayList<>();
             for (MonHoc m : allMon) {
                 if (m.getKhoiApDung() != null && m.getKhoiApDung().contains(String.valueOf(khoi))) {
                     String ten = m.getTenMon() != null ? m.getTenMon().toLowerCase() : "";
                     if (!ten.contains("shdc") && !ten.contains("sinh hoạt") && !ten.contains("chào cờ")) {
-                        monHocKhoi.add(m);
+                        // Kiểm tra xem tất cả các lớp trong khối đã có lịch thi môn này chưa
+                        boolean allLopDone = true;
+                        for (LopHoc lop : lopsOfKhoi) {
+                            Optional<LichThi> exist = lichThiRepository.findByLopIdAndMonHocIdAndLoaiKiemTraAndHocKyAndNamHoc(
+                                    lop.getId(), m.getId(), loaiKiemTra, hocKy, namHocStr);
+                            if (exist.isEmpty()) {
+                                allLopDone = false;
+                                break;
+                            }
+                        }
+                        if (!allLopDone) {
+                            monHocKhoi.add(m);
+                        }
                     }
                 }
             }
@@ -152,32 +170,45 @@ public class LichThiService {
 
                 if (subjectForDay.isEmpty()) continue;
 
-                for (LopHoc lop : allLop) {
-                    if (lop.getKhoi() == khoi) {
-                        for (int i = 0; i < subjectForDay.size(); i++) {
-                            LichThi lt = new LichThi();
-                            lt.setLop(lop);
-                            lt.setMonHoc(subjectForDay.get(i));
-                            lt.setLoaiKiemTra(loaiKiemTra);
-                            lt.setNgayThi(ngayThi);
-                            lt.setGioBatDau(i == 0 ? LocalTime.of(7, 30) : LocalTime.of(9, 30));
-                            lt.setThoiGianLamBai(45);
-                            lt.setPhongThi(lop.getTenLop()); // Phòng = Tên lớp
-                            lt.setHocKy(hocKy);
-                            lt.setNamHoc(namHocStr);
-                            
-                            if (allGv.size() > 1) {
-                                GiaoVien gt1 = allGv.get(gvIdx++ % allGv.size());
-                                GiaoVien gt2 = allGv.get(gvIdx++ % allGv.size());
-                                if (gt1.getId().equals(gt2.getId())) {
-                                    gt2 = allGv.get(gvIdx++ % allGv.size());
-                                }
-                                lt.setGiamThi1(gt1);
-                                lt.setGiamThi2(gt2);
-                            }
+                for (LopHoc lop : lopsOfKhoi) {
+                    for (int i = 0; i < subjectForDay.size(); i++) {
+                        MonHoc subject = subjectForDay.get(i);
 
-                            lichThiRepository.save(lt);
+                        // Kiểm tra nếu lớp này đã có lịch thi môn này (GK/CK) trong học kỳ & năm học này
+                        Optional<LichThi> existing = lichThiRepository.findByLopIdAndMonHocIdAndLoaiKiemTraAndHocKyAndNamHoc(
+                                lop.getId(),
+                                subject.getId(),
+                                loaiKiemTra,
+                                hocKy,
+                                namHocStr
+                        );
+                        if (existing.isPresent()) {
+                            // Lớp đã có lịch thi môn này -> Bỏ qua không tạo trùng
+                            continue;
                         }
+
+                        LichThi lt = new LichThi();
+                        lt.setLop(lop);
+                        lt.setMonHoc(subject);
+                        lt.setLoaiKiemTra(loaiKiemTra);
+                        lt.setNgayThi(ngayThi);
+                        lt.setGioBatDau(i == 0 ? LocalTime.of(7, 30) : LocalTime.of(9, 30));
+                        lt.setThoiGianLamBai(45);
+                        lt.setPhongThi(lop.getTenLop()); // Phòng = Tên lớp
+                        lt.setHocKy(hocKy);
+                        lt.setNamHoc(namHocStr);
+                        
+                        if (allGv.size() > 1) {
+                            GiaoVien gt1 = allGv.get(gvIdx++ % allGv.size());
+                            GiaoVien gt2 = allGv.get(gvIdx++ % allGv.size());
+                            if (gt1.getId().equals(gt2.getId())) {
+                                gt2 = allGv.get(gvIdx++ % allGv.size());
+                            }
+                            lt.setGiamThi1(gt1);
+                            lt.setGiamThi2(gt2);
+                        }
+
+                        lichThiRepository.save(lt);
                     }
                 }
             }

@@ -20,17 +20,21 @@ import java.util.List;
 public class TkbDayThayService {
 
     private static final Logger logger = LoggerFactory.getLogger(TkbDayThayService.class);
+    private static final java.time.format.DateTimeFormatter DATE_FMT = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final TkbDayThayRepository dayThayRepo;
     private final ThoiKhoaBieuRepository tkbRepo;
     private final GiaoVienRepository gvRepo;
+    private final LeaveNotificationService notificationService;
 
     public TkbDayThayService(TkbDayThayRepository dayThayRepo,
                               ThoiKhoaBieuRepository tkbRepo,
-                              GiaoVienRepository gvRepo) {
+                              GiaoVienRepository gvRepo,
+                              LeaveNotificationService notificationService) {
         this.dayThayRepo = dayThayRepo;
         this.tkbRepo = tkbRepo;
         this.gvRepo = gvRepo;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -93,6 +97,25 @@ public class TkbDayThayService {
         TkbDayThay saved = dayThayRepo.save(dayThay);
         logger.info("Phan cong day thay: {} -> {} ngay {} thu {} tiet {}",
             tkb.getGiaoVien().getHoTen(), gvThay.getHoTen(), ngay, tkb.getThu(), tkb.getTietBatDau());
+
+        // Gui thong bao den giao vien duoc phan cong day thay
+        if (gvThay.getUser() != null) {
+            String tenMon = tkb.getMonHoc() != null ? tkb.getMonHoc().getTenMon() : "môn học";
+            String tenLop = tkb.getLop() != null ? tkb.getLop().getTenLop() : "lớp";
+            String gvGoc = tkb.getGiaoVien() != null ? tkb.getGiaoVien().getHoTen() : "đồng nghiệp";
+            String msg = "Bạn được phân công dạy thay môn " + tenMon + " lớp " + tenLop 
+                + " (Tiết " + tkb.getTietBatDau() + ", Thứ " + tkb.getThu() + ") ngày " + ngay.format(DATE_FMT) 
+                + " thay cho GV " + gvGoc
+                + (ghiChu != null && !ghiChu.isBlank() ? " - Ghi chú: " + ghiChu : "") + ".";
+            notificationService.sendToUser(
+                gvThay.getUser(),
+                "Phân công dạy thay",
+                msg,
+                "SUBSTITUTE_TEACHING",
+                saved.getId()
+            );
+        }
+
         return saved;
     }
 

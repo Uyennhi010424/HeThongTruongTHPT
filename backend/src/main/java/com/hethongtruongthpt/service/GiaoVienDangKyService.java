@@ -3,6 +3,7 @@ package com.hethongtruongthpt.service;
 import com.hethongtruongthpt.entity.*;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.repository.*;
+import com.hethongtruongthpt.util.SchoolWeekUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class GiaoVienDangKyService {
     private final TkbDayThayRepository tkbDayThayRepository;
     private final ChiTietToHopRepository chiTietToHopRepository;
     private final ThoiKhoaBieuCrudService thoiKhoaBieuCrudService;
+    private final NamHocRepository namHocRepository;
 
     public GiaoVienDangKyService(UserRepository userRepository,
                                  GiaoVienRepository giaoVienRepository,
@@ -37,7 +39,8 @@ public class GiaoVienDangKyService {
                                  GiaoVienNghiRepository giaoVienNghiRepository,
                                  TkbDayThayRepository tkbDayThayRepository,
                                  ChiTietToHopRepository chiTietToHopRepository,
-                                 ThoiKhoaBieuCrudService thoiKhoaBieuCrudService) {
+                                 ThoiKhoaBieuCrudService thoiKhoaBieuCrudService,
+                                 NamHocRepository namHocRepository) {
         this.userRepository = userRepository;
         this.giaoVienRepository = giaoVienRepository;
         this.giaoVienBanRepository = giaoVienBanRepository;
@@ -49,6 +52,7 @@ public class GiaoVienDangKyService {
         this.tkbDayThayRepository = tkbDayThayRepository;
         this.chiTietToHopRepository = chiTietToHopRepository;
         this.thoiKhoaBieuCrudService = thoiKhoaBieuCrudService;
+        this.namHocRepository = namHocRepository;
     }
 
     @Transactional(readOnly = true)
@@ -107,8 +111,76 @@ public class GiaoVienDangKyService {
     public List<ThoiKhoaBieu> getThoiKhoaBieu(String namHoc, Integer hocKy, Integer tuan) {
         GiaoVien gv = getCurrentTeacher();
         if (tuan == null) tuan = 1;
-        List<ThoiKhoaBieu> weekSlots = thoiKhoaBieuRepository.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, tuan);
-        return weekSlots != null ? weekSlots : new ArrayList<>();
+        List<ThoiKhoaBieu> rawSlots = thoiKhoaBieuRepository.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, tuan);
+        List<ThoiKhoaBieu> weekSlots = rawSlots != null ? new ArrayList<>(rawSlots) : new ArrayList<>();
+
+        // Calculate Monday & Sunday of week tuan in namHoc
+        LocalDate monday = null;
+        LocalDate sunday = null;
+        if (namHoc != null && !namHoc.isBlank()) {
+            NamHoc nh = namHocRepository.findByTenNamHoc(namHoc).orElse(null);
+            if (nh != null && nh.getNgayBatDauHk1() != null) {
+                LocalDate week1Monday = SchoolWeekUtils.mondayOfWeekContaining(nh.getNgayBatDauHk1());
+                monday = week1Monday.plusWeeks(tuan - 1);
+                sunday = monday.plusDays(6);
+            }
+        }
+
+        // 1. Mark leave days for this teacher (GiaoVienNghi APPROVED)
+        if (monday != null && sunday != null) {
+            List<GiaoVienNghi> leaves = giaoVienNghiRepository.findByGiaoVienIdAndNgayBetween(gv.getId(), monday, sunday);
+            for (GiaoVienNghi nghi : leaves) {
+                if ("APPROVED".equals(nghi.getTrangThai())) {
+                    int absentThu = nghi.getNgay().getDayOfWeek().getValue() + 1; // 2=Mon..7=Sat
+                    for (ThoiKhoaBieu s : weekSlots) {
+                        if (s.getThu() != null && s.getThu() == absentThu) {
+                            String thayName = nghi.getGiaoVienThay() != null ? nghi.getGiaoVienThay().getHoTen() : "";
+                            String leaveTag = "[Nghỉ dạy" + (!thayName.isEmpty() ? " - GV dạy thay: " + thayName : "") + "]";
+                            if (s.getGhiChu() == null || !s.getGhiChu().contains("[Nghỉ dạy")) {
+                                s.setGhiChu(leaveTag + (s.getGhiChu() != null && !s.getGhiChu().isBlank() ? " - " + s.getGhiChu() : ""));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Fetch substitute teaching slots (TkbDayThay where giaoVienThayId == gv.getId())
+        List<TkbDayThay> subList = Collections.emptyList();
+        if (monday != null && sunday != null) {
+            subList = tkbDayThayRepository.findByGiaoVienThayIdAndNgayBetween(gv.getId(), monday, sunday);
+        } else if (namHoc != null && !namHoc.isBlank()) {
+            subList = tkbDayThayRepository.findByGiaoVienThayIdAndNamHoc(gv.getId(), namHoc);
+        }
+
+        for (TkbDayThay dt : subList) {
+            ThoiKhoaBieu orig = dt.getThoiKhoaBieu();
+            if (orig == null) continue;
+            
+            int thu = dt.getNgay() != null ? (dt.getNgay().getDayOfWeek().getValue() + 1) : (orig.getThu() != null ? orig.getThu() : 2);
+            
+            ThoiKhoaBieu subSlot = new ThoiKhoaBieu();
+            subSlot.setId(orig.getId());
+            subSlot.setLop(orig.getLop());
+            subSlot.setMonHoc(orig.getMonHoc());
+            subSlot.setGiaoVien(gv);
+            subSlot.setThu(thu);
+            subSlot.setTietBatDau(orig.getTietBatDau());
+            subSlot.setSoTiet(orig.getSoTiet());
+            subSlot.setNamHoc(orig.getNamHoc() != null ? orig.getNamHoc() : namHoc);
+            subSlot.setHocKy(orig.getHocKy() != null ? orig.getHocKy() : hocKy);
+            subSlot.setTuan(tuan);
+            subSlot.setPhongHoc(orig.getPhongHoc());
+            subSlot.setIsLocked(true);
+            
+            String origGvName = orig.getGiaoVien() != null ? orig.getGiaoVien().getHoTen() : "đồng nghiệp";
+            String note = "Dạy thay GV: " + origGvName;
+            subSlot.setGhiChu(note);
+            
+            weekSlots.add(subSlot);
+        }
+
+        return weekSlots;
     }
 
     @Transactional(readOnly = true)

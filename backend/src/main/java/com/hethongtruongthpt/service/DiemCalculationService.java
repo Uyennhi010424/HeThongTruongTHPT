@@ -327,43 +327,30 @@ public class DiemCalculationService {
         return null;
     }
 
+    private Double computeSubjectSemesterAvg(List<double[]> scores) {
+        if (scores == null || scores.isEmpty()) return null;
+        double sumTx = 0, gk = 0, ck = 0;
+        boolean hasGk = false, hasCk = false;
+        int txCount = 0;
+        for (double[] s : scores) {
+            if (s[1] == 1.0) { sumTx += s[0]; txCount++; }
+            else if (s[1] == 2.0) { gk = s[0]; hasGk = true; }
+            else if (s[1] == 3.0) { ck = s[0]; hasCk = true; }
+        }
+        // Quy chế: Phải có đủ điểm TX, Giữa kỳ và Cuối kỳ mới hình thành TBM
+        if (hasGk && hasCk && txCount > 0) {
+            return (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
+        }
+        return null;
+    }
+
     @Cacheable(value = "dashboardStats", key = "'avgGrade_' + #namHoc")
     public List<Map<String, Object>> getAvgByGrade(String namHoc) {
         String effectiveNamHoc = (namHoc != null && !namHoc.isBlank()) ? namHoc : getDefaultNamHoc();
-        try {
-            // Use DB-level aggregation query instead of pulling all raw data to Java
-            List<Map<String, Object>> rows = diemRepository.findAvgScoreByGradeNative(effectiveNamHoc);
-            Map<Integer, Map<String, Object>> byGrade = new java.util.LinkedHashMap<>();
-            for (int g : new int[]{10, 11, 12}) {
-                Map<String, Object> item = new java.util.HashMap<>();
-                item.put("khoi", g);
-                item.put("studentCount", 0);
-                item.put("avgScore", null);
-                byGrade.put(g, item);
-            }
-            for (Map<String, Object> row : rows) {
-                // MySQL native queries return lowercase column names; try both cases
-                Object khoiObj = row.getOrDefault("khoi", row.get("KHOI"));
-                Object avgObj = row.getOrDefault("avgScore", row.getOrDefault("avgscore", row.getOrDefault("avgSCORE", row.get("AVGSCORE"))));
-                Object countObj = row.getOrDefault("studentCount", row.getOrDefault("studentcount", row.get("STUDENTCOUNT")));
-                if (khoiObj == null) continue;
-                int khoi;
-                try { khoi = Integer.parseInt(khoiObj.toString()); } catch (NumberFormatException e) { continue; }
-                if (byGrade.containsKey(khoi)) {
-                    Map<String, Object> item = byGrade.get(khoi);
-                    item.put("studentCount", countObj != null ? ((Number) countObj).intValue() : 0);
-                    item.put("avgScore", avgObj != null ? Math.round(Double.parseDouble(avgObj.toString()) * 100.0) / 100.0 : null);
-                }
-            }
-            return new ArrayList<>(byGrade.values());
-        } catch (Exception e) {
-            logger.error("Error in getAvgByGrade with DB query, falling back to Java computation: {}", e.getMessage());
-            // Fallback: original Java computation
-            return getAvgByGradeFallback(effectiveNamHoc);
-        }
+        return getAvgByGradeFallback(effectiveNamHoc);
     }
 
-    /** Fallback method: original Java-based computation (kept for safety) */
+    /** Java-based computation calculating GPA strictly from completed TBMs */
     private List<Map<String, Object>> getAvgByGradeFallback(String namHoc) {
         List<Map<String, Object>> summary = getSummaryByNamHoc(namHoc);
 
@@ -418,53 +405,13 @@ public class DiemCalculationService {
             for (Map.Entry<String, Map<Integer, List<double[]>>> subjectEntry : subjectMap.entrySet()) {
                 Map<Integer, List<double[]>> semesterMap = subjectEntry.getValue();
 
-                Double avg1 = null;
-                Double avg2 = null;
-
-                List<double[]> scores1 = semesterMap.get(1);
-                if (scores1 != null && !scores1.isEmpty()) {
-                    double sumTx = 0, gk = 0, ck = 0;
-                    boolean hasGk = false, hasCk = false;
-                    int txCount = 0;
-                    for (double[] s : scores1) {
-                        if (s[1] == 1.0) { sumTx += s[0]; txCount++; }
-                        else if (s[1] == 2.0) { gk = s[0]; hasGk = true; }
-                        else if (s[1] == 3.0) { ck = s[0]; hasCk = true; }
-                    }
-                    if (hasGk && hasCk) {
-                        avg1 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
-                    } else if (hasGk) {
-                        avg1 = (sumTx + 2 * gk) / (txCount + 2);
-                    } else if (txCount > 0) {
-                        avg1 = sumTx / txCount;
-                    }
-                }
-
-                List<double[]> scores2 = semesterMap.get(2);
-                if (scores2 != null && !scores2.isEmpty()) {
-                    double sumTx = 0, gk = 0, ck = 0;
-                    boolean hasGk = false, hasCk = false;
-                    int txCount = 0;
-                    for (double[] s : scores2) {
-                        if (s[1] == 1.0) { sumTx += s[0]; txCount++; }
-                        else if (s[1] == 2.0) { gk = s[0]; hasGk = true; }
-                        else if (s[1] == 3.0) { ck = s[0]; hasCk = true; }
-                    }
-                    if (hasGk && hasCk) {
-                        avg2 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
-                    } else if (hasGk) {
-                        avg2 = (sumTx + 2 * gk) / (txCount + 2);
-                    } else if (txCount > 0) {
-                        avg2 = sumTx / txCount;
-                    }
-                }
+                Double avg1 = computeSubjectSemesterAvg(semesterMap.get(1));
+                Double avg2 = computeSubjectSemesterAvg(semesterMap.get(2));
 
                 if (avg1 != null && avg2 != null) {
                     studentSubjectAverages.add((avg1 + 2 * avg2) / 3.0);
                 } else if (avg1 != null) {
                     studentSubjectAverages.add(avg1);
-                } else if (avg2 != null) {
-                    studentSubjectAverages.add(avg2);
                 }
             }
 
@@ -494,82 +441,13 @@ public class DiemCalculationService {
         return result;
     }
 
-
     @Cacheable(value = "dashboardStats", key = "'distribution_' + #namHoc + '_' + #hocKy + '_' + #khoi")
     public Map<String, Object> getDistribution(String namHoc, Integer hocKy, Integer khoi) {
         String effectiveNamHoc = (namHoc != null && !namHoc.isBlank()) ? namHoc : getDefaultNamHoc();
-        try {
-            // Use DB-level aggregation: get per-student GPA, then bucket in Java (minimal data)
-            List<Map<String, Object>> rows;
-            if (hocKy != null && hocKy != 0) {
-                rows = diemRepository.findStudentGPAsForDistributionByHocKy(effectiveNamHoc, hocKy);
-            } else {
-                rows = diemRepository.findStudentGPAsForDistribution(effectiveNamHoc);
-            }
-
-            Map<String, Integer> counts = new LinkedHashMap<>();
-            counts.put("TOT", 0);
-            counts.put("KHA", 0);
-            counts.put("DAT", 0);
-            counts.put("CHUA_DAT", 0);
-
-            Map<String, Integer> scoreRanges = new LinkedHashMap<>();
-            scoreRanges.put("0–4,9", 0);
-            scoreRanges.put("5,0–5,9", 0);
-            scoreRanges.put("6,0–6,9", 0);
-            scoreRanges.put("7,0–7,9", 0);
-            scoreRanges.put("8,0–8,9", 0);
-            scoreRanges.put("9,0–10,0", 0);
-
-            double totalAvg = 0;
-            int totalStudents = 0;
-
-            for (Map<String, Object> row : rows) {
-                Object avgObj = row.get("avg_score");
-                Object khoiObj = row.get("khoi");
-                if (avgObj == null) continue;
-
-                // Filter by khoi if specified
-                if (khoi != null && khoi != 0 && khoiObj != null) {
-                    try {
-                        int rowKhoi = Integer.parseInt(khoiObj.toString());
-                        if (rowKhoi != khoi) continue;
-                    } catch (NumberFormatException ignored) {}
-                }
-
-                double gpa;
-                try { gpa = Double.parseDouble(avgObj.toString()); } catch (NumberFormatException e) { continue; }
-
-                totalAvg += gpa;
-                totalStudents++;
-
-                if (gpa >= 8.0) counts.merge("TOT", 1, Integer::sum);
-                else if (gpa >= 6.5) counts.merge("KHA", 1, Integer::sum);
-                else if (gpa >= 5.0) counts.merge("DAT", 1, Integer::sum);
-                else counts.merge("CHUA_DAT", 1, Integer::sum);
-
-                if (gpa < 5.0) scoreRanges.merge("0–4,9", 1, Integer::sum);
-                else if (gpa < 6.0) scoreRanges.merge("5,0–5,9", 1, Integer::sum);
-                else if (gpa < 7.0) scoreRanges.merge("6,0–6,9", 1, Integer::sum);
-                else if (gpa < 8.0) scoreRanges.merge("7,0–7,9", 1, Integer::sum);
-                else if (gpa < 9.0) scoreRanges.merge("8,0–8,9", 1, Integer::sum);
-                else scoreRanges.merge("9,0–10,0", 1, Integer::sum);
-            }
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("counts", counts);
-            result.put("scoreRanges", scoreRanges);
-            result.put("total", totalStudents);
-            result.put("avgScore", totalStudents > 0 ?
-                Math.round((totalAvg / totalStudents) * 100.0) / 100.0 : null);
-            return result;
-        } catch (Exception e) {
-            logger.error("Error in getDistribution with DB query, falling back to Java computation: {}", e.getMessage());
-            return getDistributionFallback(effectiveNamHoc, hocKy, khoi);
-        }
+        return getDistributionFallback(effectiveNamHoc, hocKy, khoi);
     }
 
-    /** Fallback method: original Java-based computation (kept for safety) */
+    /** Fallback method: Java-based computation requiring full TBMs */
     private Map<String, Object> getDistributionFallback(String namHoc, Integer hocKy, Integer khoi) {
         List<Map<String, Object>> summary = getSummaryByNamHoc(namHoc);
 
@@ -587,8 +465,10 @@ public class DiemCalculationService {
 
             if (khoi != null && khoi != 0) {
                 if (itemKhoiObj != null) {
-                    int itemKhoi = Integer.parseInt(itemKhoiObj.toString());
-                    if (itemKhoi != khoi) continue;
+                    try {
+                        int itemKhoi = Integer.parseInt(itemKhoiObj.toString());
+                        if (itemKhoi != khoi) continue;
+                    } catch (NumberFormatException ignored) {}
                 }
             }
 
@@ -628,79 +508,21 @@ public class DiemCalculationService {
                 Map<Integer, List<double[]>> semesterMap = subjectEntry.getValue();
 
                 if (hocKy != null && hocKy != 0) {
-                    List<double[]> scores = semesterMap.get(hocKy);
-                    if (scores != null && !scores.isEmpty()) {
-                        double sumTx = 0, gk = 0, ck = 0;
-                        boolean hasGk = false, hasCk = false;
-                        int txCount = 0;
-                        for (double[] s : scores) {
-                            if (s[1] == 1.0) { sumTx += s[0]; txCount++; }
-                            else if (s[1] == 2.0) { gk = s[0]; hasGk = true; }
-                            else if (s[1] == 3.0) { ck = s[0]; hasCk = true; }
-                        }
-                        if (hasGk && hasCk) {
-                            double subjectSemesterAvg = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
-                            studentSubjectAverages.add(subjectSemesterAvg);
-                        } else if (hasGk) {
-                            double subjectSemesterAvg = (sumTx + 2 * gk) / (txCount + 2);
-                            studentSubjectAverages.add(subjectSemesterAvg);
-                        } else if (txCount > 0) {
-                            double subjectSemesterAvg = sumTx / txCount;
-                            studentSubjectAverages.add(subjectSemesterAvg);
-                        }
+                    Double avg = computeSubjectSemesterAvg(semesterMap.get(hocKy));
+                    if (avg != null) {
+                        studentSubjectAverages.add(avg);
                     }
                 } else {
-                    Double avg1 = null;
-                    Double avg2 = null;
-
-                    List<double[]> scores1 = semesterMap.get(1);
-                    if (scores1 != null && !scores1.isEmpty()) {
-                        double sumTx = 0, gk = 0, ck = 0;
-                        boolean hasGk = false, hasCk = false;
-                        int txCount = 0;
-                        for (double[] s : scores1) {
-                            if (s[1] == 1.0) { sumTx += s[0]; txCount++; }
-                            else if (s[1] == 2.0) { gk = s[0]; hasGk = true; }
-                            else if (s[1] == 3.0) { ck = s[0]; hasCk = true; }
-                        }
-                        if (hasGk && hasCk) {
-                            avg1 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
-                        } else if (hasGk) {
-                            avg1 = (sumTx + 2 * gk) / (txCount + 2);
-                        } else if (txCount > 0) {
-                            avg1 = sumTx / txCount;
-                        }
-                    }
-
-                    List<double[]> scores2 = semesterMap.get(2);
-                    if (scores2 != null && !scores2.isEmpty()) {
-                        double sumTx = 0, gk = 0, ck = 0;
-                        boolean hasGk = false, hasCk = false;
-                        int txCount = 0;
-                        for (double[] s : scores2) {
-                            if (s[1] == 1.0) { sumTx += s[0]; txCount++; }
-                            else if (s[1] == 2.0) { gk = s[0]; hasGk = true; }
-                            else if (s[1] == 3.0) { ck = s[0]; hasCk = true; }
-                        }
-                        if (hasGk && hasCk) {
-                            avg2 = (sumTx + 2 * gk + 3 * ck) / (txCount + 5);
-                        } else if (hasGk) {
-                            avg2 = (sumTx + 2 * gk) / (txCount + 2);
-                        } else if (txCount > 0) {
-                            avg2 = sumTx / txCount;
-                        }
-                    }
+                    Double avg1 = computeSubjectSemesterAvg(semesterMap.get(1));
+                    Double avg2 = computeSubjectSemesterAvg(semesterMap.get(2));
 
                     if (avg1 != null && avg2 != null) {
                         studentSubjectAverages.add((avg1 + 2 * avg2) / 3.0);
-                    } else if (avg1 != null) {
-                        studentSubjectAverages.add(avg1);
-                    } else if (avg2 != null) {
-                        studentSubjectAverages.add(avg2);
                     }
                 }
             }
 
+            // Chỉ tính GPA học lực khi đã hoàn thành các cột TBM theo quy chế
             if (!studentSubjectAverages.isEmpty()) {
                 double gpa = studentSubjectAverages.stream().mapToDouble(Double::doubleValue).average().orElse(0);
                 studentFinalGPAs.add(gpa);
@@ -715,6 +537,14 @@ public class DiemCalculationService {
         counts.put("DAT", 0);
         counts.put("CHUA_DAT", 0);
 
+        Map<String, Integer> scoreRanges = new LinkedHashMap<>();
+        scoreRanges.put("0–4,9", 0);
+        scoreRanges.put("5,0–5,9", 0);
+        scoreRanges.put("6,0–6,9", 0);
+        scoreRanges.put("7,0–7,9", 0);
+        scoreRanges.put("8,0–8,9", 0);
+        scoreRanges.put("9,0–10,0", 0);
+
         double totalAvg = 0;
         for (double gpa : studentFinalGPAs) {
             totalAvg += gpa;
@@ -727,10 +557,18 @@ public class DiemCalculationService {
             } else {
                 counts.merge("CHUA_DAT", 1, Integer::sum);
             }
+
+            if (gpa < 5.0) scoreRanges.merge("0–4,9", 1, Integer::sum);
+            else if (gpa < 6.0) scoreRanges.merge("5,0–5,9", 1, Integer::sum);
+            else if (gpa < 7.0) scoreRanges.merge("6,0–6,9", 1, Integer::sum);
+            else if (gpa < 8.0) scoreRanges.merge("7,0–7,9", 1, Integer::sum);
+            else if (gpa < 9.0) scoreRanges.merge("8,0–8,9", 1, Integer::sum);
+            else scoreRanges.merge("9,0–10,0", 1, Integer::sum);
         }
 
         Map<String, Object> result = new HashMap<>();
         result.put("counts", counts);
+        result.put("scoreRanges", scoreRanges);
         result.put("total", totalStudents);
         result.put("avgScore", totalStudents > 0 ?
             Math.round((totalAvg / totalStudents) * 100.0) / 100.0 : null);

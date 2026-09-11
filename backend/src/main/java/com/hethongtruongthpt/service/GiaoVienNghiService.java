@@ -2,11 +2,15 @@ package com.hethongtruongthpt.service;
 
 import com.hethongtruongthpt.entity.GiaoVien;
 import com.hethongtruongthpt.entity.GiaoVienNghi;
+import com.hethongtruongthpt.entity.ThoiKhoaBieu;
+import com.hethongtruongthpt.entity.TkbDayThay;
 import com.hethongtruongthpt.entity.User;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
 import com.hethongtruongthpt.repository.GiaoVienNghiRepository;
 import com.hethongtruongthpt.repository.GiaoVienRepository;
+import com.hethongtruongthpt.repository.ThoiKhoaBieuRepository;
+import com.hethongtruongthpt.repository.TkbDayThayRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -32,13 +36,19 @@ public class GiaoVienNghiService {
     private final GiaoVienNghiRepository nghiRepo;
     private final GiaoVienRepository gvRepo;
     private final LeaveNotificationService notificationService;
+    private final ThoiKhoaBieuRepository tkbRepo;
+    private final TkbDayThayRepository tkbDayThayRepo;
 
     public GiaoVienNghiService(GiaoVienNghiRepository nghiRepo,
                                 GiaoVienRepository gvRepo,
-                                LeaveNotificationService notificationService) {
+                                LeaveNotificationService notificationService,
+                                ThoiKhoaBieuRepository tkbRepo,
+                                TkbDayThayRepository tkbDayThayRepo) {
         this.nghiRepo = nghiRepo;
         this.gvRepo = gvRepo;
         this.notificationService = notificationService;
+        this.tkbRepo = tkbRepo;
+        this.tkbDayThayRepo = tkbDayThayRepo;
     }
 
     @Transactional(readOnly = true)
@@ -141,6 +151,7 @@ public class GiaoVienNghiService {
         nghi.setApprovedBy(approvedByUser);
         nghi.setApprovedAt(LocalDateTime.now());
 
+        GiaoVien thay = null;
         if ("REJECTED".equals(normalizedStatus)) {
             nghi.setLyDoTuChoi(lyDoTuChoi);
             nghi.setGiaoVienThay(null);
@@ -148,7 +159,7 @@ public class GiaoVienNghiService {
         } else {
             nghi.setLyDoTuChoi(null);
             if (giaoVienThayId != null) {
-                GiaoVien thay = gvRepo.findById(giaoVienThayId)
+                thay = gvRepo.findById(giaoVienThayId)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên thay thế"));
                 nghi.setGiaoVienThay(thay);
             } else {
@@ -159,17 +170,54 @@ public class GiaoVienNghiService {
 
         GiaoVienNghi saved = nghiRepo.save(nghi);
 
-        // --- Send notification back to the teacher ---
+        // --- Send notification back to the teacher who requested leave ---
         GiaoVien gv = nghi.getGiaoVien();
         if (gv != null && gv.getUser() != null) {
             User teacherUser = gv.getUser();
-            boolean approved = "APPROVED".equals(trangThai);
+            boolean approved = "APPROVED".equals(normalizedStatus);
             String title = approved ? "Đơn xin nghỉ được duyệt" : "Đơn xin nghỉ bị từ chối";
             String msg = approved
-                ? "Đơn xin nghỉ ngày " + nghi.getNgay().format(DATE_FMT) + " của bạn đã được chấp thuận."
+                ? "Đơn xin nghỉ ngày " + nghi.getNgay().format(DATE_FMT) + " của bạn đã được chấp thuận." + (thay != null ? " Giáo viên dạy thay: " + thay.getHoTen() : "")
                 : "Đơn xin nghỉ ngày " + nghi.getNgay().format(DATE_FMT) + " của bạn đã bị từ chối."
                     + (lyDoTuChoi != null ? " Lý do: " + lyDoTuChoi : "");
             notificationService.sendToUser(teacherUser, title, msg, "LEAVE_RESULT", saved.getId());
+        }
+
+        // --- If approved with substitute teacher: notify substitute teacher and auto-create TkbDayThay slots ---
+        if ("APPROVED".equals(normalizedStatus) && thay != null) {
+            if (thay.getUser() != null) {
+                String gvNghiName = gv != null ? gv.getHoTen() : "đồng nghiệp";
+                String msg = "Bạn được phân công dạy thay cho GV " + gvNghiName 
+                    + " vào ngày " + nghi.getNgay().format(DATE_FMT) 
+                    + (adminMessage != null && !adminMessage.isBlank() ? " - Ghi chú: " + adminMessage : "") + ".";
+                notificationService.sendToUser(
+                    thay.getUser(),
+                    "Phân công dạy thay",
+                    msg,
+                    "SUBSTITUTE_TEACHING",
+                    saved.getId()
+                );
+            }
+
+            // Auto-create TkbDayThay slots for all periods on that date
+            int thu = nghi.getNgay().getDayOfWeek().getValue() + 1; // 2=Mon .. 7=Sat
+            if (thu >= 2 && thu <= 7 && gv != null) {
+                List<ThoiKhoaBieu> gvSlots = tkbRepo.findByGiaoVienId(gv.getId());
+                for (ThoiKhoaBieu tkbSlot : gvSlots) {
+                    if (tkbSlot.getThu() == thu) {
+                        List<TkbDayThay> existing = tkbDayThayRepo.findByThoiKhoaBieuId(tkbSlot.getId());
+                        boolean already = existing.stream().anyMatch(dt -> dt.getNgay().equals(nghi.getNgay()));
+                        if (!already) {
+                            TkbDayThay dt = new TkbDayThay();
+                            dt.setThoiKhoaBieu(tkbSlot);
+                            dt.setGiaoVienThay(thay);
+                            dt.setNgay(nghi.getNgay());
+                            dt.setGhiChu("Dạy thay GV: " + gv.getHoTen());
+                            tkbDayThayRepo.save(dt);
+                        }
+                    }
+                }
+            }
         }
 
         return saved;

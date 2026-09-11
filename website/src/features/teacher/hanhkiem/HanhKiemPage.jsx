@@ -53,7 +53,7 @@ export default function HanhKiemPage() {
       try {
         setLoading(true);
         const hocKy = TERM_MAP[selectedTerm];
-        const currentNamHocObj = (filters.namHocList || filters.allNamHoc || []).find(
+        const currentNamHocObj = (filters.allNamHoc || []).find(
           (y) => y.tenNamHoc === selectedNamHoc
         );
         const namHocId = currentNamHocObj?.id;
@@ -64,13 +64,13 @@ export default function HanhKiemPage() {
         if (!active) return;
 
         const records = res?.data?.data || [];
-        // Filter strictly by hocKy and namHoc
+        // Filter strictly by hocKy and namHoc (never leak data from other years)
         const filtered = records.filter((r) => {
           const rHocKy = r.hocKy ?? r.hoc_ky;
-          const matchHocKy = hocKy === 0 || rHocKy === hocKy;
+          const matchHocKy = hocKy === 0 || Number(rHocKy) === Number(hocKy);
           const rNamHocId = r?.namHoc?.id ?? r?.idNamHoc ?? r?.id_namhoc;
           const rNamHocTen = r?.namHoc?.tenNamHoc ?? r?.namHoc?.ten_nam_hoc;
-          const matchNamHoc = !namHocId || rNamHocId === namHocId || rNamHocTen === selectedNamHoc;
+          const matchNamHoc = (namHocId && Number(rNamHocId) === Number(namHocId)) || (selectedNamHoc && rNamHocTen === selectedNamHoc);
           return matchHocKy && matchNamHoc;
         });
 
@@ -81,26 +81,18 @@ export default function HanhKiemPage() {
           if (sid) {
             lookup[sid] = {
               id: r.id,
-              xepLoai: r.xepLoai || null,
+              xepLoai: r.xepLoai || "",
               nhanXet: r.nhanXet || "",
               status: r.status || "DRAFT"
             };
           }
         });
         setServerRecords(lookup);
-        // Initialize draft from server records
-        setDraftRecords((prev) => {
-          const merged = { ...lookup };
-          // Overlay any unsaved local changes
-          Object.keys(prev).forEach((key) => {
-            if (merged[key]) {
-              merged[key] = { ...merged[key], ...prev[key] };
-            }
-          });
-          return merged;
-        });
+        setDraftRecords(lookup);
+        setIsDirty(false);
       } catch {
-        // ignore - will show empty
+        setServerRecords({});
+        setDraftRecords({});
       } finally {
         if (active) setLoading(false);
       }
@@ -108,7 +100,7 @@ export default function HanhKiemPage() {
 
     loadRecords();
     return () => { active = false; };
-  }, [selectedClassId, selectedTerm, selectedNamHoc]);
+  }, [selectedClassId, selectedTerm, selectedNamHoc, filters.allNamHoc]);
 
   useEffect(() => {
     if (!saveMessage) return undefined;
@@ -142,24 +134,30 @@ export default function HanhKiemPage() {
     let kha = 0;
     let trungBinh = 0;
     let yeu = 0;
+    let chuaDanhGia = 0;
 
     filteredStudents.forEach((student) => {
-      const record = draftRecords[student.id] || { xepLoai: "TOT" };
-      const rank = record?.xepLoai || "TOT";
+      const record = draftRecords[student.id];
+      if (!record || !record.xepLoai) {
+        chuaDanhGia += 1;
+        return;
+      }
+      const rank = record.xepLoai;
       if (rank === "TOT") tot += 1;
-      if (rank === "KHA") kha += 1;
-      if (rank === "TRUNG_BINH") trungBinh += 1;
-      if (rank === "YEU") yeu += 1;
+      else if (rank === "KHA") kha += 1;
+      else if (rank === "TRUNG_BINH") trungBinh += 1;
+      else if (rank === "YEU") yeu += 1;
+      else chuaDanhGia += 1;
     });
 
-    return { tot, kha, trungBinh, yeu };
+    return { tot, kha, trungBinh, yeu, chuaDanhGia };
   }, [filteredStudents, draftRecords]);
 
   const updateRecord = (studentId, patch) => {
     if (!selectedClassId) return;
 
     setDraftRecords((prev) => {
-      const current = prev[studentId] || { xepLoai: "TOT", nhanXet: "" };
+      const current = prev[studentId] || { xepLoai: "", nhanXet: "" };
       return {
         ...prev,
         [studentId]: { ...current, ...patch }
@@ -171,7 +169,7 @@ export default function HanhKiemPage() {
   };
 
   const handleSave = async () => {
-    const currentNamHocObj = filters.allNamHoc.find((n) => n.tenNamHoc === selectedNamHoc);
+    const currentNamHocObj = (filters.allNamHoc || []).find((n) => n.tenNamHoc === selectedNamHoc);
     if (!currentTeacher || !currentNamHocObj || !selectedClassId) {
       setError("Thiếu thông tin giáo viên hoặc năm học.");
       return;
@@ -186,7 +184,7 @@ export default function HanhKiemPage() {
       const payload = filteredStudents
         .map((student) => {
           const draft = draftRecords[student.id];
-          if (!draft) return null;
+          if (!draft || !draft.xepLoai) return null;
 
           const server = serverRecords[student.id];
           const record = {
@@ -194,7 +192,7 @@ export default function HanhKiemPage() {
             giaoVien: { id: currentTeacher.id },
             namHoc: { id: currentNamHocObj.id },
             hocKy: hocKy === 0 ? null : hocKy,
-            xepLoai: draft.xepLoai || "TOT",
+            xepLoai: draft.xepLoai,
             nhanXet: draft.nhanXet || "",
             status: server?.status || "DRAFT"
           };
@@ -209,7 +207,7 @@ export default function HanhKiemPage() {
         .filter(Boolean);
 
       if (payload.length === 0) {
-        setSaveMessage("Không có dữ liệu để lưu.");
+        setSaveMessage("Chưa có đánh giá hạnh kiểm nào để lưu.");
         setSaving(false);
         return;
       }
@@ -218,19 +216,20 @@ export default function HanhKiemPage() {
       if (res?.data?.success) {
         // Update server records with saved data
         const saved = res.data.data || [];
-        const newServer = {};
+        const newServer = { ...serverRecords };
         saved.forEach((r) => {
-          const sid = r?.hocSinh?.id;
+          const sid = r?.hocSinh?.id ?? r?.idHocSinh ?? r?.id_hocsinh;
           if (sid) {
             newServer[sid] = {
               id: r.id,
-              xepLoai: r.xepLoai || "TOT",
+              xepLoai: r.xepLoai || "",
               nhanXet: r.nhanXet || "",
               status: r.status || "DRAFT"
             };
           }
         });
         setServerRecords(newServer);
+        setDraftRecords(newServer);
         setIsDirty(false);
         setLastSavedAt(new Date().toLocaleString("vi-VN"));
         setSaveMessage("Đã lưu đánh giá hạnh kiểm.");
@@ -341,6 +340,9 @@ export default function HanhKiemPage() {
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>● Khá: {loading ? "..." : stats.kha}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#ca8a04" }}>● Trung bình: {loading ? "..." : stats.trungBinh}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#dc2626" }}>● Yếu: {loading ? "..." : stats.yeu}</span>
+                {stats.chuaDanhGia > 0 && (
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#94a3b8" }}>● Chưa đánh giá: {loading ? "..." : stats.chuaDanhGia}</span>
+                )}
               </div>
             </div>
 
@@ -370,7 +372,7 @@ export default function HanhKiemPage() {
                             </tr>
                           ))
                         : paginatedStudents.map((student, idx) => {
-                            const record = draftRecords[student.id] || { xepLoai: "TOT", nhanXet: "" };
+                            const record = draftRecords[student.id] || { xepLoai: "", nhanXet: "" };
                             const isEven = idx % 2 === 0;
                             return (
                               <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
@@ -383,15 +385,17 @@ export default function HanhKiemPage() {
                                 </td>
                                 <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
                                   <select
-                                    value={record.xepLoai}
+                                    value={record.xepLoai || ""}
                                     disabled={record.status === "APPROVED" || saving}
                                     onChange={(event) => updateRecord(student.id, { xepLoai: event.target.value })}
                                     style={{
                                       width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1",
                                       fontSize: 14, background: (record.status === "APPROVED" || saving) ? "#f1f5f9" : "#fff",
-                                      fontWeight: 600, color: record.xepLoai === "YEU" ? "#dc2626" : record.xepLoai === "TRUNG_BINH" ? "#ca8a04" : record.xepLoai === "KHA" ? "#2563eb" : "#16a34a"
+                                      fontWeight: 600,
+                                      color: record.xepLoai === "YEU" ? "#dc2626" : record.xepLoai === "TRUNG_BINH" ? "#ca8a04" : record.xepLoai === "KHA" ? "#2563eb" : record.xepLoai === "TOT" ? "#16a34a" : "#64748b"
                                     }}
                                   >
+                                    <option value="">-- Chưa đánh giá --</option>
                                     <option value="TOT">Tốt</option>
                                     <option value="KHA">Khá</option>
                                     <option value="TRUNG_BINH">Trung bình</option>
@@ -400,7 +404,7 @@ export default function HanhKiemPage() {
                                 </td>
                                 <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
                                   <input
-                                    value={record.nhanXet}
+                                    value={record.nhanXet || ""}
                                     disabled={record.status === "APPROVED" || saving}
                                     onChange={(event) => updateRecord(student.id, { nhanXet: event.target.value })}
                                     placeholder={record.status === "APPROVED" ? "Đã duyệt & khóa" : "Nhận xét hạnh kiểm"}

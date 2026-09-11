@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, useRef, memo, useCallback } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useDragScroll } from "../../../hooks/useDragScroll.js";
 import { getAdminConfig } from "../../../api/adminConfigApi.js";
 import { getHocSinh } from "../../../api/hocsinhApi.js";
 import { getLop } from "../../../api/lopApi.js";
@@ -260,6 +262,7 @@ export default function NhapDiem() {
     selectedClassId: selectedClass,
     selectedSubjectObj: selectedSubject,
     selectedSubjectId,
+    setSelectedSubjectId,
     allStudents: students,
     filteredClasses,
     allowedSubjects,
@@ -282,6 +285,17 @@ export default function NhapDiem() {
   const [saveMessage, setSaveMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const dragScroll = useDragScroll();
+
+  // Auto-scroll active subject tab into view
+  useEffect(() => {
+    if (!selectedSubjectId || !dragScroll.ref.current) return;
+    const activeBtn = dragScroll.ref.current.querySelector(`[data-subject-id="${selectedSubjectId}"]`);
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [selectedSubjectId]);
 
   useEffect(() => {
     let active = true;
@@ -380,20 +394,13 @@ export default function NhapDiem() {
   }, [scoreLocks, selectedSemester, selectedPolicy.mode, selectedPolicy.txCount, selectedSubject?.id]);
 
   const filteredStudents = useMemo(() => {
-    let result = students.filter((student) => student.trangThai === 1);
-
-    if (selectedGrade && String(selectedGrade).toLowerCase() !== "all") {
-      result = result.filter((student) => String(getStudentClass(student)?.khoi || "") === String(selectedGrade));
-    }
-
-    if (selectedClass) {
-      result = result.filter((student) => String(getStudentClassId(student) || "") === String(selectedClass));
-    }
-
+    if (!selectedClass) return [];
+    let result = students.filter(
+      (student) => student.trangThai === 1 && String(getStudentClassId(student) || "") === String(selectedClass)
+    );
     result = sortStudentsByGivenName(result);
-
     return result;
-  }, [selectedClass, selectedGrade, students]);
+  }, [selectedClass, students]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -725,20 +732,29 @@ export default function NhapDiem() {
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8 max-w-[1600px] mx-auto flex flex-col gap-6">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-slate-200">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-4 border-b border-slate-200">
           <div>
-            <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
-              Bảng nhập điểm theo môn
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">
+                Bảng nhập điểm theo môn
+              </h1>
+              {selectedSubject && (
+                <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-lg text-[13px] font-bold">
+                  <span className="material-symbols-outlined text-[17px]">book</span>
+                  Môn {selectedSubject.tenMon}
+                </span>
+              )}
               {selectedClassObj && (
-                <span className="text-sm font-semibold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md border border-slate-200 flex items-center gap-1.5">
+                <span className="text-[13px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[17px]">class</span>
                   Lớp {selectedClassObj.tenLop}
                   <span className="text-slate-300">•</span>
                   {filteredStudents.length} học sinh
                 </span>
               )}
-            </h1>
-            <p className="mt-1.5 text-[15px] font-medium text-slate-500 flex items-center gap-2">
-              Bấm chọn môn học để nhập điểm.
+            </div>
+            <p className="mt-1.5 text-[14px] font-medium text-slate-500 flex items-center gap-2">
+              Nhập và quản lý điểm số cho học sinh các lớp được phân công giảng dạy ({selectedSemester === "HK1" ? "Học kỳ 1" : "Học kỳ 2"} - Năm học {selectedNamHoc}).
               {lastSavedAt && (
                 <>
                   <span className="text-slate-300">•</span>
@@ -766,19 +782,77 @@ export default function NhapDiem() {
           </div>
         </div>
 
-        {/* Tabs chọn lớp ngang */}
+        {/* Tabs chọn môn học ngang (chỉ hiển thị nếu giáo viên dạy nhiều hơn 1 môn) */}
+        {allowedSubjects && allowedSubjects.length > 1 && (
+          <div className="relative flex items-center bg-white px-2 py-1.5 rounded-xl border border-slate-200 shadow-xs">
+            {dragScroll.canScrollLeft && (
+              <button
+                type="button"
+                onClick={() => dragScroll.scrollLeft(250)}
+                className="absolute left-1 z-10 w-8 h-8 rounded-full bg-white/95 border border-slate-300 shadow-sm flex items-center justify-center cursor-pointer text-slate-700 hover:bg-slate-50 transition-all"
+                aria-label="Cuộn sang trái"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
+
+            <div
+              ref={dragScroll.ref}
+              className="flex gap-2 overflow-x-auto w-full px-2 hide-scroll-tabs"
+              {...dragScroll.events}
+              style={{
+                cursor: dragScroll.isDragging ? "grabbing" : "grab",
+                userSelect: dragScroll.isDragging ? "none" : "auto",
+                scrollbarWidth: "none"
+              }}
+            >
+              {allowedSubjects.map(s => {
+                const isActive = String(selectedSubjectId) === String(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    data-subject-id={s.id}
+                    onClick={() => setSelectedSubjectId(String(s.id))}
+                    className={`flex items-center gap-1.5 whitespace-nowrap py-2 px-3 font-semibold text-[14px] transition-all rounded-lg ${
+                      isActive
+                        ? "bg-blue-600 text-white font-bold shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[17px]">book</span>
+                    {s.tenMon}
+                  </button>
+                );
+              })}
+            </div>
+
+            {dragScroll.canScrollRight && (
+              <button
+                type="button"
+                onClick={() => dragScroll.scrollRight(250)}
+                className="absolute right-1 z-10 w-8 h-8 rounded-full bg-white/95 border border-slate-300 shadow-sm flex items-center justify-center cursor-pointer text-slate-700 hover:bg-slate-50 transition-all"
+                aria-label="Cuộn sang phải"
+              >
+                <ChevronRight size={18} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Tabs chọn lớp ngang của giáo viên */}
         {filteredClasses && filteredClasses.length > 0 && (
-          <div className="flex gap-6 overflow-x-auto border-b border-slate-200 hide-scrollbar bg-white px-2 rounded-t-xl mb-4">
+          <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 hide-scrollbar bg-white px-3 py-2 rounded-xl shadow-xs">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1 pr-2 shrink-0">Lớp dạy:</span>
             {filteredClasses.map(c => {
               const isSelected = String(filters.selectedClassId) === String(c.id);
               return (
                 <button
                   key={c.id}
                   onClick={() => filters.setSelectedClassId(String(c.id))}
-                  className={`flex items-center gap-2 whitespace-nowrap px-4 py-3 font-semibold text-[14px] transition-all border-b-2 ${
+                  className={`flex items-center gap-2 whitespace-nowrap px-4 py-2 rounded-lg font-bold text-[14px] transition-all ${
                     isSelected
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                   }`}
                 >
                   Lớp {c.tenLop}
@@ -789,28 +863,76 @@ export default function NhapDiem() {
         )}
 
         {/* Thống kê nhẹ nhàng (Không Card) */}
-        <div className="flex flex-wrap items-center gap-6 text-[14px] text-slate-600 font-medium pb-2 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-blue-500 text-[18px]">group</span>
-            Học sinh: <strong className="text-slate-900">{(loading || filterLoading) ? "..." : statistics.students}</strong>
+        {selectedClass && (
+          <div className="flex flex-wrap items-center gap-6 text-[14px] text-slate-600 font-medium pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-blue-500 text-[18px]">group</span>
+              Học sinh: <strong className="text-slate-900">{(loading || filterLoading) ? "..." : statistics.students}</strong>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-emerald-500 text-[18px]">task_alt</span>
+              Đã nhập: <strong className="text-slate-900">{(loading || filterLoading) ? "..." : statistics.completed}</strong>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-500 text-[18px]">school</span>
+              {selectedSemester === "HK1" ? "Học kỳ 1" : "Học kỳ 2"}
+            </div>
           </div>
-          <div className="w-1 h-1 rounded-full bg-slate-300"></div>
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-500 text-[18px]">task_alt</span>
-            Đã nhập: <strong className="text-slate-900">{(loading || filterLoading) ? "..." : statistics.completed}</strong>
-          </div>
-          <div className="w-1 h-1 rounded-full bg-slate-300"></div>
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-500 text-[18px]">school</span>
-            {selectedSemester === "HK1" ? "Học kỳ 1" : "Học kỳ 2"}
-          </div>
-        </div>
+        )}
 
         {/* Message */}
         {(error || filterError) && <div className="text-[14px] font-bold text-red-600 bg-red-50 px-4 py-3 rounded-xl border border-red-200">{error || filterError}</div>}
         {!(error || filterError) && saveMessage && <div className="text-[14px] font-bold text-emerald-700 bg-emerald-50 px-4 py-3 rounded-xl border border-emerald-200 flex items-center gap-2"><span className="material-symbols-outlined">check_circle</span>{saveMessage}</div>}
-        {!(error || filterError) && !(loading || filterLoading) && filteredStudents.length === 0 && (
-          <div className="text-[14px] font-medium text-slate-500 bg-slate-50 px-4 py-6 rounded-xl border border-dashed border-slate-300 text-center">Không có học sinh phù hợp. Vui lòng chọn lớp khác.</div>
+        
+        {/* Empty States */}
+        {!(error || filterError) && !(loading || filterLoading) && filteredClasses.length === 0 && (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center shadow-xs my-4">
+            <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]">assignment_late</span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Không có phân công giảng dạy</h3>
+            <p className="text-slate-500 text-sm max-w-md mx-auto">
+              Giáo viên chưa được phân công giảng dạy cho lớp nào trong năm học <strong className="text-slate-700">{selectedNamHoc}</strong> ({selectedSemester === "HK1" ? "Học kỳ 1" : "Học kỳ 2"}). Vui lòng chọn năm học hoặc học kỳ khác.
+            </p>
+          </div>
+        )}
+
+        {!(error || filterError) && !(loading || filterLoading) && filteredClasses.length > 0 && !selectedClass && (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center shadow-xs my-4">
+            <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]">touch_app</span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Vui lòng chọn lớp học</h3>
+            <p className="text-slate-500 text-sm max-w-md mx-auto">
+              Bấm vào danh sách các lớp ở trên để xem danh sách học sinh và tiến hành nhập điểm.
+            </p>
+          </div>
+        )}
+
+        {!(error || filterError) && !(loading || filterLoading) && selectedClass && !selectedSubject && (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center shadow-xs my-4">
+            <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]">menu_book</span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Vui lòng chọn môn học</h3>
+            <p className="text-slate-500 text-sm max-w-md mx-auto">
+              Bấm chọn một môn học ở thanh trên để bắt đầu nhập điểm cho lớp {selectedClassObj?.tenLop || ""}.
+            </p>
+          </div>
+        )}
+
+        {!(error || filterError) && !(loading || filterLoading) && selectedClass && selectedSubject && filteredStudents.length === 0 && (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center shadow-xs my-4">
+            <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-[32px]">person_off</span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Lớp chưa có học sinh</h3>
+            <p className="text-slate-500 text-sm max-w-md mx-auto">
+              Lớp {selectedClassObj?.tenLop || ""} hiện chưa có danh sách học sinh đang theo học.
+            </p>
+          </div>
         )}
 
         {/* Bảng nhập điểm Data Table */}

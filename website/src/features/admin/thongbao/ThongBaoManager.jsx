@@ -56,6 +56,7 @@ export default function ThongBaoManager() {
   const [pageSize, setPageSize] = useState(5);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNotice, setEditingNotice] = useState(null);
+  const [viewingNotice, setViewingNotice] = useState(null);
   const [expandedNoticeId, setExpandedNoticeId] = useState(null);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
@@ -248,7 +249,7 @@ export default function ThongBaoManager() {
                 <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[240px]">Thông báo</th>
                 <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-32">Đối tượng</th>
                 <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Ngày đăng</th>
-                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-28 text-center">Trạng thái</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-36 text-center">Trạng thái</th>
                 <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-24">Thao tác</th>
               </tr>
             </thead>
@@ -263,7 +264,7 @@ export default function ThongBaoManager() {
                     </td>
                     <td className="px-4 py-4"><div className="h-6 bg-slate-100 rounded-full w-20 animate-pulse" /></td>
                     <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-28 animate-pulse" /></td>
-                    <td className="px-4 py-4 text-center"><div className="h-6 bg-slate-100 rounded-full w-16 mx-auto animate-pulse" /></td>
+                    <td className="px-4 py-4 text-center"><div className="h-6 bg-slate-100 rounded-full w-24 mx-auto animate-pulse" /></td>
                     <td className="px-4 py-4 text-right"><div className="h-8 bg-slate-100 rounded w-16 ml-auto animate-pulse" /></td>
                   </tr>
                 ))
@@ -273,20 +274,28 @@ export default function ThongBaoManager() {
                     <td className="px-4 py-4 text-center text-sm font-bold text-slate-400">
                       {(page - 1) * pageSize + index + 1}
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{notice.tieuDe}</div>
-                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-1 max-w-[320px]">{notice.noiDung}</div>
+                    <td
+                      className="px-4 py-4 cursor-pointer"
+                      onClick={() => setViewingNotice(notice)}
+                      title="Nhấp để xem chi tiết thông báo"
+                    >
+                      <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        {notice.tieuDe}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-1 max-w-[320px]">
+                        {notice.noiDung}
+                      </div>
                     </td>
                     <td className="px-4 py-4">
-                      <span className="inline-block px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold">
+                      <span className="inline-block px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold whitespace-nowrap">
                         {getTargetLabel(notice.doiTuong || notice.loai)}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-xs font-semibold text-slate-600">
+                    <td className="px-4 py-4 text-xs font-semibold text-slate-600 whitespace-nowrap">
                       {formatDateTime(notice.ngayDang) || "--"}
                     </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    <td className="px-4 py-4 text-center whitespace-nowrap">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
                         notice.trangThai === 1
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : "bg-slate-100 text-slate-600 border border-slate-200"
@@ -421,6 +430,67 @@ export default function ThongBaoManager() {
         </div>
       </div>
 
+      {/* Modal Xem chi tiết thông báo */}
+      <SimpleModal
+        open={Boolean(viewingNotice)}
+        title="Chi tiết thông báo"
+        width={580}
+        onClose={() => setViewingNotice(null)}
+      >
+        {viewingNotice && (
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="inline-block px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold">
+                  Đối tượng: {getTargetLabel(viewingNotice.doiTuong || viewingNotice.loai)}
+                </span>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  viewingNotice.trangThai === 1
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                }`}>
+                  {getStatusLabel(viewingNotice.trangThai)}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                {viewingNotice.tieuDe}
+              </h3>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>Ngày đăng: {formatDateTime(viewingNotice.ngayDang) || "--"}</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed max-h-[50vh] overflow-y-auto">
+              {viewingNotice.noiDung || "Không có nội dung chi tiết."}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => setViewingNotice(null)}
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                className="btn-primary flex items-center gap-1.5"
+                onClick={() => {
+                  const target = viewingNotice;
+                  setViewingNotice(null);
+                  openEdit(target);
+                }}
+              >
+                <Edit className="w-4 h-4" />
+                <span>Chỉnh sửa</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </SimpleModal>
+
+      {/* Modal Thêm / Cập nhật thông báo */}
       <SimpleModal
         open={modalOpen}
         title={editingNotice ? "Cập nhật thông báo" : "Thêm thông báo"}

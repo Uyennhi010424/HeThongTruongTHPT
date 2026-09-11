@@ -21,6 +21,7 @@ function timeAgo(dateStr) {
 const TYPE_CONFIG = {
   LEAVE_REQUEST: { nav: "/admin/nghi-day", label: "Đơn xin nghỉ" },
   LEAVE_RESULT:  { nav: "/teacher/xin-nghi", label: "Kết quả đơn nghỉ" },
+  SUBSTITUTE_TEACHING: { nav: "/teacher/thoikhoabieu", label: "Phân công dạy thay" },
 };
 
 // Helper: check if a thongbao was created by current admin/vanthu user

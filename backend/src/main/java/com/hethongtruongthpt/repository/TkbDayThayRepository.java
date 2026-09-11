@@ -42,4 +42,8 @@ public interface TkbDayThayRepository extends JpaRepository<TkbDayThay, Integer>
     @EntityGraph(attributePaths = {"thoiKhoaBieu", "thoiKhoaBieu.lop", "thoiKhoaBieu.monHoc", "thoiKhoaBieu.giaoVien", "giaoVienThay"})
     @Query("SELECT d FROM TkbDayThay d WHERE d.giaoVienThay.id = :giaoVienId AND d.thoiKhoaBieu.namHoc = :namHoc")
     List<TkbDayThay> findByGiaoVienThayIdAndNamHoc(@Param("giaoVienId") Integer giaoVienId, @Param("namHoc") String namHoc);
+
+    @EntityGraph(attributePaths = {"thoiKhoaBieu", "thoiKhoaBieu.lop", "thoiKhoaBieu.monHoc", "thoiKhoaBieu.giaoVien", "giaoVienThay"})
+    @Query("SELECT d FROM TkbDayThay d WHERE d.giaoVienThay.id = :giaoVienId AND d.ngay BETWEEN :from AND :to")
+    List<TkbDayThay> findByGiaoVienThayIdAndNgayBetween(@Param("giaoVienId") Integer giaoVienId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

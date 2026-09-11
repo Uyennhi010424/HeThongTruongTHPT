@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -232,7 +233,11 @@ public class BaiKiemTraService {
 
     @Transactional(readOnly = true)
     public TeacherMetadataDTO getTeacherMetadata(Integer giaoVienId) {
-        List<PhanCongDay> phanCongs = phanCongDayRepository.findByGiaoVienId(giaoVienId);
+        String activeNamHoc = getActiveNamHoc();
+        List<PhanCongDay> phanCongs = phanCongDayRepository.findByGiaoVienId(giaoVienId).stream()
+                .filter(pc -> pc.getNamHoc() == null || activeNamHoc.equals(pc.getNamHoc()))
+                .filter(pc -> pc.getLop() == null || activeNamHoc.equals(pc.getLop().getNamHoc()))
+                .collect(Collectors.toList());
         
         List<TeacherMetadataDTO.ClassInfo> classes;
         List<TeacherMetadataDTO.SubjectInfo> subjects;
@@ -240,18 +245,21 @@ public class BaiKiemTraService {
         if (!phanCongs.isEmpty()) {
             classes = phanCongs.stream()
                 .map(pc -> pc.getLop())
+                .filter(Objects::nonNull)
                 .distinct()
                 .map(l -> new TeacherMetadataDTO.ClassInfo(l.getId(), l.getTenLop()))
                 .collect(Collectors.toList());
                 
             subjects = phanCongs.stream()
                 .map(pc -> pc.getMonHoc())
+                .filter(Objects::nonNull)
                 .distinct()
                 .map(m -> new TeacherMetadataDTO.SubjectInfo(m.getId(), m.getTenMon()))
                 .collect(Collectors.toList());
         } else {
-            // Fallback: Get all classes, and get subject based on teacher's boMon
+            // Fallback: Get all classes in active academic year, and get subject based on teacher's boMon
             classes = lopHocRepository.findAll().stream()
+                .filter(l -> l.getNamHoc() == null || activeNamHoc.equals(l.getNamHoc()))
                 .map(l -> new TeacherMetadataDTO.ClassInfo(l.getId(), l.getTenLop()))
                 .collect(Collectors.toList());
                 

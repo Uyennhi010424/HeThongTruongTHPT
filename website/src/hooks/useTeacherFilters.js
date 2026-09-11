@@ -77,9 +77,9 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
         
         setNamHocList(years);
         
-        // Check active academic year (DANG_MO)
+        // Check active academic year (DANG_MO) - ALWAYS prioritize current active school year
         const activeNamHoc = getActiveAcademicYear(rawNamHoc);
-        let targetNamHoc = activeNamHoc?.tenNamHoc || years[0] || "";
+        const targetNamHoc = activeNamHoc?.tenNamHoc || years[0] || "";
         
         setSelectedNamHoc((prev) => prev || targetNamHoc);
 
@@ -103,10 +103,99 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     return () => { active = false; };
   }, [showSubject, showClass]);
 
+  // Derived state: Is current teacher the homeroom teacher of the selected class?
+  // Must be computed FIRST because allowedSubjects depends on it
+  const isHomeroomTeacherOfSelected = useMemo(() => {
+    if (!currentTeacher || !selectedClassId) return false;
+    
+    const isCnInTable = chuNhiemData.some((cn) => {
+       const cnGvId = Number(cn?.giaoVienId ?? cn?.giaoVien?.id);
+       const cnLopId = String(cn?.lopId ?? cn?.lop?.id);
+       return cnGvId === Number(currentTeacher.id) && cnLopId === selectedClassId;
+    });
+    if (isCnInTable) return true;
+
+    const cls = allClasses.find((c) => String(c.id) === String(selectedClassId));
+    const gvcnId = cls?.gvcn?.id ?? cls?.gvcnId;
+    return gvcnId != null && Number(gvcnId) === Number(currentTeacher.id);
+  }, [currentTeacher, selectedClassId, chuNhiemData, allClasses]);
+
+  // Derived state: Allowed Subjects
+  const allowedSubjects = useMemo(() => {
+    if (!showSubject || allSubjects.length === 0 || !currentTeacher) {
+      return allSubjects; 
+    }
+
+    // If teachOnly = true: ONLY return subjects the teacher is explicitly assigned to teach
+    if (teachOnly) {
+      const assignedSubjectIds = new Set(
+        phanCongData
+          .filter((p) => {
+            const pTeacherId = Number(p?.giaoVienId ?? p?.giaoVien?.id);
+            if (pTeacherId !== Number(currentTeacher.id)) return false;
+            if (selectedNamHoc && p?.namHoc && p.namHoc !== selectedNamHoc) return false;
+            if (selectedSemester) {
+              const semNum = selectedSemester === "HK1" ? 1 : 2;
+              if (p?.hocKy && Number(p.hocKy) !== semNum) return false;
+            }
+            return true;
+          })
+          .map((p) => String(p?.monHocId ?? p?.monHoc?.id ?? ""))
+          .filter(Boolean)
+      );
+
+      if (assignedSubjectIds.size > 0) {
+        return allSubjects.filter((s) => assignedSubjectIds.has(String(s.id)));
+      }
+
+      // Fallback to currentTeacher.boMon
+      if (currentTeacher?.boMon) {
+        const matchingSubject = allSubjects.filter(
+          (s) => s.tenMon && s.tenMon.toLowerCase().trim() === currentTeacher.boMon.toLowerCase().trim()
+        );
+        if (matchingSubject.length > 0) return matchingSubject;
+      }
+
+      return [];
+    }
+
+    // If homeroom teacher of the selected class (and not teachOnly), can see all subjects
+    if (isHomeroomTeacherOfSelected) {
+      return allSubjects;
+    }
+
+    if (selectedClassId) {
+      const assignedSubjectIds = new Set(
+        phanCongData
+          .filter((p) => {
+            const pTeacherId = Number(p?.giaoVienId ?? p?.giaoVien?.id);
+            const pClassId = String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? "");
+            if (pTeacherId !== Number(currentTeacher.id) || pClassId !== selectedClassId) return false;
+            if (selectedNamHoc && p?.namHoc && p.namHoc !== selectedNamHoc) return false;
+            if (selectedSemester) {
+              const semNum = selectedSemester === "HK1" ? 1 : 2;
+              if (p?.hocKy && Number(p.hocKy) !== semNum) return false;
+            }
+            return true;
+          })
+          .map((p) => String(p?.monHocId ?? p?.monHoc?.id ?? ""))
+          .filter(Boolean)
+      );
+      return allSubjects.filter((s) => assignedSubjectIds.has(String(s.id)));
+    }
+
+    return allSubjects;
+  }, [showSubject, allSubjects, selectedClassId, currentTeacher, isHomeroomTeacherOfSelected, phanCongData, teachOnly, selectedNamHoc, selectedSemester]);
+
   // Derived state: Visible Classes
   const allowedClasses = useMemo(() => {
     if (!showClass) return [];
     if (!currentTeacher || allClasses.length === 0) return allClasses;
+
+    // Filter allClasses strictly by selectedNamHoc
+    const yearClasses = selectedNamHoc
+      ? allClasses.filter((c) => c.namHoc === selectedNamHoc)
+      : allClasses;
 
     // 2. Class they are homeroom teacher for
     const homeroomClassIds = new Set(
@@ -121,8 +210,16 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
         .filter(Boolean)
     );
 
+    // Also check direct lop.gvcn.id in yearClasses
+    yearClasses.forEach((c) => {
+      const gvcnId = c?.gvcn?.id ?? c?.gvcnId;
+      if (gvcnId != null && Number(gvcnId) === Number(currentTeacher.id)) {
+        homeroomClassIds.add(String(c.id));
+      }
+    });
+
     if (homeroomOnly) {
-      return allClasses.filter((c) => homeroomClassIds.has(String(c.id)));
+      return yearClasses.filter((c) => homeroomClassIds.has(String(c.id)));
     }
 
     // 1. Classes they teach
@@ -136,24 +233,24 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
             const semNum = selectedSemester === "HK1" ? 1 : 2;
             if (p?.hocKy && Number(p.hocKy) !== semNum) return false;
           }
+          if (teachOnly && selectedSubjectId) {
+            const pSubId = String(p?.monHocId ?? p?.monHoc?.id ?? "");
+            if (pSubId !== String(selectedSubjectId)) return false;
+          }
           return true;
         })
         .map((p) => String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? ""))
         .filter(Boolean)
     );
 
-    if (assignedClassIds.size === 0 && homeroomClassIds.size === 0) {
-      return [];
-    }
-
     if (teachOnly) {
-      return allClasses.filter((c) => assignedClassIds.has(String(c.id)));
+      return yearClasses.filter((c) => assignedClassIds.has(String(c.id)));
     }
 
-    return allClasses.filter(
+    return yearClasses.filter(
       (c) => assignedClassIds.has(String(c.id)) || homeroomClassIds.has(String(c.id))
     );
-  }, [allClasses, currentTeacher, phanCongData, chuNhiemData, showClass, homeroomOnly, teachOnly, selectedNamHoc, selectedSemester]);
+  }, [allClasses, currentTeacher, phanCongData, chuNhiemData, showClass, homeroomOnly, teachOnly, selectedNamHoc, selectedSemester, selectedSubjectId]);
 
   // Derived state: Available Grades from allowed classes
   const availableGrades = useMemo(() => {
@@ -180,7 +277,7 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
   useEffect(() => {
     if (!showClass) return;
     if (filteredClasses.length > 0) {
-      if (!filteredClasses.some(c => String(c.id) === selectedClassId)) {
+      if (!filteredClasses.some(c => String(c.id) === String(selectedClassId))) {
         setSelectedClassId(String(filteredClasses[0].id));
       }
     } else {
@@ -188,48 +285,6 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     }
   }, [filteredClasses, selectedClassId, showClass]);
 
-  // Derived state: Is current teacher the homeroom teacher of the selected class?
-  const isHomeroomTeacherOfSelected = useMemo(() => {
-    if (!currentTeacher || !selectedClassId) return false;
-    
-    return chuNhiemData.some((cn) => {
-       const cnGvId = Number(cn?.giaoVienId ?? cn?.giaoVien?.id);
-       const cnLopId = String(cn?.lopId ?? cn?.lop?.id);
-       return cnGvId === Number(currentTeacher.id) && cnLopId === selectedClassId;
-    });
-  }, [currentTeacher, selectedClassId, chuNhiemData]);
-
-  // Derived state: Allowed Subjects
-  const allowedSubjects = useMemo(() => {
-    if (!showSubject || allSubjects.length === 0 || !selectedClassId || !currentTeacher) {
-      return allSubjects; 
-    }
-
-    // If they are homeroom teacher for the selected class, and teachOnly is not true, they can SEE all subjects.
-    if (!teachOnly && isHomeroomTeacherOfSelected) {
-      return allSubjects;
-    }
-
-    // Otherwise, they can only see subjects they are explicitly assigned to teach in this class.
-    const assignedSubjectIds = new Set(
-      phanCongData
-        .filter((p) => {
-          const pTeacherId = Number(p?.giaoVienId ?? p?.giaoVien?.id);
-          const pClassId = String(p?.lopId ?? p?.lop?.id ?? p?.lopHocId ?? "");
-          if (pTeacherId !== Number(currentTeacher.id) || pClassId !== selectedClassId) return false;
-          if (selectedNamHoc && p?.namHoc && p.namHoc !== selectedNamHoc) return false;
-          if (selectedSemester) {
-            const semNum = selectedSemester === "HK1" ? 1 : 2;
-            if (p?.hocKy && Number(p.hocKy) !== semNum) return false;
-          }
-          return true;
-        })
-        .map((p) => String(p?.monHocId ?? p?.monHoc?.id ?? ""))
-        .filter(Boolean)
-    );
-
-    return allSubjects.filter((s) => assignedSubjectIds.has(String(s.id)));
-  }, [showSubject, allSubjects, selectedClassId, currentTeacher, isHomeroomTeacherOfSelected, phanCongData, teachOnly, selectedNamHoc, selectedSemester]);
 
   // Derived state: Taught subjects by this teacher in the selected class (used for disabling inputs)
   const taughtSubjectsInSelectedClass = useMemo(() => {
@@ -256,7 +311,7 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
   useEffect(() => {
     if (!showSubject) return;
     if (allowedSubjects.length > 0) {
-      if (!allowedSubjects.some(s => String(s.id) === selectedSubjectId)) {
+      if (!allowedSubjects.some(s => String(s.id) === String(selectedSubjectId))) {
         setSelectedSubjectId(String(allowedSubjects[0].id));
       }
     } else {
