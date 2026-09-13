@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { formatDate, getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
+import { formatDate, getActiveAcademicYear, getVisibleAcademicYears, getStudentAcademicYears } from "../../utils/helpers.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
@@ -56,7 +56,7 @@ export default function ConductPage() {
         setConducts(conductRes?.data?.data || []);
 
         const rawYears = namHocRes?.data?.data || [];
-        const visibleYears = getVisibleAcademicYears(rawYears);
+        const visibleYears = getStudentAcademicYears(rawYears, currentStudent);
         const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
           .filter(Boolean);

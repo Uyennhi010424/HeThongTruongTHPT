@@ -33,22 +33,11 @@ const isFemaleVietnameseName = (fullName) => {
 
 
 
-const QUAN_HE_OPTIONS = [
-  { value: "CHA", label: "Cha" },
-  { value: "ME", label: "Mẹ" },
-  { value: "NGUOI_GIAM_HO", label: "Người giám hộ" }
-];
-
-const getQuanHeLabel = (value) => {
-  const found = QUAN_HE_OPTIONS.find((opt) => opt.value === value);
-  return found ? found.label : value || "--";
-};
-
 const emptyForm = {
   hoTen: "",
   soDienThoai: "",
   email: "",
-  quanHe: "CHA",
+  quanHe: "PHU_HUYNH",
   ngheNghiep: "",
   isSmSActive: false
 };
@@ -335,7 +324,7 @@ export default function PhuHuynhList() {
       hoTen: parent.hoTen || "",
       soDienThoai: parent.soDienThoai || "",
       email: parent.email || "",
-      quanHe: parent.quanHe || (isFemaleVietnameseName(parent.hoTen) ? "ME" : "CHA"),
+      quanHe: parent.quanHe || "PHU_HUYNH",
       ngheNghiep: parent.ngheNghiep || "",
       isSmSActive: !!parent.isSmSActive
     });
@@ -581,10 +570,9 @@ export default function PhuHuynhList() {
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-200">
                 <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
-                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Họ tên</th>
-                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/5">SĐT</th>
-                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Email</th>
-                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-32">Quan hệ</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/3">Họ tên</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">SĐT</th>
+                <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/3">Email</th>
                 <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-24">Thao tác</th>
               </tr>
             </thead>
@@ -601,13 +589,12 @@ export default function PhuHuynhList() {
                     </td>
                     <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-24 animate-pulse"></div></td>
                     <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-32 animate-pulse"></div></td>
-                    <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-16 mx-auto animate-pulse"></div></td>
                     <td className="px-4 py-4 text-right"><div className="h-8 bg-slate-100 rounded w-16 ml-auto animate-pulse"></div></td>
                   </tr>
                 ))
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-500 font-medium">
+                  <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-medium">
                     Không tìm thấy phụ huynh phù hợp.
                   </td>
                 </tr>
@@ -649,11 +636,6 @@ export default function PhuHuynhList() {
                       <div className="text-sm text-slate-600 font-medium truncate max-w-[200px]" title={parent.email}>
                         {parent.email || "--"}
                       </div>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-md">
-                        {getQuanHeLabel(parent.quanHe)}
-                      </span>
                     </td>
                     <td className="px-4 py-4 text-right">
                       <div className="inline-flex items-center justify-end gap-1">
@@ -721,9 +703,6 @@ export default function PhuHuynhList() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-bold text-slate-900 truncate">{parent.hoTen}</span>
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-bold">
-                            {getQuanHeLabel(parent.quanHe)}
-                          </span>
                         </div>
                         <div className="text-xs text-slate-500 font-medium mt-0.5 truncate">
                           {parent.soDienThoai || parent.email || parent.ngheNghiep || "Phụ huynh"}
@@ -772,10 +751,6 @@ export default function PhuHuynhList() {
                         <div className="flex items-center gap-2 text-slate-600">
                           <Briefcase className="w-4 h-4 text-indigo-500 shrink-0" />
                           <span>Nghề nghiệp: <strong className="text-slate-800">{parent.ngheNghiep || "--"}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-600">
-                          <User className="w-4 h-4 text-purple-500 shrink-0" />
-                          <span>Quan hệ: <strong className="text-slate-800">{getQuanHeLabel(parent.quanHe)}</strong></span>
                         </div>
                       </div>
 
@@ -873,42 +848,18 @@ export default function PhuHuynhList() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">Quan hệ</label>
-              <div className="relative">
-                <select
-                  value={form.quanHe}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, quanHe: e.target.value }))
-                  }
-                  className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block p-3 pr-10 outline-none transition-all"
-                >
-                  {QUAN_HE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                  <span className="material-symbols-outlined !text-[20px]">expand_more</span>
-                </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">Kích hoạt SMS (Nút gạt)</label>
+            <div
+              className="flex items-center h-[46px] cursor-pointer"
+              onClick={() => setForm((prev) => ({ ...prev, isSmSActive: !prev.isSmSActive }))}
+            >
+              <div className={`relative inline-flex items-center w-12 h-6 rounded-full transition-colors duration-300 ease-in-out ${form.isSmSActive ? 'bg-blue-600' : 'bg-slate-200'}`}>
+                <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ease-in-out shadow-sm ${form.isSmSActive ? 'translate-x-7' : 'translate-x-1'}`} />
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">Kích hoạt SMS (Nút gạt)</label>
-              <div
-                className="flex items-center h-[46px] cursor-pointer"
-                onClick={() => setForm((prev) => ({ ...prev, isSmSActive: !prev.isSmSActive }))}
-              >
-                <div className={`relative inline-flex items-center w-12 h-6 rounded-full transition-colors duration-300 ease-in-out ${form.isSmSActive ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                  <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ease-in-out shadow-sm ${form.isSmSActive ? 'translate-x-7' : 'translate-x-1'}`} />
-                </div>
-                <span className={`ml-3 text-sm font-bold ${form.isSmSActive ? 'text-blue-600' : 'text-slate-500'}`}>
-                  {form.isSmSActive ? 'Đang bật SMS' : 'Đang tắt'}
-                </span>
-              </div>
+              <span className={`ml-3 text-sm font-bold ${form.isSmSActive ? 'text-blue-600' : 'text-slate-500'}`}>
+                {form.isSmSActive ? 'Đang bật SMS' : 'Đang tắt'}
+              </span>
             </div>
           </div>
 
@@ -962,9 +913,6 @@ export default function PhuHuynhList() {
                     {detailParent.isSmSActive ? "SMS Hoạt động" : "Tắt SMS"}
                   </span>
                 </div>
-                <div className="text-sm font-semibold text-indigo-600 mt-1 mb-3">
-                  {getQuanHeLabel(detailParent.quanHe)}
-                </div>
 
                 <div className="grid grid-cols-2 gap-y-3 gap-x-6">
                   <div className="flex items-center gap-2.5 text-slate-600 text-sm">
@@ -1001,7 +949,7 @@ export default function PhuHuynhList() {
                         </div>
                         <div>
                           <div className="font-bold text-slate-900 text-sm">{s.hoTen}</div>
-                          <div className="text-xs font-medium text-slate-500 mt-0.5">MHS: {s.id}</div>
+                          <div className="text-xs font-medium text-slate-500 mt-0.5">Mã HS: {s.maHocSinh || `HS${s.id}`}</div>
                         </div>
                       </div>
                       <div className="text-right">

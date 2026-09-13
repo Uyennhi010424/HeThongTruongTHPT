@@ -118,13 +118,12 @@ export default function ParentXinNghi() {
       <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 pt-2">
         
         {/* Chọn học sinh */}
-        {students && students.length > 1 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-outline-variant p-6">
+        {students && students.length > 0 && (
+          <div className="mb-6">
             <StudentSelector 
               students={students}
               selectedIndex={selectedIndex}
               onSelect={selectStudent}
-              loading={studentsLoading}
             />
           </div>
         )}

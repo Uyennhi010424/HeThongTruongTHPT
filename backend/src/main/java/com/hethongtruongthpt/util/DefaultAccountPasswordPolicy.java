@@ -3,7 +3,7 @@ package com.hethongtruongthpt.util;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("defaultAccountPasswordPolicy")
 public class DefaultAccountPasswordPolicy {
 
     @Value("${student-default-password:}")

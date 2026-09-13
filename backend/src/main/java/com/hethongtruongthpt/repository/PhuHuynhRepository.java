@@ -9,5 +9,8 @@ import java.util.Optional;
 @Repository
 public interface PhuHuynhRepository extends JpaRepository<PhuHuynh, Integer> {
     Optional<PhuHuynh> findByUserId(Integer userId);
+    Optional<PhuHuynh> findFirstByUserId(Integer userId);
     Optional<PhuHuynh> findByEmailIgnoreCase(String email);
+    Optional<PhuHuynh> findFirstByEmailIgnoreCase(String email);
+    Optional<PhuHuynh> findFirstBySoDienThoai(String soDienThoai);
 }

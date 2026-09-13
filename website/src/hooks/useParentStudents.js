@@ -33,6 +33,14 @@ export default function useParentStudents() {
         const list = studentsRes?.data?.data || [];
         setStudents(list);
 
+        const savedId = localStorage.getItem("parent_selected_student_id");
+        if (savedId && list.length > 0) {
+          const foundIdx = list.findIndex((s) => String(s.id) === String(savedId));
+          if (foundIdx >= 0) {
+            setSelectedIndex(foundIdx);
+          }
+        }
+
         if (list.length === 0) {
           setError("Chưa có học sinh nào được liên kết.");
         }
@@ -53,6 +61,9 @@ export default function useParentStudents() {
   const selectStudent = (index) => {
     if (index >= 0 && index < students.length) {
       setSelectedIndex(index);
+      if (students[index]?.id) {
+        localStorage.setItem("parent_selected_student_id", String(students[index].id));
+      }
     }
   };
 

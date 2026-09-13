@@ -52,7 +52,7 @@ public class UserService {
     public UserService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            DefaultAccountPasswordPolicy passwordPolicy,
+            @org.springframework.context.annotation.Lazy DefaultAccountPasswordPolicy passwordPolicy,
             UserAuditLogService auditLogService,
             EmailResetPasswordService emailResetPasswordService,
             GiaoVienRepository giaoVienRepository,

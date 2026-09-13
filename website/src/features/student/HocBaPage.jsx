@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getHocBa } from "../../api/hocbaApi.js";
 import { getCurrentHocSinh } from "../../api/hocsinhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
+import { getActiveAcademicYear, getVisibleAcademicYears, getStudentAcademicYears } from "../../utils/helpers.js";
 import { getDiem } from "../../api/diemApi.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 
@@ -79,7 +79,7 @@ export default function HocBaPage() {
         setHanhKiemList(hkRes?.data?.data || []);
 
         const rawYears = namHocRes?.data?.data || [];
-        const visibleYears = getVisibleAcademicYears(rawYears);
+        const visibleYears = getStudentAcademicYears(rawYears, currentStudent);
         const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
           .filter(Boolean);

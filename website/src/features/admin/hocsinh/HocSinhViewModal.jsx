@@ -156,16 +156,8 @@ export default function HocSinhViewModal({ hooks }) {
                     </span>
                   </div>
                 )}
-                {parentInfo.quanHe && (
-                  <div>
-                    <span className="block text-xs font-semibold text-slate-400 uppercase">Quan hệ</span>
-                    <span className="text-sm font-medium text-slate-900">
-                      {parentInfo.quanHe === "ME" ? "Mẹ" : parentInfo.quanHe === "CHA" ? "Cha" : parentInfo.quanHe === "NGUOI_GIAM_HO" ? "Người giám hộ" : parentInfo.quanHe}
-                    </span>
-                  </div>
-                )}
                 {parentInfo.ngheNghiep && (
-                  <div className="col-span-2">
+                  <div>
                     <span className="block text-xs font-semibold text-slate-400 uppercase">Nghề nghiệp</span>
                     <span className="text-sm font-medium text-slate-900">
                       {parentInfo.ngheNghiep}

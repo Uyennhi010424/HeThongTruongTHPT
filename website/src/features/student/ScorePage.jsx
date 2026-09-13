@@ -6,7 +6,7 @@ import { getNamHoc } from "../../api/namhocApi.js";
 import { getHanhKiem } from "../../api/hanhkiemApi.js";
 import { getHocBa } from "../../api/hocbaApi.js";
 import { getToHopMonById } from "../../api/toHopMonApi.js";
-import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
+import { getActiveAcademicYear, getVisibleAcademicYears, getStudentAcademicYears } from "../../utils/helpers.js";
 import { Download } from "lucide-react";
 import PdfPreviewModal from "../../components/common/PdfPreviewModal.jsx";
 import {
@@ -95,7 +95,7 @@ export default function ScorePage() {
         setSubjects(subjectList);
 
         const rawYears = namHocRes?.data?.data || [];
-        const visibleYears = getVisibleAcademicYears(rawYears);
+        const visibleYears = getStudentAcademicYears(rawYears, currentStudent);
         const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
           .filter(Boolean);

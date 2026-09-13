@@ -171,6 +171,14 @@ const SubjectDetailDrawer = ({ item, onClose }) => {
   );
 };
 
+const sortToHop = (a, b) => {
+  return String(a?.maToHop || a?.tenToHop || "").localeCompare(
+    String(b?.maToHop || b?.tenToHop || ""),
+    "vi",
+    { numeric: true, sensitivity: "base" }
+  );
+};
+
 export default function ToHopMonList() {
   const [toHopList, setToHopList] = useState([]);
   const [allMonHoc, setAllMonHoc] = useState([]);
@@ -202,7 +210,8 @@ export default function ToHopMonList() {
         getToHopMon(),
         getMonHoc()
       ]);
-      setToHopList(toHopRes?.data?.data || []);
+      const rawData = toHopRes?.data?.data || [];
+      setToHopList([...rawData].sort(sortToHop));
       setAllMonHoc(monHocRes?.data?.data || []);
     } catch {
       setError("Không thể tải dữ liệu.");
@@ -243,6 +252,9 @@ export default function ToHopMonList() {
       const ban = item.ban || "Khác";
       if (!map.has(ban)) map.set(ban, []);
       map.get(ban).push(item);
+    });
+    map.forEach((items) => {
+      items.sort(sortToHop);
     });
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredList]);
@@ -297,7 +309,7 @@ export default function ToHopMonList() {
       return;
     }
     if (!/^[A-Za-z0-9_-]+$/.test(trimmedMa)) {
-      notifyError("Mã tổ hợp chỉ được chứa chữ cái, chữ số, gạch ngang và gạch dưới (vd: KHTN01, KHXH_02).");
+      notifyError("Mã tổ hợp không hợp lệ (VD: TN1, XH01).");
       return;
     }
     if (!trimmedTen) {
@@ -305,7 +317,7 @@ export default function ToHopMonList() {
       return;
     }
     if (!/^[A-ZÀ-Ỹa-zà-ỹ0-9\s(),\.-]+$/.test(trimmedTen)) {
-      notifyError("Tên tổ hợp không được chứa ký tự đặc biệt không hợp lệ.");
+      notifyError("Tên tổ hợp chứa ký tự không hợp lệ.");
       return;
     }
     if (!form.ban) {
@@ -361,13 +373,13 @@ export default function ToHopMonList() {
         const response = await updateToHopMon(editingItem.id, payload);
         const updated = response?.data?.data;
         setToHopList((prev) =>
-          prev.map((row) => (row.id === editingItem.id ? updated : row))
+          prev.map((row) => (row.id === editingItem.id ? updated : row)).sort(sortToHop)
         );
         notifySuccess("Cập nhật tổ hợp môn thành công.");
       } else {
         const response = await createToHopMon(payload);
         const created = response?.data?.data;
-        setToHopList((prev) => [created, ...prev]);
+        setToHopList((prev) => [...prev, created].sort(sortToHop));
         notifySuccess("Thêm tổ hợp môn thành công.");
       }
       setModalOpen(false);
@@ -490,16 +502,16 @@ export default function ToHopMonList() {
           </p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={handleSeedDefaults} className="inline-flex items-center justify-center bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-colors shadow-sm gap-2">
+        <div className="flex items-center gap-2.5 shrink-0 flex-nowrap">
+          <button onClick={handleSeedDefaults} className="inline-flex items-center justify-center bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-colors shadow-sm gap-2 whitespace-nowrap">
              Tạo tổ hợp mẫu
           </button>
           
-          <button onClick={handleRefresh} className="inline-flex items-center justify-center w-[42px] h-[42px] bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition-colors duration-200">
+          <button onClick={handleRefresh} className="inline-flex items-center justify-center w-[42px] h-[42px] bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition-colors duration-200 shrink-0" title="Làm mới">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
-          <button onClick={openCreate} className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors duration-200">
+          <button onClick={openCreate} className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors duration-200 whitespace-nowrap shrink-0">
             <Plus className="w-4 h-4" /> Thêm tổ hợp
           </button>
         </div>
@@ -561,24 +573,23 @@ export default function ToHopMonList() {
         )}
       </div>
 
-      <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)} title={editingItem ? "Cập nhật tổ hợp môn" : "Thêm tổ hợp môn"} width={500}>
+      <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)} title={editingItem ? "Cập nhật tổ hợp môn" : "Thêm tổ hợp môn"} width={620}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Mã tổ hợp <span className="text-red-500">*</span></label>
-              <input type="text" value={form.maToHop} onChange={e => setForm({...form, maToHop: e.target.value.toUpperCase()})} placeholder="vd: A1" maxLength={10} disabled={!!editingItem} className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60" />
+              <input type="text" value={form.maToHop} onChange={e => setForm({...form, maToHop: e.target.value.toUpperCase()})} placeholder="vd: A1" maxLength={10} disabled={!!editingItem} className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60" />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Tên tổ hợp <span className="text-red-500">*</span></label>
-              <input type="text" value={form.tenToHop} onChange={e => setForm({...form, tenToHop: e.target.value})} placeholder="vd: KHTN 1" className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              <input type="text" value={form.tenToHop} onChange={e => setForm({...form, tenToHop: e.target.value})} placeholder="vd: KHTN 1" className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
             </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Ban <span className="text-red-500">*</span></label>
-            <select value={form.ban} onChange={e => setForm({...form, ban: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-              {BAN_OPTIONS.map((ban) => <option key={ban} value={ban}>{ban}</option>)}
-            </select>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Ban <span className="text-red-500">*</span></label>
+              <select value={form.ban} onChange={e => setForm({...form, ban: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                {BAN_OPTIONS.map((ban) => <option key={ban} value={ban}>{ban}</option>)}
+              </select>
+            </div>
           </div>
           
           <div>

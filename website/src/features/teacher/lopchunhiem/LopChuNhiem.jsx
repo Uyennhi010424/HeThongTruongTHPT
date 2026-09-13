@@ -218,7 +218,7 @@ export default function LopChuNhiem() {
               </option>
               {parents.map((ph) => (
                 <option key={ph.id} value={ph.id}>
-                  {ph.hoTen}{ph.sdt ? ` - ${ph.sdt}` : ""}{ph.quanHe ? ` (${ph.quanHe})` : ""}
+                  {ph.hoTen}{ph.sdt ? ` - ${ph.sdt}` : ""}
                 </option>
               ))}
             </select>
@@ -250,7 +250,6 @@ export default function LopChuNhiem() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px", fontSize: 14, color: "#334155" }}>
               <div><span style={{ color: "#64748b" }}>Họ tên:</span> {selectedParent.hoTen}</div>
-              <div><span style={{ color: "#64748b" }}>Quan hệ:</span> {selectedParent.quanHe || "--"}</div>
               <div><span style={{ color: "#64748b" }}>SĐT:</span> {selectedParent.sdt || "--"}</div>
               <div><span style={{ color: "#64748b" }}>Email:</span> {selectedParent.email || "--"}</div>
               <div><span style={{ color: "#64748b" }}>Địa chỉ:</span> {selectedParent.diaChi || "--"}</div>

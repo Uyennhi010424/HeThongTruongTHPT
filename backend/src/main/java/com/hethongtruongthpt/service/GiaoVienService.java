@@ -60,14 +60,14 @@ public class GiaoVienService {
 
     public GiaoVienService(
             GiaoVienRepository giaoVienRepository,
-            UserService userService,
+            @org.springframework.context.annotation.Lazy UserService userService,
             UserRepository userRepository,
             ChuNhiemRepository chuNhiemRepository,
             PhanCongDayRepository phanCongDayRepository,
             ThoiKhoaBieuRepository thoiKhoaBieuRepository,
             HanhKiemRepository hanhKiemRepository,
             DiemRepository diemRepository,
-            DefaultAccountPasswordPolicy passwordPolicy,
+            @org.springframework.context.annotation.Lazy DefaultAccountPasswordPolicy passwordPolicy,
             MonHocRepository monHocRepository,
             com.hethongtruongthpt.repository.LopHocRepository lopHocRepository,
             NamHocRepository namHocRepository

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { TrendingUp, CalendarDays, FileText, CheckCircle } from "lucide-react";
 import { getStudentDashboard } from "../../api/hocsinhApi";
 import { getNamHoc } from "../../api/namhocApi";
-import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers";
+import { getActiveAcademicYear, getVisibleAcademicYears, getStudentAcademicYears } from "../../utils/helpers";
 import { readCachedAvatar } from "../../utils/avatarCache";
 import { getCurrentUsernameFromToken } from "../../utils/teacherProfile";
 import StudentProfileWidget from "./dashboard/StudentProfileWidget";
@@ -107,12 +107,10 @@ export default function HomePage() {
   }, [data?.subjects]);
 
   const namHocList = useMemo(() => {
-    const fromSystem = (systemYears || []).map(y => y.tenNamHoc).filter(Boolean);
-    const fromScores = (data?.scores || []).map(s => s.namHoc).filter(Boolean);
-    const fromClass = data?.student?.lop?.namHoc ? [data.student.lop.namHoc] : [];
-    const all = [...new Set([...fromSystem, ...fromScores, ...fromClass, activeYearName].filter(Boolean))];
-    return all.sort((a, b) => b.localeCompare(a));
-  }, [systemYears, data?.scores, data?.student?.lop?.namHoc, activeYearName]);
+    const studentYears = getStudentAcademicYears(systemYears, data?.student);
+    const years = studentYears.map(y => y.tenNamHoc).filter(Boolean);
+    return years.length > 0 ? years : (activeYearName ? [activeYearName] : []);
+  }, [systemYears, data?.student, activeYearName]);
 
   useEffect(() => {
     if (namHocList.length > 0 && !selectedNamHoc) {

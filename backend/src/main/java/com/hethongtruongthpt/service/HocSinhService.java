@@ -74,6 +74,33 @@ public class HocSinhService {
         this.transactionTemplate = transactionTemplate;
     }
 
+    @jakarta.annotation.PostConstruct
+    public void autoFixStudentAdmissionYears() {
+        try {
+            List<HocSinh> list = hocSinhRepository.findAll();
+            int fixedCount = 0;
+            for (HocSinh hs : list) {
+                if (hs.getLop() != null && hs.getLop().getNamHoc() != null && hs.getLop().getKhoi() != null) {
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d{4}").matcher(hs.getLop().getNamHoc());
+                    if (m.find()) {
+                        int startYear = Integer.parseInt(m.group());
+                        int expectedYear = startYear - (hs.getLop().getKhoi() - 10);
+                        if (hs.getNamNhapHoc() == null || !hs.getNamNhapHoc().equals(expectedYear)) {
+                            hs.setNamNhapHoc(expectedYear);
+                            hocSinhRepository.save(hs);
+                            fixedCount++;
+                        }
+                    }
+                }
+            }
+            if (fixedCount > 0) {
+                log.info("Đã tự động chuẩn hóa năm nhập học cho {} học sinh", fixedCount);
+            }
+        } catch (Exception e) {
+            log.warn("Không thể tự động chuẩn hóa năm nhập học: {}", e.getMessage());
+        }
+    }
+
     public List<LichSuHocTap> getLichSuHocTap(Integer hocSinhId) {
         return lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDescIdDesc(hocSinhId);
     }
@@ -189,6 +216,14 @@ public class HocSinhService {
     public HocSinh create(HocSinh hocSinh) {
         // Validate trước khi vào transaction
         LopHoc lop = resolveLop(hocSinh);
+        if (hocSinh.getNamNhapHoc() == null && lop != null && lop.getNamHoc() != null && lop.getKhoi() != null) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d{4}").matcher(lop.getNamHoc());
+            if (m.find()) {
+                int startYear = Integer.parseInt(m.group());
+                int calculatedYear = startYear - (lop.getKhoi() - 10);
+                hocSinh.setNamNhapHoc(calculatedYear);
+            }
+        }
         if (hocSinh.getTrangThai() == null) hocSinh.setTrangThai(1);
         if (hocSinh.getNamNhapHoc() == null) hocSinh.setNamNhapHoc(Year.now().getValue());
         
@@ -243,12 +278,12 @@ public class HocSinhService {
                                 PhuHuynhHocSinh link = new PhuHuynhHocSinh();
                                 link.setPhuHuynh(ph);
                                 link.setHocSinh(result);
-                                link.setQuanHe(ph.getQuanHe() != null ? ph.getQuanHe() : "CHA");
+                                link.setQuanHe(ph.getQuanHe() != null && !ph.getQuanHe().isBlank() ? ph.getQuanHe() : "CHA");
                                 link.setLaNguoiLienHeChinh(Boolean.TRUE);
-                                phuHuynhHocSinhRepository.save(link);
+                                phuHuynhHocSinhRepository.saveAndFlush(link);
                             }
                         } catch (Exception e) {
-                            log.warn("Không thể liên kết phụ huynh: {}", e.getMessage());
+                            log.warn("Không thể liên kết phụ huynh trong transaction: {}", e.getMessage());
                         }
                     }
 
@@ -278,9 +313,9 @@ public class HocSinhService {
                                 PhuHuynhHocSinh link = new PhuHuynhHocSinh();
                                 link.setPhuHuynh(ph);
                                 link.setHocSinh(saved);
-                                link.setQuanHe(ph.getQuanHe() != null ? ph.getQuanHe() : "CHA");
+                                link.setQuanHe(ph.getQuanHe() != null && !ph.getQuanHe().isBlank() ? ph.getQuanHe() : "CHA");
                                 link.setLaNguoiLienHeChinh(Boolean.TRUE);
-                                phuHuynhHocSinhRepository.save(link);
+                                phuHuynhHocSinhRepository.saveAndFlush(link);
                                 saved.setPhuHuynhId(phuHuynhId);
                                 saved.setPhuHuynh(ph);
                             }
@@ -315,7 +350,11 @@ public class HocSinhService {
         Integer oldLopId = existing.getLop() != null ? existing.getLop().getId() : null;
 
         if (hocSinh.getLop() != null && hocSinh.getLop().getId() != null) {
-            existing.setLop(resolveLop(hocSinh));
+            LopHoc resolvedLop = resolveLop(hocSinh);
+            existing.setLop(resolvedLop);
+        }
+        if (hocSinh.getNamNhapHoc() != null) {
+            existing.setNamNhapHoc(hocSinh.getNamNhapHoc());
         }
 
         if (hocSinh.getHoTen() != null) existing.setHoTen(hocSinh.getHoTen());
@@ -399,13 +438,13 @@ public class HocSinhService {
                         PhuHuynhHocSinh link = new PhuHuynhHocSinh();
                         link.setPhuHuynh(ph);
                         link.setHocSinh(saved);
-                        link.setQuanHe(ph.getQuanHe() != null ? ph.getQuanHe() : "CHA");
+                        link.setQuanHe(ph.getQuanHe() != null && !ph.getQuanHe().isBlank() ? ph.getQuanHe() : "CHA");
                         link.setLaNguoiLienHeChinh(Boolean.TRUE);
-                        phuHuynhHocSinhRepository.save(link);
+                        phuHuynhHocSinhRepository.saveAndFlush(link);
                     } else {
                         PhuHuynhHocSinh link = existingLinks.get(0);
                         link.setPhuHuynh(ph);
-                        phuHuynhHocSinhRepository.save(link);
+                        phuHuynhHocSinhRepository.saveAndFlush(link);
                     }
                 }
             } catch (Exception e) {
@@ -416,12 +455,56 @@ public class HocSinhService {
         return getById(saved.getId());
     }
 
-    @CacheEvict(value = "hocSinhList", allEntries = true)
+    @CacheEvict(value = {"hocSinhList", "phuHuynhList"}, allEntries = true)
+    @Transactional
     public void delete(Integer id) {
         HocSinh existing = getById(id);
         Integer lopId = existing.getLop() != null ? existing.getLop().getId() : null;
         existing.setTrangThai(0);
         hocSinhRepository.save(existing);
+        
+        // Vô hiệu hóa tài khoản học sinh
+        if (existing.getUser() != null) {
+            existing.getUser().setIsActive(false);
+            userRepository.save(existing.getUser());
+        }
+
+        // Kiểm tra và dọn dẹp phụ huynh nếu không còn học sinh nào khác
+        try {
+            List<PhuHuynhHocSinh> parentLinks = phuHuynhHocSinhRepository.findByHocSinhId(id);
+            for (PhuHuynhHocSinh link : parentLinks) {
+                PhuHuynh ph = link.getPhuHuynh();
+                phuHuynhHocSinhRepository.delete(link);
+
+                if (ph != null && ph.getId() != null) {
+                    List<PhuHuynhHocSinh> remainingLinks = phuHuynhHocSinhRepository.findByPhuHuynhId(ph.getId());
+                    boolean hasOtherActiveChildren = remainingLinks.stream().anyMatch(l -> {
+                        HocSinh other = l.getHocSinh();
+                        return other != null && !other.getId().equals(id) && other.getTrangThai() != null && other.getTrangThai() == 1;
+                    });
+
+                    if (!hasOtherActiveChildren && remainingLinks.isEmpty()) {
+                        Integer phUserId = ph.getUser() != null ? ph.getUser().getId() : null;
+                        try {
+                            phuHuynhRepository.delete(ph);
+                            if (phUserId != null) {
+                                userRepository.deleteById(phUserId);
+                            }
+                            log.info("Đã tự động xóa phụ huynh {} (ID: {}) do không còn học sinh nào", ph.getHoTen(), ph.getId());
+                        } catch (Exception ex) {
+                            log.warn("Không thể xóa cứng phụ huynh ID {}: {}. Tiến hành vô hiệu hóa tài khoản.", ph.getId(), ex.getMessage());
+                            if (ph.getUser() != null) {
+                                ph.getUser().setIsActive(false);
+                                userRepository.save(ph.getUser());
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi khi dọn dẹp phụ huynh của học sinh ID {}: {}", id, e.getMessage());
+        }
+
         // Auto-sync sĩ số lớp
         if (lopId != null) refreshSiSo(lopId);
     }
@@ -687,25 +770,51 @@ public class HocSinhService {
         }
 
         if (hocSinh.getNamNhapHoc() != null) {
-            if (hocSinh.getNamNhapHoc() > currentYear + 1) {
-                throw new ApiException("Năm nhập học không được vượt quá " + (currentYear + 1));
-            }
             if (hocSinh.getNamNhapHoc() < 2000) {
                 throw new ApiException("Năm nhập học phải từ năm 2000 trở đi");
+            }
+            if (lop != null && lop.getNamHoc() != null && lop.getKhoi() != null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d{4}").matcher(lop.getNamHoc());
+                if (m.find()) {
+                    int schoolStartYear = Integer.parseInt(m.group());
+                    int maxAllowedYear = schoolStartYear - (lop.getKhoi() - 10);
+                    if (hocSinh.getNamNhapHoc() > maxAllowedYear) {
+                        throw new ApiException("Năm nhập học " + hocSinh.getNamNhapHoc() + " không hợp lệ. Đối với Khối " + lop.getKhoi() + " năm học " + lop.getNamHoc() + ", năm nhập học tối đa là " + maxAllowedYear);
+                    }
+                }
+            } else if (hocSinh.getNamNhapHoc() > currentYear + 1) {
+                throw new ApiException("Năm nhập học không được vượt quá " + (currentYear + 1));
+            }
+
+            if (hocSinh.getNgaySinh() != null) {
+                int birthYear = hocSinh.getNgaySinh().getYear();
+                int ageAtAdmission = hocSinh.getNamNhapHoc() - birthYear;
+                if (ageAtAdmission < 14) {
+                    throw new ApiException("Học sinh sinh năm " + birthYear + " chưa đủ tuổi nhập học năm " + hocSinh.getNamNhapHoc() + " (Độ tuổi nhập học THPT tối thiểu 14 tuổi)");
+                } else if (ageAtAdmission > 19) {
+                    throw new ApiException("Học sinh sinh năm " + birthYear + " quá tuổi nhập học năm " + hocSinh.getNamNhapHoc() + " (Độ tuổi nhập học THPT tối đa 19 tuổi)");
+                }
             }
         }
         
         if (hocSinh.getNgaySinh() != null && lop != null && lop.getKhoi() != null) {
-            int age = currentYear - hocSinh.getNgaySinh().getYear();
+            int birthYear = hocSinh.getNgaySinh().getYear();
+            int refYear = currentYear;
+            if (lop.getNamHoc() != null) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d{4}").matcher(lop.getNamHoc());
+                if (m.find()) refYear = Integer.parseInt(m.group());
+            }
+            int age = refYear - birthYear;
             int khoi = lop.getKhoi();
             
             boolean validAge = false;
-            if (khoi == 10 && (age >= 15 && age <= 18)) validAge = true;
-            else if (khoi == 11 && (age >= 16 && age <= 19)) validAge = true;
-            else if (khoi == 12 && (age >= 17 && age <= 20)) validAge = true;
+            if (khoi == 10 && (age >= 14 && age <= 18)) validAge = true;
+            else if (khoi == 11 && (age >= 15 && age <= 19)) validAge = true;
+            else if (khoi == 12 && (age >= 16 && age <= 20)) validAge = true;
+            else if (khoi < 10 || khoi > 12) validAge = true;
             
             if (!validAge) {
-                throw new ApiException("Độ tuổi " + age + " không phù hợp với Khối " + khoi + " (Năm sinh: " + hocSinh.getNgaySinh().getYear() + ", Năm hiện tại: " + currentYear + ")");
+                throw new ApiException("Độ tuổi " + age + " không phù hợp với Khối " + khoi + " (Năm sinh: " + birthYear + ", Niên khóa: " + (lop.getNamHoc() != null ? lop.getNamHoc() : refYear) + ")");
             }
         }
 

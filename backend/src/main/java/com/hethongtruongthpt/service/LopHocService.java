@@ -54,18 +54,38 @@ public class LopHocService {
     }
 
     public List<LopHoc> getAll() {
-        return lopHocRepository.findAll();
+        List<LopHoc> list = lopHocRepository.findAll();
+        populateActualSiSo(list);
+        return list;
     }
 
     public Page<LopHoc> getAllPaged(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("tenLop").ascending());
-        return lopHocRepository.findAll(pageable);
+        Page<LopHoc> paged = lopHocRepository.findAll(pageable);
+        populateActualSiSo(paged.getContent());
+        return paged;
     }
 
     public LopHoc getById(Integer id) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
-        return lopHocRepository.findById(id)
+        LopHoc lop = lopHocRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học"));
+        populateActualSiSo(List.of(lop));
+        return lop;
+    }
+
+    private void populateActualSiSo(List<LopHoc> lops) {
+        if (lops == null || lops.isEmpty()) return;
+        for (LopHoc lop : lops) {
+            if (lop != null && lop.getId() != null) {
+                long count = hocSinhRepository.countByLopIdAndTrangThai(lop.getId(), 1);
+                if (count == 0) {
+                    long histCount = lichSuHocTapRepository.countByLopId(lop.getId());
+                    if (histCount > 0) count = histCount;
+                }
+                lop.setSiSo((int) count);
+            }
+        }
     }
 
     public LopHoc create(LopHoc lopHoc) {
@@ -467,28 +487,31 @@ public class LopHocService {
         if (namHoc.isBlank()) {
             throw new ApiException("Năm học không được để trống");
         }
+        if (lopHoc.getToHopId() == null) {
+            throw new ApiException("Vui lòng chọn tổ hợp môn");
+        }
 
         if (!CLASS_NAME_PATTERN.matcher(tenLop).matches()) {
-            throw new ApiException("Tên lớp phải bắt đầu bằng khối 10, 11 hoặc 12 và chỉ chứa chữ cái, chữ số (vd: 10A1, 11B2, 12C3), không chứa ký tự đặc biệt hay khoảng trắng");
+            throw new ApiException("Tên lớp không hợp lệ (VD: 10A1, 11B2, 12C3)");
         }
 
         String gradeFromName = extractGradePrefix(tenLop);
         if (gradeFromName == null || !gradeFromName.equals(String.valueOf(khoi))) {
-            throw new ApiException("Tên lớp không khớp với khối " + khoi + " đã chọn");
+            throw new ApiException("Tên lớp phải thuộc khối " + khoi + " (VD: " + khoi + "A1)");
         }
 
         if (!SCHOOL_YEAR_PATTERN.matcher(namHoc).matches()) {
-            throw new ApiException("Năm học không đúng định dạng YYYY-YYYY (vd: 2026-2027)");
+            throw new ApiException("Năm học không hợp lệ (VD: 2026-2027)");
         }
         String[] yearParts = namHoc.split("-");
         int startYear = Integer.parseInt(yearParts[0]);
         int endYear = Integer.parseInt(yearParts[1]);
         if (endYear != startYear + 1) {
-            throw new ApiException("Năm học không hợp lệ: năm kết thúc phải là " + (startYear + 1));
+            throw new ApiException("Năm học không hợp lệ (VD: 2026-2027)");
         }
 
         if (!phongHoc.isBlank() && !ROOM_PATTERN.matcher(phongHoc).matches()) {
-            throw new ApiException("Tên phòng học không được chứa ký tự đặc biệt (vd: P101, P.102, A-201)");
+            throw new ApiException("Tên phòng học không hợp lệ (VD: P101, P.102)");
         }
     }
 

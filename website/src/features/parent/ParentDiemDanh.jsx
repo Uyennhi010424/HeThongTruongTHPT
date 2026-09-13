@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Calendar, CheckCircle2, AlertTriangle, XCircle, Clock, Filter, Percent } from "lucide-react";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
+import { getActiveAcademicYear, getVisibleAcademicYears, getStudentAcademicYears } from "../../utils/helpers.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
 
@@ -29,7 +29,7 @@ export default function ParentDiemDanh() {
       try {
         const res = await getNamHoc();
         const rawYears = res?.data?.data || [];
-        const visibleYears = getVisibleAcademicYears(rawYears);
+        const visibleYears = getStudentAcademicYears(rawYears, currentStudent);
         const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
           .filter(Boolean);
@@ -47,7 +47,7 @@ export default function ParentDiemDanh() {
       }
     };
     fetchYears();
-  }, [currentStudent?.id]);
+  }, [currentStudent?.id, currentStudent?.namNhapHoc, currentStudent?.lop?.id]);
 
   const handleYearChange = (year) => {
     setSelectedNamHoc(year);

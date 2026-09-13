@@ -216,3 +216,33 @@ export const sortClasses = (a, b) => {
   });
 };
 
+/**
+ * Lọc danh sách năm học phù hợp cho từng học sinh dựa vào năm nhập học và lớp hiện tại:
+ * - Học sinh không thể xem năm học trước năm nhập học (ví dụ nhập học 2026 thì không có năm 2025-2026).
+ * - Học sinh chỉ xem các năm học từ năm nhập học đến năm học hiện tại (tối đa 3 năm THPT: Khối 10, 11, 12).
+ */
+export const getStudentAcademicYears = (allNamHoc, student) => {
+  const visible = getVisibleAcademicYears(allNamHoc);
+  if (!student) return visible;
+
+  const namNhapHoc = Number(student?.namNhapHoc || 0);
+  const currentClassNamHoc = student?.lop?.namHoc || student?.lopHoc?.namHoc || "";
+  const currentClassStart = getAcademicYearStart(currentClassNamHoc);
+
+  if (!namNhapHoc && !currentClassStart) return visible;
+
+  const minStartYear = namNhapHoc > 0 ? namNhapHoc : (currentClassStart > 0 ? currentClassStart : 0);
+  const maxStartYear = currentClassStart > 0 ? currentClassStart : (namNhapHoc > 0 ? namNhapHoc + 2 : 9999);
+
+  const filtered = visible.filter((y) => {
+    const yStart = getAcademicYearStart(y);
+    if (!yStart) return true;
+    if (minStartYear > 0 && yStart < minStartYear) return false;
+    if (maxStartYear > 0 && yStart > maxStartYear) return false;
+    return true;
+  });
+
+  return filtered.length > 0 ? filtered : visible;
+};
+
+

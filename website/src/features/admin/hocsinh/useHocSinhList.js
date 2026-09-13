@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useTheme } from "../../../contexts/ThemeContext.jsx";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import * as XLSX from "xlsx-js-style";
@@ -15,7 +16,7 @@ import { getLop } from "../../../api/lopApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { getActiveAcademicYear, getVisibleAcademicYears, sortClasses } from "../../../utils/helpers.js";
 import { createPhuHuynh, getPhuHuynh, updatePhuHuynh } from "../../../api/phuhuynhApi.js";
-import { getParentsForStudent } from "../../../api/phuhuynhHocSinhApi.js";
+import { getParentsForStudent, linkParentToStudent } from "../../../api/phuhuynhHocSinhApi.js";
 import { createUser, getUsers } from "../../../api/userApi.js";
 import {
   buildStudentEmailPreview,
@@ -38,7 +39,9 @@ import {
   getStudentStatus,
   validateStudentAgeAndYear,
   createStudentDuplicateKey,
-  isDuplicateStudent
+  isDuplicateStudent,
+  calculateAdmissionYear,
+  generateRealisticParentName
 } from "./hocSinhUtils.js";
 
 
@@ -154,6 +157,16 @@ export function useHocSinhList() {
   const handleRefresh = () => setRefreshToggle(prev => !prev);
 
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const { systemName } = useTheme() || {};
+
+  const schoolName = useMemo(() => {
+    if (!systemName) return "TRƯỜNG THPT";
+    const trimmed = systemName.trim();
+    if (trimmed.toUpperCase().startsWith("TRƯỜNG") || trimmed.toUpperCase().startsWith("THPT")) {
+      return trimmed.toUpperCase();
+    }
+    return `TRƯỜNG THPT ${trimmed.toUpperCase()}`;
+  }, [systemName]);
 
   const executeExportExcel = (type, classId) => {
     if (!students || students.length === 0) {
@@ -188,12 +201,12 @@ export function useHocSinhList() {
     const centerDataStyle = { ...dataStyle, alignment: { vertical: "center", horizontal: "center" } };
 
     const generateSheetForStudents = (studentList, sheetTitle, classNameStr) => {
-      // Row 1: TRƯỜNG THPT
+      // Row 1: Tên trường
       // Row 2: DANH SÁCH HỌC SINH
       // Row 3: Lớp: ...
       // Row 4: Header
       const wsData = [
-        ["TRƯỜNG THPT"],
+        [schoolName],
         ["DANH SÁCH HỌC SINH"],
         [`Lớp: ${classNameStr || "Tất cả"}`],
         ["STT", "Họ và tên", "Lớp", "Khối", "Giới tính", "Ngày sinh", "Số điện thoại", "Email", "Năm nhập học", "Trạng thái"]
@@ -582,11 +595,17 @@ export function useHocSinhList() {
 
   const openCreate = () => {
     setEditingStudent(null);
+    const initialClass = filteredClasses[0] || classes[0];
+    const initialLopId = initialClass?.id ? String(initialClass.id) : "";
+    const initialNamNhapHoc = initialClass
+      ? calculateAdmissionYear(initialClass.namHoc, initialClass.khoi)
+      : new Date().getFullYear();
+
     setForm({
       hoTen: "",
       ngaySinh: "",
       gioiTinh: "true",
-      lopHocId: filteredClasses[0]?.id ? String(filteredClasses[0].id) : (classes[0]?.id ? String(classes[0].id) : ""),
+      lopHocId: initialLopId,
       danTocTen: "Kinh",
       tonGiao: "Không",
       phuHuynhId: "",
@@ -597,7 +616,7 @@ export function useHocSinhList() {
       sdt: "",
       email: "",
       diaChi: "",
-      namNhapHoc: "",
+      namNhapHoc: initialNamNhapHoc,
       maBhyt: "",
       dienChinhSach: "false",
       trangThai: 1
@@ -632,37 +651,38 @@ export function useHocSinhList() {
         }
       }
 
+      const currentClassId = student?.lopHoc?.id || student?.lop?.id;
+      const currentClass = classes.find((c) => String(c.id) === String(currentClassId || ""));
+      const computedNamNhapHoc = currentClass
+        ? calculateAdmissionYear(currentClass.namHoc, currentClass.khoi)
+        : (student.namNhapHoc !== null && student.namNhapHoc !== undefined
+            ? Number(student.namNhapHoc)
+            : new Date().getFullYear());
+
       setForm({
         hoTen: student.hoTen || "",
         ngaySinh: formatDateInput(student.ngaySinh),
         gioiTinh: (student.gioiTinh === "NU" || student.gioiTinh === "false" || student.gioiTinh === false) ? "false" : "true",
-        lopHocId: student?.lopHoc?.id
-        ? String(student.lopHoc.id)
-        : student?.lop?.id
-        ? String(student.lop.id)
-        : "",
-      danTocTen: student?.danToc || "",
-      tonGiao: student?.tonGiao || "Không",
-      phuHuynhId: student?.phuHuynhId
-        ? String(student.phuHuynhId)
-        : parentToUse?.id
-        ? String(parentToUse.id)
-        : "",
-      phuHuynhHoTen: parentToUse?.hoTen || selectedParent?.hoTen || "",
-      phuHuynhSdt: formatPhoneDisplay(parentToUse?.soDienThoai || selectedParent?.soDienThoai || ""),
-      phuHuynhEmail: parentToUse?.email || selectedParent?.email || "",
-      phuHuynhNgheNghiep: parentToUse?.ngheNghiep || selectedParent?.ngheNghiep || "",
-      sdt: student.sdt || "",
-      email: student.email || "",
-      diaChi: student.diaChi || "",
-      namNhapHoc:
-        student.namNhapHoc !== null && student.namNhapHoc !== undefined
-          ? String(student.namNhapHoc)
+        lopHocId: currentClassId ? String(currentClassId) : "",
+        danTocTen: student?.danToc || "",
+        tonGiao: student?.tonGiao || "Không",
+        phuHuynhId: student?.phuHuynhId
+          ? String(student.phuHuynhId)
+          : parentToUse?.id
+          ? String(parentToUse.id)
           : "",
-      maBhyt: student.maBhyt || "",
-      dienChinhSach: String(student.dienChinhSach ?? false),
-      trangThai: student.trangThai ?? (student.user?.isActive ? 1 : 0)
-    });
+        phuHuynhHoTen: parentToUse?.hoTen || selectedParent?.hoTen || "",
+        phuHuynhSdt: formatPhoneDisplay(parentToUse?.soDienThoai || selectedParent?.soDienThoai || ""),
+        phuHuynhEmail: parentToUse?.email || selectedParent?.email || "",
+        phuHuynhNgheNghiep: parentToUse?.ngheNghiep || selectedParent?.ngheNghiep || "",
+        sdt: student.sdt || "",
+        email: student.email || "",
+        diaChi: student.diaChi || "",
+        namNhapHoc: computedNamNhapHoc,
+        maBhyt: student.maBhyt || "",
+        dienChinhSach: String(student.dienChinhSach ?? false),
+        trangThai: student.trangThai ?? (student.user?.isActive ? 1 : 0)
+      });
       setFormError("");
       setSuccessMessage("");
       setModalOpen(true);
@@ -714,7 +734,10 @@ export function useHocSinhList() {
       await deleteHocSinh(student.id);
       setStudents(prev => prev.map(s => s.id === student.id ? { ...s, trangThai: 0 } : s));
       notifySuccess("Đã cập nhật trạng thái ngừng học");
-      // Optional: handleRefresh();
+      // Cập nhật lại danh sách phụ huynh nếu có phụ huynh không còn con bị dọn dẹp
+      getPhuHuynh().then(res => {
+        if (res?.data?.data) setParents(res.data.data);
+      }).catch(() => {});
     } catch (err) {
       setError("Không thể xóa học sinh.");
       setSuccessMessage("");
@@ -844,58 +867,87 @@ export function useHocSinhList() {
         return;
       }
 
-      try {
-        const candidateEmail =
-          parentEmail ||
-          buildParentEmailPreview(parentName, parentPhone);
-        let createdUserId = null;
+      // Tự động kiểm tra phụ huynh đã tồn tại theo số điện thoại hoặc email trong danh sách phụ huynh hiện có
+      const rawPhoneDigits = parentPhone.replace(/\D/g, "");
+      const matchedParent = parents.find((p) => {
+        if (!p) return false;
+        const pPhone = String(p.soDienThoai || p.sdt || "").replace(/\D/g, "");
+        if (pPhone && rawPhoneDigits && pPhone === rawPhoneDigits) return true;
+        if (parentEmail && p.email && p.email.toLowerCase() === parentEmail.toLowerCase()) return true;
+        return false;
+      });
+
+      if (matchedParent?.id) {
+        phuHuynhId = Number(matchedParent.id);
+      } else {
         try {
-          const userRes = await createUser({
-            username: candidateEmail,
-            email: candidateEmail,
-            password: "Abc1234@",
-            status: 1,
-            role: "PHU_HUYNH"
-          });
-          createdUserId = userRes?.data?.data?.id;
-        } catch {
+          const candidateEmail =
+            parentEmail ||
+            buildParentEmailPreview(parentName, parentPhone);
+          let createdUserId = null;
           try {
-            const usersRes = await getUsers();
-            const found = (usersRes?.data?.data || []).find((u) => {
-              const email = String(u?.email || "").toLowerCase();
-              return email === candidateEmail.toLowerCase();
+            const userRes = await createUser({
+              username: candidateEmail,
+              email: candidateEmail,
+              password: "Abc1234@",
+              status: 1,
+              role: "PHU_HUYNH"
             });
-            if (found?.id) createdUserId = found.id;
+            createdUserId = userRes?.data?.data?.id;
           } catch {
-            // ignore
+            try {
+              const usersRes = await getUsers();
+              const found = (usersRes?.data?.data || []).find((u) => {
+                const email = String(u?.email || "").toLowerCase();
+                return email === candidateEmail.toLowerCase();
+              });
+              if (found?.id) createdUserId = found.id;
+            } catch {
+              // ignore
+            }
           }
-        }
 
-        const phPayload = {
-          hoTen: parentName,
-          soDienThoai: parentPhone,
-          email: form.phuHuynhEmail.trim() || null,
-          diaChi: form.diaChi.trim() || null,
-          ngheNghiep: parentJob,
-          quanHe: isFemaleVietnameseName(parentName) ? "ME" : "CHA",
-          isSmSActive: true
-        };
-        if (createdUserId) phPayload.user = { id: Number(createdUserId) };
+          const phPayload = {
+            hoTen: parentName,
+            soDienThoai: parentPhone,
+            email: form.phuHuynhEmail.trim() || null,
+            diaChi: form.diaChi.trim() || null,
+            ngheNghiep: parentJob,
+            quanHe: isFemaleVietnameseName(parentName) ? "ME" : "CHA",
+            isSmSActive: true
+          };
+          if (createdUserId) phPayload.user = { id: Number(createdUserId) };
 
-        const phRes = await createPhuHuynh(phPayload);
-        const createdParent = phRes?.data?.data;
-        if (createdParent?.id) {
-          phuHuynhId = Number(createdParent.id);
-          setParents((prev) => [createdParent, ...prev]);
+          const phRes = await createPhuHuynh(phPayload);
+          const createdParent = phRes?.data?.data;
+          if (createdParent?.id) {
+            phuHuynhId = Number(createdParent.id);
+            setParents((prev) => {
+              const exists = prev.some((p) => String(p.id) === String(createdParent.id));
+              return exists ? prev : [createdParent, ...prev];
+            });
+          }
+        } catch {
+          setFormError("Không thể tạo thông tin phụ huynh.");
+          return;
         }
-      } catch {
-        setFormError("Không thể tạo thông tin phụ huynh.");
-        return;
       }
     }
 
     if (!phuHuynhId) {
       setFormError("Vui lòng chọn phụ huynh có sẵn hoặc nhập đầy đủ thông tin phụ huynh.");
+      return;
+    }
+
+    const selectedClass = classes.find((c) => String(c.id) === String(form.lopHocId));
+    let selectedKhoi = selectedClass?.khoi;
+    const finalNamNhapHoc = form.namNhapHoc
+      ? Number(form.namNhapHoc)
+      : (selectedClass ? calculateAdmissionYear(selectedClass.namHoc, selectedClass.khoi) : new Date().getFullYear());
+
+    const studentAgeError = validateStudentAgeAndYear(form.ngaySinh, finalNamNhapHoc, selectedKhoi, selectedClass?.namHoc);
+    if (studentAgeError) {
+      setFormError(studentAgeError);
       return;
     }
 
@@ -913,7 +965,7 @@ export function useHocSinhList() {
         ? form.email.trim() || null
         : buildStudentEmailPreview(form.hoTen) || null,
       diaChi: form.diaChi.trim() || null,
-      namNhapHoc: form.namNhapHoc ? Number(form.namNhapHoc) : null,
+      namNhapHoc: finalNamNhapHoc,
       maBhyt: form.maBhyt.trim() || null,
       dienChinhSach: form.dienChinhSach === "true",
       trangThai: Number(form.trangThai)
@@ -966,10 +1018,13 @@ export function useHocSinhList() {
         const selectedClass = classes.find(
           (item) => String(item.id) === String(form.lopHocId)
         );
+        const linkedParentObj = parents.find((p) => Number(p.id) === Number(phuHuynhId)) || null;
         const normalizedCreated = {
           ...created,
           lopHoc: created?.lopHoc || created?.lop || selectedClass || null,
-          email: created?.email || buildStudentEmailPreview(form.hoTen)
+          email: created?.email || buildStudentEmailPreview(form.hoTen),
+          phuHuynhId: created?.phuHuynhId || phuHuynhId || null,
+          phuHuynh: created?.phuHuynh || linkedParentObj
         };
         setStudents((prev) => [normalizedCreated, ...prev]);
         await ensureStudentUserAccount(normalizedCreated, form.hoTen);
@@ -1304,7 +1359,7 @@ export function useHocSinhList() {
 
         const ngaySinhRaw = findColumnValue(row, EXCEL_FIELD_ALIASES.ngaySinh);
         const ngaySinhNormalized = normalizeDateCell(ngaySinhRaw);
-        const namNhapHoc = parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.namNhapHoc));
+        const namNhapHoc = calculateAdmissionYear(classMatch.namHoc || rowNamHoc, classMatch.khoi);
 
         const ageError = validateStudentAgeAndYear(ngaySinhNormalized, namNhapHoc, classMatch.khoi);
         if (ageError) {
@@ -1410,7 +1465,7 @@ export function useHocSinhList() {
         const danTocId =
           parseNullableNumber(findColumnValue(row, EXCEL_FIELD_ALIASES.danTocId)) ?? 1;
 
-        // Xử lý phụ huynh: ưu tiên ID có sẵn → cache → tạo mới
+        // Xử lý phụ huynh: ưu tiên ID có sẵn → tên/SĐT trong Excel → tự động tạo phụ huynh cho học sinh
         let phuHuynhId =
           parseNullableNumber(
             findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhIdOptional)
@@ -1421,24 +1476,30 @@ export function useHocSinhList() {
         let resolvedParentObj = null;
 
         if (phuHuynhId) {
-          resolvedParentObj = dynamicParents.find(p => Number(p.id) === Number(phuHuynhId)) || null;
+          resolvedParentObj = dynamicParents.find((p) => Number(p.id) === Number(phuHuynhId)) || null;
         }
 
         if (!phuHuynhId) {
-          const phHoTen = String(
+          let phHoTen = String(
             findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhHoTen) || ""
           ).trim();
-          const phSdt = normalizePhone(
+          let phSdt = normalizePhone(
             findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhSdt) || ""
           );
-          const phEmail = String(
+          let phEmail = String(
             findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhEmail) || ""
           ).trim();
           const phNgheNghiep = String(
             findColumnValue(row, EXCEL_FIELD_ALIASES.phuHuynhNgheNghiep) || ""
           ).trim();
 
-          // ✅ Dùng email hoặc SĐT hoặc họ tên làm cache key
+          // Nếu dòng Excel không có thông tin phụ huynh, tự động tạo phụ huynh với họ tên chuẩn xác theo họ học sinh
+          phHoTen = generateRealisticParentName(fullName, phHoTen);
+
+          if (!phSdt || !/^0[0-9]{9}$/.test(phSdt)) {
+            phSdt = `09${String(Date.now() + Math.floor(Math.random() * 1000000)).slice(-8)}`;
+          }
+
           const cacheKey = (phEmail || phSdt || phHoTen).toLowerCase();
 
           if (cacheKey && createdParentCache.has(cacheKey)) {
@@ -1448,15 +1509,17 @@ export function useHocSinhList() {
               resolvedParentObj = cached;
             } else if (cached) {
               phuHuynhId = Number(cached);
-              resolvedParentObj = dynamicParents.find(p => Number(p.id) === Number(phuHuynhId)) || null;
+              resolvedParentObj = dynamicParents.find((p) => Number(p.id) === Number(phuHuynhId)) || null;
             }
-          } else if (phHoTen || phSdt || phEmail) {
+          }
+
+          if (!phuHuynhId) {
             try {
-              // Kiểm tra phụ huynh đã tồn tại trong danh sách chưa (theo email hoặc SĐT)
+              // Tìm phụ huynh đã có sẵn trong danh sách
               const existingParent = dynamicParents.find((p) => {
-                if (phEmail && String(p.email || "").toLowerCase() === phEmail.toLowerCase())
-                  return true;
+                if (phEmail && String(p.email || "").toLowerCase() === phEmail.toLowerCase()) return true;
                 if (phSdt && String(p.soDienThoai || "") === phSdt) return true;
+                if (phHoTen && String(p.hoTen || "").toLowerCase() === phHoTen.toLowerCase()) return true;
                 return false;
               });
 
@@ -1464,59 +1527,17 @@ export function useHocSinhList() {
                 phuHuynhId = Number(existingParent.id);
                 resolvedParentObj = existingParent;
                 if (cacheKey) createdParentCache.set(cacheKey, existingParent);
-                // Cập nhật nghề nghiệp nếu có
-                try {
-                  if (phNgheNghiep && String(existingParent.ngheNghiep || "").trim() === "") {
-                    await updatePhuHuynh(existingParent.id, { ...existingParent, ngheNghiep: phNgheNghiep || null });
-                    existingParent.ngheNghiep = phNgheNghiep;
-                  }
-                } catch {
-                  // ignore
-                }
               } else {
-                // Đảm bảo số điện thoại hợp lệ cho backend validation (^0[0-9]{9}$)
-                let validPhSdt = phSdt;
-                if (!validPhSdt || !/^0[0-9]{9}$/.test(validPhSdt)) {
-                  validPhSdt = `09${String(Date.now() + Math.floor(Math.random() * 1000000)).slice(-8)}`;
-                }
-
-                // Tạo user cho phụ huynh
-                const candidateEmail =
-                  phEmail || buildParentEmailPreview(phHoTen, validPhSdt);
-                let createdUserId = null;
-                try {
-                  const userRes = await createUser({
-                    username: candidateEmail,
-                    email: candidateEmail,
-                    password: "Abc1234@",
-                    status: 1,
-                    role: "PHU_HUYNH"
-                  });
-                  createdUserId = userRes?.data?.data?.id;
-                } catch {
-                  try {
-                    const usersRes = await getUsers();
-                    const found = (usersRes?.data?.data || []).find(
-                      (u) =>
-                        String(u?.email || "").toLowerCase() ===
-                        candidateEmail.toLowerCase()
-                    );
-                    if (found?.id) createdUserId = found.id;
-                  } catch {
-                    // ignore
-                  }
-                }
-
+                const candidateEmail = phEmail || buildParentEmailPreview(phHoTen, phSdt);
                 const phPayload = {
-                  hoTen: phHoTen || "Phụ huynh",
-                  soDienThoai: validPhSdt,
+                  hoTen: phHoTen,
+                  soDienThoai: phSdt,
                   email: candidateEmail,
-                  diaChi: null,
-                  ngheNghiep: phNgheNghiep || null,
+                  diaChi: String(findColumnValue(row, EXCEL_FIELD_ALIASES.diaChi) || "").trim() || null,
+                  ngheNghiep: phNgheNghiep || "Kinh doanh",
                   quanHe: isFemaleVietnameseName(phHoTen) ? "ME" : "CHA",
                   isSmSActive: true
                 };
-                if (createdUserId) phPayload.user = { id: Number(createdUserId) };
 
                 const phRes = await createPhuHuynh(phPayload);
                 const createdParent = phRes?.data?.data;
@@ -1528,20 +1549,16 @@ export function useHocSinhList() {
                   if (cacheKey) createdParentCache.set(cacheKey, createdParent);
                 }
               }
-            } catch {
-              // Fallback nếu tạo lỗi
+            } catch (pErr) {
+              console.warn("Lỗi khi tạo phụ huynh cho học sinh:", fullName, pErr);
             }
           }
         }
 
-        // Fallback cuối: dùng phụ huynh đầu tiên trong danh sách nếu vẫn chưa có
-        if (!phuHuynhId) {
-          if (dynamicParents[0]?.id) {
-            phuHuynhId = Number(dynamicParents[0].id);
-            resolvedParentObj = dynamicParents[0];
-          } else {
-            phuHuynhId = 1;
-          }
+        // Fallback an toàn nếu vẫn chưa có
+        if (!phuHuynhId && dynamicParents.length > 0) {
+          phuHuynhId = Number(dynamicParents[0].id);
+          resolvedParentObj = dynamicParents[0];
         }
 
         const payload = {
@@ -1562,9 +1579,7 @@ export function useHocSinhList() {
             null,
           diaChi:
             String(findColumnValue(row, EXCEL_FIELD_ALIASES.diaChi) || "").trim() || null,
-          namNhapHoc: parseNullableNumber(
-            findColumnValue(row, EXCEL_FIELD_ALIASES.namNhapHoc)
-          ),
+          namNhapHoc: calculateAdmissionYear(classMatch.namHoc || rowNamHoc, classMatch.khoi),
           maBhyt: maBhyt,
           tonGiao: String(findColumnValue(row, EXCEL_FIELD_ALIASES.tonGiao) || "").trim() || "Không",
           dienChinhSach: parseBoolean(
@@ -1583,6 +1598,13 @@ export function useHocSinhList() {
             }
             if (!created.phuHuynh && resolvedParentObj) {
               created.phuHuynh = resolvedParentObj;
+            }
+            if (created.id && phuHuynhId) {
+              try {
+                await linkParentToStudent(created.id, phuHuynhId);
+              } catch {
+                // Link already created in backend or fallback
+              }
             }
             createdStudents.push(created);
           }

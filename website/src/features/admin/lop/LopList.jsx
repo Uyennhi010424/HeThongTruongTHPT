@@ -385,7 +385,7 @@ const StudentListModal = ({ item, onClose }) => {
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
             <div>
               <h2 className="text-lg font-bold text-blue-900">Danh sách học sinh</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Lớp: {item?.tenLop} - Sĩ số: {item?.siSo || 0} học sinh</p>
+              <p className="text-sm text-slate-500 mt-0.5">Lớp: {item?.tenLop} - Sĩ số: {loading ? (item?.siSo || 0) : students.length} học sinh</p>
             </div>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
               <X className="w-5 h-5" />
@@ -706,13 +706,18 @@ export default function LopList() {
 
     const CLASS_NAME_REGEX = /^(10|11|12)[A-Za-z0-9]+$/;
     if (!CLASS_NAME_REGEX.test(trimmedTenLop)) {
-      notifyError("Tên lớp phải bắt đầu bằng 10, 11 hoặc 12 và chỉ chứa chữ cái, chữ số (vd: 10A1, 11B2, 12C3), không chứa ký tự đặc biệt hay khoảng trắng.");
+      notifyError("Tên lớp không hợp lệ (VD: 10A1, 11B2, 12C3).");
       return;
     }
 
     const gradeInName = extractGradeFromClassName(trimmedTenLop);
     if (!gradeInName || gradeInName !== String(form.khoi)) {
-      notifyError(`Tên lớp phải bắt đầu bằng khối ${form.khoi}. VD: ${form.khoi}A1.`);
+      notifyError(`Tên lớp phải thuộc khối ${form.khoi} (VD: ${form.khoi}A1).`);
+      return;
+    }
+
+    if (!form.toHopId) {
+      notifyError("Vui lòng chọn tổ hợp môn.");
       return;
     }
 
@@ -720,7 +725,7 @@ export default function LopList() {
       tenLop: trimmedTenLop,
       khoi: form.khoi,
       namHoc: form.namHoc.trim(),
-      toHopId: form.toHopId ? Number(form.toHopId) : null
+      toHopId: Number(form.toHopId)
     };
 
     try {
@@ -1104,13 +1109,13 @@ export default function LopList() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Tổ hợp môn</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Tổ hợp môn <span className="text-red-500">*</span></label>
                 <select
                   value={form.toHopId}
                   onChange={e => setForm(p => ({ ...p, toHopId: e.target.value }))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
                 >
-                  <option value="">-- Chưa gán tổ hợp --</option>
+                  <option value="">-- Chọn tổ hợp môn --</option>
                   {toHopList.map(th => (
                     <option key={th.id} value={th.id}>{th.maToHop} - {th.tenToHop} ({th.ban})</option>
                   ))}

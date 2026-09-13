@@ -116,9 +116,18 @@ public class PhanCongDayService {
         Map<Integer, Set<Integer>> teacherClasses = new HashMap<>();
         Map<Integer, Integer> teacherPeriods = new HashMap<>();
 
-        // Delete all existing assignments for this namHoc + hocKy
-        if (!existingAssignments.isEmpty()) {
-            repository.deleteAll(existingAssignments);
+        // Bảo lưu toàn bộ phân công thủ công đã có trước đó, không xóa/đè
+        Map<String, PhanCongDay> existingMap = new HashMap<>();
+        for (PhanCongDay existing : existingAssignments) {
+            if (existing.getLop() != null && existing.getMonHoc() != null && existing.getGiaoVien() != null) {
+                String key = existing.getLop().getId() + "_" + existing.getMonHoc().getId();
+                existingMap.put(key, existing);
+
+                int gvId = existing.getGiaoVien().getId();
+                int periods = getEstimatedPeriods(existing.getMonHoc());
+                teacherPeriods.put(gvId, teacherPeriods.getOrDefault(gvId, 0) + periods);
+                teacherClasses.computeIfAbsent(gvId, ignored -> new HashSet<>()).add(existing.getLop().getId());
+            }
         }
 
         // Capacity predicates
@@ -160,17 +169,23 @@ public class PhanCongDayService {
             if (eligibleLops.isEmpty()) continue;
 
             Set<Integer> assignedLopIds = new HashSet<>();
+            // Đánh dấu các lớp đã được phân công môn này từ trước (phân công thủ công)
+            for (LopHoc lop : eligibleLops) {
+                if (existingMap.containsKey(lop.getId() + "_" + mon.getId())) {
+                    assignedLopIds.add(lop.getId());
+                }
+            }
 
             int periodsPerClass = getEstimatedPeriods(mon);
 
-            // First pass: homeroom teachers
-            assignHomeroomTeachers(mon, eligibleLops, teachersForMon, assignedLopIds, hocKy, namHoc, created, teacherPeriods, periodsPerClass);
+            // First pass: homeroom teachers (chỉ gán cho lớp chưa được phân công)
+            assignHomeroomTeachers(mon, eligibleLops, teachersForMon, assignedLopIds, markTaught, hocKy, namHoc, created, teacherPeriods, periodsPerClass);
 
-            // Second pass: load-balanced assign
+            // Second pass: load-balanced assign (chỉ gán cho lớp còn lại)
             roundRobinAssign(mon, eligibleLops, teachersForMon, assignedLopIds, canTeach, markTaught, hocKy, namHoc, created, teacherPeriods, periodsPerClass);
         }
 
-        // Nếu vừa phân công cho HK1, đồng bộ ngay sang HK2 để giáo viên dạy xuyên suốt cả năm học
+        // Nếu vừa phân công cho HK1, đồng bộ sang HK2 cho các phân công chưa có
         if (hocKy == 1) {
             syncHocKy2FromHocKy1(namHoc);
         }
@@ -325,9 +340,11 @@ public class PhanCongDayService {
      */
     private void assignHomeroomTeachers(MonHoc subject, List<LopHoc> lops,
                                          List<GiaoVien> eligibleTeachers, Set<Integer> assignedLopIds,
+                                         java.util.function.BiConsumer<GiaoVien, LopHoc> markTaught,
                                          Integer hocKy, String namHoc, List<PhanCongDayDTO> created,
                                          Map<Integer, Integer> teacherPeriods, int periodsPerClass) {
         for (LopHoc lop : lops) {
+            if (assignedLopIds.contains(lop.getId())) continue;
             if (lop.getGvcn() == null) continue;
             Integer gvcnId = lop.getGvcn().getId();
             GiaoVien homeroomTeacher = eligibleTeachers.stream()
@@ -336,9 +353,14 @@ public class PhanCongDayService {
                     .orElse(null);
 
             if (homeroomTeacher != null) {
-                createAndSaveAssignment(homeroomTeacher, subject, lop, hocKy, namHoc, created);
-                assignedLopIds.add(lop.getId());
-                teacherPeriods.put(gvcnId, teacherPeriods.getOrDefault(gvcnId, 0) + periodsPerClass);
+                if (repository.findByMonHocIdAndLopIdAndHocKy(subject.getId(), lop.getId(), hocKy).isEmpty()) {
+                    createAndSaveAssignment(homeroomTeacher, subject, lop, hocKy, namHoc, created);
+                    assignedLopIds.add(lop.getId());
+                    markTaught.accept(homeroomTeacher, lop);
+                    teacherPeriods.put(gvcnId, teacherPeriods.getOrDefault(gvcnId, 0) + periodsPerClass);
+                } else {
+                    assignedLopIds.add(lop.getId());
+                }
             }
         }
     }
@@ -348,16 +370,6 @@ public class PhanCongDayService {
      * classes among the eligible teachers. Iterates through classes and cycles through
      * teachers, skipping those who cannot teach (capacity full or already assigned),
      * until a suitable teacher is found or all candidates are exhausted.
-     *
-     * @param subject          the MonHoc being assigned
-     * @param lops             the list of all LopHoc classes for the academic year
-     * @param eligibleTeachers the list of teachers eligible to teach this subject
-     * @param assignedLopIds   set of class IDs already assigned in the first pass
-     * @param canTeach         predicate that checks if a teacher can teach a class
-     * @param markTaught       consumer that marks a teacher as having taught a class
-     * @param hocKy            the semester number
-     * @param namHoc           the academic year string
-     * @param created          the accumulator list for newly created assignment DTOs (will be mutated)
      */
     private void roundRobinAssign(MonHoc subject, List<LopHoc> lops,
                                    List<GiaoVien> eligibleTeachers, Set<Integer> assignedLopIds,
@@ -367,6 +379,11 @@ public class PhanCongDayService {
                                    Map<Integer, Integer> teacherPeriods, int periodsPerClass) {
         for (LopHoc lop : lops) {
             if (assignedLopIds.contains(lop.getId())) continue;
+
+            if (repository.findByMonHocIdAndLopIdAndHocKy(subject.getId(), lop.getId(), hocKy).isPresent()) {
+                assignedLopIds.add(lop.getId());
+                continue;
+            }
 
             List<GiaoVien> sortedTeachers = new ArrayList<>(eligibleTeachers);
             Collections.shuffle(sortedTeachers);
@@ -386,41 +403,32 @@ public class PhanCongDayService {
 
             if (pick == null) continue;
 
-            if (repository.findByGiaoVienIdAndMonHocIdAndLopIdAndHocKy(pick.getId(), subject.getId(), lop.getId(), hocKy).isEmpty()) {
-                try {
-                    PhanCongDay entity = new PhanCongDay();
-                    entity.setGiaoVien(pick);
-                    entity.setMonHoc(subject);
-                    entity.setLop(lop);
-                    entity.setHocKy(hocKy);
-                    entity.setNamHoc(namHoc);
-                    PhanCongDay saved = repository.save(entity);
-                    created.add(toDto(saved));
-                    markTaught.accept(pick, lop);
-                    teacherPeriods.put(pick.getId(), teacherPeriods.getOrDefault(pick.getId(), 0) + periodsPerClass);
-                } catch (DataIntegrityViolationException ex) {
-                    log.warn("Phân công trùng lặp: gv={}, mon={}, lop={}", pick.getId(), subject.getId(), lop.getId());
-                }
+            try {
+                PhanCongDay entity = new PhanCongDay();
+                entity.setGiaoVien(pick);
+                entity.setMonHoc(subject);
+                entity.setLop(lop);
+                entity.setHocKy(hocKy);
+                entity.setNamHoc(namHoc);
+                PhanCongDay saved = repository.save(entity);
+                created.add(toDto(saved));
+                assignedLopIds.add(lop.getId());
+                markTaught.accept(pick, lop);
+                teacherPeriods.put(pick.getId(), teacherPeriods.getOrDefault(pick.getId(), 0) + periodsPerClass);
+            } catch (DataIntegrityViolationException ex) {
+                log.warn("Phân công trùng lặp: gv={}, mon={}, lop={}", pick.getId(), subject.getId(), lop.getId());
             }
         }
     }
 
     /**
      * Creates a new PhanCongDay assignment entity if one does not already exist for the
-     * given combination of teacher, subject, class, and semester. Saves the entity and
-     * adds the resulting DTO to the created list. Handles DataIntegrityViolationException
-     * gracefully (e.g., concurrent duplicate inserts).
-     *
-     * @param teacher the GiaoVien teacher to assign
-     * @param subject the MonHoc subject being taught
-     * @param lop     the LopHoc class being assigned
-     * @param hocKy   the semester number
-     * @param namHoc  the academic year string
-     * @param created the accumulator list for newly created assignment DTOs (will be mutated)
+     * given combination of subject, class, and semester. Saves the entity and
+     * adds the resulting DTO to the created list.
      */
     private void createAndSaveAssignment(GiaoVien teacher, MonHoc subject, LopHoc lop,
                                           Integer hocKy, String namHoc, List<PhanCongDayDTO> created) {
-        if (repository.findByGiaoVienIdAndMonHocIdAndLopIdAndHocKy(teacher.getId(), subject.getId(), lop.getId(), hocKy).isEmpty()) {
+        if (repository.findByMonHocIdAndLopIdAndHocKy(subject.getId(), lop.getId(), hocKy).isEmpty()) {
             try {
                 PhanCongDay entity = new PhanCongDay();
                 entity.setGiaoVien(teacher);
@@ -431,7 +439,7 @@ public class PhanCongDayService {
                 PhanCongDay saved = repository.save(entity);
                 created.add(toDto(saved));
             } catch (DataIntegrityViolationException ex) {
-                log.warn("Phân công chủ nhiệm đã tồn tại: gv={}, mon={}, lop={}", teacher.getId(), subject.getId(), lop.getId());
+                log.warn("Phân công đã tồn tại: mon={}, lop={}", subject.getId(), lop.getId());
             }
         }
     }

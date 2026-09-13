@@ -193,29 +193,66 @@ export const isDuplicateStudent = (candidate, existingStudents = []) => {
   });
 };
 
-export const validateStudentAgeAndYear = (ngaySinh, namNhapHoc, khoi) => {
+export const calculateAdmissionYear = (namHoc, khoi) => {
+  if (!namHoc) return new Date().getFullYear();
+  const match = String(namHoc).match(/\d{4}/);
+  if (!match) return new Date().getFullYear();
+  const startYear = parseInt(match[0], 10);
+  const grade = Number(khoi) || 10;
+  return startYear - (grade - 10);
+};
+
+export const validateStudentAgeAndYear = (ngaySinh, namNhapHoc, khoi, namHoc) => {
   const currentYear = new Date().getFullYear();
   let error = null;
 
   if (namNhapHoc) {
-    if (namNhapHoc > currentYear + 1) {
-      error = `Năm nhập học không được vượt quá ${currentYear + 1}`;
-    } else if (namNhapHoc < 2000) {
+    if (namNhapHoc < 2000) {
       error = "Năm nhập học phải từ năm 2000 trở đi";
+    }
+
+    let maxAllowedYear = currentYear + 1;
+    if (namHoc) {
+      const match = String(namHoc).match(/\d{4}/);
+      if (match) {
+        const startYear = parseInt(match[0], 10);
+        const grade = Number(khoi) || 10;
+        maxAllowedYear = startYear - (grade - 10);
+      }
+    }
+
+    if (!error && namNhapHoc > maxAllowedYear) {
+      error = `Năm nhập học ${namNhapHoc} không hợp lệ. Đối với Khối ${khoi || 10} năm học ${namHoc || ""}, năm nhập học tối đa là ${maxAllowedYear} (không được lớn hơn ${maxAllowedYear})`;
+    }
+
+    if (!error && ngaySinh) {
+      const birthYear = new Date(ngaySinh).getFullYear();
+      const ageAtAdmission = namNhapHoc - birthYear;
+      if (ageAtAdmission < 14) {
+        error = `Học sinh sinh năm ${birthYear} chưa đủ tuổi nhập học năm ${namNhapHoc} (tuổi nhập học THPT tối thiểu 14 tuổi)`;
+      } else if (ageAtAdmission > 19) {
+        error = `Học sinh sinh năm ${birthYear} quá tuổi nhập học năm ${namNhapHoc} (tuổi nhập học THPT tối đa 19 tuổi)`;
+      }
     }
   }
 
   if (!error && ngaySinh && khoi) {
     const birthYear = new Date(ngaySinh).getFullYear();
-    const age = currentYear - birthYear;
+    let refYear = currentYear;
+    if (namHoc) {
+      const match = String(namHoc).match(/\d{4}/);
+      if (match) refYear = parseInt(match[0], 10);
+    }
+    const age = refYear - birthYear;
     
     let validAge = false;
-    if (khoi == 10 && (age >= 15 && age <= 18)) validAge = true;
-    else if (khoi == 11 && (age >= 16 && age <= 19)) validAge = true;
-    else if (khoi == 12 && (age >= 17 && age <= 20)) validAge = true;
+    if (khoi == 10 && (age >= 14 && age <= 18)) validAge = true;
+    else if (khoi == 11 && (age >= 15 && age <= 19)) validAge = true;
+    else if (khoi == 12 && (age >= 16 && age <= 20)) validAge = true;
+    else if (![10, 11, 12].includes(Number(khoi))) validAge = true;
 
     if (!validAge) {
-      error = `Độ tuổi ${age} không phù hợp với Khối ${khoi} (Năm sinh: ${birthYear}, Năm hiện tại: ${currentYear})`;
+      error = `Độ tuổi ${age} không phù hợp với Khối ${khoi} (Năm sinh: ${birthYear}, Niên khóa: ${namHoc || refYear})`;
     }
   }
 
@@ -267,11 +304,43 @@ export const parseNullableNumber = (value) => {
 
 export const findColumnValue = (row, aliases) => {
   const entries = Object.entries(row || {});
+  
+  // Pass 1: Exact normalized match
   for (const alias of aliases) {
     const normalizedAlias = normalizeStrict(alias);
+    if (!normalizedAlias) continue;
     const match = entries.find(([key]) => normalizeStrict(key) === normalizedAlias);
-    if (match) return match[1];
+    if (match && match[1] !== undefined && match[1] !== null && String(match[1]).trim() !== "") {
+      return match[1];
+    }
   }
+
+  // Pass 2: Strip leading numbering (e.g. "1. Họ tên" -> "hoten")
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeStrict(alias);
+    if (!normalizedAlias) continue;
+    const match = entries.find(([key]) => {
+      const strippedKey = normalizeStrict(key).replace(/^\d+/, "");
+      return strippedKey === normalizedAlias;
+    });
+    if (match && match[1] !== undefined && match[1] !== null && String(match[1]).trim() !== "") {
+      return match[1];
+    }
+  }
+
+  // Pass 3: Check if key ends with or starts with alias (for compound column headers)
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeStrict(alias);
+    if (normalizedAlias.length < 3) continue;
+    const match = entries.find(([key]) => {
+      const normKey = normalizeStrict(key);
+      return normKey.endsWith(normalizedAlias) || normKey.startsWith(normalizedAlias);
+    });
+    if (match && match[1] !== undefined && match[1] !== null && String(match[1]).trim() !== "") {
+      return match[1];
+    }
+  }
+
   return "";
 };
 
@@ -352,49 +421,57 @@ export const EXCEL_TEMPLATE_COLUMNS = [
 ];
 
 export const EXCEL_FIELD_ALIASES = {
-  hoTen: ["Họ tên", "Họ và tên", "HO_TEN"],
-  ngaySinh: ["Ngày sinh", "NGAY_SINH"],
-  gioiTinh: ["Giới tính", "GIOI_TINH"],
-  lop: ["Lớp", "Lớp học", "LOP"],
+  hoTen: ["Họ tên", "Họ và tên", "HO_TEN", "Tên học sinh", "Họ tên học sinh", "Học sinh"],
+  ngaySinh: ["Ngày sinh", "NGAY_SINH", "Sinh ngày", "Ngày tháng năm sinh"],
+  gioiTinh: ["Giới tính", "GIOI_TINH", "Phái"],
+  lop: ["Lớp", "Lớp học", "LOP", "Tên lớp"],
   namHoc: ["Năm học", "NAM_HOC", "Niên khóa", "NIEN_KHOA"],
-  sdt: ["Số điện thoại", "Điện thoại", "SDT", "SO_DIEN_THOAI"],
-  email: ["Email", "EMAIL"],
-  diaChi: ["Địa chỉ", "DIA_CHI"],
-  namNhapHoc: ["Năm nhập học", "NAM_NHAP_HOC"],
-  maBhyt: ["Mã BHYT", "MA_BHYT"],
+  sdt: ["Số điện thoại", "Điện thoại", "SDT", "SO_DIEN_THOAI", "Số ĐT", "ĐTDĐ"],
+  email: ["Email", "EMAIL", "Hòm thư"],
+  diaChi: ["Địa chỉ", "DIA_CHI", "Nơi ở", "Thường trú"],
+  namNhapHoc: ["Năm nhập học", "NAM_NHAP_HOC", "Khóa nhập học", "Năm vào trường"],
+  maBhyt: ["Mã BHYT", "MA_BHYT", "Số thẻ BHYT", "BHYT"],
   danToc: ["Dân tộc", "DAN_TOC"],
   tonGiao: ["Tôn giáo", "TON_GIAO"],
-  dienChinhSach: ["Diện chính sách", "DIEN_CHINH_SACH"],
+  dienChinhSach: ["Diện chính sách", "DIEN_CHINH_SACH", "Chính sách"],
   trangThai: ["Trạng thái", "TRANG_THAI"],
   phuHuynhHoTen: [
     "Phụ huynh - Họ tên", "PHU_HUYNH_HO_TEN", "PHUHUYNH_HOTEN",
     "Họ tên phụ huynh", "Tên phụ huynh", "Phụ huynh", "Họ và tên phụ huynh",
     "Họ tên cha", "Họ tên mẹ", "Họ và tên cha", "Họ và tên mẹ", "Người giám hộ", "Họ tên người giám hộ",
-    "Họ tên PH", "Tên PH", "Cha", "Mẹ", "Cha / Mẹ", "Cha/Mẹ", "PH - Họ tên", "PH Họ tên",
-    "Phụ huynh (Họ tên)", "Họ tên cha mẹ", "Họ tên cha/mẹ"
+    "Họ tên bố", "Họ tên ba", "Họ và tên bố", "Họ và tên ba",
+    "Họ tên PH", "Tên PH", "Cha", "Mẹ", "Bố", "Ba", "Cha / Mẹ", "Cha/Mẹ", "PH - Họ tên", "PH Họ tên",
+    "Phụ huynh (Họ tên)", "Họ tên cha mẹ", "Họ tên cha/mẹ", "Tên cha", "Tên mẹ", "Tên bố", "Tên ba",
+    "Phụ Huynh - Họ Tên", "Phụ Huynh"
   ],
   phuHuynhSdt: [
     "Phụ huynh - SĐT", "PHU_HUYNH_SDT", "PHUHUYNH_SDT", "Phụ huynh - SDT",
     "SĐT phụ huynh", "Số điện thoại phụ huynh", "Số điện thoại PH", "SĐT PH", "SDT phụ huynh", "SDT PH",
     "Điện thoại phụ huynh", "Điện thoại PH", "SĐT cha", "SĐT mẹ", "Số điện thoại cha", "Số điện thoại mẹ",
+    "SĐT bố", "SĐT ba", "Số điện thoại bố", "Số điện thoại ba", "Điện thoại cha", "Điện thoại mẹ",
+    "Điện thoại bố", "Điện thoại ba", "ĐTDĐ cha", "ĐTDĐ mẹ", "ĐTDĐ phụ huynh", "ĐTDĐ PH",
     "SĐT người giám hộ", "Điện thoại liên hệ", "SĐT liên hệ", "SDT liên hệ", "PH - SĐT", "PH - SDT", "PH SĐT", "PH SDT",
-    "Phụ huynh (SĐT)", "Phụ huynh (SDT)"
+    "Phụ huynh (SĐT)", "Phụ huynh (SDT)", "Phụ Huynh - Số Điện Thoại", "Phụ Huynh - SĐT"
   ],
   phuHuynhEmail: [
     "Phụ huynh - Email", "PHU_HUYNH_EMAIL", "PHUHUYNH_EMAIL",
-    "Email phụ huynh", "Email PH", "Email cha", "Email mẹ", "Email người giám hộ", "PH - Email", "PH Email",
+    "Email phụ huynh", "Email PH", "Email cha", "Email mẹ", "Email bố", "Email ba",
+    "Email người giám hộ", "PH - Email", "PH Email", "Phụ Huynh - Email",
     "Phụ huynh (Email)"
   ],
   phuHuynhNgheNghiep: [
     "Phụ huynh - Nghề nghiệp", "PHU_HUYNH_NGHE_NGHIEP", "PHUHUYNH_NGHENGHIEP",
-    "Nghề nghiệp phụ huynh", "Nghề nghiệp", "Nghề nghiệp cha", "Nghề nghiệp mẹ", "Nghề nghiệp PH", "PH - Nghề nghiệp",
+    "Nghề nghiệp phụ huynh", "Nghề nghiệp", "Nghề nghiệp cha", "Nghề nghiệp mẹ", "Nghề nghiệp bố", "Nghề nghiệp ba",
+    "Nghề nghiệp PH", "PH - Nghề nghiệp", "Phụ Huynh - Nghề Nghiệp",
     "Phụ huynh (Nghề nghiệp)"
   ],
   phuHuynhIdOptional: [
     "ID phụ huynh (tùy chọn)",
     "ID phụ huynh",
     "PHUHUYNH_ID",
-    "ID_PHUHUYNH"
+    "ID_PHUHUYNH",
+    "Mã phụ huynh",
+    "Mã PH"
   ],
   hocBaId: ["ID học bạ", "HOCBA_ID", "ID_HOCBA"],
   danTocId: ["ID dân tộc", "DANTOC_ID", "ID_DANTOC"],
@@ -441,5 +518,31 @@ export const formatHanhKiem = (val) => {
   if (str === "YEU") return "Yếu";
   return val;
 };
+
+const PARENT_GIVEN_NAMES = [
+  "Văn Hùng", "Văn Dũng", "Văn Tuấn", "Văn Thành", "Văn Long",
+  "Minh Trí", "Minh Tuấn", "Quốc Bảo", "Quốc Cường", "Quốc Thắng",
+  "Hoàng Nam", "Đình Trọng", "Văn Sang", "Văn Khoa", "Văn Lâm",
+  "Văn Phúc", "Quốc Đạt", "Quang Khải", "Tuấn Kiệt", "Hữu Thắng"
+];
+
+export const generateRealisticParentName = (studentFullName, providedName) => {
+  if (providedName && typeof providedName === "string") {
+    const trimmed = providedName.trim();
+    if (trimmed.length > 0) {
+      const words = trimmed.split(/\s+/).filter(Boolean);
+      if (words.length >= 2) {
+        return trimmed;
+      }
+      const studentSurname = String(studentFullName || "").trim().split(/\s+/)[0] || "Nguyễn";
+      return `${studentSurname} Văn ${trimmed}`;
+    }
+  }
+
+  const studentSurname = String(studentFullName || "").trim().split(/\s+/)[0] || "Nguyễn";
+  const randomSuffix = PARENT_GIVEN_NAMES[Math.floor(Math.random() * PARENT_GIVEN_NAMES.length)];
+  return `${studentSurname} ${randomSuffix}`;
+};
+
 
 

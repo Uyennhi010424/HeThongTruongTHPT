@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { MoreVertical, Eye, Edit2, Trash2, X, RefreshCw, Plus, Settings2 } from "lucide-react";
+import { MoreVertical, Eye, Edit2, Trash2, X, RefreshCw, Plus, Settings2, ChevronDown } from "lucide-react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
@@ -44,29 +44,28 @@ const ActionDropdown = ({ item, onView, onEdit, onDelete }) => {
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
         className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
       >
-        <MoreVertical className="w-5 h-5" />
+        <MoreVertical className="w-4 h-4" />
       </button>
-      
+
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+        <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
           <button
             onClick={() => { setIsOpen(false); onView(item); }}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+            className="w-full px-3 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
           >
-            <Eye className="w-4 h-4" /> Xem chi tiết
+            <Eye className="w-3.5 h-3.5 text-slate-400" /> Xem chi tiết
           </button>
           <button
             onClick={() => { setIsOpen(false); onEdit(item); }}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+            className="w-full px-3 py-1.5 text-left text-xs font-medium text-blue-600 hover:bg-blue-50 flex items-center gap-2"
           >
-            <Edit2 className="w-4 h-4" /> Chỉnh sửa
+            <Edit2 className="w-3.5 h-3.5 text-blue-500" /> Chỉnh sửa
           </button>
-          <div className="h-px bg-slate-100 my-1"></div>
           <button
             onClick={() => { setIsOpen(false); onDelete(item); }}
-            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            className="w-full px-3 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
           >
-            <Trash2 className="w-4 h-4" /> Xóa phân công
+            <Trash2 className="w-3.5 h-3.5 text-red-500" /> Xóa
           </button>
         </div>
       )}
@@ -92,24 +91,28 @@ const AddDropdown = ({ onManual, onAuto }) => {
     <div className="relative add-menu-wrapper">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
+        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors duration-200"
       >
-        <Plus className="w-4 h-4" /> Thêm phân công
+        <Plus className="w-4 h-4" />
+        <span>Thêm phân công</span>
+        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-100 z-50 overflow-hidden py-1">
           <button
             onClick={() => { setIsOpen(false); onManual(); }}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+            className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors"
           >
-            <Plus className="w-4 h-4" /> Thêm thủ công
+            <Plus className="w-4 h-4" />
+            Thêm thủ công
           </button>
           <button
             onClick={() => { setIsOpen(false); onAuto(); }}
-            className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 font-medium"
+            className="w-full text-left px-4 py-2.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 flex items-center gap-2 transition-colors"
           >
-            <Settings2 className="w-4 h-4" /> Tự động phân công
+            <Settings2 className="w-4 h-4" />
+            Tự động phân công
           </button>
         </div>
       )}
@@ -131,10 +134,10 @@ export default function PhanCongPage() {
 
   // Form state
   const [formOpen, setFormOpen] = useState(false);
+  const [formNamHoc, setFormNamHoc] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedHocKy, setSelectedHocKy] = useState("Học kỳ 1");
   const [saving, setSaving] = useState(false);
 
   // Auto assign state
@@ -171,6 +174,23 @@ export default function PhanCongPage() {
     ].filter(Boolean));
     return Array.from(set).sort().reverse();
   }, [academicYears, assignments, classes]);
+
+  // Lọc danh sách lớp trong Form thêm/sửa phân công theo đúng Năm học hiện hành
+  const formClassList = useMemo(() => {
+    const targetYear = formNamHoc || filter.namHoc || autoNamHoc;
+    let list = classes;
+    if (targetYear) {
+      const filtered = classes.filter((c) => String(c.namHoc || "").trim() === String(targetYear).trim());
+      if (filtered.length > 0) {
+        list = filtered;
+      }
+    }
+    return list.slice().sort((a, b) => {
+      const cmp = String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { numeric: true });
+      if (cmp !== 0) return cmp;
+      return String(b.namHoc || "").localeCompare(String(a.namHoc || ""));
+    });
+  }, [classes, formNamHoc, filter.namHoc, autoNamHoc]);
   
   const khoiList = ["Khối 10", "Khối 11", "Khối 12"];
 
@@ -279,28 +299,20 @@ export default function PhanCongPage() {
     if (!mon) { notifyError("Môn học chưa có trong hệ thống."); return; }
 
     const lopObj = classes.find((c) => String(c.id) === String(selectedClassId));
-    const namHocVal = lopObj?.namHoc || "";
-    const hkInt = selectedHocKy === "Học kỳ 2" ? 2 : 1;
+    const namHocVal = formNamHoc || lopObj?.namHoc || filter.namHoc || autoNamHoc || "";
 
     try {
       setSaving(true);
-      const res = await createPhanCongDay({
+      // Mặc định phân công cho cả năm học (tạo HK1 và tự động đồng bộ sang HK2)
+      await createPhanCongDay({
         giaoVienId: Number(selectedTeacherId), monHocId: mon.id,
-        lopId: Number(selectedClassId), hocKy: hkInt, namHoc: namHocVal
+        lopId: Number(selectedClassId), hocKy: 1, namHoc: namHocVal
       });
-      const saved = res?.data?.data;
-      if (!saved) throw new Error("Lỗi server");
 
-      setAssignments((prev) => [{
-        id: saved.id, gv: saved.giaoVienHoTen || teacher.hoTen,
-        ma: saved.maGiaoVien || "", mon: saved.monHocTen || selectedSubject,
-        lop: saved.tenLop || lopObj?.tenLop || "",
-        hk: formatHocKy(saved.hocKy), hocKy: saved.hocKy,
-        namHoc: saved.namHoc || namHocVal,
-        khoi: (lopObj?.tenLop || "").substring(0, 2)
-      }, ...prev].sort(sortByAssignment));
+      axiosClient.invalidateCache("/phancong-day");
+      await fetchData();
 
-      notifySuccess("Đã thêm phân công thành công.");
+      notifySuccess(`Đã phân công ${teacher.hoTen} dạy ${selectedSubject} lớp ${lopObj?.tenLop || ""} cả năm học.`);
       setFormOpen(false);
       setSelectedSubject("");
       setSelectedClassId("");
@@ -309,6 +321,15 @@ export default function PhanCongPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenAddModal = () => {
+    const defaultYear = filter.namHoc || autoNamHoc || academicYears[0] || "2025-2026";
+    setFormNamHoc(defaultYear);
+    setSelectedTeacherId("");
+    setSelectedSubject("");
+    setSelectedClassId("");
+    setFormOpen(true);
   };
 
   const handleAutoAssign = async () => {
@@ -353,134 +374,164 @@ export default function PhanCongPage() {
   };
 
   const handleEdit = (item) => {
-    // Basic edit setup - will just open add form with preset for now
+    const matchedClass = classes.find(c => c.tenLop === item.lop && (!item.namHoc || c.namHoc === item.namHoc));
+    const targetYear = item.namHoc || matchedClass?.namHoc || filter.namHoc || autoNamHoc;
+    setFormNamHoc(targetYear);
     setSelectedTeacherId(teachers.find(t => t.maGiaoVien === item.ma)?.id || "");
     setSelectedSubject(item.mon !== "--" ? item.mon : "");
-    setSelectedClassId(classes.find(c => c.tenLop === item.lop)?.id || "");
-    setSelectedHocKy(item.hk);
+    setSelectedClassId(matchedClass?.id || classes.find(c => c.tenLop === item.lop)?.id || "");
     setFormOpen(true);
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/50">
-      <PageHeader title="Phân công giảng dạy" />
+    <div className="min-h-screen bg-[#F8FAFC] pb-12 font-sans text-slate-900">
+      <div className="p-6 space-y-6">
+        {/* Header & Action Buttons */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">Phân công giảng dạy</h1>
+            <p className="text-sm text-slate-500 mt-1 font-medium">Quản lý và phân bổ giáo viên giảng dạy theo môn học, khối lớp và học kỳ.</p>
+          </div>
 
-      <div className="p-6 space-y-6 flex-1">
+          <div className="flex items-center gap-2.5 shrink-0 flex-nowrap">
+            <button
+              onClick={() => {
+                fetchData();
+                setFilter(p => ({ ...p, khoi: "", lop: "", monThi: "", hocKy: 0 }));
+              }}
+              className="inline-flex items-center justify-center w-[42px] h-[42px] bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition-colors duration-200 shrink-0"
+              title="Làm mới dữ liệu"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+
+            <AddDropdown onManual={handleOpenAddModal} onAuto={() => setAutoOpen(true)} />
+          </div>
+        </div>
+
         {/* Filter Card */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 flex-1">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Năm học</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Năm học</label>
               <select
                 value={filter.namHoc}
                 onChange={(e) => { setFilter(p => ({ ...p, namHoc: e.target.value })); setPage(1); }}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
               >
                 <option value="">Tất cả</option>
                 {namHocList.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Học kỳ</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Học kỳ</label>
               <select
                 value={filter.hocKy}
                 onChange={(e) => { setFilter(p => ({ ...p, hocKy: Number(e.target.value) })); setPage(1); }}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
               >
-                <option value={0}>Tất cả</option>
+                <option value={0}>Tất cả học kỳ</option>
                 <option value={1}>Học kỳ 1</option>
                 <option value={2}>Học kỳ 2</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Khối</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Khối</label>
               <select
                 value={filter.khoi}
                 onChange={(e) => { setFilter(p => ({ ...p, khoi: e.target.value, lop: "" })); setPage(1); }}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
               >
                 <option value="">Tất cả</option>
                 {khoiList.map((k) => <option key={k} value={k}>{k}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Lớp</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Lớp</label>
               <select
                 value={filter.lop}
                 onChange={(e) => { setFilter(p => ({ ...p, lop: e.target.value })); setPage(1); }}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
               >
                 <option value="">Tất cả</option>
                 {classes
-                  .filter(c => (!filter.namHoc || c.namHoc === filter.namHoc) && (!filter.khoi || String(c.tenLop).startsWith(filter.khoi.replace("Khối ", ""))))
-                  .sort((a,b) => String(a.tenLop).localeCompare(String(b.tenLop), "vi", {numeric: true}))
-                  .map((l) => <option key={l.id} value={l.tenLop}>{l.tenLop}</option>)
-                }
+                  .filter((c) => !filter.namHoc || c.namHoc === filter.namHoc)
+                  .filter((c) => !filter.khoi || String(c.khoi) === filter.khoi.replace("Khối ", ""))
+                  .map((c) => <option key={c.id} value={c.tenLop}>{c.tenLop}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Môn học</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Môn học</label>
               <select
                 value={filter.monThi}
                 onChange={(e) => { setFilter(p => ({ ...p, monThi: e.target.value })); setPage(1); }}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
               >
                 <option value="">Tất cả</option>
                 {subjects.map((m) => <option key={m.id} value={m.tenMon}>{m.tenMon}</option>)}
               </select>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                fetchData();
-                setFilter(p => ({ ...p, khoi: "", lop: "", monThi: "", hocKy: 0 }));
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" /> Làm mới
-            </button>
-            <AddDropdown onManual={() => setFormOpen(true)} onAuto={() => setAutoOpen(true)} />
-          </div>
         </div>
 
         {/* Table Data */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                  <th className="px-4 py-3 text-center w-16">STT</th>
-                  <th className="px-4 py-3">Giáo viên</th>
-                  <th className="px-4 py-3">Mã GV</th>
-                  <th className="px-4 py-3 text-center">Môn học</th>
-                  <th className="px-4 py-3 text-center">Lớp</th>
-                  <th className="px-4 py-3 text-center">Học kỳ</th>
-                  <th className="px-4 py-3 text-center">Năm học</th>
-                  <th className="px-4 py-3 text-center">Trạng thái</th>
-                  <th className="px-4 py-3 text-center w-20">Thao tác</th>
+                <tr className="bg-slate-50/70 border-b border-slate-200">
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 text-center">STT</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-1/4">Giáo viên</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">Mã GV</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Môn học</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-24">Lớp</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-28">Học kỳ</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-28">Năm học</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-32">Trạng thái</th>
+                  <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-20">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={`skeleton-${i}`}>
-                      <td className="px-4 py-3 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-8 mx-auto" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-32" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-20" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-24 mx-auto" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-16 mx-auto" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-16 mx-auto" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-24 mx-auto" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-24 mx-auto" /></td>
-                      <td className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-8 mx-auto" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse w-32" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-slate-100 rounded animate-pulse w-20" /></td>
+                      <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-24 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-16 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-16 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-24 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-24 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="h-4 bg-slate-100 rounded animate-pulse w-8 mx-auto" /></td>
                     </tr>
                   ))
                 ) : pagedAssignments.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
-                      Không tìm thấy phân công giảng dạy nào.
+                    <td colSpan={9} className="px-6 py-16 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 border border-blue-100">
+                        <Settings2 className="w-7 h-7 text-blue-500" />
+                      </div>
+                      <div className="text-base font-bold text-slate-800 mb-1">Chưa có phân công giảng dạy nào</div>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto mb-5">
+                        Bạn có thể chọn phân công tự động cho toàn bộ lớp học hoặc thêm thủ công theo từng giáo viên.
+                      </p>
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          onClick={() => setAutoOpen(true)}
+                          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-colors"
+                        >
+                          <Settings2 className="w-3.5 h-3.5" />
+                          <span>Tự động phân công ngay</span>
+                        </button>
+                        <button
+                          onClick={handleOpenAddModal}
+                          className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Thêm thủ công</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -488,33 +539,33 @@ export default function PhanCongPage() {
                     const isAssigned = row.gv && row.gv !== "--";
                     return (
                       <tr key={`${row.id}-${row.lop}`} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-4 py-2.5 text-center text-slate-500 font-medium">
+                        <td className="px-4 py-3.5 text-center text-slate-400 font-bold">
                           {(currentPage - 1) * pageSize + idx + 1}
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-slate-900">
+                        <td className="px-4 py-3.5 font-bold text-slate-900">
                           {row.gv}
                         </td>
-                        <td className="px-4 py-2.5 text-slate-500 font-mono text-xs">
+                        <td className="px-4 py-3.5 text-slate-500 font-mono text-xs font-semibold">
                           {row.ma}
                         </td>
-                        <td className="px-4 py-2.5 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        <td className="px-4 py-3.5 text-center">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
                             {row.mon}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        <td className="px-4 py-3.5 text-center">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
                             {row.lop}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-center text-slate-600">
+                        <td className="px-4 py-3.5 text-center text-slate-600 font-medium">
                           {row.hk}
                         </td>
-                        <td className="px-4 py-2.5 text-center text-slate-600">
+                        <td className="px-4 py-3.5 text-center text-slate-600 font-semibold">
                           {row.namHoc || "--"}
                         </td>
-                        <td className="px-4 py-2.5 text-center">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                        <td className="px-4 py-3.5 text-center">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${
                             isAssigned 
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
                               : "bg-amber-50 text-amber-700 border-amber-200"
@@ -522,7 +573,7 @@ export default function PhanCongPage() {
                             {isAssigned ? "Đã phân công" : "Chưa phân công"}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-center">
+                        <td className="px-4 py-3.5 text-center">
                           <ActionDropdown
                             item={row}
                             onView={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
@@ -628,72 +679,74 @@ export default function PhanCongPage() {
       )}
 
       {/* Add Assignment Modal */}
-      <SimpleModal open={formOpen} title="Thêm phân công" onClose={() => setFormOpen(false)}>
+      <SimpleModal open={formOpen} title="Thêm phân công" onClose={() => setFormOpen(false)} width={640}>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleAssign(); }}>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Giáo viên *</label>
+            <label className="text-sm font-semibold text-slate-700">Năm học <span className="text-red-500 font-bold ml-0.5">*</span></label>
             <select
-              value={selectedTeacherId}
-              onChange={(e) => { setSelectedTeacherId(e.target.value); setSelectedSubject(""); setSelectedClassId(""); }}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formNamHoc}
+              onChange={(e) => {
+                setFormNamHoc(e.target.value);
+                setSelectedClassId("");
+              }}
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="">-- Chọn giáo viên --</option>
-              {teachers.map((t) => <option key={t.id} value={t.id}>{t.hoTen} - {t.maGiaoVien}</option>)}
+              {namHocList.map((n) => (
+                <option key={n} value={n}>
+                  Năm học {n}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Môn học *</label>
-            <select 
-              value={selectedSubject} 
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Chọn môn --</option>
-              {(() => {
-                const t = teachers.find((x) => String(x.id) === String(selectedTeacherId));
-                if (t?.boMon) {
-                  const parts = String(t.boMon).split(/[,;\/|]+/).map((s) => s.trim()).filter(Boolean);
-                  if (parts.length) return parts.map((p) => <option key={p} value={p}>{p}</option>);
-                }
-                return subjects.map((m) => <option key={m.id} value={m.tenMon}>{m.tenMon}</option>);
-              })()}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Lớp *</label>
-            <select 
-              value={selectedClassId} 
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">-- Chọn lớp --</option>
-              {classes
-                .slice()
-                .sort((a, b) => {
-                  const cmp = String(a.tenLop || "").localeCompare(String(b.tenLop || ""), "vi", { numeric: true });
-                  if (cmp !== 0) return cmp;
-                  return String(b.namHoc || "").localeCompare(String(a.namHoc || ""));
-                })
-                .map((l) => (
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Giáo viên <span className="text-red-500 font-bold ml-0.5">*</span></label>
+              <select
+                value={selectedTeacherId}
+                onChange={(e) => { setSelectedTeacherId(e.target.value); setSelectedSubject(""); setSelectedClassId(""); }}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">-- Chọn GV --</option>
+                {teachers.map((t) => <option key={t.id} value={t.id}>{t.hoTen} - {t.maGiaoVien}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Môn học <span className="text-red-500 font-bold ml-0.5">*</span></label>
+              <select 
+                value={selectedSubject} 
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">-- Chọn môn --</option>
+                {(() => {
+                  const t = teachers.find((x) => String(x.id) === String(selectedTeacherId));
+                  if (t?.boMon) {
+                    const parts = String(t.boMon).split(/[,;\/|]+/).map((s) => s.trim()).filter(Boolean);
+                    if (parts.length) return parts.map((p) => <option key={p} value={p}>{p}</option>);
+                  }
+                  return subjects.map((m) => <option key={m.id} value={m.tenMon}>{m.tenMon}</option>);
+                })()}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Lớp <span className="text-red-500 font-bold ml-0.5">*</span></label>
+              <select 
+                value={selectedClassId} 
+                onChange={(e) => setSelectedClassId(e.target.value)}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">-- Chọn lớp --</option>
+                {formClassList.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.tenLop} {l.namHoc ? `(${l.namHoc})` : ""}
+                    {l.tenLop} {l.khoi ? `(Khối ${l.khoi})` : ""}
                   </option>
                 ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Học kỳ *</label>
-            <select 
-              value={selectedHocKy} 
-              onChange={(e) => setSelectedHocKy(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Học kỳ 1">Học kỳ 1</option>
-              <option value="Học kỳ 2">Học kỳ 2</option>
-            </select>
+              </select>
+            </div>
           </div>
           
-          <div className="pt-4 flex items-center justify-end gap-2">
+          <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">
             <button type="button" className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors" onClick={() => setFormOpen(false)}>Hủy</button>
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors" disabled={saving}>
               {saving ? "Đang lưu..." : "Xác nhận"}
@@ -709,7 +762,7 @@ export default function PhanCongPage() {
             Hệ thống sẽ tự động phân bổ và phân công giáo viên giảng dạy cho tất cả các lớp trong năm học theo đúng chuyên môn bộ môn (áp dụng cho cả <strong>Học kỳ 1</strong> và <strong>Học kỳ 2</strong>).
           </p>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Năm học áp dụng *</label>
+            <label className="text-sm font-medium text-slate-700">Năm học áp dụng <span className="text-red-500 font-bold ml-0.5">*</span></label>
             <select 
               value={autoNamHoc} 
               onChange={(e) => setAutoNamHoc(e.target.value)} 

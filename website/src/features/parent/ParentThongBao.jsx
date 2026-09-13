@@ -3,6 +3,7 @@ import { MessageSquare, Bell, ChevronRight, Send, Inbox, X, Clock, User, AlertCi
 import { getThongBao, getConversationByHocSinh, replyThongBao, getThread, createThongBao } from "../../api/thongbaoApi.js";
 import { notifySuccess, notifyError } from "../../utils/notify.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
+import StudentSelector from "./StudentSelector.jsx";
 import NoticeModal from "../../components/thongbao/NoticeModal";
 import BaoCongThongBaoUI from "../../components/common/BaoCongThongBaoUI.jsx";
 import { webSocketService } from "../../utils/websocket.js";
@@ -210,7 +211,7 @@ function GvcnChatBox({ studentId }) {
 
 /* ── Màn hình chính ───────────────────────────────────────────── */
 export default function ParentThongBao() {
-  const { currentStudent, loading: studentsLoading } = useParentStudents();
+  const { students, currentStudent, selectedIndex, selectStudent, loading: studentsLoading } = useParentStudents();
   const [allNotices, setAllNotices] = useState([]);
   const [loadingNotices, setLoadingNotices] = useState(true);
   const [selectedNotice, setSelectedNotice] = useState(null);
@@ -309,13 +310,16 @@ export default function ParentThongBao() {
   return (
     <div className="p-4 md:p-6 max-w-[1200px] mx-auto h-full flex flex-col">
       {/* Page header */}
-      <div className="mb-6 shrink-0 border-b border-slate-200 pb-4">
-        <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
-          Hộp thư & Trao đổi
-        </h2>
-        <p className="text-slate-500 text-[14px] mt-2">
-          Theo dõi thông báo từ nhà trường và trao đổi trực tiếp với Giáo viên chủ nhiệm
-        </p>
+      <div className="mb-6 shrink-0 border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-extrabold text-blue-900 tracking-tight flex items-center gap-3">
+            Hộp thư & Trao đổi
+          </h2>
+          <p className="text-slate-500 text-[14px] mt-2">
+            Theo dõi thông báo từ nhà trường và trao đổi trực tiếp với Giáo viên chủ nhiệm
+          </p>
+        </div>
+        <StudentSelector students={students} selectedIndex={selectedIndex} onSelect={selectStudent} />
       </div>
 
       <div className="flex-1 w-full mx-auto flex flex-col h-[calc(100vh-160px)] min-h-[500px] overflow-y-auto custom-scrollbar">

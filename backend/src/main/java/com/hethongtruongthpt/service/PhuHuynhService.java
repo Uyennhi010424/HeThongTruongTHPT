@@ -105,13 +105,10 @@ public class PhuHuynhService {
             throw new ApiException("Họ và tên phụ huynh không được để trống");
         }
         String trimmedName = phuHuynh.getHoTen().trim();
-        String[] words = trimmedName.split("\\s+");
-        if (words.length < 2) {
-            throw new ApiException("Họ và tên phụ huynh phải có ít nhất 2 từ (vd: Nguyễn Văn A)");
-        }
         if (!PARENT_NAME_PATTERN.matcher(trimmedName).matches()) {
             throw new ApiException("Họ và tên phụ huynh chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt");
         }
+        phuHuynh.setHoTen(trimmedName);
 
         String sdt = phuHuynh.getSoDienThoai();
         if (sdt != null && !sdt.isBlank() && !sdt.equals("0000000000")) {
@@ -141,8 +138,38 @@ public class PhuHuynhService {
         }
         validatePhuHuynh(phuHuynh);
 
-        if (phuHuynh.getSoDienThoai() == null || phuHuynh.getSoDienThoai().isBlank()) {
+        String sdt = phuHuynh.getSoDienThoai();
+        if (sdt == null || sdt.isBlank()) {
             phuHuynh.setSoDienThoai("0000000000");
+        } else {
+            phuHuynh.setSoDienThoai(sdt.trim());
+        }
+
+        // Kiểm tra xem phụ huynh đã tồn tại theo SĐT, User ID hoặc Email chưa để tránh trùng lặp
+        Optional<PhuHuynh> existingParent = Optional.empty();
+        if (phuHuynh.getUser() != null && phuHuynh.getUser().getId() != null) {
+            existingParent = phuHuynhRepository.findFirstByUserId(phuHuynh.getUser().getId());
+        }
+        if (existingParent.isEmpty() && phuHuynh.getSoDienThoai() != null && !phuHuynh.getSoDienThoai().equals("0000000000")) {
+            existingParent = phuHuynhRepository.findFirstBySoDienThoai(phuHuynh.getSoDienThoai());
+        }
+        if (existingParent.isEmpty() && phuHuynh.getEmail() != null && !phuHuynh.getEmail().isBlank()) {
+            existingParent = phuHuynhRepository.findFirstByEmailIgnoreCase(phuHuynh.getEmail().trim());
+        }
+
+        if (existingParent.isPresent()) {
+            PhuHuynh existing = existingParent.get();
+            if (phuHuynh.getHoTen() != null && !phuHuynh.getHoTen().isBlank()) existing.setHoTen(phuHuynh.getHoTen().trim());
+            if (phuHuynh.getNgheNghiep() != null && !phuHuynh.getNgheNghiep().isBlank()) existing.setNgheNghiep(phuHuynh.getNgheNghiep().trim());
+            if (phuHuynh.getEmail() != null && !phuHuynh.getEmail().isBlank()) existing.setEmail(phuHuynh.getEmail().trim());
+            if (phuHuynh.getQuanHe() != null) existing.setQuanHe(phuHuynh.getQuanHe());
+            if (phuHuynh.getIsSmSActive() != null) existing.setIsSmSActive(phuHuynh.getIsSmSActive());
+            return phuHuynhRepository.save(existing);
+        }
+
+        if (phuHuynh.getUser() != null && phuHuynh.getUser().getId() != null) {
+            User managedUser = userRepository.findById(phuHuynh.getUser().getId()).orElse(null);
+            phuHuynh.setUser(managedUser);
         }
 
         if (phuHuynh.getUser() == null) {
@@ -150,7 +177,7 @@ public class PhuHuynhService {
             if (username == null || username.isBlank()) {
                 // fallback username from name
                 String name = phuHuynh.getHoTen() == null ? "phuhuynh" : phuHuynh.getHoTen().replaceAll("\\s+", "").toLowerCase();
-                username = name + System.currentTimeMillis() % 10000;
+                username = name + (System.currentTimeMillis() % 100000);
             }
             username = username.trim();
             Optional<User> existing = userRepository.findByUsername(username);

@@ -75,9 +75,11 @@ public class HocSinh {
     private String truongChuyenDen;
 
     @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("phuHuynhId")
     private Integer phuHuynhId; // populated at service layer when available
 
     @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("phuHuynh")
     private PhuHuynh phuHuynh; // populated at service layer when available
 
     @Transient
@@ -93,13 +95,13 @@ public class HocSinh {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @AssertTrue(message = "Tuổi nhập học phải từ 15 tuổi trở lên")
+    @AssertTrue(message = "Tuổi nhập học phải từ 14 tuổi trở lên")
     @JsonIgnore
     public boolean isTuoiNhapHocHopLe() {
         if (ngaySinh == null || namNhapHoc == null) {
             return true;
         }
-        return (namNhapHoc - ngaySinh.getYear()) >= 15;
+        return (namNhapHoc - ngaySinh.getYear()) >= 14;
     }
 
     @PostLoad

@@ -8,7 +8,7 @@ import { getMonHoc } from "../../api/monhocApi.js";
 import { getDiem } from "../../api/diemApi.js";
 import { getStudentStatistics } from "../../api/diemdanhApi.js";
 import { getNamHoc } from "../../api/namhocApi.js";
-import { formatDate, getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
+import { formatDate, getActiveAcademicYear, getVisibleAcademicYears, getStudentAcademicYears } from "../../utils/helpers.js";
 import useParentStudents from "../../hooks/useParentStudents.js";
 import StudentSelector from "./StudentSelector.jsx";
 import { webSocketService } from "../../utils/websocket.js";
@@ -37,7 +37,7 @@ const formatExamTime = (timeStr, duration) => {
 };
 
 export default function HomePage() {
-  const { students, currentStudent, selectStudent, loading: studentsLoading } = useParentStudents();
+  const { students, currentStudent, selectedIndex, selectStudent, loading: studentsLoading, error: studentsError } = useParentStudents();
   const [selectedNotice, setSelectedNotice] = useState(null);
   const navigate = useNavigate();
   const [data, setData] = useState({
@@ -138,7 +138,7 @@ export default function HomePage() {
   }, [currentStudent]);
 
   const { upcomingExams, recentActivities, subjectsTodayCount } = useMemo(() => {
-    const visibleYears = getVisibleAcademicYears(data.namHocs || []);
+    const visibleYears = getStudentAcademicYears(data.namHocs || [], currentStudent);
     const activeYearObj = getActiveAcademicYear(visibleYears) || visibleYears[0];
     const curNamHoc = activeYearObj?.tenNamHoc || "";
 
@@ -224,9 +224,9 @@ export default function HomePage() {
       <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
         <User size={40} className="text-slate-300" />
       </div>
-      <h3 className="text-lg font-semibold text-slate-800 mb-1">Chưa chọn học sinh</h3>
+      <h3 className="text-lg font-semibold text-slate-800 mb-1">Chưa có thông tin học sinh</h3>
       <p className="text-slate-500 text-center text-sm max-w-sm">
-        Vui lòng chọn học sinh ở góc phải phía trên để bắt đầu theo dõi quá trình học tập.
+        {studentsError || "Tài khoản phụ huynh hiện chưa được liên kết với học sinh nào trong trường. Vui lòng liên hệ nhà trường để được hỗ trợ."}
       </p>
     </div>
   );
@@ -248,7 +248,7 @@ export default function HomePage() {
         <div>
           <StudentSelector 
             students={students} 
-            selectedStudent={currentStudent} 
+            selectedIndex={selectedIndex} 
             onSelect={selectStudent} 
           />
         </div>
