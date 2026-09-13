@@ -135,7 +135,10 @@ export default function StudentThongBao() {
       setError("");
       const res = await getThongBao();
       const all = res?.data?.data || [];
-      const filtered = all.filter((n) => n.doiTuong === "HOC_SINH" || n.doiTuong === "ALL");
+      const filtered = all.filter((n) => {
+        const dt = (n.doiTuong || n.loai || "").split(",").map((s) => s.trim());
+        return dt.includes("HOC_SINH") || dt.includes("ALL");
+      });
       setNotices(filtered.sort((a, b) => new Date(b.ngayDang) - new Date(a.ngayDang)));
     } catch {
       setError("Không thể tải thông báo.");

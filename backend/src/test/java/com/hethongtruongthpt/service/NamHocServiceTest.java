@@ -113,12 +113,12 @@ class NamHocServiceTest {
             when(namHocRepository.save(any(NamHoc.class))).thenAnswer(inv -> inv.getArgument(0));
 
             NamHoc updated = new NamHoc();
-            updated.setTenNamHoc("2024-2025-updated");
+            updated.setTenNamHoc("2026-2027");
 
             NamHoc result = namHocService.update(1, updated);
 
             assertThat(result.getId()).isEqualTo(1);
-            assertThat(result.getTenNamHoc()).isEqualTo("2024-2025-updated");
+            assertThat(result.getTenNamHoc()).isEqualTo("2026-2027");
         }
 
         @Test
@@ -126,8 +126,22 @@ class NamHocServiceTest {
         void throwsWhenNotFound() {
             when(namHocRepository.findById(99)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> namHocService.update(99, new NamHoc()))
+            NamHoc updated = new NamHoc();
+            updated.setTenNamHoc("2026-2027");
+
+            assertThatThrownBy(() -> namHocService.update(99, updated))
                     .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("should throw when ten nam hoc contains special characters or invalid format")
+        void throwsWhenInvalidFormat() {
+            NamHoc newNh = new NamHoc();
+            newNh.setTenNamHoc("2024@2025");
+
+            assertThatThrownBy(() -> namHocService.create(newNh))
+                    .isInstanceOf(com.hethongtruongthpt.exception.ApiException.class)
+                    .hasMessageContaining("Tên năm học");
         }
     }
 

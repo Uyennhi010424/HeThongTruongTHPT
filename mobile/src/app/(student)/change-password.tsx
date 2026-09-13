@@ -12,20 +12,45 @@ export default function ChangePasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
+    if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
       Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
       return;
     }
+    if (oldPassword.trim() === newPassword.trim()) {
+      Alert.alert('Lỗi', 'Mật khẩu mới không được trùng với mật khẩu hiện tại');
+      return;
+    }
+    const p = newPassword.trim();
+    if (p.length < 8) {
+      Alert.alert('Lỗi', 'Mật khẩu mới phải có tối thiểu 8 ký tự');
+      return;
+    }
+    if (!/[A-Z]/.test(p)) {
+      Alert.alert('Lỗi', 'Mật khẩu mới phải chứa ít nhất 1 chữ cái in hoa (A-Z)');
+      return;
+    }
+    if (!/[a-z]/.test(p)) {
+      Alert.alert('Lỗi', 'Mật khẩu mới phải chứa ít nhất 1 chữ cái in thường (a-z)');
+      return;
+    }
+    if (!/\d/.test(p)) {
+      Alert.alert('Lỗi', 'Mật khẩu mới phải chứa ít nhất 1 chữ số (0-9)');
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(p)) {
+      Alert.alert('Lỗi', 'Mật khẩu mới phải chứa ít nhất 1 ký tự đặc biệt (@, #, $, !, %,...)');
+      return;
+    }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu mới không khớp');
+      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp với mật khẩu mới');
       return;
     }
 
     try {
       setIsLoading(true);
       await axiosClient.post('/api/users/me/change-password', {
-        oldPassword,
-        newPassword
+        oldPassword: oldPassword.trim(),
+        newPassword: newPassword.trim()
       });
       Alert.alert('Thành công', 'Đổi mật khẩu thành công', [
         { text: 'OK', onPress: () => router.back() }

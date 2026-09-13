@@ -35,7 +35,7 @@ export default function HocSinhFormModal({ hooks }) {
     >
       <form className="form-grid form-grid-student" onSubmit={handleSubmit}>
         <label className="form-field">
-          <span>Họ và tên</span>
+          <span>Họ và tên <span style={{color: '#ef4444'}}>*</span></span>
           <input
             value={form.hoTen}
             onChange={(event) => {
@@ -50,7 +50,7 @@ export default function HocSinhFormModal({ hooks }) {
           />
         </label>
         <label className="form-field">
-          <span>Ngày sinh</span>
+          <span>Ngày sinh <span style={{color: '#ef4444'}}>*</span></span>
           <input
             type="date"
             value={form.ngaySinh}
@@ -61,7 +61,7 @@ export default function HocSinhFormModal({ hooks }) {
           {ageError && <div className="field-error-text" style={{color: 'red', fontSize: '0.85rem', marginTop: '4px'}}>{ageError}</div>}
         </label>
         <label className="form-field">
-          <span>Giới tính</span>
+          <span>Giới tính <span style={{color: '#ef4444'}}>*</span></span>
           <select
             value={form.gioiTinh}
             onChange={(event) =>
@@ -73,7 +73,7 @@ export default function HocSinhFormModal({ hooks }) {
           </select>
         </label>
         <label className="form-field">
-          <span>Lớp học</span>
+          <span>Lớp học <span style={{color: '#ef4444'}}>*</span></span>
           <select
             value={form.lopHocId}
             onChange={(event) =>
@@ -93,7 +93,7 @@ export default function HocSinhFormModal({ hooks }) {
           </select>
         </label>
         <label className="form-field">
-          <span>Dân tộc</span>
+          <span>Dân tộc <span style={{color: '#ef4444'}}>*</span></span>
           <input
             value={form.danTocTen}
             onChange={(event) =>
@@ -103,7 +103,7 @@ export default function HocSinhFormModal({ hooks }) {
           />
         </label>
         <label className="form-field">
-          <span>Tôn giáo</span>
+          <span>Tôn giáo <span style={{color: '#ef4444'}}>*</span></span>
           <select
             value={form.tonGiao || "Không"}
             onChange={(event) =>
@@ -125,7 +125,7 @@ export default function HocSinhFormModal({ hooks }) {
           </select>
         </label>
         <label className="form-field">
-          <span>Số điện thoại</span>
+          <span>Số điện thoại <span style={{color: '#ef4444'}}>*</span></span>
           <input
             value={form.sdt}
             onChange={(event) =>
@@ -145,7 +145,7 @@ export default function HocSinhFormModal({ hooks }) {
           />
         </label>
         <label className="form-field">
-          <span>Địa chỉ</span>
+          <span>Địa chỉ <span style={{color: '#ef4444'}}>*</span></span>
           <input
             value={form.diaChi}
             onChange={(event) =>
@@ -155,7 +155,7 @@ export default function HocSinhFormModal({ hooks }) {
           />
         </label>
         <label className="form-field">
-          <span>Năm nhập học</span>
+          <span>Năm nhập học <span style={{color: '#ef4444'}}>*</span></span>
           <select
             value={form.namNhapHoc || ""}
             onChange={(event) =>
@@ -169,7 +169,7 @@ export default function HocSinhFormModal({ hooks }) {
           </select>
         </label>
         <label className="form-field">
-          <span>Mã BHYT</span>
+          <span>Mã BHYT <span style={{color: '#ef4444'}}>*</span></span>
           <input
             value={form.maBhyt}
             onChange={(event) =>
@@ -179,7 +179,7 @@ export default function HocSinhFormModal({ hooks }) {
           />
         </label>
         <label className="form-field">
-          <span>Diện chính sách</span>
+          <span>Diện chính sách <span style={{color: '#ef4444'}}>*</span></span>
           <select
             value={form.dienChinhSach}
             onChange={(event) =>
@@ -191,7 +191,7 @@ export default function HocSinhFormModal({ hooks }) {
           </select>
         </label>
         <label className="form-field">
-          <span>Trạng thái</span>
+          <span>Trạng thái <span style={{color: '#ef4444'}}>*</span></span>
           <select
             value={form.trangThai}
             onChange={(event) =>
@@ -206,7 +206,7 @@ export default function HocSinhFormModal({ hooks }) {
           </select>
         </label>
         
-        <div className="form-section-title">Thông tin phụ huynh</div>
+        <div className="form-section-title">Thông tin phụ huynh (Bắt buộc chọn hoặc nhập mới)</div>
         <label className="form-field">
           <span>Phụ huynh (đã có)</span>
           <select
@@ -225,7 +225,7 @@ export default function HocSinhFormModal({ hooks }) {
           </select>
         </label>
         <label className="form-field">
-          <span>Họ tên phụ huynh</span>
+          <span>Họ tên phụ huynh {!form.phuHuynhId && <span style={{color: '#ef4444'}}>*</span>}</span>
           <input
             value={form.phuHuynhHoTen}
             onChange={(event) =>
@@ -235,7 +235,7 @@ export default function HocSinhFormModal({ hooks }) {
           />
         </label>
         <label className="form-field">
-          <span>SĐT phụ huynh</span>
+          <span>SĐT phụ huynh {!form.phuHuynhId && <span style={{color: '#ef4444'}}>*</span>}</span>
           <input
             value={form.phuHuynhSdt}
             onChange={(event) =>
@@ -255,7 +255,7 @@ export default function HocSinhFormModal({ hooks }) {
           />
         </label>
         <label className="form-field">
-          <span>Nghề nghiệp phụ huynh</span>
+          <span>Nghề nghiệp phụ huynh {!form.phuHuynhId && <span style={{color: '#ef4444'}}>*</span>}</span>
           <input
             value={form.phuHuynhNgheNghiep}
             onChange={(event) =>

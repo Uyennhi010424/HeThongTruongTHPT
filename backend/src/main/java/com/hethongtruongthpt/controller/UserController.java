@@ -89,8 +89,11 @@ public class UserController {
 	@PostMapping("/{id}/reset-password")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse<Object>> resetPassword(@PathVariable("id") Integer id) {
-		userService.resetPasswordToDefault(id);
-		return ResponseEntity.ok(ApiResponse.ok("Đặt lại mật khẩu thành công", null));
+		String newPassword = userService.resetPasswordToDefault(id);
+		return ResponseEntity.ok(ApiResponse.ok("Cấp lại mật khẩu thành công", java.util.Map.of(
+				"newPassword", newPassword,
+				"message", "Mật khẩu mới đã được tạo ngẫu nhiên và gửi qua email"
+		)));
 	}
 
 	@PostMapping("/{id}/change-password")

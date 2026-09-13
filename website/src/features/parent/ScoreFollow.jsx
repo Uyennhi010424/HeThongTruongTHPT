@@ -231,7 +231,7 @@ export default function ScoreFollow() {
       setShowPdfPreview(true);
     } catch (err) {
       console.error(err);
-      alert("Xuất PDF thất bại!");
+      notifyError("Xuất PDF thất bại!");
     } finally {
       setIsExporting(false);
     }

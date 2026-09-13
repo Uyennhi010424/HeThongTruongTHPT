@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { WifiOff, RefreshCw, Send, CheckCircle2, AlertCircle, Loader2, CalendarDays } from "lucide-react";
+import { WifiOff, RefreshCw, Send, CalendarDays, Loader2 } from "lucide-react";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
 import { getDiemProgressSummary, guiBangDiemTuDong } from "../../../api/diemApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
@@ -7,7 +7,6 @@ import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
 import DiemProgressTable from "./DiemProgressTable.jsx";
-
 
 export default function AdminNhapDiemPage() {
   const currentSemester = 1;
@@ -17,13 +16,8 @@ export default function AdminNhapDiemPage() {
   const [progressData, setProgressData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [serverError, setServerError] = useState(false);
-  const { searchQuery, setIsSearchVisible, setSearchPlaceholder } = useAdminSearch();
-
-  // State cho chức năng gửi bảng điểm tự động
   const [sending, setSending] = useState(false);
-  const [sendSuccessMsg, setSendSuccessMsg] = useState("");
-  const [sendError, setSendError] = useState("");
-
+  const { searchQuery, setIsSearchVisible, setSearchPlaceholder } = useAdminSearch();
 
   useEffect(() => {
     setIsSearchVisible(true);
@@ -85,15 +79,11 @@ export default function AdminNhapDiemPage() {
   const handleGuiBangDiem = async () => {
     try {
       setSending(true);
-      setSendError("");
-      setSendSuccessMsg("");
       const res = await guiBangDiemTuDong(sendHocKy);
-      const msg = res?.data?.message || "Hệ thống đang tiến hành gửi điểm...";
-      setSendSuccessMsg(msg);
+      const msg = res?.data?.message || "Hệ thống đang tiến hành quét và gửi bảng điểm cho phụ huynh.";
       notifySuccess(msg);
     } catch (err) {
-      const errorMsg = err?.response?.data?.message || "Lỗi kết nối máy chủ";
-      setSendError(errorMsg);
+      const errorMsg = err?.response?.data?.message || "Không thể thực hiện gửi bảng điểm. Vui lòng thử lại.";
       notifyError(errorMsg);
     } finally {
       setSending(false);
@@ -130,16 +120,16 @@ export default function AdminNhapDiemPage() {
         description="Theo dõi tiến độ nhập điểm của giáo viên theo từng lớp và môn học."
       />
 
-      {/* Panel gửi bảng điểm tự động */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mb-2">
-        <div className="flex items-start gap-4 flex-wrap">
+      {/* Panel gửi bảng điểm cho phụ huynh */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-2">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
               <Send size={18} className="text-blue-600" />
             </div>
             <div>
               <h3 className="font-bold text-blue-900 text-[15px]">Gửi bảng điểm cho phụ huynh</h3>
-              <p className="text-slate-500 text-[13px] mt-0.5">Gửi tất cả điểm đã khóa sổ (LOCKED) chưa thông báo trong kỳ này vào hộp chat phụ huynh.</p>
+              <p className="text-slate-500 text-[13px]">Gửi tất cả điểm đã khóa sổ (LOCKED) chưa thông báo trong kỳ này vào hộp chat phụ huynh.</p>
             </div>
           </div>
 
@@ -149,7 +139,7 @@ export default function AdminNhapDiemPage() {
               <label className="text-[13px] text-slate-600 font-medium">Chọn kỳ gửi:</label>
               <select
                 value={sendHocKy}
-                onChange={e => { setSendHocKy(Number(e.target.value)); setSendSuccessMsg(""); setSendError(""); }}
+                onChange={e => setSendHocKy(Number(e.target.value))}
                 className="border border-slate-200 rounded-lg px-3 py-1.5 text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all bg-white"
               >
                 <option value={1}>Học kỳ 1</option>
@@ -161,33 +151,14 @@ export default function AdminNhapDiemPage() {
               disabled={sending}
               className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg text-[13px] font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow"
             >
-              {sending
-                ? <>Loading... <Loader2 size={14} className="animate-spin" /></>
-                : <><Send size={14} /> Gửi ngay</>
-              }
+              {sending ? (
+                <>Đang gửi... <Loader2 size={14} className="animate-spin" /></>
+              ) : (
+                <><Send size={14} /> Gửi ngay</>
+              )}
             </button>
           </div>
         </div>
-
-        {/* Kết quả gửi */}
-        {sendSuccessMsg && (
-          <div className="mt-4 flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl p-4">
-            <CheckCircle2 size={20} className="text-green-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-green-800 text-[14px]">Thành công</p>
-              <p className="text-[13px] text-green-700 mt-1">{sendSuccessMsg}</p>
-            </div>
-          </div>
-        )}
-        {sendError && (
-          <div className="mt-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
-            <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-red-700 text-[14px]">Gửi thất bại</p>
-              <p className="text-[13px] text-red-600 mt-1">{sendError}</p>
-            </div>
-          </div>
-        )}
       </div>
 
       <DiemProgressTable 

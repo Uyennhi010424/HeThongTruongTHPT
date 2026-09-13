@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { resetPassword } from "../../api/authApi";
+import { PASSWORD_RULES, validatePassword, getPasswordStrength } from "../../utils/passwordPolicy.js";
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -13,6 +14,8 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const strength = useMemo(() => getPasswordStrength(password), [password]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,8 +35,9 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (p.length < 6) {
-      setError("Mật khẩu mới phải có độ dài tối thiểu 6 ký tự.");
+    const validationError = validatePassword(p);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -72,30 +76,38 @@ export default function ResetPasswordPage() {
         borderRadius: "20px",
         boxShadow: "0 10px 30px rgba(30, 58, 138, 0.08)",
         width: "100%",
-        maxWidth: 420
+        maxWidth: 440
       }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 44, color: "var(--navy-900)" }}>lock_reset</span>
           <h2 style={{ fontSize: 22, fontWeight: 700, margin: "10px 0 6px 0", color: "var(--navy-900)" }}>Đặt lại mật khẩu</h2>
-          <p style={{ fontSize: 13, color: "#666", margin: 0 }}>Vui lòng thiết lập mật khẩu mới cho tài khoản của bạn</p>
+          <p style={{ fontSize: 13, color: "#666", margin: 0 }}>Vui lòng thiết lập mật khẩu mới đáp ứng tiêu chuẩn an toàn</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>Mật khẩu mới</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>Mật khẩu mới</label>
+              {password && (
+                <span className={`text-xs font-bold ${strength.textColor}`}>
+                  Độ mạnh: {strength.label}
+                </span>
+              )}
+            </div>
             <div style={{ position: "relative" }}>
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Nhập mật khẩu mới"
+                placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
                   paddingRight: 40,
                   borderRadius: "8px",
                   border: "1px solid var(--stroke)",
-                  outline: "none"
+                  outline: "none",
+                  fontSize: 14
                 }}
                 disabled={loading || !!success}
                 required
@@ -122,6 +134,39 @@ export default function ResetPasswordPage() {
                 </span>
               </button>
             </div>
+
+            {/* Strength Meter Bar */}
+            {password && (
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${strength.color}`}
+                  style={{ width: `${strength.score}%` }}
+                />
+              </div>
+            )}
+
+            {/* Checklist of Password Rules */}
+            <div className="mt-2 p-3 bg-slate-50 border border-slate-100 rounded-lg space-y-1">
+              <div className="text-xs font-bold text-slate-600 mb-1">Quy chuẩn mật khẩu:</div>
+              <div className="grid grid-cols-1 gap-1">
+                {PASSWORD_RULES.map((rule) => {
+                  const passed = rule.test(password);
+                  return (
+                    <div
+                      key={rule.id}
+                      className={`flex items-center gap-1.5 text-xs transition-colors ${
+                        passed ? "text-emerald-700 font-semibold" : "text-slate-500"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">
+                        {passed ? "check_circle" : "radio_button_unchecked"}
+                      </span>
+                      <span>{rule.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -136,11 +181,15 @@ export default function ResetPasswordPage() {
                 padding: "10px 12px",
                 borderRadius: "8px",
                 border: "1px solid var(--stroke)",
-                outline: "none"
+                outline: "none",
+                fontSize: 14
               }}
               disabled={loading || !!success}
               required
             />
+            {confirmPassword && password && confirmPassword !== password && (
+              <p className="text-xs text-red-500 font-medium">Mật khẩu xác nhận chưa khớp.</p>
+            )}
           </div>
 
           {error && <div style={{ fontSize: 13, color: "#dc2626", background: "#fef2f2", padding: "10px 12px", borderRadius: "8px" }}>{error}</div>}

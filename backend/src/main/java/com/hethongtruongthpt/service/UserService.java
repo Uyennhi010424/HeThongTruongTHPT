@@ -22,6 +22,9 @@ import com.hethongtruongthpt.repository.GiaoVienRepository;
 import com.hethongtruongthpt.repository.HocSinhRepository;
 import com.hethongtruongthpt.repository.PhuHuynhRepository;
 
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,6 +32,14 @@ import java.util.stream.Collectors;
 @Transactional
 public class UserService {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
+
+    private static final String UPPERCASE = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private static final String LOWERCASE = "abcdefghijkmnopqrstuvwxyz";
+    private static final String DIGITS = "23456789";
+    private static final String SPECIAL = "@#$!";
+    private static final String ALL_CHARS = UPPERCASE + LOWERCASE + DIGITS + SPECIAL;
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final DefaultAccountPasswordPolicy passwordPolicy;
@@ -57,23 +68,36 @@ public class UserService {
         this.phuHuynhRepository = phuHuynhRepository;
     }
 
-    public void resetPasswordToDefault(Integer id) {
+    public String generateRandomPassword(int length) {
+        if (length < 8) length = 8;
+        List<Character> chars = new ArrayList<>();
+        chars.add(UPPERCASE.charAt(RANDOM.nextInt(UPPERCASE.length())));
+        chars.add(LOWERCASE.charAt(RANDOM.nextInt(LOWERCASE.length())));
+        chars.add(DIGITS.charAt(RANDOM.nextInt(DIGITS.length())));
+        chars.add(SPECIAL.charAt(RANDOM.nextInt(SPECIAL.length())));
+
+        for (int i = 4; i < length; i++) {
+            chars.add(ALL_CHARS.charAt(RANDOM.nextInt(ALL_CHARS.length())));
+        }
+
+        Collections.shuffle(chars, RANDOM);
+        StringBuilder sb = new StringBuilder();
+        for (char c : chars) {
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    public String resetPasswordToDefault(Integer id) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
         try {
             User existing = userRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
-            String newRaw;
-            if (existing.getRole() == RoleEnum.GIAO_VIEN && existing.getUsername() != null) {
-                newRaw = passwordPolicy.getTeacherDefaultPassword(existing.getUsername());
-            } else if (existing.getRole() == RoleEnum.PHU_HUYNH) {
-                newRaw = passwordPolicy.getParentDefaultPassword();
-            } else {
-                newRaw = passwordPolicy.getStudentDefaultPassword();
-            }
+            String newRaw = generateRandomPassword(8);
             existing.setPassword(passwordEncoder.encode(newRaw));
             existing.setMustChangePassword(true);
             userRepository.save(existing);
-            auditLogService.logAction(existing.getId(), "RESET_PASSWORD", "Đặt lại mật khẩu về mặc định", null);
+            auditLogService.logAction(existing.getId(), "RESET_PASSWORD", "Cấp lại mật khẩu ngẫu nhiên mới", null);
 
             // Gửi email thông báo mật khẩu mới
             String recipientEmail = resolveUserEmail(existing);
@@ -82,6 +106,7 @@ public class UserService {
             } else {
                 log.warn("Tài khoản {} (id: {}) không có email hợp lệ để gửi thông báo mật khẩu mới", existing.getUsername(), existing.getId());
             }
+            return newRaw;
         } catch (Exception ex) {
             throw new ApiException("Không thể đặt lại mật khẩu: " + ex.getMessage());
         }
@@ -116,6 +141,27 @@ public class UserService {
         return null;
     }
 
+    public static void validatePasswordStrength(String password) {
+        if (password == null || password.isBlank()) {
+            throw new ApiException("Mật khẩu mới không được để trống");
+        }
+        if (password.length() < 8 || password.length() > 100) {
+            throw new ApiException("Mật khẩu mới phải có độ dài từ 8 đến 100 ký tự");
+        }
+        if (!password.matches(".*[A-Z].*")) {
+            throw new ApiException("Mật khẩu mới phải chứa ít nhất 1 chữ cái in hoa (A-Z)");
+        }
+        if (!password.matches(".*[a-z].*")) {
+            throw new ApiException("Mật khẩu mới phải chứa ít nhất 1 chữ cái in thường (a-z)");
+        }
+        if (!password.matches(".*\\d.*")) {
+            throw new ApiException("Mật khẩu mới phải chứa ít nhất 1 chữ số (0-9)");
+        }
+        if (!password.matches(".*[^A-Za-z0-9].*")) {
+            throw new ApiException("Mật khẩu mới phải chứa ít nhất 1 ký tự đặc biệt (ví dụ: @, #, $, !, %,...)");
+        }
+    }
+
     public void changePassword(Integer id, String oldPassword, String newPassword) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
         if (oldPassword == null || oldPassword.isBlank()) {
@@ -124,6 +170,11 @@ public class UserService {
         if (newPassword == null || newPassword.isBlank()) {
             throw new ApiException("Mật khẩu mới không được để trống");
         }
+        if (oldPassword.trim().equals(newPassword.trim())) {
+            throw new ApiException("Mật khẩu mới không được trùng với mật khẩu cũ");
+        }
+
+        validatePasswordStrength(newPassword.trim());
 
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
@@ -132,16 +183,17 @@ public class UserService {
         boolean isBcrypt = storedPassword != null && storedPassword.matches("^\\$2[aby]\\$\\d{2}\\$.+");
 
         if (!isBcrypt) {
-            if (!storedPassword.equals(oldPassword)) {
+            if (!storedPassword.equals(oldPassword.trim())) {
                 throw new ApiException("Mật khẩu cũ không chính xác");
             }
         } else {
-            if (!passwordEncoder.matches(oldPassword, storedPassword)) {
+            if (!passwordEncoder.matches(oldPassword.trim(), storedPassword)) {
                 throw new ApiException("Mật khẩu cũ không chính xác");
             }
         }
 
         existing.setPassword(passwordEncoder.encode(newPassword.trim()));
+        existing.setMustChangePassword(false);
         userRepository.save(existing);
         auditLogService.logAction(existing.getId(), "CHANGE_PASSWORD", "Người dùng tự đổi mật khẩu", null);
     }
@@ -171,11 +223,29 @@ public class UserService {
                 .orElse(null);
     }
 
+    private static final java.util.regex.Pattern USERNAME_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9._-]+(@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})?$");
+    private static final java.util.regex.Pattern USER_EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
+    private void validateUserInfo(String username, String email) {
+        if (username == null || username.isBlank()) {
+            throw new ApiException("Tên đăng nhập không được để trống");
+        }
+        String trimmedUser = username.trim();
+        if (!USERNAME_PATTERN.matcher(trimmedUser).matches()) {
+            throw new ApiException("Tên đăng nhập chỉ được chứa chữ cái, chữ số, dấu chấm, gạch ngang, gạch dưới hoặc là địa chỉ email hợp lệ");
+        }
+        if (email != null && !email.isBlank()) {
+            if (!USER_EMAIL_PATTERN.matcher(email.trim()).matches()) {
+                throw new ApiException("Email không đúng định dạng");
+            }
+        }
+    }
+
     public UserDTO create(UserRequest request) {
         String username = request.getUsername() == null ? null : request.getUsername().trim();
-        if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("Username không được để trống");
-        }
+        validateUserInfo(username, request.getEmail());
 
         if (userRepository.findByUsername(username).isPresent()) {
             // Reuse existing account to keep import flow idempotent.
@@ -185,7 +255,7 @@ public class UserService {
         User user = new User();
         user.setUsername(username);
         if (request.getEmail() != null) {
-            user.setEmail(request.getEmail());
+            user.setEmail(request.getEmail().trim());
         }
 
         // Generate default password server-side when none is provided
@@ -212,9 +282,15 @@ public class UserService {
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
 
-        existing.setUsername(request.getUsername());
+        if (request.getUsername() != null) {
+            validateUserInfo(request.getUsername(), request.getEmail());
+            existing.setUsername(request.getUsername().trim());
+        }
         if (request.getEmail() != null) {
-            existing.setEmail(request.getEmail());
+            if (!request.getEmail().isBlank() && !USER_EMAIL_PATTERN.matcher(request.getEmail().trim()).matches()) {
+                throw new ApiException("Email không đúng định dạng");
+            }
+            existing.setEmail(request.getEmail().trim());
         }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             existing.setPassword(normalizePassword(request.getPassword()));

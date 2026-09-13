@@ -289,6 +289,7 @@ public class SampleDataSeeder implements CommandLineRunner {
         if (monHocs.isEmpty()) return;
 
         int totalTeachers = 0;
+        java.util.Set<String> usedTeacherEmails = new java.util.HashSet<>();
         
         for (MonHoc mon : monHocs) {
             if (!mon.getIsActive()) continue;
@@ -296,7 +297,16 @@ public class SampleDataSeeder implements CommandLineRunner {
             for (int i = 1; i <= 10; i++) {
                 String fullName = generateRandomName(false);
                 String maGv = String.format("GV%04d", totalTeachers + 1);
-                String username = buildLocalPart(fullName) + (totalTeachers + 1) + "c3@tdu.edu.vn";
+                
+                String baseLocal = buildLocalPart(fullName);
+                String username = baseLocal + "c3@tdu.edu.vn";
+                int suffix = 2;
+                while (usedTeacherEmails.contains(username) || userRepository.findByUsername(username).isPresent()) {
+                    username = baseLocal + suffix + "c3@tdu.edu.vn";
+                    suffix++;
+                }
+                usedTeacherEmails.add(username);
+                
                 String defaultPw = passwordEncoder.encode(username.split("@")[0] + "@123");
 
                 User u = new User();

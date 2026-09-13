@@ -290,16 +290,41 @@ public class LichThiService {
         }
     }
 
+    private static final java.util.regex.Pattern EXAM_ROOM_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9\\s\\.-]+$");
+    private static final java.util.regex.Pattern EXAM_YEAR_PATTERN =
+            java.util.regex.Pattern.compile("^\\d{4}-\\d{4}$");
+
     private void validateLichThi(LichThi lichThi) {
         if (lichThi.getLop() == null) throw new ApiException("Thiếu thông tin lớp");
         if (lichThi.getMonHoc() == null) throw new ApiException("Thiếu thông tin môn học");
         if (lichThi.getNgayThi() == null) throw new ApiException("Thiếu ngày thi");
         if (lichThi.getGioBatDau() == null) throw new ApiException("Thiếu giờ bắt đầu");
-        if (lichThi.getThoiGianLamBai() == null || lichThi.getThoiGianLamBai() <= 0) {
-            throw new ApiException("Thời gian làm bài phải lớn hơn 0");
+        if (lichThi.getThoiGianLamBai() == null || lichThi.getThoiGianLamBai() <= 0 || lichThi.getThoiGianLamBai() > 300) {
+            throw new ApiException("Thời gian làm bài phải từ 1 đến 300 phút");
         }
-        if (lichThi.getHocKy() == null) throw new ApiException("Thiếu học kỳ");
-        if (lichThi.getNamHoc() == null || lichThi.getNamHoc().isBlank()) throw new ApiException("Thiếu năm học");
+        if (lichThi.getHocKy() == null || (lichThi.getHocKy() != 1 && lichThi.getHocKy() != 2)) {
+            throw new ApiException("Học kỳ phải là 1 hoặc 2");
+        }
+        if (lichThi.getNamHoc() == null || lichThi.getNamHoc().isBlank()) {
+            throw new ApiException("Thiếu năm học");
+        }
+        if (!EXAM_YEAR_PATTERN.matcher(lichThi.getNamHoc().trim()).matches()) {
+            throw new ApiException("Năm học phải có định dạng YYYY-YYYY (vd: 2026-2027)");
+        }
+
+        if (lichThi.getPhongThi() != null && !lichThi.getPhongThi().isBlank()) {
+            if (!EXAM_ROOM_PATTERN.matcher(lichThi.getPhongThi().trim()).matches()) {
+                throw new ApiException("Phòng thi không được chứa ký tự đặc biệt (vd: P01, P.101, A-201)");
+            }
+        }
+
+        if (lichThi.getLoaiKiemTra() != null && !lichThi.getLoaiKiemTra().isBlank()) {
+            String lkt = lichThi.getLoaiKiemTra().trim().toUpperCase();
+            if (!lkt.equals("TX") && !lkt.equals("GK") && !lkt.equals("CK")) {
+                throw new ApiException("Loại kiểm tra phải là TX, GK hoặc CK");
+            }
+        }
 
         // Kiểm tra giám thị 1 và giám thị 2 không được trùng nhau
         if (lichThi.getGiamThi1() != null && lichThi.getGiamThi2() != null

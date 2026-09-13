@@ -9,8 +9,6 @@ import org.hibernate.annotations.SQLRestriction;
 @Table(name = "lop", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"ten_lop", "nam_hoc"})
 })
-@SQLDelete(sql = "UPDATE lop SET is_deleted = true WHERE id = ?")
-@SQLRestriction("is_deleted = false")
 public class LopHoc {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

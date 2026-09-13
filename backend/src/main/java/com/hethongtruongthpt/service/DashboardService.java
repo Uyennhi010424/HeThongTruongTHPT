@@ -203,7 +203,11 @@ public class DashboardService {
 
         // 1. Notices (Chỉ lấy thông báo dành cho học sinh hoặc toàn trường)
         List<ThongBao> notices = thongBaoRepository.findAll().stream()
-                .filter(tb -> "HOC_SINH".equalsIgnoreCase(tb.getLoai()) || "ALL".equalsIgnoreCase(tb.getLoai()))
+                .filter(tb -> {
+                    if (tb.getLoai() == null) return false;
+                    String l = tb.getLoai().toUpperCase();
+                    return l.contains("HOC_SINH") || l.contains("ALL");
+                })
                 .filter(tb -> tb.getRecipientId() == null || (hocSinh.getUser() != null && hocSinh.getUser().getId().equals(tb.getRecipientId())))
                 .sorted((a, b) -> b.getNgayDang().compareTo(a.getNgayDang()))
                 .collect(Collectors.toList());

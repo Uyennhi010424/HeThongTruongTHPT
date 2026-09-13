@@ -16,6 +16,7 @@ import {
 } from "../../../api/userApi.js";
 import { notifySuccess, notifyError } from "../../../utils/notify.js";
 import { getCurrentUsernameFromToken } from "../../../utils/teacherProfile.js";
+import { validatePassword } from "../../../utils/passwordPolicy.js";
 
 // --- Tiện ích định dạng ---
 const formatDate = (value) => {
@@ -118,7 +119,7 @@ const ActionDropdown = ({ user, onAction }) => {
           <div className="h-px bg-slate-100 my-1 mx-2"></div>
           
           <button onClick={() => handleSelect("RESET_PASSWORD")} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-            <Key className="w-4 h-4 text-slate-400" /> Đặt lại mật khẩu
+            <Key className="w-4 h-4 text-slate-400" /> Cấp lại mật khẩu
           </button>
           {user.status === 1 ? (
             <button onClick={() => handleSelect("LOCK")} className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2">
@@ -452,12 +453,17 @@ export default function UserList() {
       });
       setModalOpen(true);
     } else if (action === "RESET_PASSWORD") {
-      if (!(await confirm(`Đặt lại mật khẩu cho ${user.username} về mặc định và gửi email thông báo kèm mật khẩu mới?`))) return;
+      if (!(await confirm(`Cấp lại mật khẩu ngẫu nhiên cho tài khoản "${user.username}" và gửi email thông báo kèm mật khẩu mới?`))) return;
       try {
-        await resetPassword(user.id);
-        notifySuccess("Đặt lại mật khẩu thành công và đã gửi email thông báo");
+        const res = await resetPassword(user.id);
+        const newPwd = res?.data?.data?.newPassword || res?.data?.newPassword;
+        if (newPwd) {
+          notifySuccess(`Cấp lại mật khẩu thành công! Mật khẩu mới: ${newPwd}`);
+        } else {
+          notifySuccess("Cấp lại mật khẩu thành công và đã gửi email thông báo");
+        }
       } catch (e) {
-        notifyError(e?.response?.data?.message || "Không thể đặt lại mật khẩu");
+        notifyError(e?.response?.data?.message || "Không thể cấp lại mật khẩu");
       }
     } else if (action === "LOCK") {
       setLockingUser(user);
@@ -485,11 +491,32 @@ export default function UserList() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.username.trim()) { notifyError("Vui lòng nhập tên đăng nhập"); return; }
+    const trimmedUsername = form.username.trim();
+    if (!trimmedUsername) { notifyError("Vui lòng nhập tên đăng nhập"); return; }
+
+    const USERNAME_REGEX = /^[a-zA-Z0-9._-]+(@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})?$/;
+    if (!USERNAME_REGEX.test(trimmedUsername)) {
+      notifyError("Tên đăng nhập chỉ được chứa chữ cái, chữ số, dấu chấm, gạch ngang, gạch dưới hoặc là email hợp lệ.");
+      return;
+    }
+
+    const trimmedEmail = form.email.trim();
+    if (trimmedEmail && !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(trimmedEmail)) {
+      notifyError("Email không đúng định dạng.");
+      return;
+    }
     
     try {
-      const payload = { ...form };
-      if (!payload.password) delete payload.password;
+      const payload = { ...form, username: trimmedUsername, email: trimmedEmail };
+      if (!payload.password) {
+        delete payload.password;
+      } else {
+        const valError = validatePassword(payload.password);
+        if (valError) {
+          notifyError(valError);
+          return;
+        }
+      }
       
       if (editingUser) {
         await updateUser(editingUser.id, payload);
@@ -501,7 +528,7 @@ export default function UserList() {
       setModalOpen(false);
       fetchUsers();
     } catch (err) {
-      notifyError("Có lỗi xảy ra");
+      notifyError(err?.response?.data?.message || "Có lỗi xảy ra");
     }
   };
 
@@ -679,8 +706,8 @@ export default function UserList() {
               className={`w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${form.role !== "ADMIN" ? "opacity-70 cursor-not-allowed" : ""}`} />
           </div>
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Mật khẩu {editingUser && <span className="font-normal text-slate-500">(Để trống nếu không đổi)</span>}</label>
-            <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+            <label className="block text-sm font-bold text-slate-700 mb-1">Mật khẩu {editingUser ? <span className="font-normal text-slate-500">(Để trống nếu không đổi)</span> : <span className="font-normal text-slate-500">(Để trống để tự tạo mặc định)</span>}</label>
+            <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="Tối thiểu 8 ký tự, gồm chữ hoa, thường, số, ký tự đặc biệt" className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-xs placeholder:text-slate-400" />
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Vai trò</label>

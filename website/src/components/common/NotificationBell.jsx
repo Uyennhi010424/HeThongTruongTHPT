@@ -55,7 +55,10 @@ export default function NotificationBell({ role = "admin" }) {
       
       const role = getRole();
       if (role === "GIAOVIEN" || role === "GIAO_VIEN") {
-        thongBaos = thongBaos.filter(item => ["GIAO_VIEN", "ALL", "CA_NHAN", "REPLY", "PHU_HUYNH"].includes(item.doiTuong));
+        thongBaos = thongBaos.filter(item => {
+          const dt = (item.doiTuong || item.loai || "").split(",").map(s => s.trim());
+          return dt.some(r => ["GIAO_VIEN", "ALL", "CA_NHAN", "REPLY", "PHU_HUYNH"].includes(r));
+        });
       } else if (role === "ADMIN" || role === "VAN_THU") {
         const currentUsername = getCurrentUsernameFromToken();
         thongBaos = thongBaos.filter(item => {

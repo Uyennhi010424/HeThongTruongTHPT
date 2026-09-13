@@ -242,12 +242,13 @@ export default function ParentThongBao() {
     try {
       const res = await getThongBao();
       const all = res?.data?.data || [];
-      const filtered = all.filter(n =>
-        (n.doiTuong === "PHU_HUYNH" || n.doiTuong === "ALL") &&
-        !n.isReply &&
-        n.senderRole !== "PHU_HUYNH" &&
-        (!n.hocSinh || n.hocSinh.id === currentStudentRef.current?.id)
-      );
+      const filtered = all.filter(n => {
+        const dt = (n.doiTuong || n.loai || "").split(",").map(s => s.trim());
+        return (dt.includes("PHU_HUYNH") || dt.includes("ALL")) &&
+          !n.isReply &&
+          n.senderRole !== "PHU_HUYNH" &&
+          (!n.hocSinh || n.hocSinh.id === currentStudentRef.current?.id);
+      });
       setAllNotices(filtered.sort((a, b) => new Date(b.ngayDang) - new Date(a.ngayDang)));
     } catch {
       setAllNotices([]);
@@ -266,7 +267,8 @@ export default function ParentThongBao() {
     webSocketService.connect(() => {
       webSocketService.subscribe('/topic/notifications', (newNotice) => {
         // Chỉ thêm nếu là thông báo dành cho phụ huynh hoặc ALL, và không phải reply
-        if ((newNotice.doiTuong === "PHU_HUYNH" || newNotice.doiTuong === "ALL") && 
+        const dt = (newNotice.doiTuong || newNotice.loai || "").split(",").map(s => s.trim());
+        if ((dt.includes("PHU_HUYNH") || dt.includes("ALL")) && 
             !newNotice.isReply && 
             newNotice.senderRole !== "PHU_HUYNH" &&
             (!newNotice.hocSinh || newNotice.hocSinh.id === currentStudentRef.current?.id)) {

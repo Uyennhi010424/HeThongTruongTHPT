@@ -5,7 +5,7 @@ import com.hethongtruongthpt.entity.HocSinh;
 import com.hethongtruongthpt.entity.NamHoc;
 import com.hethongtruongthpt.enums.HanhKiemEnum;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
-import com.hethongtruongthpt.repository.HanhKiemRepository;
+import com.hethongtruongthpt.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -29,6 +29,12 @@ class HanhKiemServiceTest {
 
     @Mock
     private HanhKiemRepository hanhKiemRepository;
+
+    @Mock
+    private LichSuHocTapRepository lichSuHocTapRepository;
+
+    @Mock
+    private HocSinhRepository hocSinhRepository;
 
     @InjectMocks
     private HanhKiemService hanhKiemService;
@@ -139,7 +145,10 @@ class HanhKiemServiceTest {
         @Test
         @DisplayName("should return list by lop and nam hoc")
         void returnsByLopAndNamHoc() {
-            when(hanhKiemRepository.findByHocSinhLopIdAndNamHocId(3, 1))
+            HocSinh hs = new HocSinh();
+            hs.setId(10);
+            when(hocSinhRepository.findByLopId(3)).thenReturn(List.of(hs));
+            when(hanhKiemRepository.findByHocSinhIdInAndNamHocId(anyList(), eq(1)))
                     .thenReturn(List.of(sampleHanhKiem));
 
             List<HanhKiem> result = hanhKiemService.getByLopAndNamHoc(3, 1);
@@ -154,7 +163,10 @@ class HanhKiemServiceTest {
         @Test
         @DisplayName("should return list by lop id")
         void returnsByLopId() {
-            when(hanhKiemRepository.findByHocSinhLopId(3)).thenReturn(List.of(sampleHanhKiem));
+            HocSinh hs = new HocSinh();
+            hs.setId(10);
+            when(hocSinhRepository.findByLopId(3)).thenReturn(List.of(hs));
+            when(hanhKiemRepository.findByHocSinhIdIn(anyList())).thenReturn(List.of(sampleHanhKiem));
 
             List<HanhKiem> result = hanhKiemService.getByLop(3);
 

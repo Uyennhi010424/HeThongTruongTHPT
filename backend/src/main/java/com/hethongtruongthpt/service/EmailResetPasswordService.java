@@ -159,6 +159,7 @@ public class EmailResetPasswordService {
         if (newPassword == null || newPassword.isBlank()) {
             throw new ApiException("Mật khẩu mới không được để trống");
         }
+        UserService.validatePasswordStrength(newPassword.trim());
 
         PasswordResetToken resetToken = tokenRepository.findByToken(token)
                 .orElseThrow(() -> new ApiException("Token xác thực đổi mật khẩu không tồn tại hoặc đã được sử dụng"));

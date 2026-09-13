@@ -306,6 +306,10 @@ export default function NamHocHocKyPage() {
 
   const handleLockYear = async () => {
     if (!selectedYear) return;
+    if (years.length <= 1) {
+      notifyError("Không thể khóa khi hệ thống chỉ có duy nhất một năm học.");
+      return;
+    }
     try {
       setSaving(true);
       const res = await updateNamHoc(selectedYear.id, buildPayload({ tenNamHoc: selectedYear.tenNamHoc || "", form: toFormFromYear(selectedYear), trangThai: "DA_DONG" }));
@@ -315,8 +319,9 @@ export default function NamHocHocKyPage() {
       );
       if (updated) setSelectedYear(updated);
       notifySuccess(`Đã khóa năm học ${selectedYear.tenNamHoc}.`);
-    } catch {
-      notifyError("Không thể khóa năm học.");
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Không thể khóa năm học.";
+      notifyError(msg);
     } finally {
       setSaving(false);
     }

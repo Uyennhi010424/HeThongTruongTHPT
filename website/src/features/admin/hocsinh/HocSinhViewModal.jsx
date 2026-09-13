@@ -207,7 +207,8 @@ export default function HocSinhViewModal({ hooks }) {
                     </div>
                     <span className={`px-2.5 py-1.5 text-xs font-bold rounded ${
                       ls.ketQua === 'Ở lại lớp' ? 'bg-red-100 text-red-700' :
-                      ls.ketQua === 'Chuyển lớp' ? 'bg-amber-100 text-amber-700' :
+                      ls.ketQua === 'Chuyển lớp' || (ls.ketQua && ls.ketQua.startsWith('Từ ')) ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                      ls.ketQua === 'Tốt nghiệp' ? 'bg-emerald-100 text-emerald-700' :
                       'bg-indigo-100 text-indigo-700'
                     }`}>
                       {ls.ketQua || "Chưa có kết quả"}

@@ -61,47 +61,54 @@ public class DiemTest {
             return giaoVienRepository.save(newGv);
         });
 
-        // Fetch or create LopHoc
-        LopHoc lop = lopHocRepository.findAll().stream().findFirst().orElseGet(() -> {
-            LopHoc newLop = new LopHoc();
-            newLop.setTenLop("TestLop");
-            newLop.setGvcn(gv);
-            newLop.setKhoi(10);
-            newLop.setNamHoc("2024-2025");
-            return lopHocRepository.save(newLop);
-        });
+        // Create dedicated LopHoc for test
+        LopHoc lop = new LopHoc();
+        lop.setTenLop("10T" + randomStr);
+        lop.setKhoi(10);
+        lop.setNamHoc("2024-2025");
+        lop = lopHocRepository.save(lop);
 
-        // Fetch or create HocSinh
-        HocSinh hs = hocSinhRepository.findAll().stream().findFirst().orElseGet(() -> {
-            HocSinh newHs = new HocSinh();
-            newHs.setHoTen("Test HS");
-            newHs.setMaHocSinh("HS" + randomStr);
-            newHs.setLop(lop);
-            return hocSinhRepository.save(newHs);
-        });
+        // Create dedicated User for HocSinh
+        com.hethongtruongthpt.entity.User userHs = new com.hethongtruongthpt.entity.User();
+        userHs.setUsername("hs" + randomStr);
+        userHs.setPassword("test");
+        userHs.setRole(com.hethongtruongthpt.enums.RoleEnum.HOC_SINH);
+        userHs.setIsActive(true);
+        userHs = userRepository.save(userHs);
 
-        // Fetch or create MonHoc
-        MonHoc mh = monHocRepository.findAll().stream().findFirst().orElseGet(() -> {
-            MonHoc newMh = new MonHoc();
-            newMh.setTenMon("Test Mon " + randomStr);
-            newMh.setMaMon("M" + randomStr);
-            newMh.setNhomDanhGia("Toan");
-            newMh.setSoDtxHocKy(4);
-            newMh.setKhoiApDung("10");
-            return monHocRepository.save(newMh);
-        });
+        // Create dedicated HocSinh for test
+        HocSinh hs = new HocSinh();
+        hs.setUser(userHs);
+        hs.setHoTen("Nguyen Test HS");
+        hs.setMaHocSinh("HS" + randomStr);
+        hs.setNgaySinh(java.time.LocalDate.of(2008, 1, 15));
+        hs.setGioiTinh("NAM");
+        hs.setNamNhapHoc(2024);
+        hs.setSdt("090" + (int)(1000000 + Math.random() * 9000000));
+        hs.setDiaChi("123 Duong ABC, Quan 1, TP.HCM");
+        hs.setMaBhyt("HS" + randomStr + "12345");
+        hs.setDanToc("Kinh");
+        hs.setTonGiao("Không");
+        hs.setLop(lop);
+        hs = hocSinhRepository.save(hs);
 
-        // Fetch or create PhanCongDay
-        PhanCongDay pcd = phanCongDayRepository.findAll().stream().findFirst().orElseGet(() -> {
-            PhanCongDay newPcd = new PhanCongDay();
-            newPcd.setLop(lop);
-            newPcd.setMonHoc(mh);
-            newPcd.setGiaoVien(gv);
-            newPcd.setHocKy(1);
-            newPcd.setNamHoc("2024-2025");
-            return phanCongDayRepository.save(newPcd);
-        });
+        // Create dedicated MonHoc for test
+        MonHoc mh = new MonHoc();
+        mh.setTenMon("MonHoc " + randomStr);
+        mh.setMaMon("M" + randomStr);
+        mh.setNhomDanhGia("Toan");
+        mh.setSoDtxHocKy(4);
+        mh.setKhoiApDung("10");
+        mh = monHocRepository.save(mh);
 
+        // Create dedicated PhanCongDay
+        PhanCongDay pcd = new PhanCongDay();
+        pcd.setLop(lop);
+        pcd.setMonHoc(mh);
+        pcd.setGiaoVien(gv);
+        pcd.setHocKy(1);
+        pcd.setNamHoc("2024-2025");
+        pcd = phanCongDayRepository.save(pcd);
 
         Diem diem = new Diem();
         diem.setHocSinh(hs);
@@ -112,8 +119,7 @@ public class DiemTest {
         diem.setLoaiDiem("GK");
         diem.setSoThuTu(0);
         diem.setHocKy(1);
-        // Randomize nam_hoc to bypass unique constraints if they exist
-        diem.setNamHoc("2024-20" + randomStr.substring(0, 2)); 
+        diem.setNamHoc("2024-2025"); 
         diem.setGiaTriDiem(new BigDecimal("7.0"));
         diem.setStatus("DRAFT");
 

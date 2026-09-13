@@ -356,6 +356,7 @@ export const EXCEL_FIELD_ALIASES = {
   ngaySinh: ["Ngày sinh", "NGAY_SINH"],
   gioiTinh: ["Giới tính", "GIOI_TINH"],
   lop: ["Lớp", "Lớp học", "LOP"],
+  namHoc: ["Năm học", "NAM_HOC", "Niên khóa", "NIEN_KHOA"],
   sdt: ["Số điện thoại", "Điện thoại", "SDT", "SO_DIEN_THOAI"],
   email: ["Email", "EMAIL"],
   diaChi: ["Địa chỉ", "DIA_CHI"],

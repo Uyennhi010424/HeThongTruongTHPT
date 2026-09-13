@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { Edit, Trash2, ChevronDown, Phone, Mail, GraduationCap, Calendar, User } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { 
+  Edit, Trash2, ChevronDown, ChevronUp, Phone, Mail, GraduationCap, 
+  Calendar, User, BookOpen, ExternalLink, ShieldCheck, AlertTriangle, Layers 
+} from "lucide-react";
 import { useAdminSearch } from "../../../contexts/AdminSearchContext.jsx";
 import { useConfirm } from "../../../contexts/ConfirmContext.jsx";
 import PageHeader from "../../../components/edu/PageHeader.jsx";
@@ -11,9 +15,13 @@ import {
   updateGiaoVien
 } from "../../../api/giaovienApi.js";
 import { getLop } from "../../../api/lopApi.js";
+import { getPhanCongDay } from "../../../api/phancongDayApi.js";
+import { getNamHoc } from "../../../api/namhocApi.js";
 import { createUser, getUsers } from "../../../api/userApi.js";
+import { getVisibleAcademicYears, getActiveAcademicYear } from "../../../utils/helpers.js";
 import Pagination from "../../../components/common/Pagination.jsx";
 import CachedAvatar from "../../../components/common/CachedAvatar.jsx";
+import { notifySuccess, notifyError } from "../../../utils/notify.js";
 
 const formatDate = (value) => {
   if (!value) return "";
@@ -86,8 +94,12 @@ const notifyUsersUpdated = () => {
 };
 
 export default function GiaoVienList() {
+  const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [allNamHoc, setAllNamHoc] = useState([]);
+  const [selectedNamHoc, setSelectedNamHoc] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -107,6 +119,14 @@ export default function GiaoVienList() {
     sdt: "",
     email: ""
   });
+
+  const visibleNamHoc = useMemo(() => {
+    return getVisibleAcademicYears(allNamHoc);
+  }, [allNamHoc]);
+
+  const activeNamHoc = useMemo(() => {
+    return getActiveAcademicYear(allNamHoc);
+  }, [allNamHoc]);
 
   const ensureTeacherUserAccount = async (teacher, fallbackFullName = "") => {
     const candidate =
@@ -139,7 +159,24 @@ export default function GiaoVienList() {
     }
   };
 
-  const isHomeroomTeacher = (teacher) => Boolean(teacher?.isGvcn);
+  const getTeacherHomeroomInfo = (teacher, year) => {
+    if (!teacher) return { isHomeroom: false, className: "" };
+    const foundClass = classes.find((c) => {
+      const isTeacherMatch = c.gvcnId === teacher.id || c.gvcn?.id === teacher.id;
+      if (!isTeacherMatch) return false;
+      if (!year || year === "ALL") return true;
+      return c.namHoc === year;
+    });
+    if (foundClass) {
+      return { isHomeroom: true, className: foundClass.tenLop };
+    }
+    if ((!year || year === "ALL" || (activeNamHoc?.tenNamHoc && year === activeNamHoc.tenNamHoc)) && teacher.isGvcn) {
+      return { isHomeroom: true, className: teacher.tenLopChuNhiem || "" };
+    }
+    return { isHomeroom: false, className: "" };
+  };
+
+  const isHomeroomTeacher = (teacher) => getTeacherHomeroomInfo(teacher, selectedNamHoc).isHomeroom;
 
   useEffect(() => {
     setSearchPlaceholder("Tìm kiếm giáo viên...");
@@ -157,9 +194,11 @@ export default function GiaoVienList() {
       try {
         setLoading(true);
         setError("");
-        const [teacherResult, classResult] = await Promise.allSettled([
+        const [teacherResult, classResult, assignmentResult, namHocResult] = await Promise.allSettled([
           getGiaoVien(),
-          getLop()
+          getLop(),
+          getPhanCongDay(),
+          getNamHoc()
         ]);
         if (!active) return;
 
@@ -173,6 +212,18 @@ export default function GiaoVienList() {
         setClasses(
           classResult.status === "fulfilled" ? classResult.value?.data?.data || [] : []
         );
+        setAssignments(
+          assignmentResult.status === "fulfilled" ? assignmentResult.value?.data?.data || [] : []
+        );
+        const rawYears = namHocResult.status === "fulfilled" ? namHocResult.value?.data?.data || [] : [];
+        setAllNamHoc(rawYears);
+        const visible = getVisibleAcademicYears(rawYears);
+        const activeYear = getActiveAcademicYear(rawYears);
+        if (activeYear?.tenNamHoc) {
+          setSelectedNamHoc((prev) => prev || activeYear.tenNamHoc);
+        } else if (visible.length > 0) {
+          setSelectedNamHoc((prev) => prev || visible[0].tenNamHoc);
+        }
       } catch (err) {
         if (!active) return;
         setError("Không thể tải danh sách giáo viên.");
@@ -192,9 +243,56 @@ export default function GiaoVienList() {
     const total = teachers.length;
     const maleCount = teachers.filter((item) => item.gioiTinh === true).length;
     const femaleCount = teachers.filter((item) => item.gioiTinh === false).length;
-    const homeroomCount = teachers.filter((item) => isHomeroomTeacher(item)).length;
+    const homeroomCount = teachers.filter((item) => getTeacherHomeroomInfo(item, selectedNamHoc).isHomeroom).length;
     return { total, maleCount, femaleCount, homeroomCount };
-  }, [teachers]);
+  }, [teachers, classes, selectedNamHoc, activeNamHoc]);
+
+  const allAssignmentsByTeacherId = useMemo(() => {
+    const map = {};
+    for (const item of assignments) {
+      const gvId = item.giaoVienId;
+      if (!gvId) continue;
+      if (!map[gvId]) map[gvId] = [];
+      map[gvId].push(item);
+    }
+    return map;
+  }, [assignments]);
+
+  const getTeacherAssignmentSummary = (teacherId) => {
+    const teacherAll = allAssignmentsByTeacherId[teacherId] || [];
+    const currentYearAssigned = assignmentsByTeacherId[teacherId] || [];
+    
+    const yearCounts = {};
+    for (const a of teacherAll) {
+      const y = a.namHoc || "Chưa rõ";
+      yearCounts[y] = (yearCounts[y] || 0) + 1;
+    }
+
+    const otherYearsWithAssignments = Object.entries(yearCounts)
+      .filter(([year]) => selectedNamHoc !== "ALL" && year !== selectedNamHoc);
+
+    return {
+      totalAllYears: teacherAll.length,
+      currentYearCount: currentYearAssigned.length,
+      yearCounts,
+      otherYearsWithAssignments,
+      hasOtherYearAssignments: otherYearsWithAssignments.length > 0
+    };
+  };
+
+  const assignmentsByTeacherId = useMemo(() => {
+    const map = {};
+    for (const item of assignments) {
+      if (selectedNamHoc && selectedNamHoc !== "ALL" && item.namHoc !== selectedNamHoc) {
+        continue;
+      }
+      const gvId = item.giaoVienId;
+      if (!gvId) continue;
+      if (!map[gvId]) map[gvId] = [];
+      map[gvId].push(item);
+    }
+    return map;
+  }, [assignments, selectedNamHoc]);
 
   const filteredTeachers = useMemo(() => {
     if (!keyword.trim()) return teachers;
@@ -258,36 +356,89 @@ export default function GiaoVienList() {
   };
 
   const handleDelete = async (teacher) => {
-    if (!(await confirm(`Xóa giáo viên ${teacher.hoTen}?`))) return;
+    const summary = getTeacherAssignmentSummary(teacher.id);
+    const homeroomInfo = getTeacherHomeroomInfo(teacher, "ALL");
+
+    if (summary.totalAllYears > 0) {
+      const yearDetails = Object.entries(summary.yearCounts)
+        .map(([y, count]) => `Năm ${y}: ${count} phân công`)
+        .join(", ");
+      const msg = `Không thể xóa giáo viên ${teacher.hoTen} vì đang có dữ liệu phân công giảng dạy (${yearDetails}). Vui lòng chuyển sang năm học tương ứng để gỡ toàn bộ phân công trước khi xóa.`;
+      setError(msg);
+      notifyError(msg);
+      return;
+    }
+
+    if (homeroomInfo.isHomeroom) {
+      const msg = `Không thể xóa giáo viên ${teacher.hoTen} vì đang làm GVCN lớp ${homeroomInfo.className}. Vui lòng bỏ phân công chủ nhiệm trước khi xóa.`;
+      setError(msg);
+      notifyError(msg);
+      return;
+    }
+
+    if (!(await confirm(`Bạn có chắc chắn muốn xóa giáo viên ${teacher.hoTen}? Dữ liệu giáo viên sẽ bị xóa khỏi hệ thống.`, "Xác nhận xóa giáo viên"))) return;
     try {
       await deleteGiaoVien(teacher.id);
       setTeachers((prev) => prev.filter((item) => item.id !== teacher.id));
       setError("");
       setSuccessMessage("Xóa giáo viên thành công.");
+      notifySuccess("Xóa giáo viên thành công.");
     } catch (err) {
-      setError("Không thể xóa giáo viên.");
+      const msg = getApiErrorMessage(err, "Không thể xóa giáo viên.");
+      setError(msg);
       setSuccessMessage("");
+      notifyError(msg);
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError("");
-    if (!form.hoTen.trim()) {
+
+    const trimmedName = form.hoTen.trim();
+    if (!trimmedName) {
       setFormError("Vui lòng nhập họ tên.");
+      return;
+    }
+    const words = trimmedName.split(/\s+/);
+    if (words.length < 2) {
+      setFormError("Họ tên phải có ít nhất 2 từ (vd: Trần Minh, Nguyễn Thị Lan).");
+      return;
+    }
+    const TEACHER_NAME_PATTERN = /^[A-ZÀ-Ỹ][a-zà-ỹ]+(\s+[A-ZÀ-Ỹ][a-zà-ỹ]+)+$/;
+    if (!TEACHER_NAME_PATTERN.test(trimmedName)) {
+      setFormError("Mỗi từ trong họ tên phải bắt đầu bằng chữ hoa, chỉ chứa chữ cái tiếng Việt (vd: Nguyễn Vy).");
+      return;
+    }
+
+    const trimmedPhone = form.sdt.trim();
+    if (trimmedPhone && !/^0\d{9}$/.test(trimmedPhone)) {
+      setFormError("Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0.");
+      return;
+    }
+
+    const trimmedEmail = form.email.trim();
+    if (trimmedEmail && !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(trimmedEmail)) {
+      setFormError("Email không đúng định dạng.");
+      return;
+    }
+
+    const trimmedBoMon = form.boMon.trim();
+    if (trimmedBoMon && !/^[A-Za-zÀ-ỹĐđ0-9\s,\/\.\-]+$/.test(trimmedBoMon)) {
+      setFormError("Tổ bộ môn không được chứa ký tự đặc biệt không hợp lệ.");
       return;
     }
 
     const payload = {
-      hoTen: form.hoTen.trim(),
+      hoTen: trimmedName,
       ngaySinh: form.ngaySinh || null,
       gioiTinh: form.gioiTinh === "true",
-      boMon: form.boMon.trim() || null,
+      boMon: trimmedBoMon || null,
       trinhDo: form.trinhDo.trim() || null,
-      soDienThoai: form.sdt.trim() || null,
+      soDienThoai: trimmedPhone || null,
       email: editingTeacher
-        ? form.email.trim() || null
-        : buildTeacherEmailPreview(form.hoTen) || null
+        ? trimmedEmail || null
+        : buildTeacherEmailPreview(trimmedName) || null
     };
 
     try {
@@ -334,7 +485,11 @@ export default function GiaoVienList() {
     <div className="page users-page">
       <PageHeader
         title="Danh mục giáo viên"
-        description={loading ? "Đang tải dữ liệu..." : `Tổng cộng: ${stats.total} giáo viên (${stats.maleCount} nam, ${stats.femaleCount} nữ) - ${stats.homeroomCount} GVCN`}
+        description={
+          loading
+            ? "Đang tải dữ liệu..."
+            : `Năm học: ${selectedNamHoc === "ALL" ? "Tất cả các năm" : selectedNamHoc} • Tổng cộng: ${stats.total} giáo viên (${stats.maleCount} nam, ${stats.femaleCount} nữ) - ${stats.homeroomCount} GVCN`
+        }
         actions={
           <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0 ml-auto">
             <button className="btn-primary" onClick={openCreate}>
@@ -345,6 +500,33 @@ export default function GiaoVienList() {
       />
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col p-4 sm:p-6">
+        {/* ── Toolbar: Filter theo Năm học ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+            <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-600">Năm học:</span>
+            <select
+              value={selectedNamHoc}
+              onChange={(e) => {
+                setSelectedNamHoc(e.target.value);
+                setPage(1);
+              }}
+              className="bg-transparent border-none text-blue-900 font-extrabold text-xs sm:text-sm focus:outline-none cursor-pointer"
+            >
+              {visibleNamHoc.map((nh) => (
+                <option key={nh.id || nh.tenNamHoc} value={nh.tenNamHoc}>
+                  {nh.tenNamHoc} {nh.trangThai === "DANG_MO" ? "(Đang mở)" : "(Đã đóng)"}
+                </option>
+              ))}
+              <option value="ALL">-- Tất cả các năm --</option>
+            </select>
+          </div>
+
+          <div className="text-xs font-semibold text-slate-500 hidden sm:block">
+            Dữ liệu phân công & chủ nhiệm: <span className="text-blue-700 font-bold">{selectedNamHoc === "ALL" ? "Tất cả các năm" : selectedNamHoc}</span>
+          </div>
+        </div>
+
         {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-xl text-sm font-semibold">{error}</div>}
         {!error && successMessage && <div className="p-4 mb-4 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-semibold">{successMessage}</div>}
         {!error && !loading && filteredTeachers.length === 0 && (
@@ -387,78 +569,235 @@ export default function GiaoVienList() {
                   </tr>
                 ))
               ) : (
-                pagedTeachers.map((teacher, index) => (
-                  <tr key={teacher.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="py-4 px-4 text-center text-sm font-bold text-slate-400">
-                      {(page - 1) * pageSize + index + 1}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <CachedAvatar
-                          username={teacher.username || teacher.email}
-                          role="teacher"
-                          src={teacher.anhDaiDien}
-                          fallback={(() => {
-                            const parts = (teacher.hoTen || "G").trim().split(" ");
-                            return parts[parts.length - 1].charAt(0).toUpperCase();
-                          })()}
-                          className="w-10 h-10 rounded-full object-cover shrink-0 aspect-square border border-indigo-100"
-                          fallbackClassName="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 aspect-square"
-                        />
-                        <div>
-                          <div className="text-sm font-bold text-slate-900">{teacher.hoTen}</div>
-                          <div className="text-xs text-slate-500 mt-0.5 font-medium">
-                            {formatDate(teacher.ngaySinh) || "--"} • {getGenderLabel(teacher.gioiTinh)}
+                pagedTeachers.map((teacher, index) => {
+                  const isExpanded = expandedTeacherId === teacher.id;
+                  const teacherAssignments = assignmentsByTeacherId[teacher.id] || [];
+                  const homeroomInfo = getTeacherHomeroomInfo(teacher, selectedNamHoc);
+                  const summary = getTeacherAssignmentSummary(teacher.id);
+                  return (
+                    <React.Fragment key={teacher.id}>
+                      <tr 
+                        className={`transition-colors group cursor-pointer ${
+                          isExpanded ? "bg-blue-50/40" : "hover:bg-slate-50/80"
+                        }`}
+                        onClick={() => setExpandedTeacherId(isExpanded ? null : teacher.id)}
+                      >
+                        <td className="py-4 px-4 text-center text-sm font-bold text-slate-400">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span>{(page - 1) * pageSize + index + 1}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180 text-blue-600 font-bold" : "group-hover:text-slate-600"}`} />
                           </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">
-                        {teacher.boMon || "--"}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-sm font-semibold text-slate-700">
-                      {teacher.trinhDo || "--"}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-sm font-bold text-slate-800">{teacher.sdt || "--"}</div>
-                      <div className="text-xs text-slate-500 font-medium truncate max-w-[180px]">{teacher.email || ""}</div>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        isHomeroomTeacher(teacher)
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-600 border border-slate-200"
-                      }`}>
-                        {isHomeroomTeacher(teacher) ? "Có" : "Không"}
-                      </span>
-                      {isHomeroomTeacher(teacher) && teacher.tenLopChuNhiem && (
-                        <div className="text-[11px] font-bold text-emerald-700 mt-1">
-                          Lớp {teacher.tenLopChuNhiem}
-                        </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <CachedAvatar
+                              username={teacher.username || teacher.email}
+                              role="teacher"
+                              src={teacher.anhDaiDien}
+                              fallback={(() => {
+                                const parts = (teacher.hoTen || "G").trim().split(" ");
+                                return parts[parts.length - 1].charAt(0).toUpperCase();
+                              })()}
+                              className="w-10 h-10 rounded-full object-cover shrink-0 aspect-square border border-indigo-100"
+                              fallbackClassName="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 aspect-square"
+                            />
+                            <div>
+                              <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{teacher.hoTen}</div>
+                              <div className="text-xs text-slate-500 mt-0.5 font-medium">
+                                {formatDate(teacher.ngaySinh) || "--"} • {getGenderLabel(teacher.gioiTinh)}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">
+                            {teacher.boMon || "--"}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-sm font-semibold text-slate-700">
+                          {teacher.trinhDo || "--"}
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-sm font-bold text-slate-800">{teacher.sdt || "--"}</div>
+                          <div className="text-xs text-slate-500 font-medium truncate max-w-[180px]">{teacher.email || ""}</div>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                            homeroomInfo.isHomeroom
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-slate-100 text-slate-600 border border-slate-200"
+                          }`}>
+                            {homeroomInfo.isHomeroom ? "Có" : "Không"}
+                          </span>
+                          {homeroomInfo.isHomeroom && homeroomInfo.className && (
+                            <div className="text-[11px] font-bold text-emerald-700 mt-1">
+                              Lớp {homeroomInfo.className}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => openEdit(teacher)}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Chỉnh sửa"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(teacher)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Xóa"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* ── Expandable Details Row (Desktop) ── */}
+                      {isExpanded && (
+                        <tr className="bg-slate-50/90 border-b border-slate-200">
+                          <td colSpan={7} className="p-3 sm:p-4">
+                            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Cột 1: Thông tin cá nhân & Liên hệ */}
+                                <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-2.5 text-xs text-slate-600">
+                                  <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
+                                    <User className="w-4 h-4 text-blue-600" /> Thông tin hồ sơ & Liên hệ
+                                  </h4>
+                                  <div className="flex items-center gap-2">
+                                    <GraduationCap className="w-4 h-4 text-blue-500 shrink-0" />
+                                    <span>Trình độ: <strong className="text-slate-800">{teacher.trinhDo || "--"}</strong></span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                                    <span>Ngày sinh: <strong className="text-slate-800">{formatDate(teacher.ngaySinh) || "--"}</strong> ({getGenderLabel(teacher.gioiTinh)})</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
+                                    <span>SĐT: {teacher.sdt ? <a href={`tel:${teacher.sdt}`} className="font-bold text-blue-600 hover:underline">{teacher.sdt}</a> : <strong className="text-slate-800">--</strong>}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Mail className="w-4 h-4 text-amber-500 shrink-0" />
+                                    <span>Email: {teacher.email ? <a href={`mailto:${teacher.email}`} className="font-bold text-blue-600 hover:underline">{teacher.email}</a> : <strong className="text-slate-800">--</strong>}</span>
+                                  </div>
+                                </div>
+
+                                {/* Cột 2: Lớp Chủ nhiệm & Phân công giảng dạy */}
+                                <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 flex flex-col justify-between space-y-3 text-xs">
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-200">
+                                      <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+                                        <BookOpen className="w-4 h-4 text-indigo-600" /> Lớp Chủ nhiệm & Giảng dạy
+                                        <span className="text-[11px] font-semibold text-blue-600 normal-case">
+                                          ({selectedNamHoc === "ALL" ? "Tất cả các năm" : `Năm học ${selectedNamHoc}`})
+                                        </span>
+                                      </h4>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigate("/admin/phancong");
+                                        }}
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                                      >
+                                        <span>Quản lý phân công</span>
+                                        <ExternalLink className="w-3 h-3" />
+                                      </button>
+                                    </div>
+
+                                    {/* Lớp Chủ nhiệm */}
+                                    <div className="mb-3 flex items-center gap-2 flex-wrap">
+                                      <span className="text-slate-500 font-medium">Chủ nhiệm:</span>
+                                      {homeroomInfo.isHomeroom ? (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                          Lớp {homeroomInfo.className || "Chưa xác định"}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-500 italic bg-slate-100 px-2.5 py-0.5 rounded-lg text-xs font-medium">
+                                          Không làm chủ nhiệm ({selectedNamHoc === "ALL" ? "Tất cả" : selectedNamHoc})
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Lớp Giảng dạy */}
+                                    <div>
+                                      <div className="text-slate-500 font-medium mb-1.5 flex items-center gap-1.5">
+                                        <span>Lớp giảng dạy:</span>
+                                        <span className="font-bold text-slate-800">
+                                          {teacherAssignments.length > 0 ? `(${teacherAssignments.length} phân công)` : ""}
+                                        </span>
+                                      </div>
+
+                                      {teacherAssignments.length > 0 ? (
+                                        <div className="space-y-2">
+                                          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                                            {teacherAssignments.map((a, idx) => (
+                                              <span
+                                                key={a.id || idx}
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-xs"
+                                                title={`${a.monHocTen || "Môn"} - Lớp ${a.tenLop} (Học kỳ ${a.hocKy} - Năm ${a.namHoc})`}
+                                              >
+                                                <Layers className="w-3 h-3 text-blue-500" />
+                                                {a.monHocTen} - Lớp {a.tenLop} <span className="text-blue-500 font-normal">(HK{a.hocKy}{selectedNamHoc === "ALL" ? ` • ${a.namHoc}` : ""})</span>
+                                              </span>
+                                            ))}
+                                          </div>
+                                          {summary.hasOtherYearAssignments && selectedNamHoc !== "ALL" && (
+                                            <div className="text-[11px] text-slate-500 font-medium bg-slate-100/80 px-2.5 py-1 rounded-lg">
+                                              * Phân công năm khác: {summary.otherYearsWithAssignments.map(([y, c]) => `Năm ${y} (${c} phân công)`).join(", ")}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        summary.hasOtherYearAssignments && selectedNamHoc !== "ALL" ? (
+                                          <div className="space-y-2">
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                              <span>✓ Chưa có phân công dạy trong năm học {selectedNamHoc}</span>
+                                            </div>
+                                            <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-[11.5px] space-y-1.5">
+                                              <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                                Phát hiện dữ liệu giảng dạy ở các năm học khác:
+                                              </p>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {summary.otherYearsWithAssignments.map(([year, count]) => (
+                                                  <span key={year} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 font-bold border border-amber-300">
+                                                    Năm {year}: {count} phân công
+                                                  </span>
+                                                ))}
+                                              </div>
+                                              <p className="text-[11px] text-amber-800 font-medium pt-1 border-t border-amber-200/80">
+                                                ⚠️ <strong>Lưu ý xóa:</strong> Không thể xóa giáo viên nếu còn phân công ở bất kỳ năm học nào (kể cả năm cũ). Vui lòng chuyển sang năm học trên để gỡ phân công trước.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span>✓ Không có phân công dạy ở tất cả các năm học (Đủ điều kiện xóa an toàn)</span>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {(teacherAssignments.length > 0 || summary.hasOtherYearAssignments) && (
+                                    <div className="pt-2 border-t border-slate-200/80 text-[11px] text-amber-700 font-medium flex items-center gap-1.5">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      <span>Cần gỡ hết các phân công dạy (cả các năm học cũ) trước khi có thể xóa giáo viên này.</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          onClick={() => openEdit(teacher)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Chỉnh sửa"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(teacher)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Xóa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -481,6 +820,9 @@ export default function GiaoVienList() {
           ) : (
             pagedTeachers.map((teacher, index) => {
               const isExpanded = expandedTeacherId === teacher.id;
+              const teacherAssignments = assignmentsByTeacherId[teacher.id] || [];
+              const homeroomInfo = getTeacherHomeroomInfo(teacher, selectedNamHoc);
+              const summary = getTeacherAssignmentSummary(teacher.id);
               return (
                 <div
                   key={teacher.id}
@@ -518,7 +860,7 @@ export default function GiaoVienList() {
                           )}
                         </div>
                         <div className="text-xs text-slate-500 font-medium mt-0.5 truncate">
-                          {teacher.sdt || teacher.email || (isHomeroomTeacher(teacher) ? `GVCN Lớp ${teacher.tenLopChuNhiem || ""}` : "Giáo viên")}
+                          {teacher.sdt || teacher.email || (homeroomInfo.isHomeroom ? `GVCN Lớp ${homeroomInfo.className || ""}` : "Giáo viên")}
                         </div>
                       </div>
                     </div>
@@ -551,28 +893,116 @@ export default function GiaoVienList() {
 
                   {/* Expanded Card Details ("Show xuống") */}
                   {isExpanded && (
-                    <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/60 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <GraduationCap className="w-4 h-4 text-blue-500 shrink-0" />
-                        <span>Trình độ: <strong className="text-slate-800">{teacher.trinhDo || "--"}</strong></span>
+                    <div className="px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/60 space-y-3 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <GraduationCap className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span>Trình độ: <strong className="text-slate-800">{teacher.trinhDo || "--"}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                          <span>Ngày sinh: <strong className="text-slate-800">{formatDate(teacher.ngaySinh) || "--"}</strong> ({getGenderLabel(teacher.gioiTinh)})</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>SĐT: {teacher.sdt ? <a href={`tel:${teacher.sdt}`} className="font-bold text-blue-600 hover:underline">{teacher.sdt}</a> : <strong className="text-slate-800">--</strong>}</span>
+                        </div>
+                        <div className="flex items-center gap-2 truncate">
+                          <Mail className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span className="truncate">Email: {teacher.email ? <a href={`mailto:${teacher.email}`} className="font-bold text-blue-600 hover:underline">{teacher.email}</a> : <strong className="text-slate-800">--</strong>}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
-                        <span>Ngày sinh: <strong className="text-slate-800">{formatDate(teacher.ngaySinh) || "--"}</strong> ({getGenderLabel(teacher.gioiTinh)})</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <span>SĐT: {teacher.sdt ? <a href={`tel:${teacher.sdt}`} className="font-bold text-blue-600 hover:underline">{teacher.sdt}</a> : <strong className="text-slate-800">--</strong>}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-600 truncate">
-                        <Mail className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span className="truncate">Email: {teacher.email ? <a href={`mailto:${teacher.email}`} className="font-bold text-blue-600 hover:underline">{teacher.email}</a> : <strong className="text-slate-800">--</strong>}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-600 sm:col-span-2">
-                        <User className="w-4 h-4 text-purple-500 shrink-0" />
-                        <span>Chủ nhiệm: <strong className={isHomeroomTeacher(teacher) ? "text-emerald-700 font-bold" : "text-slate-700"}>
-                          {isHomeroomTeacher(teacher) ? `Có (Lớp ${teacher.tenLopChuNhiem || "--"})` : "Không"}
-                        </strong></span>
+
+                      {/* Lớp Chủ nhiệm & Giảng dạy (Mobile) */}
+                      <div className="pt-2.5 border-t border-slate-200/70 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-indigo-600" /> Phân công & Lớp học
+                            <span className="text-[11px] font-semibold text-blue-600 normal-case">
+                              ({selectedNamHoc === "ALL" ? "Tất cả" : selectedNamHoc})
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate("/admin/phancong");
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline"
+                          >
+                            <span>Quản lý phân công</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-slate-500">Chủ nhiệm:</span>
+                          {homeroomInfo.isHomeroom ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                              Lớp {homeroomInfo.className || "--"}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 italic">Không ({selectedNamHoc === "ALL" ? "Tất cả" : selectedNamHoc})</span>
+                          )}
+                        </div>
+
+                        <div>
+                          <span className="text-slate-500 block mb-1">
+                            Lớp dạy: <strong className="text-slate-800">{teacherAssignments.length > 0 ? `(${teacherAssignments.length} phân công)` : ""}</strong>
+                          </span>
+                          {teacherAssignments.length > 0 ? (
+                            <div className="space-y-1.5">
+                              <div className="flex flex-wrap gap-1.5">
+                                {teacherAssignments.map((a, idx) => (
+                                  <span
+                                    key={a.id || idx}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200"
+                                  >
+                                    <Layers className="w-2.5 h-2.5 text-blue-500" />
+                                    {a.monHocTen} - {a.tenLop} (HK{a.hocKy}{selectedNamHoc === "ALL" ? ` • ${a.namHoc}` : ""})
+                                  </span>
+                                ))}
+                              </div>
+                              {summary.hasOtherYearAssignments && selectedNamHoc !== "ALL" && (
+                                <div className="text-[10.5px] text-slate-500 font-medium bg-slate-100/80 px-2 py-0.5 rounded-md">
+                                  * Năm khác: {summary.otherYearsWithAssignments.map(([y, c]) => `${y} (${c} lớp)`).join(", ")}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            summary.hasOtherYearAssignments && selectedNamHoc !== "ALL" ? (
+                              <div className="space-y-1.5 pt-1">
+                                <span className="text-slate-600 font-medium text-[11px] block">✓ Chưa có phân công dạy ở năm {selectedNamHoc}</span>
+                                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] space-y-1">
+                                  <p className="font-bold flex items-center gap-1 text-amber-950">
+                                    <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                    Có dạy ở năm học khác:
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {summary.otherYearsWithAssignments.map(([year, count]) => (
+                                      <span key={year} className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold border border-amber-300">
+                                        Năm {year}: {count} phân công
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <p className="text-[10px] text-amber-800 italic pt-0.5">
+                                    * Cần chuyển sang năm học trên để gỡ phân công trước khi xóa giáo viên.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-emerald-700 font-semibold text-[11px]">✓ Không có phân công dạy ở tất cả các năm (Có thể xóa)</span>
+                            )
+                          )}
+                        </div>
+
+                        {(teacherAssignments.length > 0 || summary.hasOtherYearAssignments) && (
+                          <p className="text-[10.5px] text-amber-700 font-medium pt-1 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>Cần gỡ hết phân công (kể cả năm cũ) trước khi xóa.</span>
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}

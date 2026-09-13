@@ -57,6 +57,10 @@ public class GlobalExceptionHandler {
                 msg = "Dữ liệu đang được sử dụng ở nơi khác. Vui lòng xóa dữ liệu liên quan trước (vd: chuyển học sinh sang lớp khác trước khi xóa lớp).";
             } else if (detail.contains("username") || detail.contains("UK_r43af9ap4edm43mmtq01oddj6")) {
                 msg = "Tài khoản người dùng đã tồn tại.";
+            } else if (detail.contains("ma_giao_vien") || detail.contains("UK_hmq214awjgwg4dioem761xjr")) {
+                msg = "Mã giáo viên đã tồn tại.";
+            } else if (detail.contains("UK_807k2a6xn6d2mexwa3enpujn2") || (detail.contains("email") && detail.contains("giao_vien"))) {
+                msg = "Email giáo viên đã tồn tại trong hệ thống.";
             } else if (detail.contains("ma_hoc_sinh") || detail.contains("maHocSinh")) {
                 msg = "Mã học sinh đã tồn tại.";
             } else if (detail.contains("ten_mon") || detail.contains("ma_mon")) {

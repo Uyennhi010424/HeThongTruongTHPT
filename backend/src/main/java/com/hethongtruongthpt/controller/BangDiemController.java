@@ -1,3 +1,5 @@
+package com.hethongtruongthpt.controller;
+
 import com.hethongtruongthpt.common.ApiResponse;
 import com.hethongtruongthpt.entity.Diem;
 import com.hethongtruongthpt.entity.NamHoc;

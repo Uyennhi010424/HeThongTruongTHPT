@@ -20,21 +20,15 @@ public class SoftDeleteInitializer {
             
             for (String table : tables) {
                 try {
-                    int updated = jdbcTemplate.update("UPDATE " + table + " SET is_deleted = false WHERE is_deleted IS NULL");
-                    if (updated > 0) {
-                        log.info("Initialized {} rows in table '{}' with is_deleted = false", updated, table);
-                    }
-                    if ("thoi_khoa_bieu".equals(table)) {
-                        int deleted = jdbcTemplate.update("DELETE FROM thoi_khoa_bieu WHERE is_deleted = true");
-                        if (deleted > 0) {
-                            log.info("Hard deleted {} soft-deleted rows in table 'thoi_khoa_bieu' to prevent unique constraint conflicts", deleted);
-                        }
+                    int deleted = jdbcTemplate.update("DELETE FROM " + table + " WHERE is_deleted = true");
+                    if (deleted > 0) {
+                        log.info("Purged {} soft-deleted rows in table '{}'", deleted, table);
                     }
                 } catch (Exception e) {
-                    log.warn("Could not update table '{}': {}", table, e.getMessage());
+                    log.warn("Could not purge soft-deleted records in table '{}': {}", table, e.getMessage());
                 }
             }
-            log.info("Soft delete initialization complete.");
+            log.info("Database cleanup complete.");
         };
     }
 }

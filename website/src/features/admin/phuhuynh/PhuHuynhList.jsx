@@ -364,21 +364,54 @@ export default function PhuHuynhList() {
     e.preventDefault();
 
 
-    if (!form.hoTen.trim()) {
+    const VI_NAME_REGEX = /^[A-Za-zÀ-ỹĐđ\s]+$/;
+    const PHONE_REGEX = /^0\d{9}$/;
+    const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    const JOB_REGEX = /^[A-Za-zÀ-ỹĐđ0-9\s,\/\.\-]+$/;
+
+    const trimmedName = form.hoTen.trim();
+    if (!trimmedName) {
       notifyError("Vui lòng nhập họ tên.");
       return;
     }
-    if (!form.soDienThoai.trim()) {
+    const nameWords = trimmedName.split(/\s+/);
+    if (nameWords.length < 2) {
+      notifyError("Họ và tên phụ huynh phải có ít nhất 2 từ (vd: Nguyễn Văn A).");
+      return;
+    }
+    if (!VI_NAME_REGEX.test(trimmedName)) {
+      notifyError("Họ và tên phụ huynh chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt.");
+      return;
+    }
+
+    const trimmedPhone = form.soDienThoai.trim();
+    if (!trimmedPhone) {
       notifyError("Vui lòng nhập số điện thoại.");
+      return;
+    }
+    if (!PHONE_REGEX.test(trimmedPhone)) {
+      notifyError("Số điện thoại phụ huynh phải gồm 10 chữ số và bắt đầu bằng số 0.");
+      return;
+    }
+
+    const trimmedEmail = form.email.trim();
+    if (trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)) {
+      notifyError("Email không đúng định dạng (vd: phuhuynh@gmail.com).");
+      return;
+    }
+
+    const trimmedJob = form.ngheNghiep.trim();
+    if (trimmedJob && !JOB_REGEX.test(trimmedJob)) {
+      notifyError("Nghề nghiệp không được chứa ký tự đặc biệt không hợp lệ.");
       return;
     }
 
     const payload = {
-      hoTen: form.hoTen.trim(),
-      soDienThoai: form.soDienThoai.trim(),
-      email: form.email.trim(),
+      hoTen: trimmedName,
+      soDienThoai: trimmedPhone,
+      email: trimmedEmail,
       quanHe: form.quanHe,
-      ngheNghiep: form.ngheNghiep.trim(),
+      ngheNghiep: trimmedJob,
       isSmSActive: form.isSmSActive
     };
 

@@ -42,9 +42,20 @@ const QuestionBuilderModal = ({ exam, onClose }) => {
     }
   };
 
+  const DANGEROUS_TAG_REGEX = /(<script|<iframe|<embed|<object|javascript:|onerror=|onload=)/i;
+
   const handleAddQuestion = async () => {
-    if (!newQuestion.noiDung) {
+    const trimmedNoiDung = (newQuestion.noiDung || '').trim();
+    if (!trimmedNoiDung) {
       notifyInfo('Vui lòng nhập nội dung câu hỏi');
+      return;
+    }
+    if (trimmedNoiDung.length < 3 || trimmedNoiDung.length > 2000) {
+      notifyInfo('Nội dung câu hỏi phải từ 3 đến 2000 ký tự');
+      return;
+    }
+    if (DANGEROUS_TAG_REGEX.test(trimmedNoiDung)) {
+      notifyInfo('Nội dung câu hỏi chứa ký tự hoặc mã không hợp lệ');
       return;
     }
     
@@ -54,32 +65,48 @@ const QuestionBuilderModal = ({ exam, onClose }) => {
         notifyInfo('Vui lòng chọn 1 đáp án đúng');
         return;
       }
-      const allFilled = newQuestion.dapAns.every(d => d.noiDung.trim() !== '');
+      const allFilled = newQuestion.dapAns.every(d => d.noiDung && d.noiDung.trim() !== '');
       if (!allFilled) {
-        notifyInfo('Vui lòng nhập đủ nội dung cho 4 đáp án');
+        notifyInfo('Vui lòng nhập đủ nội dung cho tất cả đáp án');
+        return;
+      }
+      const hasDangerousAns = newQuestion.dapAns.some(d => DANGEROUS_TAG_REGEX.test(d.noiDung.trim()));
+      if (hasDangerousAns) {
+        notifyInfo('Nội dung đáp án chứa ký tự không hợp lệ');
         return;
       }
     }
 
-    if (!newQuestion.diem || newQuestion.diem <= 0 || newQuestion.diem > 10) {
+    const score = parseFloat(newQuestion.diem);
+    if (isNaN(score) || score <= 0 || score > 10) {
       notifyInfo('Điểm số phải lớn hơn 0 và tối đa là 10');
       return;
     }
 
-    const currentTotalScore = questions.reduce((acc, q) => acc + (q.id === editQuestionId ? 0 : q.diem), 0);
-    if (currentTotalScore + newQuestion.diem > 10) {
+    const currentTotalScore = questions.reduce((acc, q) => acc + (q.id === editQuestionId ? 0 : (q.diem || 0)), 0);
+    if (currentTotalScore + score > 10.0001) {
       notifyInfo(`Tổng điểm bài kiểm tra không được vượt quá 10. Điểm hiện tại: ${currentTotalScore}`);
       return;
     }
+
+    const payload = {
+      ...newQuestion,
+      noiDung: trimmedNoiDung,
+      diem: score,
+      dapAns: newQuestion.loaiCauHoi === 'TRAC_NGHIEM' ? newQuestion.dapAns.map(da => ({
+        ...da,
+        noiDung: (da.noiDung || '').trim()
+      })) : []
+    };
 
     try {
       setLoading(true);
       
       let res;
       if (editQuestionId) {
-        res = await api.put(`/baikiemtra/cauhoi/${editQuestionId}`, newQuestion);
+        res = await api.put(`/baikiemtra/cauhoi/${editQuestionId}`, payload);
       } else {
-        res = await api.post(`/baikiemtra/${exam.id}/cauhoi`, newQuestion);
+        res = await api.post(`/baikiemtra/${exam.id}/cauhoi`, payload);
       }
       
       if (res.data?.success) {

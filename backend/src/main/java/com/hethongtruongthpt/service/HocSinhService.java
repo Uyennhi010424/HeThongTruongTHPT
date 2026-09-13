@@ -75,7 +75,7 @@ public class HocSinhService {
     }
 
     public List<LichSuHocTap> getLichSuHocTap(Integer hocSinhId) {
-        return lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinhId);
+        return lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDescIdDesc(hocSinhId);
     }
 
     public HocSinh getByUsername(String username) {
@@ -617,9 +617,75 @@ public class HocSinhService {
         }
     }
 
+    private static final java.util.regex.Pattern STUDENT_NAME_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-zÀ-ỹĐđ\\s]+$");
+    private static final java.util.regex.Pattern BHYT_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9]{10,15}$");
+    private static final java.util.regex.Pattern ETHNICITY_RELIGION_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-zÀ-ỹĐđ\\s]+$");
+    private static final java.util.regex.Pattern ADDRESS_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-zÀ-ỹĐđ0-9\\s,\\/\\.\\-]+$");
+
     private void validateStudentRules(HocSinh hocSinh, LopHoc lop) {
         int currentYear = java.time.Year.now().getValue();
         
+        if (hocSinh.getHoTen() == null || hocSinh.getHoTen().isBlank()) {
+            throw new ApiException("Họ và tên học sinh không được để trống");
+        }
+        String trimmedHoTen = hocSinh.getHoTen().trim();
+        String[] nameParts = trimmedHoTen.split("\\s+");
+        if (nameParts.length < 2) {
+            throw new ApiException("Họ và tên học sinh phải có ít nhất 2 từ (vd: Nguyễn Văn A)");
+        }
+        if (!STUDENT_NAME_PATTERN.matcher(trimmedHoTen).matches()) {
+            throw new ApiException("Họ và tên học sinh chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt");
+        }
+
+        if (hocSinh.getNgaySinh() == null) {
+            throw new ApiException("Ngày sinh học sinh không được để trống");
+        }
+        if (lop == null || lop.getId() == null) {
+            throw new ApiException("Lớp học không được để trống");
+        }
+        if (hocSinh.getSdt() == null || hocSinh.getSdt().isBlank()) {
+            throw new ApiException("Số điện thoại học sinh không được để trống");
+        }
+        if (!hocSinh.getSdt().trim().matches("^0\\d{9}$")) {
+            throw new ApiException("Số điện thoại học sinh phải gồm 10 chữ số và bắt đầu bằng số 0");
+        }
+        if (hocSinh.getDiaChi() == null || hocSinh.getDiaChi().isBlank()) {
+            throw new ApiException("Địa chỉ học sinh không được để trống");
+        }
+        String trimmedAddress = hocSinh.getDiaChi().trim();
+        if (!ADDRESS_PATTERN.matcher(trimmedAddress).matches()) {
+            throw new ApiException("Địa chỉ học sinh không được chứa ký tự đặc biệt không hợp lệ (vd: @, #, $, %, ^, &, *, <, >)");
+        }
+
+        if (hocSinh.getDanToc() != null && !hocSinh.getDanToc().isBlank()) {
+            String trimmedDanToc = hocSinh.getDanToc().trim();
+            if (!ETHNICITY_RELIGION_PATTERN.matcher(trimmedDanToc).matches()) {
+                throw new ApiException("Tên dân tộc chỉ được chứa chữ cái tiếng Việt, không chứa số hay ký tự đặc biệt");
+            }
+        }
+
+        if (hocSinh.getTonGiao() != null && !hocSinh.getTonGiao().isBlank()) {
+            String trimmedTonGiao = hocSinh.getTonGiao().trim();
+            if (!ETHNICITY_RELIGION_PATTERN.matcher(trimmedTonGiao).matches()) {
+                throw new ApiException("Tên tôn giáo chỉ được chứa chữ cái tiếng Việt, không chứa số hay ký tự đặc biệt");
+            }
+        }
+
+        if (hocSinh.getNamNhapHoc() == null) {
+            throw new ApiException("Năm nhập học không được để trống");
+        }
+        if (hocSinh.getMaBhyt() == null || hocSinh.getMaBhyt().isBlank()) {
+            throw new ApiException("Mã BHYT học sinh không được để trống");
+        }
+        String trimmedBhyt = hocSinh.getMaBhyt().trim();
+        if (!BHYT_PATTERN.matcher(trimmedBhyt).matches()) {
+            throw new ApiException("Mã BHYT học sinh phải gồm 10-15 ký tự chữ và số, không chứa ký tự đặc biệt hay khoảng trắng (vd: HS1234567890)");
+        }
+
         if (hocSinh.getNamNhapHoc() != null) {
             if (hocSinh.getNamNhapHoc() > currentYear + 1) {
                 throw new ApiException("Năm nhập học không được vượt quá " + (currentYear + 1));
@@ -661,7 +727,6 @@ public class HocSinhService {
 
         // Kiểm tra trùng lặp Mã BHYT nếu có
         if (hocSinh.getMaBhyt() != null && !hocSinh.getMaBhyt().isBlank()) {
-            String trimmedBhyt = hocSinh.getMaBhyt().trim();
             List<HocSinh> bhytDupes = hocSinhRepository.findByMaBhytActive(trimmedBhyt);
             for (HocSinh dupe : bhytDupes) {
                 if (hocSinh.getId() == null || !hocSinh.getId().equals(dupe.getId())) {

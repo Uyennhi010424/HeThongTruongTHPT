@@ -16,6 +16,9 @@ public interface LichSuHocTapRepository extends JpaRepository<LichSuHocTap, Inte
     
     @EntityGraph(attributePaths = {"lopHoc"})
     List<LichSuHocTap> findByHocSinhIdOrderByNamHocDesc(Integer hocSinhId);
+
+    @EntityGraph(attributePaths = {"lopHoc"})
+    List<LichSuHocTap> findByHocSinhIdOrderByNamHocDescIdDesc(Integer hocSinhId);
     
     List<LichSuHocTap> findByNamHoc(String namHoc);
     boolean existsByNamHoc(String namHoc);

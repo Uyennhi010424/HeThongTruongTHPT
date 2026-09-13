@@ -91,10 +91,55 @@ public class PhuHuynhService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phụ huynh"));
     }
 
-    public PhuHuynh create(PhuHuynh phuHuynh) {
+    private static final java.util.regex.Pattern PARENT_NAME_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-zÀ-ỹĐđ\\s]+$");
+    private static final java.util.regex.Pattern PHONE_PATTERN =
+            java.util.regex.Pattern.compile("^0\\d{9}$");
+    private static final java.util.regex.Pattern EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final java.util.regex.Pattern JOB_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-zÀ-ỹĐđ0-9\\s,\\/\\.\\-]+$");
+
+    private void validatePhuHuynh(PhuHuynh phuHuynh) {
         if (phuHuynh.getHoTen() == null || phuHuynh.getHoTen().isBlank()) {
-            throw new ApiException("Thiếu họ tên phụ huynh");
+            throw new ApiException("Họ và tên phụ huynh không được để trống");
         }
+        String trimmedName = phuHuynh.getHoTen().trim();
+        String[] words = trimmedName.split("\\s+");
+        if (words.length < 2) {
+            throw new ApiException("Họ và tên phụ huynh phải có ít nhất 2 từ (vd: Nguyễn Văn A)");
+        }
+        if (!PARENT_NAME_PATTERN.matcher(trimmedName).matches()) {
+            throw new ApiException("Họ và tên phụ huynh chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt");
+        }
+
+        String sdt = phuHuynh.getSoDienThoai();
+        if (sdt != null && !sdt.isBlank() && !sdt.equals("0000000000")) {
+            if (!PHONE_PATTERN.matcher(sdt.trim()).matches()) {
+                throw new ApiException("Số điện thoại phụ huynh phải gồm 10 chữ số và bắt đầu bằng số 0");
+            }
+        }
+
+        String email = phuHuynh.getEmail();
+        if (email != null && !email.isBlank()) {
+            if (!EMAIL_PATTERN.matcher(email.trim()).matches()) {
+                throw new ApiException("Email phụ huynh không đúng định dạng (vd: phuhuynh@gmail.com)");
+            }
+        }
+
+        String job = phuHuynh.getNgheNghiep();
+        if (job != null && !job.isBlank()) {
+            if (!JOB_PATTERN.matcher(job.trim()).matches()) {
+                throw new ApiException("Nghề nghiệp phụ huynh không được chứa ký tự đặc biệt không hợp lệ");
+            }
+        }
+    }
+
+    public PhuHuynh create(PhuHuynh phuHuynh) {
+        if (phuHuynh == null) {
+            throw new ApiException("Thông tin phụ huynh không được để trống");
+        }
+        validatePhuHuynh(phuHuynh);
 
         if (phuHuynh.getSoDienThoai() == null || phuHuynh.getSoDienThoai().isBlank()) {
             phuHuynh.setSoDienThoai("0000000000");
@@ -150,6 +195,7 @@ public class PhuHuynhService {
         if (phuHuynh.getIsSmSActive() != null) {
             existing.setIsSmSActive(phuHuynh.getIsSmSActive());
         }
+        validatePhuHuynh(existing);
         return phuHuynhRepository.save(existing);
     }
 

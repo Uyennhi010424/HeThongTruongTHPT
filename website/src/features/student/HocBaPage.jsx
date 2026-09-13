@@ -72,7 +72,7 @@ export default function HocBaPage() {
         const hocBaRes = await getHocBa({ hocSinhId: currentStudent.id }).catch(() => null);
         const diemRes = await getDiem({ hocSinhId: currentStudent.id }).catch(() => null);
         const hkRes = await getHanhKiem({ hocSinhId: currentStudent.id }).catch(() => null);
-        
+
         if (!active) return;
         setHocBaList(hocBaRes?.data?.data || []);
         setDiemList(diemRes?.data?.data || []);
@@ -83,7 +83,7 @@ export default function HocBaPage() {
         const years = visibleYears
           .map((item) => item?.tenNamHoc || "")
           .filter(Boolean);
-        
+
         setNamHocListObj(visibleYears);
         setNamHocList(years);
         if (years.length > 0) {
@@ -112,8 +112,8 @@ export default function HocBaPage() {
   const calculateSemesterDtb = (hkNum) => {
     if (!diemList.length || !selectedNamHoc) return null;
 
-    const semesterScores = diemList.filter(d => 
-      (d.namHoc === selectedNamHoc || d.namHoc?.tenNamHoc === selectedNamHoc) && 
+    const semesterScores = diemList.filter(d =>
+      (d.namHoc === selectedNamHoc || d.namHoc?.tenNamHoc === selectedNamHoc) &&
       d.hocKy === hkNum
     );
 
@@ -123,7 +123,7 @@ export default function HocBaPage() {
     for (const s of semesterScores) {
       const mid = s.monHocId || s.monHoc?.id;
       if (!mid) continue;
-      
+
       const val = s.giaTriDiem ?? s.giaTri;
       if (val == null || val === "") continue;
 
@@ -185,7 +185,7 @@ export default function HocBaPage() {
 
   const displayHocLucHK1 = getHocLucLabel(calculateHocLuc(dtbHK1));
   const displayHanhKiemHK1 = getHanhKiemLabel(hk1HanhKiemObj?.xepLoai);
-  
+
   const displayHocLucHK2 = getHocLucLabel(calculateHocLuc(dtbHK2));
   const displayHanhKiemHK2 = getHanhKiemLabel(hk2HanhKiemObj?.xepLoai);
 
@@ -206,8 +206,8 @@ export default function HocBaPage() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col sm:flex-row items-center gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">Năm học</span>
-            <select 
-              value={selectedNamHoc} 
+            <select
+              value={selectedNamHoc}
               onChange={(e) => setSelectedNamHoc(e.target.value)}
               className="bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             >
@@ -241,7 +241,7 @@ export default function HocBaPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  { (currentPhase === "HK1" || currentPhase === "HK2" || currentPhase === "ALL") && (
+                  {(currentPhase === "HK1" || currentPhase === "HK2" || currentPhase === "ALL") && (
                     <tr className="hover:bg-slate-50/50 transition-colors bg-white">
                       <td className="px-6 py-5 text-sm font-bold text-slate-700">Học kỳ I</td>
                       <td className="px-6 py-5 text-xl font-bold text-slate-800">{dtbHK1 !== null ? dtbHK1.toFixed(1) : "--"}</td>
@@ -250,7 +250,7 @@ export default function HocBaPage() {
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHocLucHK1.color}>{displayHocLucHK1.label}</span></td>
                     </tr>
                   )}
-                  { (currentPhase === "HK2" || currentPhase === "ALL") && (
+                  {(currentPhase === "HK2" || currentPhase === "ALL") && (
                     <tr className="hover:bg-slate-50/50 transition-colors bg-white">
                       <td className="px-6 py-5 text-sm font-bold text-slate-700">Học kỳ II</td>
                       <td className="px-6 py-5 text-xl font-bold text-slate-800">{dtbHK2 !== null ? dtbHK2.toFixed(1) : "--"}</td>
@@ -259,7 +259,7 @@ export default function HocBaPage() {
                       <td className="px-6 py-5 text-base font-bold"><span className={displayHocLucHK2.color}>{displayHocLucHK2.label}</span></td>
                     </tr>
                   )}
-                  { currentPhase === "ALL" && (
+                  {currentPhase === "ALL" && (
                     <tr className="bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
                       <td className="px-6 py-6 text-base font-bold text-blue-900">Cả năm</td>
                       <td className="px-6 py-6">

@@ -34,14 +34,29 @@ public class DanTocService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dân tộc"));
     }
 
+    private static final java.util.regex.Pattern ETHNIC_NAME_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-zÀ-ỹĐđ\\s]+$");
+
+    private void validateDanToc(DanToc danToc) {
+        if (danToc == null || danToc.getTenDanToc() == null || danToc.getTenDanToc().isBlank()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tên dân tộc không được để trống");
+        }
+        String trimmed = danToc.getTenDanToc().trim();
+        if (!ETHNIC_NAME_PATTERN.matcher(trimmed).matches()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tên dân tộc chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt");
+        }
+        danToc.setTenDanToc(trimmed);
+    }
+
     public DanToc create(DanToc danToc) {
-        if (danToc == null) throw new IllegalArgumentException("Dân tộc không được để trống");
+        validateDanToc(danToc);
         return danTocRepository.save(danToc);
     }
 
     public DanToc update(Integer id, DanToc danToc) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
         getById(id);
+        validateDanToc(danToc);
         danToc.setId(id);
         return danTocRepository.save(danToc);
     }

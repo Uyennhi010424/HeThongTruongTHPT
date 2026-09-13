@@ -54,9 +54,10 @@ export default function NotificationsScreen() {
       const response = await axiosClient.get('/thongbao');
       if (response.data && response.data.data) {
         // Filter for parent notifications
-        const filtered = response.data.data.filter((item: ThongBao) => 
-          item.doiTuong === 'PHU_HUYNH' || item.doiTuong === 'ALL' || item.loai === 'PHU_HUYNH' || item.loai === 'ALL'
-        );
+        const filtered = response.data.data.filter((item: ThongBao) => {
+          const dt = (item.doiTuong || item.loai || '').split(',').map((s: string) => s.trim());
+          return dt.includes('PHU_HUYNH') || dt.includes('ALL');
+        });
         const data = filtered.sort((a: any, b: any) => {
           const timeA = new Date(a.ngayDang || a.ngayTao || 0).getTime();
           const timeB = new Date(b.ngayDang || b.ngayTao || 0).getTime();

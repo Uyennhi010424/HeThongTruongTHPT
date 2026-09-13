@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class RateLimitConfig {
 
-    private static final int MAX_ATTEMPTS = 5;
+    private static final int MAX_ATTEMPTS = 30;
     private static final long WINDOW_MS = 60_000; // 1 minute
 
     // Auto-evict entries after 2 minutes of no access (TTL = window + buffer)

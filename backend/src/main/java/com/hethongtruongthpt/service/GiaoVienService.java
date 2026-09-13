@@ -131,6 +131,10 @@ public class GiaoVienService {
                 ? generatedUsername
                 : giaoVien.getEmail().trim();
 
+        if (giaoVienRepository.countByEmailNative(username) > 0) {
+            throw new ApiException("Email giáo viên đã tồn tại trong hệ thống: " + username);
+        }
+
         giaoVien.setEmail(username);
         if (giaoVien.getUser() == null || giaoVien.getUser().getId() == null) {
             giaoVien.setUser(ensureTeacherAccountExists(username));
@@ -210,16 +214,44 @@ public class GiaoVienService {
 
     public void syncMissingTeacherAccounts() {
         List<GiaoVien> teachers = giaoVienRepository.findAll();
-        for (GiaoVien teacher : teachers) {
-            if (teacher == null) continue;
+        java.util.Set<String> assignedEmails = new java.util.HashSet<>();
 
-            String email = teacher.getEmail();
-            if (email == null || email.isBlank()) {
-                email = generateUniqueUsername(teacher.getHoTen());
-                teacher.setEmail(email);
-                giaoVienRepository.save(teacher);
+        for (GiaoVien teacher : teachers) {
+            if (teacher == null || teacher.getHoTen() == null || teacher.getHoTen().isBlank()) continue;
+
+            String baseLocalPart = buildLocalPart(teacher.getHoTen());
+            String expectedEmail = baseLocalPart + DEFAULT_ACCOUNT_SUFFIX;
+            int suffix = 2;
+
+            while (assignedEmails.contains(expectedEmail)) {
+                expectedEmail = baseLocalPart + suffix + DEFAULT_ACCOUNT_SUFFIX;
+                suffix++;
             }
-            ensureTeacherAccountExists(email);
+            assignedEmails.add(expectedEmail);
+
+            String oldEmail = teacher.getEmail();
+            boolean emailChanged = oldEmail == null || !oldEmail.equalsIgnoreCase(expectedEmail);
+
+            if (emailChanged) {
+                teacher.setEmail(expectedEmail);
+                if (teacher.getUser() != null) {
+                    User u = teacher.getUser();
+                    u.setUsername(expectedEmail);
+                    u.setEmail(expectedEmail);
+                    userRepository.save(u);
+                } else {
+                    User existingUser = userRepository.findByUsername(expectedEmail).orElse(null);
+                    if (existingUser != null) {
+                        teacher.setUser(existingUser);
+                    } else {
+                        teacher.setUser(ensureTeacherAccountExists(expectedEmail));
+                    }
+                }
+                giaoVienRepository.save(teacher);
+                log.info("Đã chuẩn hóa email giáo viên {} từ '{}' -> '{}'", teacher.getHoTen(), oldEmail, expectedEmail);
+            } else {
+                ensureTeacherAccountExists(expectedEmail);
+            }
         }
     }
 
@@ -413,16 +445,14 @@ public class GiaoVienService {
     }
 
     private String generateUniqueTeacherCode() {
-        int suffix = 1;
-        int maxRetries = 1000;
-        while (suffix <= maxRetries) {
-            String candidate = String.format("GV%04d", suffix);
-            if (giaoVienRepository.findByMaGiaoVien(candidate).isEmpty()) {
-                return candidate;
-            }
-            suffix += 1;
+        Integer maxNum = giaoVienRepository.findMaxTeacherCodeNumber();
+        int next = (maxNum == null ? 0 : maxNum) + 1;
+        String candidate = String.format("GV%04d", next);
+        while (giaoVienRepository.countByMaGiaoVienNative(candidate) > 0) {
+            next++;
+            candidate = String.format("GV%04d", next);
         }
-        throw new ApiException("Không thể tạo mã giáo viên duy nhất sau " + maxRetries + " lần thử");
+        return candidate;
     }
 
     private String generateUniqueUsername(String fullName) {
@@ -432,7 +462,9 @@ public class GiaoVienService {
         while (suffix <= maxRetries) {
             String localPart = suffix == 1 ? baseLocalPart : baseLocalPart + suffix;
             String candidate = localPart + DEFAULT_ACCOUNT_SUFFIX;
-            if (userRepository.findByUsername(candidate).isEmpty()) return candidate;
+            if (userRepository.findByUsername(candidate).isEmpty() && giaoVienRepository.countByEmailNative(candidate) == 0) {
+                return candidate;
+            }
             suffix += 1;
         }
         throw new ApiException("Không thể tạo username giáo viên duy nhất sau " + maxRetries + " lần thử");

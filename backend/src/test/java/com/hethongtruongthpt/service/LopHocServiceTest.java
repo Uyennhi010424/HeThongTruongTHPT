@@ -3,7 +3,7 @@ package com.hethongtruongthpt.service;
 import com.hethongtruongthpt.entity.LopHoc;
 import com.hethongtruongthpt.exception.ApiException;
 import com.hethongtruongthpt.exception.ResourceNotFoundException;
-import com.hethongtruongthpt.repository.LopHocRepository;
+import com.hethongtruongthpt.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,6 +27,24 @@ class LopHocServiceTest {
 
     @Mock
     private LopHocRepository lopHocRepository;
+
+    @Mock
+    private HocSinhRepository hocSinhRepository;
+
+    @Mock
+    private GiaoVienRepository giaoVienRepository;
+
+    @Mock
+    private ChuNhiemRepository chuNhiemRepository;
+
+    @Mock
+    private LichSuHocTapRepository lichSuHocTapRepository;
+
+    @Mock
+    private HocBaRepository hocBaRepository;
+
+    @Mock
+    private NamHocRepository namHocRepository;
 
     @InjectMocks
     private LopHocService lopHocService;
@@ -160,6 +178,32 @@ class LopHocServiceTest {
 
             assertThatThrownBy(() -> lopHocService.create(newLop))
                     .isInstanceOf(ApiException.class);
+        }
+
+        @Test
+        @DisplayName("should throw when ten lop contains special characters like 10@1")
+        void throwsWhenTenLopContainsSpecialCharacters() {
+            LopHoc newLop = new LopHoc();
+            newLop.setTenLop("10@1");
+            newLop.setKhoi(10);
+            newLop.setNamHoc("2024-2025");
+
+            assertThatThrownBy(() -> lopHocService.create(newLop))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("không chứa ký tự đặc biệt");
+        }
+
+        @Test
+        @DisplayName("should throw when nam hoc format is invalid or range is incorrect")
+        void throwsWhenNamHocInvalid() {
+            LopHoc newLop = new LopHoc();
+            newLop.setTenLop("10A1");
+            newLop.setKhoi(10);
+            newLop.setNamHoc("2024-2026");
+
+            assertThatThrownBy(() -> lopHocService.create(newLop))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("Năm học không hợp lệ");
         }
 
         @Test

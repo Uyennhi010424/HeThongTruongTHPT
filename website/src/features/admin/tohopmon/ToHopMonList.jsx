@@ -289,12 +289,23 @@ export default function ToHopMonList() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     
-    if (!form.maToHop.trim()) {
+    const trimmedMa = form.maToHop.trim().toUpperCase();
+    const trimmedTen = form.tenToHop.trim();
+
+    if (!trimmedMa) {
       notifyError("Vui lòng nhập mã tổ hợp.");
       return;
     }
-    if (!form.tenToHop.trim()) {
+    if (!/^[A-Za-z0-9_-]+$/.test(trimmedMa)) {
+      notifyError("Mã tổ hợp chỉ được chứa chữ cái, chữ số, gạch ngang và gạch dưới (vd: KHTN01, KHXH_02).");
+      return;
+    }
+    if (!trimmedTen) {
       notifyError("Vui lòng nhập tên tổ hợp.");
+      return;
+    }
+    if (!/^[A-ZÀ-Ỹa-zà-ỹ0-9\s(),\.-]+$/.test(trimmedTen)) {
+      notifyError("Tên tổ hợp không được chứa ký tự đặc biệt không hợp lệ.");
       return;
     }
     if (!form.ban) {
@@ -306,11 +317,39 @@ export default function ToHopMonList() {
       return;
     }
 
+    // Kiểm tra trùng mã tổ hợp (khi tạo mới)
+    if (!editingItem && toHopList.some((t) => t.maToHop?.trim().toUpperCase() === trimmedMa)) {
+      notifyError("Mã tổ hợp đã tồn tại.");
+      return;
+    }
+
+    // Kiểm tra trùng tên tổ hợp
+    const duplicateName = toHopList.find(
+      (t) => (!editingItem || t.id !== editingItem.id) && t.tenToHop?.trim().toLowerCase() === trimmedTen.toLowerCase()
+    );
+    if (duplicateName) {
+      notifyError(`Tên tổ hợp '${trimmedTen}' đã tồn tại.`);
+      return;
+    }
+
+    // Kiểm tra trùng 4 môn tự chọn
+    const formMonSet = new Set(form.monHocIds);
+    const duplicateSubjects = toHopList.find((t) => {
+      if (editingItem && t.id === editingItem.id) return false;
+      const tMonIds = t.monHocIds || [];
+      if (tMonIds.length !== formMonSet.size) return false;
+      return tMonIds.every((id) => formMonSet.has(id));
+    });
+    if (duplicateSubjects) {
+      notifyError(`Tổ hợp 4 môn này đã tồn tại (trùng với ${duplicateSubjects.maToHop} - ${duplicateSubjects.tenToHop}).`);
+      return;
+    }
+
     const finalSoTiets = form.monHocIds.map((_, index) => form.soTiets?.[index] ?? 2);
 
     const payload = {
-      maToHop: form.maToHop.trim().toUpperCase(),
-      tenToHop: form.tenToHop.trim(),
+      maToHop: trimmedMa,
+      tenToHop: trimmedTen,
       ban: form.ban,
       moTa: form.moTa.trim(),
       monHocIds: form.monHocIds,
@@ -348,24 +387,33 @@ export default function ToHopMonList() {
 
   const handleSeedDefaults = async () => {
     try {
-      const existingMaSet = new Set(toHopList.map((item) => item.maToHop));
+      const existingMaSet = new Set(toHopList.map((item) => item.maToHop?.toUpperCase()));
+      const existingTenSet = new Set(toHopList.map((item) => item.tenToHop?.trim().toLowerCase()));
+      const existingSubjectSets = toHopList.map((item) => new Set(item.monHocIds || []));
+
       const monHocMap = new Map();
       allMonHoc.forEach((m) => {
-        monHocMap.set(m.tenMon, m.id);
+        monHocMap.set(m.tenMon?.trim().toLowerCase(), m.id);
       });
 
       let createdCount = 0;
       for (const combo of DEFAULT_COMBINATIONS) {
-        if (existingMaSet.has(combo.maToHop)) continue;
+        if (existingMaSet.has(combo.maToHop.toUpperCase())) continue;
+        if (existingTenSet.has(combo.tenToHop.trim().toLowerCase())) continue;
 
         const monHocIds = combo.monHoc
-          .map((ten) => monHocMap.get(ten))
+          .map((ten) => monHocMap.get(ten.trim().toLowerCase()))
           .filter(Boolean);
 
         if (monHocIds.length !== 4) {
-          notifyError(`Thiếu môn học cho tổ hợp ${combo.maToHop}. Vui lòng thêm đủ môn trước.`);
           continue;
         }
+
+        const comboSet = new Set(monHocIds);
+        const isDuplicateSubjects = existingSubjectSets.some(
+          (set) => set.size === comboSet.size && [...set].every((id) => comboSet.has(id))
+        );
+        if (isDuplicateSubjects) continue;
 
         await createToHopMon({
           maToHop: combo.maToHop,
@@ -374,13 +422,16 @@ export default function ToHopMonList() {
           monHocIds
         });
         createdCount++;
+        existingMaSet.add(combo.maToHop.toUpperCase());
+        existingTenSet.add(combo.tenToHop.trim().toLowerCase());
+        existingSubjectSets.push(comboSet);
       }
 
       await fetchData();
       if (createdCount > 0) {
         notifySuccess(`Đã tạo ${createdCount} tổ hợp môn theo quy định.`);
       } else {
-        notifySuccess("Danh mục tổ hợp đã đủ theo quy định.");
+        notifySuccess("Danh mục tổ hợp đã đủ hoặc không có tổ hợp mới cần tạo.");
       }
     } catch (err) {
       notifyError(getApiErrorMessage(err, "Không thể tạo tổ hợp môn."));
@@ -393,12 +444,33 @@ export default function ToHopMonList() {
 
   // Nhóm môn học theo loại (bắt buộc vs tự chọn) để hiển thị trong form
   const monHocByType = useMemo(() => {
-    const batBuoc = ["Toán", "Ngữ văn", "Tiếng Anh", "Lịch sử", "Giáo dục thể chất",
-      "Giáo dục QP&AN", "Hoạt động trải nghiệm", "Nội dung giáo dục địa phương"];
+    const batBuoc = [
+      "Toán", "Ngữ văn", "Tiếng Anh", "Lịch sử", "Giáo dục thể chất",
+      "Giáo dục QP&AN", "Hoạt động trải nghiệm", "Nội dung giáo dục địa phương"
+    ];
+    const excluded = ["SHDC", "SHL", "Sinh hoạt lớp", "Chào cờ", "Sinh hoạt dưới cờ"];
+
     const batBuocList = [];
     const tuChonList = [];
+
     allMonHoc.forEach((m) => {
-      if (batBuoc.some((bb) => m.tenMon?.includes(bb) || bb.includes(m.tenMon))) {
+      const tenMon = String(m.tenMon || "").trim();
+      const maMon = String(m.maMon || "").trim().toUpperCase();
+      const lower = tenMon.toLowerCase();
+
+      // Ẩn các môn/tiết SHDC, Sinh hoạt lớp, Chào cờ
+      if (
+        excluded.some((ex) => tenMon.includes(ex) || ex.includes(tenMon)) ||
+        maMon === "SHDC" ||
+        maMon === "SHL" ||
+        lower.includes("shdc") ||
+        lower.includes("sinh hoạt lớp") ||
+        lower.includes("chào cờ")
+      ) {
+        return;
+      }
+
+      if (batBuoc.some((bb) => tenMon.includes(bb) || bb.includes(tenMon))) {
         batBuocList.push(m);
       } else {
         tuChonList.push(m);

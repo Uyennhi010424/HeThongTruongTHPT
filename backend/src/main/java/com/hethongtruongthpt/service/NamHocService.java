@@ -63,20 +63,44 @@ public class NamHocService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy năm học"));
     }
 
+    private static final java.util.regex.Pattern SCHOOL_YEAR_PATTERN =
+            java.util.regex.Pattern.compile("^\\d{4}-\\d{4}$");
+
+    private void validateNamHoc(NamHoc namHoc) {
+        if (namHoc == null || namHoc.getTenNamHoc() == null || namHoc.getTenNamHoc().isBlank()) {
+            throw new ApiException("Tên năm học không được để trống");
+        }
+        String cleaned = namHoc.getTenNamHoc().replaceAll("\\s+", "");
+        if (!SCHOOL_YEAR_PATTERN.matcher(cleaned).matches()) {
+            throw new ApiException("Tên năm học phải có định dạng YYYY-YYYY (vd: 2026-2027)");
+        }
+        String[] parts = cleaned.split("-");
+        int startYear = Integer.parseInt(parts[0]);
+        int endYear = Integer.parseInt(parts[1]);
+        if (endYear != startYear + 1) {
+            throw new ApiException("Năm học không hợp lệ: năm kết thúc phải là " + (startYear + 1));
+        }
+        namHoc.setTenNamHoc(cleaned);
+    }
+
     public NamHoc create(NamHoc namHoc) {
         namHoc.setId(null); // Để MySQL tự tăng ID
-        if (namHoc.getTenNamHoc() != null) {
-            namHoc.setTenNamHoc(namHoc.getTenNamHoc().replaceAll("\\s+", ""));
-        }
+        validateNamHoc(namHoc);
         return namHocRepository.save(namHoc);
     }
 
     public NamHoc update(Integer id, NamHoc namHoc) {
-        getById(id);
-        namHoc.setId(id);
-        if (namHoc.getTenNamHoc() != null) {
-            namHoc.setTenNamHoc(namHoc.getTenNamHoc().replaceAll("\\s+", ""));
+        NamHoc existing = getById(id);
+        if (namHoc.getTrangThai() != null
+                && "DA_DONG".equalsIgnoreCase(namHoc.getTrangThai())
+                && "DANG_MO".equalsIgnoreCase(existing.getTrangThai())) {
+            long totalYears = namHocRepository.count();
+            if (totalYears <= 1) {
+                throw new ApiException("Không thể khóa năm học khi hệ thống chỉ có duy nhất một năm học.");
+            }
         }
+        validateNamHoc(namHoc);
+        namHoc.setId(id);
         return namHocRepository.save(namHoc);
     }
 

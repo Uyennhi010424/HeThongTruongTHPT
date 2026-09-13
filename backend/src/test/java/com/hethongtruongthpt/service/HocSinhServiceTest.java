@@ -98,12 +98,17 @@ class HocSinhServiceTest {
         sampleHocSinh.setId(1);
         sampleHocSinh.setHoTen("Nguyen Van A");
         sampleHocSinh.setMaHocSinh("HS2024");
-        sampleHocSinh.setNgaySinh(LocalDate.of(2008, 1, 15));
+        sampleHocSinh.setNgaySinh(LocalDate.now().minusYears(16));
         sampleHocSinh.setGioiTinh("NAM");
         sampleHocSinh.setLop(sampleLop);
         sampleHocSinh.setUser(sampleUser);
         sampleHocSinh.setTrangThai(1);
         sampleHocSinh.setNamNhapHoc(2024);
+        sampleHocSinh.setSdt("0901234567");
+        sampleHocSinh.setDiaChi("123 Duong ABC, Quan 1, TP.HCM");
+        sampleHocSinh.setMaBhyt("HS1234567890");
+        sampleHocSinh.setDanToc("Kinh");
+        sampleHocSinh.setTonGiao("Không");
     }
 
     @Nested
@@ -236,9 +241,14 @@ class HocSinhServiceTest {
         void createsSuccessfully() {
             HocSinh newHs = new HocSinh();
             newHs.setHoTen("Tran Thi B");
-            newHs.setNgaySinh(LocalDate.of(2008, 5, 20));
+            newHs.setNgaySinh(LocalDate.now().minusYears(16));
             newHs.setGioiTinh("NU");
             newHs.setNamNhapHoc(2024);
+            newHs.setSdt("0912345678");
+            newHs.setDiaChi("456 Duong XYZ, Quan 3, TP.HCM");
+            newHs.setMaBhyt("HS9876543210");
+            newHs.setDanToc("Kinh");
+            newHs.setTonGiao("Không");
             LopHoc lopRef = new LopHoc();
             lopRef.setId(1);
             newHs.setLop(lopRef);
@@ -298,17 +308,23 @@ class HocSinhServiceTest {
         @Test
         @DisplayName("should throw when duplicate student in same class")
         void throwsWhenDuplicateStudentInSameClass() {
+            LocalDate birthDate = LocalDate.now().minusYears(16);
             HocSinh newHs = new HocSinh();
             newHs.setHoTen("Nguyen Van A");
-            newHs.setNgaySinh(LocalDate.of(2008, 1, 15));
+            newHs.setNgaySinh(birthDate);
             newHs.setGioiTinh("NAM");
             newHs.setNamNhapHoc(2024);
+            newHs.setSdt("0901234567");
+            newHs.setDiaChi("123 Duong ABC, TP.HCM");
+            newHs.setMaBhyt("HS1234567890");
+            newHs.setDanToc("Kinh");
+            newHs.setTonGiao("Không");
             LopHoc lopRef = new LopHoc();
             lopRef.setId(1);
             newHs.setLop(lopRef);
 
             when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
-            when(hocSinhRepository.findActiveDuplicateInClass(eq("Nguyen Van A"), eq(LocalDate.of(2008, 1, 15)), eq(1)))
+            when(hocSinhRepository.findActiveDuplicateInClass(eq("Nguyen Van A"), eq(birthDate), eq(1)))
                     .thenReturn(List.of(sampleHocSinh));
 
             assertThatThrownBy(() -> hocSinhService.create(newHs))
@@ -317,20 +333,86 @@ class HocSinhServiceTest {
         }
 
         @Test
-        @DisplayName("should throw when duplicate ma bhyt")
-        void throwsWhenDuplicateMaBhyt() {
+        @DisplayName("should throw when hoTen contains numbers or special characters")
+        void throwsWhenHoTenContainsSpecialCharacters() {
             HocSinh newHs = new HocSinh();
-            newHs.setHoTen("Tran Thi C");
-            newHs.setNgaySinh(LocalDate.of(2008, 5, 20));
-            newHs.setGioiTinh("NU");
+            newHs.setHoTen("Nguyen Van @123");
+            newHs.setNgaySinh(LocalDate.now().minusYears(16));
+            newHs.setGioiTinh("NAM");
             newHs.setNamNhapHoc(2024);
-            newHs.setMaBhyt("BHYT123456");
             LopHoc lopRef = new LopHoc();
             lopRef.setId(1);
             newHs.setLop(lopRef);
 
             when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
-            when(hocSinhRepository.findByMaBhytActive("BHYT123456"))
+
+            assertThatThrownBy(() -> hocSinhService.create(newHs))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("Họ và tên học sinh");
+        }
+
+        @Test
+        @DisplayName("should throw when hoTen has only one word")
+        void throwsWhenHoTenHasOnlyOneWord() {
+            HocSinh newHs = new HocSinh();
+            newHs.setHoTen("Nguyen");
+            newHs.setNgaySinh(LocalDate.now().minusYears(16));
+            newHs.setGioiTinh("NAM");
+            newHs.setNamNhapHoc(2024);
+            LopHoc lopRef = new LopHoc();
+            lopRef.setId(1);
+            newHs.setLop(lopRef);
+
+            when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
+
+            assertThatThrownBy(() -> hocSinhService.create(newHs))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("ít nhất 2 từ");
+        }
+
+        @Test
+        @DisplayName("should throw when maBhyt contains special characters")
+        void throwsWhenMaBhytContainsSpecialCharacters() {
+            HocSinh newHs = new HocSinh();
+            newHs.setHoTen("Tran Thi B");
+            newHs.setNgaySinh(LocalDate.now().minusYears(16));
+            newHs.setGioiTinh("NU");
+            newHs.setNamNhapHoc(2024);
+            newHs.setSdt("0901234567");
+            newHs.setDiaChi("123 Duong ABC, TP.HCM");
+            newHs.setMaBhyt("BHYT@12345");
+            newHs.setDanToc("Kinh");
+            newHs.setTonGiao("Không");
+            LopHoc lopRef = new LopHoc();
+            lopRef.setId(1);
+            newHs.setLop(lopRef);
+
+            when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
+
+            assertThatThrownBy(() -> hocSinhService.create(newHs))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("Mã BHYT");
+        }
+
+        @Test
+        @DisplayName("should throw when duplicate ma bhyt")
+        void throwsWhenDuplicateMaBhyt() {
+            HocSinh newHs = new HocSinh();
+            newHs.setHoTen("Tran Thi C");
+            newHs.setNgaySinh(LocalDate.now().minusYears(16));
+            newHs.setGioiTinh("NU");
+            newHs.setNamNhapHoc(2024);
+            newHs.setSdt("0901234567");
+            newHs.setDiaChi("123 Duong ABC, TP.HCM");
+            newHs.setMaBhyt("HS1234567890");
+            newHs.setDanToc("Kinh");
+            newHs.setTonGiao("Không");
+            LopHoc lopRef = new LopHoc();
+            lopRef.setId(1);
+            newHs.setLop(lopRef);
+
+            when(lopHocRepository.findById(1)).thenReturn(Optional.of(sampleLop));
+            when(hocSinhRepository.findByMaBhytActive("HS1234567890"))
                     .thenReturn(List.of(sampleHocSinh));
 
             assertThatThrownBy(() -> hocSinhService.create(newHs))
@@ -352,8 +434,14 @@ class HocSinhServiceTest {
 
             HocSinh updated = new HocSinh();
             updated.setHoTen("Nguyen Van A Updated");
-            updated.setNgaySinh(LocalDate.of(2008, 1, 15));
+            updated.setNgaySinh(LocalDate.now().minusYears(16));
             updated.setGioiTinh("NAM");
+            updated.setNamNhapHoc(2024);
+            updated.setSdt("0901234567");
+            updated.setDiaChi("123 Duong ABC, Quan 1, TP.HCM");
+            updated.setMaBhyt("HS1234567890");
+            updated.setDanToc("Kinh");
+            updated.setTonGiao("Không");
             LopHoc lopRef = new LopHoc();
             lopRef.setId(1);
             updated.setLop(lopRef);
@@ -383,6 +471,14 @@ class HocSinhServiceTest {
             HocSinh existing = new HocSinh();
             existing.setId(1);
             existing.setHoTen("Nguyen Van A");
+            existing.setNgaySinh(LocalDate.now().minusYears(16));
+            existing.setGioiTinh("NAM");
+            existing.setNamNhapHoc(2024);
+            existing.setSdt("0901234567");
+            existing.setDiaChi("123 Duong ABC, Quan 1, TP.HCM");
+            existing.setMaBhyt("HS1234567890");
+            existing.setDanToc("Kinh");
+            existing.setTonGiao("Không");
             existing.setLop(sampleLop);
             existing.setUser(sampleUser);
 
@@ -392,6 +488,14 @@ class HocSinhServiceTest {
 
             HocSinh updated = new HocSinh();
             updated.setHoTen("Nguyen Van A Updated");
+            updated.setNgaySinh(LocalDate.now().minusYears(16));
+            updated.setGioiTinh("NAM");
+            updated.setNamNhapHoc(2024);
+            updated.setSdt("0901234567");
+            updated.setDiaChi("123 Duong ABC, Quan 1, TP.HCM");
+            updated.setMaBhyt("HS1234567890");
+            updated.setDanToc("Kinh");
+            updated.setTonGiao("Không");
             // lop is null
 
             HocSinh result = hocSinhService.update(1, updated);

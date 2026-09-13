@@ -586,7 +586,7 @@ export function useHocSinhList() {
       hoTen: "",
       ngaySinh: "",
       gioiTinh: "true",
-      lopHocId: classes[0]?.id ? String(classes[0].id) : "",
+      lopHocId: filteredClasses[0]?.id ? String(filteredClasses[0].id) : (classes[0]?.id ? String(classes[0].id) : ""),
       danTocTen: "Kinh",
       tonGiao: "Không",
       phuHuynhId: "",
@@ -724,91 +724,178 @@ export function useHocSinhList() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError("");
-    if (!form.hoTen.trim()) {
-      setFormError("Vui lòng nhập họ tên.");
+    
+    // 1. Kiểm tra thông tin học sinh
+    const studentName = form.hoTen.trim();
+    if (!studentName) {
+      setFormError("Vui lòng nhập họ và tên học sinh.");
+      return;
+    }
+    const nameWords = studentName.split(/\s+/);
+    if (nameWords.length < 2) {
+      setFormError("Họ và tên học sinh phải có ít nhất 2 từ (vd: Nguyễn Văn A).");
+      return;
+    }
+    const VI_NAME_REGEX = /^[A-Za-zÀ-ỹĐđ\s]+$/;
+    if (!VI_NAME_REGEX.test(studentName)) {
+      setFormError("Họ và tên học sinh chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt.");
+      return;
+    }
+    if (!form.ngaySinh) {
+      setFormError("Vui lòng chọn ngày sinh học sinh.");
       return;
     }
     if (!form.lopHocId) {
       setFormError("Vui lòng chọn lớp học.");
       return;
     }
-
     const ethnicityName = form.danTocTen.trim();
     if (!ethnicityName) {
       setFormError("Vui lòng nhập dân tộc.");
       return;
     }
+    if (!VI_NAME_REGEX.test(ethnicityName)) {
+      setFormError("Tên dân tộc chỉ được chứa chữ cái tiếng Việt, không chứa số hay ký tự đặc biệt.");
+      return;
+    }
+    const religionName = (form.tonGiao || "").trim();
+    if (!religionName) {
+      setFormError("Vui lòng chọn hoặc nhập tôn giáo.");
+      return;
+    }
+    if (!VI_NAME_REGEX.test(religionName)) {
+      setFormError("Tên tôn giáo chỉ được chứa chữ cái tiếng Việt, không chứa số hay ký tự đặc biệt.");
+      return;
+    }
+    const studentPhone = form.sdt.trim();
+    if (!studentPhone) {
+      setFormError("Vui lòng nhập số điện thoại học sinh.");
+      return;
+    }
+    if (!/^0\d{9}$/.test(studentPhone)) {
+      setFormError("Số điện thoại học sinh phải gồm 10 chữ số và bắt đầu bằng số 0.");
+      return;
+    }
+    const addressStr = form.diaChi.trim();
+    if (!addressStr) {
+      setFormError("Vui lòng nhập địa chỉ học sinh.");
+      return;
+    }
+    const ADDRESS_REGEX = /^[A-Za-zÀ-ỹĐđ0-9\s,\/\.\-]+$/;
+    if (!ADDRESS_REGEX.test(addressStr)) {
+      setFormError("Địa chỉ học sinh không được chứa ký tự đặc biệt không hợp lệ (vd: @, #, $, %, ^, &, *, <, >).");
+      return;
+    }
+    if (!form.namNhapHoc) {
+      setFormError("Vui lòng chọn năm nhập học.");
+      return;
+    }
+    const bhytStr = form.maBhyt.trim();
+    if (!bhytStr) {
+      setFormError("Vui lòng nhập mã BHYT học sinh.");
+      return;
+    }
+    if (!/^[A-Za-z0-9]{10,15}$/.test(bhytStr)) {
+      setFormError("Mã BHYT học sinh phải gồm 10-15 ký tự chữ và số, không chứa ký tự đặc biệt hay khoảng trắng (vd: HS1234567890).");
+      return;
+    }
 
+    // 2. Kiểm tra thông tin phụ huynh
     const danTocId = editingStudent?.danTocId || 1;
     let phuHuynhId = form.phuHuynhId ? Number(form.phuHuynhId) : null;
 
     if (!phuHuynhId) {
-      const hasParentContact =
-        form.phuHuynhHoTen.trim() ||
-        form.phuHuynhSdt.trim() ||
-        form.phuHuynhEmail.trim();
+      const parentName = form.phuHuynhHoTen.trim();
+      const parentPhone = form.phuHuynhSdt.trim();
+      const parentJob = form.phuHuynhNgheNghiep.trim();
+      const parentEmail = form.phuHuynhEmail.trim();
 
-      if (hasParentContact) {
+      if (!parentName) {
+        setFormError("Vui lòng chọn phụ huynh có sẵn hoặc nhập họ tên phụ huynh mới.");
+        return;
+      }
+      const parentWords = parentName.split(/\s+/);
+      if (parentWords.length < 2) {
+        setFormError("Họ và tên phụ huynh phải có ít nhất 2 từ (vd: Nguyễn Văn B).");
+        return;
+      }
+      if (!VI_NAME_REGEX.test(parentName)) {
+        setFormError("Họ và tên phụ huynh chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt.");
+        return;
+      }
+      if (!parentPhone) {
+        setFormError("Vui lòng nhập số điện thoại phụ huynh.");
+        return;
+      }
+      if (!/^0\d{9}$/.test(parentPhone)) {
+        setFormError("Số điện thoại phụ huynh phải gồm 10 chữ số và bắt đầu bằng số 0.");
+        return;
+      }
+      if (!parentJob) {
+        setFormError("Vui lòng nhập nghề nghiệp phụ huynh.");
+        return;
+      }
+      if (!ADDRESS_REGEX.test(parentJob)) {
+        setFormError("Nghề nghiệp phụ huynh không được chứa ký tự đặc biệt không hợp lệ.");
+        return;
+      }
+      if (parentEmail && !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(parentEmail)) {
+        setFormError("Email phụ huynh không đúng định dạng (vd: phuhuynh@gmail.com).");
+        return;
+      }
+
+      try {
+        const candidateEmail =
+          parentEmail ||
+          buildParentEmailPreview(parentName, parentPhone);
+        let createdUserId = null;
         try {
-          const candidateEmail =
-            form.phuHuynhEmail.trim() ||
-            buildParentEmailPreview(form.phuHuynhHoTen, form.phuHuynhSdt);
-          let createdUserId = null;
-          try {
-            const userRes = await createUser({
-              username: candidateEmail,
-              email: candidateEmail,
-              password: "Abc1234@",
-              status: 1,
-              role: "PHU_HUYNH"
-            });
-            createdUserId = userRes?.data?.data?.id;
-          } catch {
-            try {
-              const usersRes = await getUsers();
-              const found = (usersRes?.data?.data || []).find((u) => {
-                const email = String(u?.email || "").toLowerCase();
-                return email === candidateEmail.toLowerCase();
-              });
-              if (found?.id) createdUserId = found.id;
-            } catch {
-              // ignore
-            }
-          }
-
-          const phPayload = {
-            hoTen: form.phuHuynhHoTen.trim() || null,
-            soDienThoai: form.phuHuynhSdt.trim() || null,
-            email: form.phuHuynhEmail.trim() || null,
-            diaChi: null,
-            ngheNghiep: form.phuHuynhNgheNghiep.trim() || null,
-            quanHe: isFemaleVietnameseName(form.phuHuynhHoTen) ? "ME" : "CHA",
-            isSmSActive: true
-          };
-          if (createdUserId) phPayload.user = { id: Number(createdUserId) };
-
-          const phRes = await createPhuHuynh(phPayload);
-          const createdParent = phRes?.data?.data;
-          if (createdParent?.id) {
-            phuHuynhId = Number(createdParent.id);
-            setParents((prev) => [createdParent, ...prev]);
-          }
+          const userRes = await createUser({
+            username: candidateEmail,
+            email: candidateEmail,
+            password: "Abc1234@",
+            status: 1,
+            role: "PHU_HUYNH"
+          });
+          createdUserId = userRes?.data?.data?.id;
         } catch {
-          setFormError("Không thể tạo thông tin phụ huynh.");
-          return;
+          try {
+            const usersRes = await getUsers();
+            const found = (usersRes?.data?.data || []).find((u) => {
+              const email = String(u?.email || "").toLowerCase();
+              return email === candidateEmail.toLowerCase();
+            });
+            if (found?.id) createdUserId = found.id;
+          } catch {
+            // ignore
+          }
         }
+
+        const phPayload = {
+          hoTen: parentName,
+          soDienThoai: parentPhone,
+          email: form.phuHuynhEmail.trim() || null,
+          diaChi: form.diaChi.trim() || null,
+          ngheNghiep: parentJob,
+          quanHe: isFemaleVietnameseName(parentName) ? "ME" : "CHA",
+          isSmSActive: true
+        };
+        if (createdUserId) phPayload.user = { id: Number(createdUserId) };
+
+        const phRes = await createPhuHuynh(phPayload);
+        const createdParent = phRes?.data?.data;
+        if (createdParent?.id) {
+          phuHuynhId = Number(createdParent.id);
+          setParents((prev) => [createdParent, ...prev]);
+        }
+      } catch {
+        setFormError("Không thể tạo thông tin phụ huynh.");
+        return;
       }
     }
 
     if (!phuHuynhId) {
-      const fallbackParent = parents[0];
-      if (fallbackParent?.id) {
-        phuHuynhId = Number(fallbackParent.id);
-      }
-    }
-
-    if (!phuHuynhId) {
-      setFormError("Vui lòng chọn phụ huynh hoặc nhập thông tin liên hệ phụ huynh.");
+      setFormError("Vui lòng chọn phụ huynh có sẵn hoặc nhập đầy đủ thông tin phụ huynh.");
       return;
     }
 
@@ -995,20 +1082,58 @@ export function useHocSinhList() {
       // ✅ FIX: Thêm cellDates: true để SheetJS tự convert số serial thành JS Date
       const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
 
+      // Xác định năm học mục tiêu khi import:
+      // Ưu tiên năm học đang lọc (yearFilter khác 'all'), nếu 'all' thì lấy năm học hiện hành
+      const activeAcademicYearObj = getActiveAcademicYear(namHocList) || namHocList[0];
+      const targetNamHoc = (yearFilter && yearFilter !== "all")
+        ? yearFilter
+        : (activeAcademicYearObj?.tenNamHoc || "");
+
+      // Danh sách lớp thuộc năm học mục tiêu
+      const activeYearClasses = targetNamHoc
+        ? classes.filter((lop) => String(lop.namHoc || "").trim() === targetNamHoc.trim())
+        : classes;
+
       const classMap = new Map();
-      classes.forEach((lop) => {
+      activeYearClasses.forEach((lop) => {
         classMap.set(normalizeText(lop.tenLop), lop);
       });
 
-      const fuzzyFindClass = (normName) => {
+      const findClassForStudent = (className, rowNamHoc) => {
+        const normName = normalizeText(className);
         if (!normName) return null;
-        if (classMap.has(normName)) return classMap.get(normName);
-        for (const [key, lop] of classMap.entries()) {
-          if (key.includes(normName) || normName.includes(key)) return lop;
+
+        const effectiveNamHoc = String(rowNamHoc || targetNamHoc || "").trim();
+        if (effectiveNamHoc) {
+          return (
+            classes.find(
+              (c) =>
+                normalizeText(c.tenLop) === normName &&
+                String(c.namHoc || "").trim() === effectiveNamHoc
+            ) || null
+          );
+        }
+        return classMap.get(normName) || null;
+      };
+
+      const fuzzyFindClass = (normName, rowNamHoc) => {
+        if (!normName) return null;
+        const exact = findClassForStudent(normName, rowNamHoc);
+        if (exact) return exact;
+
+        const effectiveNamHoc = String(rowNamHoc || targetNamHoc || "").trim();
+        const pool = effectiveNamHoc
+          ? classes.filter((c) => String(c.namHoc || "").trim() === effectiveNamHoc)
+          : activeYearClasses;
+
+        for (const lop of pool) {
+          const key = normalizeText(lop.tenLop);
+          if (key === normName) return lop;
         }
         const simple = normName.replace(/[^a-z0-9]/g, "");
-        for (const [key, lop] of classMap.entries()) {
-          if (key.includes(simple) || simple.includes(key)) return lop;
+        for (const lop of pool) {
+          const key = normalizeText(lop.tenLop).replace(/[^a-z0-9]/g, "");
+          if (key === simple) return lop;
         }
         return null;
       };
@@ -1145,6 +1270,9 @@ export function useHocSinhList() {
       // PRE-VALIDATION PASS
       const seenInFileMap = new Map(); // key -> rowLabel
       const fileDuplicates = [];
+      const missingClasses = new Set();
+      const missingHoTenRows = [];
+      const ageErrors = new Set();
 
       for (const item of allCollectedRows) {
         const { row, rowNumber, sheetName } = item;
@@ -1157,19 +1285,20 @@ export function useHocSinhList() {
         totalNonEmptyRows += 1;
 
         const className = String(findColumnValue(row, EXCEL_FIELD_ALIASES.lop) || "").trim();
+        const rowNamHoc = String(findColumnValue(row, EXCEL_FIELD_ALIASES.namHoc) || "").trim() || targetNamHoc;
         const normClassName = normalizeText(className);
-        let classMatch = classMap.get(normClassName);
-        if (!classMatch) classMatch = fuzzyFindClass(normClassName);
+        let classMatch = findClassForStudent(className, rowNamHoc);
+        if (!classMatch) classMatch = fuzzyFindClass(normClassName, rowNamHoc);
 
         const fullName = String(findColumnValue(row, EXCEL_FIELD_ALIASES.hoTen) || "").trim();
 
         if (!fullName) {
-          failedRows.push(`${rowLabel}: thiếu cột Họ tên`);
+          missingHoTenRows.push(rowLabel);
           continue;
         }
 
         if (!classMatch) {
-          failedRows.push(`${rowLabel}: không tìm thấy lớp '${className || "(trống)"}'`);
+          missingClasses.add(className || "(trống)");
           continue;
         }
 
@@ -1179,7 +1308,7 @@ export function useHocSinhList() {
 
         const ageError = validateStudentAgeAndYear(ngaySinhNormalized, namNhapHoc, classMatch.khoi);
         if (ageError) {
-          failedRows.push(`${rowLabel}: ${ageError}`);
+          ageErrors.add(ageError);
         }
 
         // Kiểm tra trùng lặp nội bộ trong file Excel
@@ -1191,12 +1320,35 @@ export function useHocSinhList() {
         }
       }
 
-      if (fileDuplicates.length > 0) {
-        failedRows.push(...fileDuplicates);
+      // Xử lý thông báo lỗi ngắn gọn 1 dòng duy nhất
+      if (missingClasses.size > 0) {
+        const classNames = Array.from(missingClasses).map((c) => `'${c}'`).join(", ");
+        setExcelError(
+          `Lớp ${classNames} chưa được tạo trong năm học ${targetNamHoc || ""}. Vui lòng tạo lớp học trước khi nhập.`
+        );
+        setImporting(false);
+        event.target.value = "";
+        return;
       }
 
-      if (failedRows.length > 0) {
-        setExcelError(`Tệp Excel không hợp lệ. Vui lòng sửa lỗi và thử lại: ${failedRows.slice(0, 3).join(" | ")}`);
+      if (missingHoTenRows.length > 0) {
+        setExcelError(
+          `Thiếu cột Họ tên tại ${missingHoTenRows.slice(0, 3).join(", ")}${missingHoTenRows.length > 3 ? ` và ${missingHoTenRows.length - 3} dòng khác` : ""}.`
+        );
+        setImporting(false);
+        event.target.value = "";
+        return;
+      }
+
+      if (fileDuplicates.length > 0) {
+        setExcelError(`Tệp Excel có học sinh trùng lặp: ${fileDuplicates[0]}.`);
+        setImporting(false);
+        event.target.value = "";
+        return;
+      }
+
+      if (ageErrors.size > 0) {
+        setExcelError(`Lỗi độ tuổi: ${Array.from(ageErrors)[0]}.`);
         setImporting(false);
         event.target.value = "";
         return;
@@ -1219,9 +1371,15 @@ export function useHocSinhList() {
         const className = String(
           findColumnValue(row, EXCEL_FIELD_ALIASES.lop) || ""
         ).trim();
+        const rowNamHoc = String(findColumnValue(row, EXCEL_FIELD_ALIASES.namHoc) || "").trim() || targetNamHoc;
         const normClassName = normalizeText(className);
-        let classMatch = classMap.get(normClassName);
-        if (!classMatch) classMatch = fuzzyFindClass(normClassName);
+        let classMatch = findClassForStudent(className, rowNamHoc);
+        if (!classMatch) classMatch = fuzzyFindClass(normClassName, rowNamHoc);
+
+        if (!classMatch) {
+          failedRows.push(`${rowLabel}: Lớp '${className || "(trống)"}' chưa được tạo trong năm học ${rowNamHoc || targetNamHoc || ""}`);
+          continue;
+        }
 
         const fullName = String(
           findColumnValue(row, EXCEL_FIELD_ALIASES.hoTen) || ""

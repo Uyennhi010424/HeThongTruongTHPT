@@ -103,16 +103,29 @@ public class MonHocService {
         monHocRepository.deleteById(id);
     }
 
+    private static final java.util.regex.Pattern SUBJECT_NAME_PATTERN =
+            java.util.regex.Pattern.compile("^[A-ZÀ-Ỹa-zà-ỹ0-9\\s(),\\.-]+$");
+    private static final java.util.regex.Pattern SUBJECT_CODE_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9_-]+$");
+
     private void applySubjectValues(MonHoc target, MonHoc source, String tenMon, boolean isCreate) {
         target.setTenMon(tenMon);
         target.setNhomDanhGia(resolveNhomDanhGia(source, tenMon));
-        target.setSoDtxHocKy(resolveSoDtxHocKy(source, tenMon));
+        Integer soDtx = resolveSoDtxHocKy(source, tenMon);
+        if (soDtx != null && (soDtx < 0 || soDtx > 10)) {
+            throw new ApiException("Số ĐTX phải từ 0 đến 10");
+        }
+        target.setSoDtxHocKy(soDtx);
         target.setKhoiApDung(resolveKhoiApDung(source));
         target.setMoTa(source.getMoTa());
         target.setIsActive(source.getIsActive() != null ? source.getIsActive() : true);
 
         if (!isCreate && !isBlank(source.getMaMon())) {
-            target.setMaMon(source.getMaMon().trim());
+            String trimmedMa = source.getMaMon().trim();
+            if (!SUBJECT_CODE_PATTERN.matcher(trimmedMa).matches()) {
+                throw new ApiException("Mã môn học chỉ được chứa chữ cái, chữ số, gạch ngang và gạch dưới");
+            }
+            target.setMaMon(trimmedMa);
         }
     }
 
@@ -179,7 +192,11 @@ public class MonHocService {
         if (isBlank(tenMon)) {
             throw new ApiException("Vui lòng nhập tên môn.");
         }
-        return tenMon.trim();
+        String trimmed = tenMon.trim();
+        if (!SUBJECT_NAME_PATTERN.matcher(trimmed).matches()) {
+            throw new ApiException("Tên môn học không được chứa ký tự đặc biệt không hợp lệ (vd: @, #, $, %, !, *, <, >)");
+        }
+        return trimmed;
     }
 
     private boolean isRemarkOnlySubject(String tenMon) {

@@ -28,18 +28,24 @@ const formatDateTime = (value) => {
 };
 
 const getTargetLabel = (value) => {
-  switch (value) {
-    case "HOC_SINH":
-      return "Học sinh";
-    case "GIAO_VIEN":
-      return "Giáo viên";
-    case "PHU_HUYNH":
-      return "Phụ huynh";
-    case "ALL":
-      return "Toàn trường";
-    default:
-      return "--";
-  }
+  if (!value) return "--";
+  const items = value.split(",").map((v) => v.trim()).filter(Boolean);
+  if (items.includes("ALL") || items.length === 0) return "Toàn trường";
+  const labels = items.map((v) => {
+    switch (v) {
+      case "HOC_SINH":
+        return "Học sinh";
+      case "GIAO_VIEN":
+        return "Giáo viên";
+      case "PHU_HUYNH":
+        return "Phụ huynh";
+      case "ALL":
+        return "Toàn trường";
+      default:
+        return v;
+    }
+  });
+  return labels.join(", ");
 };
 
 const getStatusLabel = (value) => (value === 1 ? "Đang hiển thị" : "Đã ẩn");
@@ -179,6 +185,36 @@ export default function ThongBaoManager() {
     }
   };
 
+  const parseDoiTuong = (value) => {
+    if (!value) return [];
+    return value.split(",").map((s) => s.trim()).filter(Boolean);
+  };
+
+  const isAllSelected = useMemo(() => {
+    const list = parseDoiTuong(form.doiTuong);
+    return list.includes("ALL") || form.doiTuong === "ALL";
+  }, [form.doiTuong]);
+
+  const handleToggleRole = (roleKey) => {
+    if (roleKey === "ALL") {
+      if (isAllSelected) {
+        setForm((prev) => ({ ...prev, doiTuong: "" }));
+      } else {
+        setForm((prev) => ({ ...prev, doiTuong: "ALL" }));
+      }
+    } else {
+      if (isAllSelected) return;
+      const currentList = parseDoiTuong(form.doiTuong).filter((r) => r !== "ALL");
+      let nextList;
+      if (currentList.includes(roleKey)) {
+        nextList = currentList.filter((r) => r !== roleKey);
+      } else {
+        nextList = [...currentList, roleKey];
+      }
+      setForm((prev) => ({ ...prev, doiTuong: nextList.join(",") }));
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError("");
@@ -188,6 +224,10 @@ export default function ThongBaoManager() {
     }
     if (!form.noiDung.trim()) {
       setFormError("Vui lòng nhập nội dung.");
+      return;
+    }
+    if (!form.doiTuong || parseDoiTuong(form.doiTuong).length === 0) {
+      setFormError("Vui lòng chọn ít nhất một đối tượng nhận thông báo.");
       return;
     }
 
@@ -518,20 +558,105 @@ export default function ThongBaoManager() {
               placeholder="Nội dung thông báo"
             />
           </label>
-          <label className="form-field">
-            <span>Đối tượng</span>
-            <select
-              value={form.doiTuong}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, doiTuong: event.target.value }))
-              }
+          {/* Đối tượng nhận thông báo (Checkbox group) */}
+          <div className="flex flex-col gap-2 pt-0.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Đối tượng nhận thông báo <span className="text-red-500">*</span>
+              </span>
+              {isAllSelected ? (
+                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                  Toàn trường
+                </span>
+              ) : (
+                <span className="text-xs font-medium text-slate-500">
+                  Đã chọn: {parseDoiTuong(form.doiTuong).length} nhóm
+                </span>
+              )}
+            </div>
+
+            {/* Checkbox 1: Toàn trường */}
+            <label
+              className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                isAllSelected
+                  ? "bg-blue-50/80 border-blue-400 ring-1 ring-blue-300"
+                  : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50"
+              }`}
             >
-              <option value="ALL">Toàn trường</option>
-              <option value="HOC_SINH">Học sinh</option>
-              <option value="GIAO_VIEN">Giáo viên</option>
-              <option value="PHU_HUYNH">Phụ huynh</option>
-            </select>
-          </label>
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={() => handleToggleRole("ALL")}
+                className="w-4 h-4 mt-0.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-900">Toàn trường</span>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    Tất cả
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Gửi đồng thời tới toàn bộ học sinh, giáo viên và phụ huynh.
+                </p>
+              </div>
+            </label>
+
+            {/* Các tùy chọn cụ thể (Học sinh, Giáo viên, Phụ huynh) */}
+            <div className="space-y-1.5 pt-0.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-medium">Hoặc chọn theo từng đối tượng:</span>
+                {isAllSelected && (
+                  <span className="text-[11px] text-amber-600 italic font-medium">
+                    (Bỏ tick &quot;Toàn trường&quot; để chọn từng đối tượng)
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { key: "HOC_SINH", label: "Học sinh", desc: "Học sinh các lớp" },
+                  { key: "GIAO_VIEN", label: "Giáo viên", desc: "Cán bộ giáo viên" },
+                  { key: "PHU_HUYNH", label: "Phụ huynh", desc: "Phụ huynh học sinh" },
+                ].map(({ key, label, desc }) => {
+                  const isChecked = !isAllSelected && parseDoiTuong(form.doiTuong).includes(key);
+                  const isDisabled = isAllSelected;
+
+                  return (
+                    <label
+                      key={key}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-sm transition-all select-none ${
+                        isDisabled
+                          ? "opacity-40 bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed"
+                          : isChecked
+                          ? "bg-blue-50/80 border-blue-400 ring-1 ring-blue-300 cursor-pointer shadow-sm"
+                          : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 cursor-pointer"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={isDisabled}
+                        onChange={() => handleToggleRole(key)}
+                        className="w-4 h-4 mt-0.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span
+                          className={`text-sm font-semibold block ${
+                            isDisabled ? "text-slate-400" : isChecked ? "text-blue-900" : "text-slate-700"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                        <span className="text-[11px] text-slate-400 block truncate">
+                          {desc}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
           <label className="form-field">
             <span>Trạng thái</span>
             <select

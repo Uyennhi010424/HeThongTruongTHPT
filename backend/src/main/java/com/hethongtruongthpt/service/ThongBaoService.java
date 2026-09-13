@@ -43,8 +43,22 @@ public class ThongBaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông báo"));
     }
 
+    private static final java.util.regex.Pattern DANGEROUS_SCRIPT_PATTERN =
+            java.util.regex.Pattern.compile("(?i)(<script|<iframe|<embed|<object|javascript:|onerror=|onload=)");
+
+    private void validateThongBao(ThongBao tb) {
+        if (tb == null) return;
+        if (tb.getTieuDe() != null && DANGEROUS_SCRIPT_PATTERN.matcher(tb.getTieuDe()).find()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tiêu đề thông báo chứa ký tự hoặc thẻ mã không hợp lệ");
+        }
+        if (tb.getNoiDung() != null && DANGEROUS_SCRIPT_PATTERN.matcher(tb.getNoiDung()).find()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Nội dung thông báo chứa ký tự hoặc thẻ mã không hợp lệ");
+        }
+    }
+
     public ThongBao create(ThongBao thongBao) {
         if (thongBao == null) throw new IllegalArgumentException("Thông báo không được để trống");
+        validateThongBao(thongBao);
         
         // Tự động tìm GVCN nếu phụ huynh bắt đầu nhắn cho giáo viên nhưng chưa có recipientId
         if (thongBao.getRecipientId() == null && 
@@ -65,6 +79,7 @@ public class ThongBaoService {
 
     public ThongBao update(Integer id, ThongBao thongBao) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
+        validateThongBao(thongBao);
         ThongBao existing = getById(id);
         
         if (thongBao.getTieuDe() != null) existing.setTieuDe(thongBao.getTieuDe());
@@ -150,7 +165,9 @@ public class ThongBaoService {
         }
         
         // Nếu là thông báo chung toàn trường hoặc theo role (không phải gửi riêng cho cá nhân)
-        if (thongBao.getRecipientId() == null && ("ALL".equals(thongBao.getLoai()) || "PHU_HUYNH".equals(thongBao.getLoai()) || "GIAO_VIEN".equals(thongBao.getLoai()))) {
+        if (thongBao.getRecipientId() == null && thongBao.getLoai() != null &&
+                (thongBao.getLoai().contains("ALL") || thongBao.getLoai().contains("PHU_HUYNH") ||
+                 thongBao.getLoai().contains("GIAO_VIEN") || thongBao.getLoai().contains("HOC_SINH"))) {
             messagingTemplate.convertAndSend("/topic/notifications", thongBao);
         } else if (thongBao.getRecipientId() != null) {
             // Nhắn riêng

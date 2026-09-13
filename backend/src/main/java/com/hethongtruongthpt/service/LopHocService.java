@@ -38,14 +38,16 @@ public class LopHocService {
     private final LopHocRepository lopHocRepository;
     private final HocSinhRepository hocSinhRepository;
     private final GiaoVienRepository giaoVienRepository;
+    private final ChuNhiemRepository chuNhiemRepository;
     private final LichSuHocTapRepository lichSuHocTapRepository;
     private final HocBaRepository hocBaRepository;
     private final NamHocRepository namHocRepository;
 
-    public LopHocService(LopHocRepository lopHocRepository, HocSinhRepository hocSinhRepository, GiaoVienRepository giaoVienRepository, LichSuHocTapRepository lichSuHocTapRepository, HocBaRepository hocBaRepository, NamHocRepository namHocRepository) {
+    public LopHocService(LopHocRepository lopHocRepository, HocSinhRepository hocSinhRepository, GiaoVienRepository giaoVienRepository, ChuNhiemRepository chuNhiemRepository, LichSuHocTapRepository lichSuHocTapRepository, HocBaRepository hocBaRepository, NamHocRepository namHocRepository) {
         this.lopHocRepository = lopHocRepository;
         this.hocSinhRepository = hocSinhRepository;
         this.giaoVienRepository = giaoVienRepository;
+        this.chuNhiemRepository = chuNhiemRepository;
         this.lichSuHocTapRepository = lichSuHocTapRepository;
         this.hocBaRepository = hocBaRepository;
         this.namHocRepository = namHocRepository;
@@ -185,10 +187,14 @@ public class LopHocService {
             }
         }
 
-        // Pre-fetch all LichSuHocTap for current school year into set of student IDs
+        // Pre-fetch all LichSuHocTap (end-of-year promotion results) for current school year into set of student IDs
         Set<Integer> existingHistoryStudentIds = lichSuHocTapRepository.findByNamHoc(currentNamHoc)
                 .stream()
                 .filter(ls -> ls.getHocSinh() != null && ls.getHocSinh().getId() != null)
+                .filter(ls -> {
+                    String kq = ls.getKetQua();
+                    return "Lên lớp".equalsIgnoreCase(kq) || "Tốt nghiệp".equalsIgnoreCase(kq) || "Ở lại lớp".equalsIgnoreCase(kq);
+                })
                 .map(ls -> ls.getHocSinh().getId())
                 .collect(Collectors.toSet());
 
@@ -236,12 +242,10 @@ public class LopHocService {
                     }
                     studentsToSave.add(hs);
                 }
-                if (oldLop.getGvcn() != null) {
-                    log.info("Xóa chủ nhiệm: GV {} thôi chủ nhiệm lớp {} (tốt nghiệp)",
-                        oldLop.getGvcn().getId(), tenLop);
-                    oldLop.setGvcn(null);
+                // Giu nguyen si so & GVCN cho lop cu de luu tru lich su nam hoc
+                if (oldLop.getSiSo() == null || oldLop.getSiSo() == 0) {
+                    oldLop.setSiSo(students.size());
                 }
-                oldLop.setSiSo(0);
                 classesToSave.add(oldLop);
                 log.info("Tốt nghiệp {} học sinh từ lớp {}", students.size(), tenLop);
 
@@ -296,16 +300,17 @@ public class LopHocService {
                 }
 
                 newLop.setSiSo(newClassStudentCount);
-                oldLop.setSiSo(0);
+                if (oldLop.getSiSo() == null || oldLop.getSiSo() == 0) {
+                    oldLop.setSiSo(students.size());
+                }
 
-                // Chuyen giao vien chu nhiem sang lop moi
+                // Chuyen giao vien chu nhiem sang lop moi (va giu nguyen GVCN o lop cu de bao toan lich su)
                 if (oldLop.getGvcn() != null) {
-                    if (newLop.getGvcn() == null || !newLop.getGvcn().getId().equals(oldLop.getGvcn().getId())) {
+                    if (newLop.getGvcn() == null) {
                         newLop.setGvcn(oldLop.getGvcn());
                         teacherMovedCount++;
-                        log.info("Chuyển chủ nhiệm: GV {} từ {} sang {}", oldLop.getGvcn().getId(), tenLop, newTenLop);
+                        log.info("Chuyển chủ nhiệm: GV {} sang lớp mới {}", oldLop.getGvcn().getId(), newTenLop);
                     }
-                    oldLop.setGvcn(null);
                 }
                 classesToSave.add(newLop);
                 classesToSave.add(oldLop);
@@ -321,7 +326,19 @@ public class LopHocService {
             hocSinhRepository.saveAll(studentsToSave);
         }
         if (!classesToSave.isEmpty()) {
-            lopHocRepository.saveAll(classesToSave);
+            List<LopHoc> savedClasses = lopHocRepository.saveAll(classesToSave);
+            for (LopHoc lop : savedClasses) {
+                if (lop.getGvcn() != null && lop.getId() != null) {
+                    ChuNhiemId cnId = new ChuNhiemId();
+                    cnId.setGiaoVienId(lop.getGvcn().getId());
+                    cnId.setLopId(lop.getId());
+                    if (!chuNhiemRepository.existsById(cnId)) {
+                        ChuNhiem cn = new ChuNhiem();
+                        cn.setId(cnId);
+                        chuNhiemRepository.save(cn);
+                    }
+                }
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -367,8 +384,14 @@ public class LopHocService {
         return lopHocRepository.save(lop);
     }
 
+    @Transactional
     public void delete(Integer id) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
+        long studentCount = hocSinhRepository.countByLopId(id);
+        if (studentCount > 0) {
+            throw new ApiException("Không thể xóa lớp học này vì đang có " + studentCount + " học sinh theo học. Vui lòng chuyển lớp cho học sinh trước khi xóa!");
+        }
+        chuNhiemRepository.deleteById_LopId(id);
         lopHocRepository.deleteById(id);
     }
 
@@ -422,10 +445,18 @@ public class LopHocService {
         return updated;
     }
 
+    private static final java.util.regex.Pattern CLASS_NAME_PATTERN =
+            java.util.regex.Pattern.compile("^(10|11|12)[A-Za-z0-9]+$");
+    private static final java.util.regex.Pattern SCHOOL_YEAR_PATTERN =
+            java.util.regex.Pattern.compile("^\\d{4}-\\d{4}$");
+    private static final java.util.regex.Pattern ROOM_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9\\s\\.-]+$");
+
     private void validateLopHoc(LopHoc lopHoc) {
         String tenLop = lopHoc.getTenLop() != null ? lopHoc.getTenLop().trim() : "";
         Integer khoi = lopHoc.getKhoi();
         String namHoc = lopHoc.getNamHoc() != null ? lopHoc.getNamHoc().trim() : "";
+        String phongHoc = lopHoc.getPhongHoc() != null ? lopHoc.getPhongHoc().trim() : "";
 
         if (tenLop.isBlank()) {
             throw new ApiException("Tên lớp không được để trống");
@@ -437,12 +468,27 @@ public class LopHocService {
             throw new ApiException("Năm học không được để trống");
         }
 
-        String gradeFromName = extractGradePrefix(tenLop);
-        if (gradeFromName == null) {
-            throw new ApiException("Tên lớp phải bắt đầu bằng 10, 11 hoặc 12");
+        if (!CLASS_NAME_PATTERN.matcher(tenLop).matches()) {
+            throw new ApiException("Tên lớp phải bắt đầu bằng khối 10, 11 hoặc 12 và chỉ chứa chữ cái, chữ số (vd: 10A1, 11B2, 12C3), không chứa ký tự đặc biệt hay khoảng trắng");
         }
-        if (!gradeFromName.equals(String.valueOf(khoi))) {
-            throw new ApiException("Tên lớp không khớp với khối đã chọn");
+
+        String gradeFromName = extractGradePrefix(tenLop);
+        if (gradeFromName == null || !gradeFromName.equals(String.valueOf(khoi))) {
+            throw new ApiException("Tên lớp không khớp với khối " + khoi + " đã chọn");
+        }
+
+        if (!SCHOOL_YEAR_PATTERN.matcher(namHoc).matches()) {
+            throw new ApiException("Năm học không đúng định dạng YYYY-YYYY (vd: 2026-2027)");
+        }
+        String[] yearParts = namHoc.split("-");
+        int startYear = Integer.parseInt(yearParts[0]);
+        int endYear = Integer.parseInt(yearParts[1]);
+        if (endYear != startYear + 1) {
+            throw new ApiException("Năm học không hợp lệ: năm kết thúc phải là " + (startYear + 1));
+        }
+
+        if (!phongHoc.isBlank() && !ROOM_PATTERN.matcher(phongHoc).matches()) {
+            throw new ApiException("Tên phòng học không được chứa ký tự đặc biệt (vd: P101, P.102, A-201)");
         }
     }
 

@@ -102,7 +102,8 @@ export default function HomePage() {
     // Đăng ký nhận thông báo real-time
     webSocketService.connect(() => {
       webSocketService.subscribe('/topic/notifications', (newNotice) => {
-        if ((newNotice.doiTuong === "PHU_HUYNH" || newNotice.doiTuong === "ALL") && 
+        const dt = (newNotice.doiTuong || newNotice.loai || "").split(",").map(s => s.trim());
+        if ((dt.includes("PHU_HUYNH") || dt.includes("ALL")) && 
             !newNotice.isReply && 
             newNotice.senderRole !== "PHU_HUYNH") {
           setData(prev => {

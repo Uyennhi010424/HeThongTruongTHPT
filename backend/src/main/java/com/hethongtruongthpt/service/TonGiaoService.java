@@ -34,14 +34,29 @@ public class TonGiaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tôn giáo"));
     }
 
+    private static final java.util.regex.Pattern RELIGION_NAME_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-zÀ-ỹĐđ\\s]+$");
+
+    private void validateTonGiao(TonGiao tonGiao) {
+        if (tonGiao == null || tonGiao.getTenTonGiao() == null || tonGiao.getTenTonGiao().isBlank()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tên tôn giáo không được để trống");
+        }
+        String trimmed = tonGiao.getTenTonGiao().trim();
+        if (!RELIGION_NAME_PATTERN.matcher(trimmed).matches()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tên tôn giáo chỉ được chứa chữ cái tiếng Việt và khoảng trắng, không chứa số hay ký tự đặc biệt");
+        }
+        tonGiao.setTenTonGiao(trimmed);
+    }
+
     public TonGiao create(TonGiao tonGiao) {
-        if (tonGiao == null) throw new IllegalArgumentException("Tôn giáo không được để trống");
+        validateTonGiao(tonGiao);
         return tonGiaoRepository.save(tonGiao);
     }
 
     public TonGiao update(Integer id, TonGiao tonGiao) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
         getById(id);
+        validateTonGiao(tonGiao);
         tonGiao.setId(id);
         return tonGiaoRepository.save(tonGiao);
     }

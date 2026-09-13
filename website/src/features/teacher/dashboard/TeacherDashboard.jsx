@@ -400,7 +400,10 @@ export default function TeacherDashboard() {
 
   const teacherNotices = useMemo(() => {
     return [...data.notices]
-      .filter((item) => item.doiTuong === "GIAO_VIEN" || item.doiTuong === "ALL")
+      .filter((item) => {
+        const dt = (item.doiTuong || item.loai || "").split(",").map((s) => s.trim());
+        return dt.includes("GIAO_VIEN") || dt.includes("ALL");
+      })
       .sort((a, b) => new Date(b.ngayDang) - new Date(a.ngayDang));
   }, [data.notices]);
 

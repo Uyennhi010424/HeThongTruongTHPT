@@ -499,6 +499,7 @@ export default function LopList() {
   const [studentListModalOpen, setStudentListModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
   const [expandedClassId, setExpandedClassId] = useState(null);
+  const { confirm } = useConfirm();
 
   const [selectedNamHoc, setSelectedNamHoc] = useState("");
 
@@ -674,34 +675,49 @@ export default function LopList() {
     setModalOpen(true);
   };
 
-  const { confirm } = useConfirm();
+  const handleDelete = async (target) => {
+    const item = typeof target === "object" && target !== null 
+      ? target 
+      : classes.find(c => c.id === target) || { id: target, tenLop: "lớp này" };
 
-  const handleDelete = async (item) => {
-    if (!(await confirm(`Xóa lớp ${item.tenLop}?`))) return;
+    const classId = item.id;
+    if (!classId) {
+      notifyError("Không tìm thấy ID lớp học để xóa.");
+      return;
+    }
+
+    if (!(await confirm(`Bạn có chắc chắn muốn xóa lớp ${item.tenLop}? Dữ liệu lớp học sẽ bị xóa khỏi hệ thống.`, "Xác nhận xóa lớp học"))) return;
     try {
-      await deleteLop(item.id);
-      setClasses((prev) => prev.filter((row) => row.id !== item.id));
+      await deleteLop(classId);
+      setClasses((prev) => prev.filter((row) => row.id !== classId));
       notifySuccess("Xóa lớp học thành công.");
       notifyClassesUpdated();
     } catch (err) {
-      notifyError("Không thể xóa lớp học.");
+      notifyError(getApiErrorMessage(err, "Không thể xóa lớp học."));
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!form.tenLop.trim()) { notifyError("Vui lòng nhập tên lớp."); return; }
+    const trimmedTenLop = form.tenLop.trim();
+    if (!trimmedTenLop) { notifyError("Vui lòng nhập tên lớp."); return; }
     if (!form.khoi) { notifyError("Vui lòng chọn khối."); return; }
     if (!form.namHoc.trim()) { notifyError("Vui lòng nhập năm học."); return; }
 
-    const gradeInName = extractGradeFromClassName(form.tenLop);
+    const CLASS_NAME_REGEX = /^(10|11|12)[A-Za-z0-9]+$/;
+    if (!CLASS_NAME_REGEX.test(trimmedTenLop)) {
+      notifyError("Tên lớp phải bắt đầu bằng 10, 11 hoặc 12 và chỉ chứa chữ cái, chữ số (vd: 10A1, 11B2, 12C3), không chứa ký tự đặc biệt hay khoảng trắng.");
+      return;
+    }
+
+    const gradeInName = extractGradeFromClassName(trimmedTenLop);
     if (!gradeInName || gradeInName !== String(form.khoi)) {
       notifyError(`Tên lớp phải bắt đầu bằng khối ${form.khoi}. VD: ${form.khoi}A1.`);
       return;
     }
 
     const payload = {
-      tenLop: form.tenLop.trim(),
+      tenLop: trimmedTenLop,
       khoi: form.khoi,
       namHoc: form.namHoc.trim(),
       toHopId: form.toHopId ? Number(form.toHopId) : null
@@ -710,17 +726,34 @@ export default function LopList() {
     try {
       if (editingClass) {
         const response = await updateLop(editingClass.id, payload);
-        const updated = response?.data?.data;
-        setClasses((prev) => prev.map((row) => (row.id === editingClass.id ? updated : row)));
+        const updated = response?.data?.data || {};
+        const merged = {
+          ...editingClass,
+          ...updated,
+          tenLop: payload.tenLop,
+          khoi: Number(payload.khoi),
+          namHoc: payload.namHoc,
+          toHopId: payload.toHopId
+        };
+        setClasses((prev) => prev.map((row) => (row.id === editingClass.id ? merged : row)));
         notifySuccess("Cập nhật lớp học thành công.");
       } else {
         const response = await createLop(payload);
         const created = response?.data?.data;
-        setClasses((prev) => [created, ...prev]);
+        if (created) {
+          setClasses((prev) => [created, ...prev]);
+        }
         notifySuccess("Thêm lớp học thành công.");
       }
       notifyClassesUpdated();
       setModalOpen(false);
+
+      // Đồng bộ ngầm toàn bộ dữ liệu lớp học mới nhất từ server mà không cần reload trang
+      getLop().then(res => {
+        if (res?.data?.data) {
+          setClasses(res.data.data);
+        }
+      }).catch(() => {});
     } catch (err) {
       notifyError(getApiErrorMessage(err, "Không thể lưu lớp học."));
     }
@@ -977,7 +1010,7 @@ export default function LopList() {
                               <Edit className="w-3.5 h-3.5" /> Sửa
                             </button>
                             <button
-                              onClick={() => handleDelete(item.id)}
+                              onClick={() => handleDelete(item)}
                               className="px-2.5 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-semibold flex items-center gap-1"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Xóa

@@ -53,7 +53,9 @@ public class NotificationService {
     }
 
     private boolean shouldSendSms(String loai) {
-        return "PHU_HUYNH".equals(loai) || "ALL".equals(loai);
+        if (loai == null) return false;
+        String l = loai.toUpperCase();
+        return l.contains("PHU_HUYNH") || l.contains("ALL");
     }
 
     @Async

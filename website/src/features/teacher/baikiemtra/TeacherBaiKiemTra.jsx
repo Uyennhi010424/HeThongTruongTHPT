@@ -71,32 +71,87 @@ const TeacherBaiKiemTra = () => {
     fetchMetadata();
   }, []);
 
+  const EXAM_TITLE_REGEX = /^[A-Za-zÀ-ỹĐđ0-9\s(),\.\-]+$/;
+
   const handleCreate = async (e) => {
     e.preventDefault();
     
+    const trimmedTitle = (formData.tieuDe || '').trim();
+    if (!trimmedTitle) {
+      notifyError("Tiêu đề bài kiểm tra không được để trống!");
+      return;
+    }
+    if (trimmedTitle.length < 3 || trimmedTitle.length > 200) {
+      notifyError("Tiêu đề bài kiểm tra phải từ 3 đến 200 ký tự!");
+      return;
+    }
+    if (!EXAM_TITLE_REGEX.matcher ? !EXAM_TITLE_REGEX.test(trimmedTitle) : !EXAM_TITLE_REGEX.test(trimmedTitle)) {
+      notifyError("Tiêu đề bài kiểm tra không được chứa ký tự đặc biệt không hợp lệ (như @, #, $, %, ^, &, *, <, >, {, }, ~, |)!");
+      return;
+    }
+
+    const duration = parseInt(formData.thoiGianLamBai);
+    if (isNaN(duration) || duration < 1 || duration > 300) {
+      notifyError("Thời gian làm bài phải là số nguyên từ 1 đến 300 phút!");
+      return;
+    }
+
+    const maxAttempts = parseInt(formData.soLanLamBai);
+    if (isNaN(maxAttempts) || maxAttempts < 1 || maxAttempts > 50) {
+      notifyError("Số lần làm bài tối đa phải từ 1 đến 50!");
+      return;
+    }
+
+    if (!formData.lopHocId) {
+      notifyError("Vui lòng chọn lớp học!");
+      return;
+    }
+
+    if (!formData.monHocId) {
+      notifyError("Vui lòng chọn môn học!");
+      return;
+    }
+
+    if (!formData.thoiGianBatDau || !formData.thoiGianKetThuc) {
+      notifyError("Vui lòng chọn đầy đủ thời gian bắt đầu và kết thúc!");
+      return;
+    }
+
     // Validate thời gian
     const start = new Date(formData.thoiGianBatDau).getTime();
     const end = new Date(formData.thoiGianKetThuc).getTime();
-    const durationMs = parseInt(formData.thoiGianLamBai) * 60 * 1000;
+    const durationMs = duration * 60 * 1000;
     
     if (end < start + durationMs) {
-      notifyError(`Thời gian kết thúc phải cách thời gian bắt đầu ít nhất ${formData.thoiGianLamBai} phút!`);
+      notifyError(`Thời gian kết thúc phải cách thời gian bắt đầu ít nhất ${duration} phút!`);
       return;
     }
     
     try {
       const payload = {
         ...formData,
+        tieuDe: trimmedTitle,
+        thoiGianLamBai: duration,
+        soLanLamBai: maxAttempts,
         giaoVienId: user?.id || 1
       };
       const res = await api.post('/baikiemtra', payload);
       if (res.data?.success) {
         notifySuccess("Tạo bài kiểm tra thành công");
         setIsModalVisible(false);
+        setFormData({
+          tieuDe: '',
+          thoiGianLamBai: '',
+          thoiGianBatDau: '',
+          thoiGianKetThuc: '',
+          soLanLamBai: 1,
+          lopHocId: classes[0]?.id || '',
+          monHocId: subjects[0]?.id || ''
+        });
         fetchExams();
       }
     } catch (error) {
-      notifyError("Lỗi khi tạo bài kiểm tra");
+      notifyError(error.response?.data?.message || "Lỗi khi tạo bài kiểm tra");
     }
   };
 

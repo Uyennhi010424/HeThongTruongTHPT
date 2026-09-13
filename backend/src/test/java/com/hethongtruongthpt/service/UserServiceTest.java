@@ -72,31 +72,33 @@ class UserServiceTest {
     @DisplayName("Đặt lại mật khẩu cho Giáo viên thành công và gửi email")
     void resetPasswordToDefault_teacher_success() {
         when(userRepository.findById(10)).thenReturn(Optional.of(teacherUser));
-        when(passwordPolicy.getTeacherDefaultPassword("nguyenan@school.edu.vn")).thenReturn("nguyenan@123");
-        when(passwordEncoder.encode("nguyenan@123")).thenReturn("hashed_nguyenan@123");
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_random_pwd");
 
-        userService.resetPasswordToDefault(10);
+        String newPassword = userService.resetPasswordToDefault(10);
 
-        assertThat(teacherUser.getPassword()).isEqualTo("hashed_nguyenan@123");
+        assertThat(newPassword).isNotEmpty();
+        assertThat(newPassword.length()).isGreaterThanOrEqualTo(8);
+        assertThat(teacherUser.getPassword()).isEqualTo("hashed_random_pwd");
         assertThat(teacherUser.getMustChangePassword()).isTrue();
         verify(userRepository).save(teacherUser);
         verify(auditLogService).logAction(eq(10), eq("RESET_PASSWORD"), anyString(), isNull());
-        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(teacherUser), eq("nguyenan@123"), eq("nguyenan@school.edu.vn"));
+        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(teacherUser), eq(newPassword), eq("nguyenan@school.edu.vn"));
     }
 
     @Test
     @DisplayName("Đặt lại mật khẩu cho Học sinh thành công và gửi email")
     void resetPasswordToDefault_student_success() {
         when(userRepository.findById(20)).thenReturn(Optional.of(studentUser));
-        when(passwordPolicy.getStudentDefaultPassword()).thenReturn("Abc1234@");
-        when(passwordEncoder.encode("Abc1234@")).thenReturn("hashed_Abc1234@");
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_random_pwd");
 
-        userService.resetPasswordToDefault(20);
+        String newPassword = userService.resetPasswordToDefault(20);
 
-        assertThat(studentUser.getPassword()).isEqualTo("hashed_Abc1234@");
+        assertThat(newPassword).isNotEmpty();
+        assertThat(newPassword.length()).isGreaterThanOrEqualTo(8);
+        assertThat(studentUser.getPassword()).isEqualTo("hashed_random_pwd");
         assertThat(studentUser.getMustChangePassword()).isTrue();
         verify(userRepository).save(studentUser);
-        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(studentUser), eq("Abc1234@"), eq("student@gmail.com"));
+        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(studentUser), eq(newPassword), eq("student@gmail.com"));
     }
 
     @Test
@@ -112,13 +114,13 @@ class UserServiceTest {
         gv.setEmail("gv001@school.edu.vn");
 
         when(userRepository.findById(11)).thenReturn(Optional.of(teacherNoEmail));
-        when(passwordPolicy.getTeacherDefaultPassword("gv001")).thenReturn("gv001@123");
-        when(passwordEncoder.encode("gv001@123")).thenReturn("hashed_gv001@123");
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_random_pwd");
         when(giaoVienRepository.findByUserId(11)).thenReturn(Optional.of(gv));
 
-        userService.resetPasswordToDefault(11);
+        String newPassword = userService.resetPasswordToDefault(11);
 
-        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(teacherNoEmail), eq("gv001@123"), eq("gv001@school.edu.vn"));
+        assertThat(newPassword).isNotEmpty();
+        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(teacherNoEmail), eq(newPassword), eq("gv001@school.edu.vn"));
     }
 
     @Test
@@ -129,13 +131,13 @@ class UserServiceTest {
         ph.setEmail("parent@gmail.com");
 
         when(userRepository.findById(30)).thenReturn(Optional.of(parentUser));
-        when(passwordPolicy.getParentDefaultPassword()).thenReturn("Abc1234@");
-        when(passwordEncoder.encode("Abc1234@")).thenReturn("hashed_Abc1234@");
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_random_pwd");
         when(phuHuynhRepository.findByUserId(30)).thenReturn(Optional.of(ph));
 
-        userService.resetPasswordToDefault(30);
+        String newPassword = userService.resetPasswordToDefault(30);
 
-        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(parentUser), eq("Abc1234@"), eq("parent@gmail.com"));
+        assertThat(newPassword).isNotEmpty();
+        verify(emailResetPasswordService).sendAdminResetPasswordNotification(eq(parentUser), eq(newPassword), eq("parent@gmail.com"));
     }
 
     @Test
@@ -147,12 +149,12 @@ class UserServiceTest {
         noEmailUser.setRole(RoleEnum.ADMIN);
 
         when(userRepository.findById(99)).thenReturn(Optional.of(noEmailUser));
-        when(passwordPolicy.getStudentDefaultPassword()).thenReturn("Abc1234@");
-        when(passwordEncoder.encode("Abc1234@")).thenReturn("hashed_Abc1234@");
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_random_pwd");
 
-        userService.resetPasswordToDefault(99);
+        String newPassword = userService.resetPasswordToDefault(99);
 
-        assertThat(noEmailUser.getPassword()).isEqualTo("hashed_Abc1234@");
+        assertThat(newPassword).isNotEmpty();
+        assertThat(noEmailUser.getPassword()).isEqualTo("hashed_random_pwd");
         verify(userRepository).save(noEmailUser);
         verify(emailResetPasswordService, never()).sendAdminResetPasswordNotification(any(), any(), any());
     }
@@ -165,5 +167,38 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.resetPasswordToDefault(999))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("Không tìm thấy user");
+    }
+
+    @Test
+    @DisplayName("Đổi mật khẩu thành công khi đáp ứng đầy đủ độ phức tạp và mật khẩu cũ đúng")
+    void changePassword_success() {
+        String bcryptOldPwd = "$2a$10$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ12";
+        teacherUser.setPassword(bcryptOldPwd);
+        when(userRepository.findById(10)).thenReturn(Optional.of(teacherUser));
+        when(passwordEncoder.matches("OldPassword123@", bcryptOldPwd)).thenReturn(true);
+        when(passwordEncoder.encode("NewStrongPassword123@")).thenReturn("hashed_new_pwd");
+
+        userService.changePassword(10, "OldPassword123@", "NewStrongPassword123@");
+
+        assertThat(teacherUser.getPassword()).isEqualTo("hashed_new_pwd");
+        assertThat(teacherUser.getMustChangePassword()).isFalse();
+        verify(userRepository).save(teacherUser);
+        verify(auditLogService).logAction(eq(10), eq("CHANGE_PASSWORD"), anyString(), isNull());
+    }
+
+    @Test
+    @DisplayName("Đổi mật khẩu thất bại khi mật khẩu mới trùng mật khẩu cũ")
+    void changePassword_samePassword_throwsException() {
+        assertThatThrownBy(() -> userService.changePassword(10, "SamePassword123@", "SamePassword123@"))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Mật khẩu mới không được trùng với mật khẩu cũ");
+    }
+
+    @Test
+    @DisplayName("Đổi mật khẩu thất bại khi thiếu chữ hoa, số hoặc ký tự đặc biệt")
+    void changePassword_weakPassword_throwsException() {
+        assertThatThrownBy(() -> userService.changePassword(10, "OldPassword123@", "weakpassword"))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Mật khẩu mới");
     }
 }

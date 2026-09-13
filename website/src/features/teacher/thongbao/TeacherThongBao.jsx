@@ -82,15 +82,16 @@ export default function TeacherThongBao() {
   }, [teacher]);
 
   // Lọc thông báo cho các Tab
-  const bghNotices = allNotices.filter(n => 
-    (n.doiTuong === "GIAO_VIEN" || n.doiTuong === "ALL" || 
-    ((n.loai === "ADMIN" || n.doiTuong === "ADMIN") && n.senderRole === "GIAO_VIEN")) &&
-    n.senderRole !== "PHU_HUYNH" && n.nguoiTao?.role !== "PHU_HUYNH"
-  );
-  const parentMessages = allNotices.filter(n => 
-    n.loai === "PHU_HUYNH" || n.doiTuong === "PHU_HUYNH" || 
-    n.senderRole === "PHU_HUYNH" || n.nguoiTao?.role === "PHU_HUYNH"
-  );
+  const bghNotices = allNotices.filter(n => {
+    const dt = (n.doiTuong || n.loai || "").split(",").map(r => r.trim());
+    return (dt.includes("GIAO_VIEN") || dt.includes("ALL") || 
+      (dt.includes("ADMIN") && n.senderRole === "GIAO_VIEN")) &&
+      n.senderRole !== "PHU_HUYNH" && n.nguoiTao?.role !== "PHU_HUYNH";
+  });
+  const parentMessages = allNotices.filter(n => {
+    const dt = (n.doiTuong || n.loai || "").split(",").map(r => r.trim());
+    return dt.includes("PHU_HUYNH") || n.senderRole === "PHU_HUYNH" || n.nguoiTao?.role === "PHU_HUYNH";
+  });
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

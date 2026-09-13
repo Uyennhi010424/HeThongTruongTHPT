@@ -174,9 +174,9 @@ export default function MonHocList() {
     const tenMon = form.tenMon.trim();
     if (!tenMon) { notifyError("Vui lòng nhập tên môn."); return; }
 
-    const validNamePattern = /^[A-ZÀ-Ỹa-zà-ỹ0-9\s&().,\-]+$/;
+    const validNamePattern = /^[A-ZÀ-Ỹa-zà-ỹ0-9\s(),\.-]+$/;
     if (!validNamePattern.test(tenMon)) {
-      notifyError("Tên môn chỉ được chứa chữ cái, số và ký tự &().,");
+      notifyError("Tên môn chỉ được chứa chữ cái, chữ số, khoảng trắng, dấu ngoặc và gạch ngang, không chứa ký tự đặc biệt (vd: @, #, $, %, !, *, <, >).");
       return;
     }
 

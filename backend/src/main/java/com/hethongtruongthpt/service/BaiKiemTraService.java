@@ -300,10 +300,27 @@ public class BaiKiemTraService {
         return createExam(dto);
     }
 
+    private static final java.util.regex.Pattern EXAM_TITLE_PATTERN =
+            java.util.regex.Pattern.compile("^[A-ZÀ-Ỹa-zà-ỹ0-9\\s(),\\.-]+$");
+
     @Transactional
     public BaiKiemTraDTO createExam(BaiKiemTraDTO dto) {
+        if (dto.getTieuDe() == null || dto.getTieuDe().isBlank()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tiêu đề bài kiểm tra không được để trống");
+        }
+        String trimmedTitle = dto.getTieuDe().trim();
+        if (!EXAM_TITLE_PATTERN.matcher(trimmedTitle).matches()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tiêu đề bài kiểm tra không được chứa ký tự đặc biệt không hợp lệ (vd: @, #, $, %, !, *, <, >)");
+        }
+        if (dto.getThoiGianLamBai() == null || dto.getThoiGianLamBai() <= 0 || dto.getThoiGianLamBai() > 300) {
+            throw new com.hethongtruongthpt.exception.ApiException("Thời gian làm bài phải từ 1 đến 300 phút");
+        }
+        if (dto.getSoLanLamBai() != null && (dto.getSoLanLamBai() <= 0 || dto.getSoLanLamBai() > 50)) {
+            throw new com.hethongtruongthpt.exception.ApiException("Số lần làm bài phải từ 1 đến 50");
+        }
+
         BaiKiemTra exam = new BaiKiemTra();
-        exam.setTieuDe(dto.getTieuDe());
+        exam.setTieuDe(trimmedTitle);
         exam.setThoiGianLamBai(dto.getThoiGianLamBai());
         exam.setThoiGianBatDau(dto.getThoiGianBatDau());
         exam.setThoiGianKetThuc(dto.getThoiGianKetThuc());
@@ -421,14 +438,77 @@ public class BaiKiemTraService {
         return dto;
     }
     
+    private static final java.util.regex.Pattern DANGEROUS_CHARS_PATTERN =
+            java.util.regex.Pattern.compile("(?i)(<script|<iframe|<embed|<object|javascript:|onerror=|onload=)");
+
+    private void validateCauHoi(CauHoiDTO dto, Integer examId, Integer currentCauHoiId) {
+        if (dto == null) {
+            throw new com.hethongtruongthpt.exception.ApiException("Dữ liệu câu hỏi không hợp lệ");
+        }
+        if (dto.getNoiDung() == null || dto.getNoiDung().isBlank()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Nội dung câu hỏi không được để trống");
+        }
+        String trimmedContent = dto.getNoiDung().trim();
+        if (trimmedContent.length() < 3 || trimmedContent.length() > 2000) {
+            throw new com.hethongtruongthpt.exception.ApiException("Nội dung câu hỏi phải từ 3 đến 2000 ký tự");
+        }
+        if (DANGEROUS_CHARS_PATTERN.matcher(trimmedContent).find()) {
+            throw new com.hethongtruongthpt.exception.ApiException("Nội dung câu hỏi chứa ký tự hoặc mã không hợp lệ");
+        }
+        if (dto.getDiem() == null || dto.getDiem() <= 0.0 || dto.getDiem() > 10.0) {
+            throw new com.hethongtruongthpt.exception.ApiException("Điểm số câu hỏi phải lớn hơn 0 và tối đa là 10");
+        }
+
+        // Kiểm tra tổng điểm của toàn bộ bài kiểm tra không vượt quá 10
+        List<CauHoi> existingQuestions = cauHoiRepository.findByBaiKiemTraId(examId);
+        double currentSum = existingQuestions.stream()
+                .filter(q -> currentCauHoiId == null || !q.getId().equals(currentCauHoiId))
+                .mapToDouble(q -> q.getDiem() != null ? q.getDiem() : 0.0)
+                .sum();
+        if (currentSum + dto.getDiem() > 10.0001) {
+            throw new com.hethongtruongthpt.exception.ApiException("Tổng điểm bài kiểm tra không được vượt quá 10 (Điểm hiện tại: " + String.format("%.2f", currentSum) + ")");
+        }
+
+        String loai = dto.getLoaiCauHoi();
+        if (!"TRAC_NGHIEM".equals(loai) && !"TU_LUAN".equals(loai)) {
+            throw new com.hethongtruongthpt.exception.ApiException("Loại câu hỏi không hợp lệ (phải là TRAC_NGHIEM hoặc TU_LUAN)");
+        }
+
+        if ("TRAC_NGHIEM".equals(loai)) {
+            if (dto.getDapAns() == null || dto.getDapAns().size() < 2) {
+                throw new com.hethongtruongthpt.exception.ApiException("Câu hỏi trắc nghiệm phải có ít nhất 2 đáp án");
+            }
+            boolean hasCorrect = false;
+            for (DapAnDTO da : dto.getDapAns()) {
+                if (da.getNoiDung() == null || da.getNoiDung().isBlank()) {
+                    throw new com.hethongtruongthpt.exception.ApiException("Nội dung tất cả các đáp án không được để trống");
+                }
+                String trimmedDa = da.getNoiDung().trim();
+                if (trimmedDa.length() > 500) {
+                    throw new com.hethongtruongthpt.exception.ApiException("Nội dung đáp án không được vượt quá 500 ký tự");
+                }
+                if (DANGEROUS_CHARS_PATTERN.matcher(trimmedDa).find()) {
+                    throw new com.hethongtruongthpt.exception.ApiException("Nội dung đáp án chứa ký tự không hợp lệ");
+                }
+                if (Boolean.TRUE.equals(da.getLaDapAnDung())) {
+                    hasCorrect = true;
+                }
+            }
+            if (!hasCorrect) {
+                throw new com.hethongtruongthpt.exception.ApiException("Vui lòng chọn ít nhất 1 đáp án đúng");
+            }
+        }
+    }
+
     @Transactional
     public void addQuestionToExam(Integer examId, CauHoiDTO dto) {
         BaiKiemTra exam = baiKiemTraRepository.findById(examId).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bài kiểm tra"));
+        validateCauHoi(dto, examId, null);
         
         CauHoi ch = new CauHoi();
         ch.setBaiKiemTra(exam);
         ch.setLoaiCauHoi(dto.getLoaiCauHoi());
-        ch.setNoiDung(dto.getNoiDung());
+        ch.setNoiDung(dto.getNoiDung().trim());
         ch.setDiem(dto.getDiem());
         CauHoi savedCh = cauHoiRepository.save(ch);
         
@@ -436,7 +516,7 @@ public class BaiKiemTraService {
             for (DapAnDTO daDTO : dto.getDapAns()) {
                 DapAn da = new DapAn();
                 da.setCauHoi(savedCh);
-                da.setNoiDung(daDTO.getNoiDung());
+                da.setNoiDung(daDTO.getNoiDung().trim());
                 da.setLaDapAnDung(daDTO.getLaDapAnDung());
                 dapAnRepository.save(da);
             }
@@ -452,8 +532,10 @@ public class BaiKiemTraService {
             throw new com.hethongtruongthpt.exception.ApiException("Không thể sửa câu hỏi vì bài kiểm tra này đã có học sinh làm bài.");
         }
 
+        validateCauHoi(dto, ch.getBaiKiemTra().getId(), cauHoiId);
+
         ch.setLoaiCauHoi(dto.getLoaiCauHoi());
-        ch.setNoiDung(dto.getNoiDung());
+        ch.setNoiDung(dto.getNoiDung().trim());
         ch.setDiem(dto.getDiem());
         cauHoiRepository.save(ch);
 
@@ -464,7 +546,7 @@ public class BaiKiemTraService {
             for (DapAnDTO daDTO : dto.getDapAns()) {
                 DapAn da = new DapAn();
                 da.setCauHoi(ch);
-                da.setNoiDung(daDTO.getNoiDung());
+                da.setNoiDung(daDTO.getNoiDung().trim());
                 da.setLaDapAnDung(daDTO.getLaDapAnDung());
                 dapAnRepository.save(da);
             }

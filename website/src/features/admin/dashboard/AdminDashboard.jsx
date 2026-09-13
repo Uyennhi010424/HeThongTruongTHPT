@@ -914,8 +914,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* Pie Chart (30%) */}
-        <div className="lg:w-[30%] h-[420px] rounded-[24px] bg-white border border-slate-200 p-6 flex flex-col">
-          <div className="flex justify-between items-center mb-6">
+        <div className="lg:w-[30%] min-h-[420px] lg:h-[420px] rounded-[24px] bg-white border border-slate-200 p-6 flex flex-col justify-between">
+          <div className="flex justify-between items-center mb-3">
             <h3 className="text-lg font-bold text-blue-900">Xếp loại học lực (Cả năm)</h3>
           </div>
 
@@ -926,10 +926,10 @@ export default function AdminDashboard() {
               <div className="text-slate-400 text-sm font-semibold">Chưa có dữ liệu</div>
             ) : (
               <>
-                <div className="h-[200px] w-full relative flex items-center justify-center">
+                <div className="h-[175px] w-full relative flex items-center justify-center">
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tổng học sinh</p>
-                    <p className="text-3xl font-black text-slate-900 leading-tight"><CountUp end={dashboardData.totalStudents} /></p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tổng học sinh</p>
+                    <p className="text-2xl font-black text-slate-900 leading-tight"><CountUp end={dashboardData.totalStudents} /></p>
                   </div>
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -937,8 +937,8 @@ export default function AdminDashboard() {
                         data={gradeDistribution}
                         cx="50%"
                         cy="50%"
-                        innerRadius={65}
-                        outerRadius={90}
+                        innerRadius={56}
+                        outerRadius={78}
                         paddingAngle={4}
                         dataKey="count"
                         nameKey="label"
@@ -956,16 +956,16 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Legend */}
-                <div className="w-full mt-6 flex flex-col gap-3 px-2">
+                <div className="w-full mt-3 flex flex-col gap-2 px-1">
                   {gradeDistribution.map((d) => (
-                    <div key={d.label} className="flex items-center justify-between">
+                    <div key={d.label} className="flex items-center justify-between py-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: d.color }} />
-                        <span className="text-sm font-bold text-slate-700">{d.label}</span>
+                        <span className="h-2.5 w-2.5 rounded-full shadow-xs shrink-0" style={{ backgroundColor: d.color }} />
+                        <span className="text-xs sm:text-sm font-bold text-slate-700">{d.label}</span>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-slate-500 font-semibold">{formatNumber(d.count)}</span>
-                        <span className="text-sm font-bold text-slate-900 w-8 text-right">{d.pct}%</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs sm:text-sm text-slate-500 font-semibold">{formatNumber(d.count)}</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 w-8 text-right">{d.pct}%</span>
                       </div>
                     </div>
                   ))}

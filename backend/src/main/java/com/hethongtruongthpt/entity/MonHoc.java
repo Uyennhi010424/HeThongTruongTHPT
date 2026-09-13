@@ -7,8 +7,6 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "mon_hoc")
-@SQLDelete(sql = "UPDATE mon_hoc SET is_deleted = true WHERE id = ?")
-@SQLRestriction("is_deleted = false")
 public class MonHoc {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
