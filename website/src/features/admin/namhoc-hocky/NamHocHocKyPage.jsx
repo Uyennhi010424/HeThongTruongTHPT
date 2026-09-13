@@ -212,14 +212,21 @@ export default function NamHocHocKyPage() {
 
     try {
       setCreating(true);
-      const openYears = years.filter((y) => (y.trangThai || y.trang_thai) === "DANG_MO");
-      for (const y of openYears) {
-        await updateNamHoc(y.id, buildPayload({ tenNamHoc: y.tenNamHoc || "", form: toFormFromYear(y), trangThai: "DA_DONG" }));
-      }
-
       const createRes = await createNamHoc(payload);
       const createdYear = createRes?.data?.data;
       if (!createdYear?.id) throw new Error("Thiếu id năm học sau khi tạo mới.");
+
+      // Close other previously open years now that the new year exists
+      if (payload.trangThai === "DANG_MO") {
+        const openYears = years.filter((y) => (y.trangThai || y.trang_thai) === "DANG_MO" && y.id !== createdYear.id);
+        for (const y of openYears) {
+          try {
+            await updateNamHoc(y.id, buildPayload({ tenNamHoc: y.tenNamHoc || "", form: toFormFromYear(y), trangThai: "DA_DONG" }));
+          } catch (closeErr) {
+            console.warn("Could not close previous open year", closeErr);
+          }
+        }
+      }
 
       let semesterCreateFailed = false;
       try {
@@ -236,9 +243,11 @@ export default function NamHocHocKyPage() {
       semesterCreateFailed
         ? notifyInfo("Đã thêm năm học nhưng tạo học kỳ mặc định chưa hoàn tất.")
         : notifySuccess("Đã thêm năm học mới.");
-    } catch {
-      setCreateError("Không thể thêm năm học mới. Vui lòng thử lại.");
-      notifyError("Không thể thêm năm học mới.");
+    } catch (err) {
+      console.error(err);
+      const errMsg = err?.response?.data?.message || err?.message || "Không thể thêm năm học mới. Vui lòng thử lại.";
+      setCreateError(errMsg);
+      notifyError(errMsg);
     } finally {
       setCreating(false);
     }
@@ -263,8 +272,9 @@ export default function NamHocHocKyPage() {
       setYears((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setSelectedYear(updated);
       notifySuccess("Đã lưu cấu hình năm học.");
-    } catch {
-      notifyError("Không thể lưu cấu hình năm học.");
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || "Không thể lưu cấu hình năm học.";
+      notifyError(errMsg);
     } finally {
       setSaving(false);
     }
@@ -280,14 +290,22 @@ export default function NamHocHocKyPage() {
     if (!selectedYear) return;
     try {
       setSaving(true);
+      // 1. Open the selected year first
+      const res = await updateNamHoc(selectedYear.id, buildPayload({ tenNamHoc: selectedYear.tenNamHoc || "", form: toFormFromYear(selectedYear), trangThai: "DANG_MO" }));
+      const updated = res?.data?.data;
+
+      // 2. Then close other previously open years
       const openYears = years.filter(
         (y) => (y.trangThai || y.trang_thai) === "DANG_MO" && y.id !== selectedYear.id,
       );
       for (const y of openYears) {
-        await updateNamHoc(y.id, buildPayload({ tenNamHoc: y.tenNamHoc || "", form: toFormFromYear(y), trangThai: "DA_DONG" }));
+        try {
+          await updateNamHoc(y.id, buildPayload({ tenNamHoc: y.tenNamHoc || "", form: toFormFromYear(y), trangThai: "DA_DONG" }));
+        } catch (closeErr) {
+          console.warn("Could not close other year", closeErr);
+        }
       }
-      const res = await updateNamHoc(selectedYear.id, buildPayload({ tenNamHoc: selectedYear.tenNamHoc || "", form: toFormFromYear(selectedYear), trangThai: "DANG_MO" }));
-      const updated = res?.data?.data;
+
       setYears((prev) =>
         prev.map((y) => {
           if (y.id === selectedYear.id) return updated || { ...y, trangThai: "DANG_MO" };
@@ -297,8 +315,9 @@ export default function NamHocHocKyPage() {
       );
       if (updated) setSelectedYear(updated);
       notifySuccess(`Đã đặt ${selectedYear.tenNamHoc} làm năm học hiện tại.`);
-    } catch {
-      notifyError("Không thể cập nhật năm học hiện tại.");
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || "Không thể cập nhật năm học hiện tại.";
+      notifyError(errMsg);
     } finally {
       setSaving(false);
     }
