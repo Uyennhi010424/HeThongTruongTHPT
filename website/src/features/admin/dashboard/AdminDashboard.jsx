@@ -379,23 +379,30 @@ export default function AdminDashboard() {
           setChartLoading(true);
         }
         Promise.all([
-          withTimeout(getDiemAvgByGrade({ namHoc: activeNamHoc }), 10000).catch(() => ({ data: { data: [] } })),
-          withTimeout(getDiemDistribution({ namHoc: activeNamHoc }), 15000).catch(() => ({ data: { data: { counts: {}, total: 0, avgScore: null } } })),
+          withTimeout(getDiemAvgByGrade({ namHoc: activeNamHoc }), 30000).catch(() => ({ data: { data: [] } })),
+          withTimeout(getDiemDistribution({ namHoc: activeNamHoc }), 30000).catch(() => ({ data: { data: { counts: {}, total: 0, avgScore: null } } })),
         ]).then(([avgRes, distRes]) => {
           if (cancelled) return;
           const avgByGrade = avgRes?.data?.data || [];
           const dist = distRes?.data?.data || {};
 
-          const blockAvg = avgByGrade.map((item) => ({
-            name: `Khối ${item.khoi}`,
-            value: item.avgScore != null ? Number(item.avgScore) : null,
-            count: item.studentCount || 0,
-          }));
+          let blockAvg = avgByGrade
+            .filter((item) => item != null && item.khoi != null)
+            .map((item) => ({
+              name: `Khối ${item.khoi}`,
+              value: item.avgScore != null ? Number(item.avgScore) : null,
+              count: item.studentCount || 0,
+            }));
+
+          if (blockAvg.length === 0 && chartDataRef.current.length > 0) {
+            blockAvg = chartDataRef.current;
+          } else if (blockAvg.length > 0) {
+            chartDataRef.current = blockAvg;
+          }
 
           const distributionCounts = dist.counts || { "TỐT": 0, "KHÁ": 0, "ĐẠT": 0, "CHƯA ĐẠT": 0 };
           const scoreRanges = dist.scoreRanges || null;
 
-          chartDataRef.current = blockAvg;
           setDashboardData((prev) => ({
             ...prev,
             blockAvg,

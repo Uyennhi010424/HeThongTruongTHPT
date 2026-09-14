@@ -347,6 +347,40 @@ public class DiemCalculationService {
     @Cacheable(value = "dashboardStats", key = "'avgGrade_' + #namHoc")
     public List<Map<String, Object>> getAvgByGrade(String namHoc) {
         String effectiveNamHoc = (namHoc != null && !namHoc.isBlank()) ? namHoc : getDefaultNamHoc();
+        try {
+            List<Map<String, Object>> nativeResult = diemRepository.findAvgScoreByGradeNative(effectiveNamHoc);
+            if (nativeResult != null && !nativeResult.isEmpty()) {
+                Map<Integer, Map<String, Object>> gradeMap = new HashMap<>();
+                for (Map<String, Object> row : nativeResult) {
+                    Object khoiObj = getVal(row, "khoi");
+                    if (khoiObj != null) {
+                        try {
+                            int k = Integer.parseInt(khoiObj.toString());
+                            Map<String, Object> cleanRow = new HashMap<>();
+                            cleanRow.put("khoi", k);
+                            cleanRow.put("avgScore", getVal(row, "avgScore", "avg_score"));
+                            cleanRow.put("studentCount", getVal(row, "studentCount", "student_count"));
+                            gradeMap.put(k, cleanRow);
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
+                List<Map<String, Object>> finalResult = new ArrayList<>();
+                for (int g : new int[]{10, 11, 12}) {
+                    if (gradeMap.containsKey(g)) {
+                        finalResult.add(gradeMap.get(g));
+                    } else {
+                        Map<String, Object> empty = new HashMap<>();
+                        empty.put("khoi", g);
+                        empty.put("avgScore", null);
+                        empty.put("studentCount", 0);
+                        finalResult.add(empty);
+                    }
+                }
+                return finalResult;
+            }
+        } catch (Exception e) {
+            logger.warn("Lỗi native avgByGrade, chuyển sang fallback: {}", e.getMessage());
+        }
         return getAvgByGradeFallback(effectiveNamHoc);
     }
 

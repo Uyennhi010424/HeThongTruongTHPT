@@ -269,17 +269,17 @@ export default function EduTopBar({
     navigate(`${resolveBasePath()}/thongbao`);
   };
 
-  const renderNavIcon = (icon, active = false, size = "text-[18px]") => {
+  const renderNavIcon = (icon, active = false, size = "text-[18px]", activeClass = "text-white") => {
     if (!icon) return null;
     if (typeof icon === "string") {
       return (
-        <span className={`material-symbols-outlined ${size} shrink-0 ${active ? "text-white" : ""}`}>
+        <span className={`material-symbols-outlined ${size} shrink-0 ${active ? activeClass : ""}`}>
           {icon}
         </span>
       );
     }
     const IconComp = icon;
-    return <IconComp size={18} className={`shrink-0 ${active ? "text-white" : ""}`} />;
+    return <IconComp size={18} className={`shrink-0 ${active ? activeClass : ""}`} />;
   };
 
   return (
@@ -572,7 +572,7 @@ export default function EduTopBar({
                       : "text-white/85 bg-white/10 hover:bg-white/20 hover:text-white"
                   }`}
                 >
-                  {renderNavIcon(child.icon, isActive, "text-[15px]")}
+                  {renderNavIcon(child.icon, isActive, "text-[15px]", "text-primary")}
                   <span>{child.label}</span>
                 </Link>
               );

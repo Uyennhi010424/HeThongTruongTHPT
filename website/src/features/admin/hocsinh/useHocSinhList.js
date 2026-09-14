@@ -1002,6 +1002,13 @@ export function useHocSinhList() {
             console.error("Lỗi cập nhật phụ huynh:", e);
           }
         }
+        if (phuHuynhId && editingStudent?.id) {
+          try {
+            await linkParentToStudent(editingStudent.id, phuHuynhId);
+          } catch (linkErr) {
+            console.warn("Lỗi liên kết phụ huynh cho học sinh:", linkErr);
+          }
+        }
         const updated = normalizeStudent(response?.data?.data);
         if (updated && updated.phuHuynh && phuHuynhId) {
           updated.phuHuynh.hoTen = form.phuHuynhHoTen.trim() || null;
@@ -1015,6 +1022,13 @@ export function useHocSinhList() {
       } else {
         const response = await createHocSinh(payload);
         const created = normalizeStudent(response?.data?.data);
+        if (created?.id && phuHuynhId) {
+          try {
+            await linkParentToStudent(created.id, phuHuynhId);
+          } catch (linkErr) {
+            console.warn("Lỗi liên kết phụ huynh cho học sinh mới:", linkErr);
+          }
+        }
         const selectedClass = classes.find(
           (item) => String(item.id) === String(form.lopHocId)
         );

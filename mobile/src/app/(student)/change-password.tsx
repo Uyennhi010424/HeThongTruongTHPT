@@ -64,8 +64,8 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -103,7 +103,7 @@ export default function ChangePasswordScreen() {
             placeholderTextColor="#94A3B8"
           />
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
             onPress={handleChangePassword}
             disabled={isLoading}

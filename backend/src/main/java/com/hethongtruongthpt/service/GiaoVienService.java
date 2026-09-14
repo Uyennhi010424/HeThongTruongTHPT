@@ -88,18 +88,38 @@ public class GiaoVienService {
 
     public List<GiaoVienDTO> getAll() {
         List<MonHoc> cachedMonHoc = monHocRepository.findAll(); // load 1 lần
+        String activeNamHoc = getActiveNamHocName();
+        List<com.hethongtruongthpt.entity.LopHoc> lopHocs = lopHocRepository.findByNamHoc(activeNamHoc);
+        java.util.Map<Integer, com.hethongtruongthpt.entity.LopHoc> gvcnMap = new java.util.HashMap<>();
+        for (com.hethongtruongthpt.entity.LopHoc lop : lopHocs) {
+            if (lop.getGvcn() != null) {
+                gvcnMap.put(lop.getGvcn().getId(), lop);
+            }
+        }
+        
         return giaoVienRepository.findAll().stream()
                 .map(gv -> sanitizeVietnameseText(gv, cachedMonHoc))
-                .map(this::toDto)
+                .map(gv -> toDtoFast(gv, gvcnMap.get(gv.getId())))
                 .toList();
     }
 
     public Page<GiaoVienDTO> getAllPaged(int page, int size) {
         List<MonHoc> cachedMonHoc = monHocRepository.findAll(); // load 1 lần
         Pageable pageable = PageRequest.of(page, size, Sort.by("hoTen").ascending());
-        return giaoVienRepository.findAll(pageable)
+        Page<GiaoVien> pageResult = giaoVienRepository.findAll(pageable);
+        
+        String activeNamHoc = getActiveNamHocName();
+        List<com.hethongtruongthpt.entity.LopHoc> lopHocs = lopHocRepository.findByNamHoc(activeNamHoc);
+        java.util.Map<Integer, com.hethongtruongthpt.entity.LopHoc> gvcnMap = new java.util.HashMap<>();
+        for (com.hethongtruongthpt.entity.LopHoc lop : lopHocs) {
+            if (lop.getGvcn() != null) {
+                gvcnMap.put(lop.getGvcn().getId(), lop);
+            }
+        }
+        
+        return pageResult
                 .map(gv -> sanitizeVietnameseText(gv, cachedMonHoc))
-                .map(this::toDto);
+                .map(gv -> toDtoFast(gv, gvcnMap.get(gv.getId())));
     }
 
     public GiaoVienDTO getByUsername(String username) {
@@ -342,6 +362,37 @@ public class GiaoVienService {
             com.hethongtruongthpt.entity.LopHoc lop = lopHocs.get(0);
             dto.setTenLopChuNhiem(lop.getTenLop());
             dto.setLopChuNhiemId(lop.getId());
+        } else {
+            dto.setIsGvcn(false);
+            dto.setTenLopChuNhiem(null);
+            dto.setLopChuNhiemId(null);
+        }
+
+        return dto;
+    }
+
+    private GiaoVienDTO toDtoFast(GiaoVien giaoVien, com.hethongtruongthpt.entity.LopHoc lopChuNhiem) {
+        if (giaoVien == null) return null;
+        GiaoVienDTO dto = new GiaoVienDTO();
+        dto.setId(giaoVien.getId());
+        dto.setMaGiaoVien(giaoVien.getMaGiaoVien());
+        dto.setHoTen(giaoVien.getHoTen());
+        dto.setEmail(giaoVien.getEmail());
+        dto.setSdt(giaoVien.getSoDienThoai());
+        dto.setBoMon(giaoVien.getBoMon());
+        dto.setTrinhDo(giaoVien.getTrinhDo());
+        dto.setGioiTinh(giaoVien.getGioiTinh());
+        dto.setNgaySinh(giaoVien.getNgaySinh());
+        dto.setDiaChi(giaoVien.getDiaChi());
+        dto.setAnhDaiDien(giaoVien.getAnhDaiDien());
+        if (giaoVien.getUser() != null) {
+            dto.setUsername(giaoVien.getUser().getUsername());
+        }
+
+        if (lopChuNhiem != null) {
+            dto.setIsGvcn(true);
+            dto.setTenLopChuNhiem(lopChuNhiem.getTenLop());
+            dto.setLopChuNhiemId(lopChuNhiem.getId());
         } else {
             dto.setIsGvcn(false);
             dto.setTenLopChuNhiem(null);

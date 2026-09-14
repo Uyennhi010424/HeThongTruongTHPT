@@ -30,6 +30,7 @@ public class DashboardService {
     private final NamHocRepository namHocRepository;
     private final ThoiKhoaBieuCrudService thoiKhoaBieuCrudService;
     private final LichSuHocTapRepository lichSuHocTapRepository;
+    private final PhanCongDayRepository phanCongDayRepository;
 
     public DashboardService(HocSinhService hocSinhService,
                             ThongBaoRepository thongBaoRepository,
@@ -42,7 +43,8 @@ public class DashboardService {
                             DiemCalculationService diemCalculationService,
                             NamHocRepository namHocRepository,
                             ThoiKhoaBieuCrudService thoiKhoaBieuCrudService,
-                            LichSuHocTapRepository lichSuHocTapRepository) {
+                            LichSuHocTapRepository lichSuHocTapRepository,
+                            PhanCongDayRepository phanCongDayRepository) {
         this.hocSinhService = hocSinhService;
         this.thongBaoRepository = thongBaoRepository;
         this.thoiKhoaBieuRepository = thoiKhoaBieuRepository;
@@ -55,6 +57,7 @@ public class DashboardService {
         this.namHocRepository = namHocRepository;
         this.thoiKhoaBieuCrudService = thoiKhoaBieuCrudService;
         this.lichSuHocTapRepository = lichSuHocTapRepository;
+        this.phanCongDayRepository = phanCongDayRepository;
     }
 
     public DashboardDataDTO getStudentDashboard(String username) {
@@ -255,8 +258,22 @@ public class DashboardService {
             .collect(Collectors.toList());
         dashboardData.setExams(exams);
 
-        // 4. Subjects
-        List<MonHoc> subjects = monHocRepository.findAll();
+        // 4. Subjects (Chỉ lấy các môn học thực tế của lớp học sinh)
+        List<MonHoc> subjects;
+        if (lopId != null) {
+            List<PhanCongDay> pcds = phanCongDayRepository.findByLopId(lopId);
+            subjects = pcds.stream()
+                    .map(PhanCongDay::getMonHoc)
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
+                    .sorted((a, b) -> Integer.compare(a.getId() != null ? a.getId() : 0, b.getId() != null ? b.getId() : 0))
+                    .collect(Collectors.toList());
+            if (subjects.isEmpty()) {
+                subjects = monHocRepository.findAll();
+            }
+        } else {
+            subjects = monHocRepository.findAll();
+        }
         dashboardData.setSubjects(subjects);
 
         // 5. Conducts
