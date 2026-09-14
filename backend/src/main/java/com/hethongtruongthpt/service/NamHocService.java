@@ -86,6 +86,15 @@ public class NamHocService {
     public NamHoc create(NamHoc namHoc) {
         namHoc.setId(null); // Để MySQL tự tăng ID
         validateNamHoc(namHoc);
+
+        // Lưu lại mốc ngày ban đầu khi tạo năm học
+        if (namHoc.getNgayBatDauHk1Goc() == null) namHoc.setNgayBatDauHk1Goc(namHoc.getNgayBatDauHk1());
+        if (namHoc.getNgayKetThucHk1Goc() == null) namHoc.setNgayKetThucHk1Goc(namHoc.getNgayKetThucHk1());
+        if (namHoc.getDeadlineNhapDiemHk1Goc() == null) namHoc.setDeadlineNhapDiemHk1Goc(namHoc.getDeadlineNhapDiemHk1());
+        if (namHoc.getNgayBatDauHk2Goc() == null) namHoc.setNgayBatDauHk2Goc(namHoc.getNgayBatDauHk2());
+        if (namHoc.getNgayKetThucHk2Goc() == null) namHoc.setNgayKetThucHk2Goc(namHoc.getNgayKetThucHk2());
+        if (namHoc.getDeadlineNhapDiemHk2Goc() == null) namHoc.setDeadlineNhapDiemHk2Goc(namHoc.getDeadlineNhapDiemHk2());
+
         return namHocRepository.save(namHoc);
     }
 
@@ -101,6 +110,15 @@ public class NamHocService {
         }
         validateNamHoc(namHoc);
         namHoc.setId(id);
+
+        // Luôn bảo toàn mốc thời gian ban đầu đã lưu từ lúc tạo
+        namHoc.setNgayBatDauHk1Goc(existing.getNgayBatDauHk1Goc() != null ? existing.getNgayBatDauHk1Goc() : existing.getNgayBatDauHk1());
+        namHoc.setNgayKetThucHk1Goc(existing.getNgayKetThucHk1Goc() != null ? existing.getNgayKetThucHk1Goc() : existing.getNgayKetThucHk1());
+        namHoc.setDeadlineNhapDiemHk1Goc(existing.getDeadlineNhapDiemHk1Goc() != null ? existing.getDeadlineNhapDiemHk1Goc() : existing.getDeadlineNhapDiemHk1());
+        namHoc.setNgayBatDauHk2Goc(existing.getNgayBatDauHk2Goc() != null ? existing.getNgayBatDauHk2Goc() : existing.getNgayBatDauHk2());
+        namHoc.setNgayKetThucHk2Goc(existing.getNgayKetThucHk2Goc() != null ? existing.getNgayKetThucHk2Goc() : existing.getNgayKetThucHk2());
+        namHoc.setDeadlineNhapDiemHk2Goc(existing.getDeadlineNhapDiemHk2Goc() != null ? existing.getDeadlineNhapDiemHk2Goc() : existing.getDeadlineNhapDiemHk2());
+
         return namHocRepository.save(namHoc);
     }
 

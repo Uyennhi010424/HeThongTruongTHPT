@@ -65,11 +65,10 @@ public class LeaveNotificationService {
             log.warn("Failed to create ThongBao mirror: {}", e.getMessage());
         }
 
-        // 3. Push real-time via WebSocket
+        // 3. Push real-time via WebSocket only to target user
         try {
             if (messagingTemplate != null) {
                 messagingTemplate.convertAndSend("/topic/user/" + user.getId(), savedAppNotif);
-                messagingTemplate.convertAndSend("/topic/notifications", savedAppNotif);
             }
         } catch (Exception e) {
             log.warn("Failed to broadcast notification via WebSocket: {}", e.getMessage());

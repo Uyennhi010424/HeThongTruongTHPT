@@ -153,12 +153,25 @@ public class GiaoVienDangKyService {
             subList = tkbDayThayRepository.findByGiaoVienThayIdAndNamHoc(gv.getId(), namHoc);
         }
 
+        Set<String> seenSlots = new HashSet<>();
+        for (ThoiKhoaBieu s : weekSlots) {
+            seenSlots.add(s.getThu() + "-" + s.getTietBatDau() + "-" + (s.getLop() != null ? s.getLop().getId() : 0));
+        }
+
         for (TkbDayThay dt : subList) {
             ThoiKhoaBieu orig = dt.getThoiKhoaBieu();
             if (orig == null) continue;
             
-            int thu = dt.getNgay() != null ? (dt.getNgay().getDayOfWeek().getValue() + 1) : (orig.getThu() != null ? orig.getThu() : 2);
+            // Only include substitute slot if it matches the requested academic year, semester and week
+            if (namHoc != null && orig.getNamHoc() != null && !namHoc.equals(orig.getNamHoc())) continue;
+            if (hocKy != null && orig.getHocKy() != null && !hocKy.equals(orig.getHocKy())) continue;
+            if (orig.getTuan() != null && !orig.getTuan().equals(tuan)) continue;
             
+            int thu = dt.getNgay() != null ? (dt.getNgay().getDayOfWeek().getValue() + 1) : (orig.getThu() != null ? orig.getThu() : 2);
+            String slotKey = thu + "-" + orig.getTietBatDau() + "-" + (orig.getLop() != null ? orig.getLop().getId() : 0);
+            if (seenSlots.contains(slotKey)) continue;
+            seenSlots.add(slotKey);
+
             ThoiKhoaBieu subSlot = new ThoiKhoaBieu();
             subSlot.setId(orig.getId());
             subSlot.setLop(orig.getLop());

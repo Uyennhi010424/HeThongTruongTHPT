@@ -182,6 +182,11 @@ public class LopHocService {
             throw new ApiException("Năm học mới phải khác năm học hiện tại");
         }
 
+        NamHoc nextNamHocObj = namHocRepository.findByTenNamHoc(nextNamHoc).orElse(null);
+        if (nextNamHocObj == null) {
+            throw new ApiException("Năm học mới " + nextNamHoc + " chưa được tạo trong hệ thống. Vui lòng tạo năm học mới trước!");
+        }
+
         List<LopHoc> currentLops = lopHocRepository.findByNamHoc(currentNamHoc);
         if (currentLops.isEmpty()) {
             throw new ApiException("Không tìm thấy lớp nào cho năm học " + currentNamHoc);
@@ -394,12 +399,20 @@ public class LopHocService {
     @Transactional
     public LopHoc assignGvcn(Integer lopId, Integer gvcnId) {
         LopHoc lop = getById(lopId);
+        chuNhiemRepository.deleteById_LopId(lopId);
         if (gvcnId == null) {
             lop.setGvcn(null);
         } else {
             com.hethongtruongthpt.entity.GiaoVien gv = giaoVienRepository.findById(gvcnId)
                 .orElseThrow(() -> new ApiException("Không tìm thấy giáo viên"));
             lop.setGvcn(gv);
+
+            com.hethongtruongthpt.entity.ChuNhiemId cnId = new com.hethongtruongthpt.entity.ChuNhiemId();
+            cnId.setGiaoVienId(gv.getId());
+            cnId.setLopId(lop.getId());
+            com.hethongtruongthpt.entity.ChuNhiem cn = new com.hethongtruongthpt.entity.ChuNhiem();
+            cn.setId(cnId);
+            chuNhiemRepository.save(cn);
         }
         return lopHocRepository.save(lop);
     }

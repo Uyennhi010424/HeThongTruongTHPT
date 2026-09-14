@@ -11,6 +11,9 @@ import com.hethongtruongthpt.repository.GiaoVienNghiRepository;
 import com.hethongtruongthpt.repository.GiaoVienRepository;
 import com.hethongtruongthpt.repository.ThoiKhoaBieuRepository;
 import com.hethongtruongthpt.repository.TkbDayThayRepository;
+import com.hethongtruongthpt.entity.NamHoc;
+import com.hethongtruongthpt.repository.NamHocRepository;
+import com.hethongtruongthpt.util.SchoolWeekUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -38,17 +41,20 @@ public class GiaoVienNghiService {
     private final LeaveNotificationService notificationService;
     private final ThoiKhoaBieuRepository tkbRepo;
     private final TkbDayThayRepository tkbDayThayRepo;
+    private final NamHocRepository namHocRepo;
 
     public GiaoVienNghiService(GiaoVienNghiRepository nghiRepo,
                                 GiaoVienRepository gvRepo,
                                 LeaveNotificationService notificationService,
                                 ThoiKhoaBieuRepository tkbRepo,
-                                TkbDayThayRepository tkbDayThayRepo) {
+                                TkbDayThayRepository tkbDayThayRepo,
+                                NamHocRepository namHocRepo) {
         this.nghiRepo = nghiRepo;
         this.gvRepo = gvRepo;
         this.notificationService = notificationService;
         this.tkbRepo = tkbRepo;
         this.tkbDayThayRepo = tkbDayThayRepo;
+        this.namHocRepo = namHocRepo;
     }
 
     @Transactional(readOnly = true)
@@ -199,21 +205,40 @@ public class GiaoVienNghiService {
                 );
             }
 
-            // Auto-create TkbDayThay slots for all periods on that date
+            // Auto-create TkbDayThay slots for all periods on that date in matching academic year, semester and week
             int thu = nghi.getNgay().getDayOfWeek().getValue() + 1; // 2=Mon .. 7=Sat
             if (thu >= 2 && thu <= 7 && gv != null) {
-                List<ThoiKhoaBieu> gvSlots = tkbRepo.findByGiaoVienId(gv.getId());
-                for (ThoiKhoaBieu tkbSlot : gvSlots) {
-                    if (tkbSlot.getThu() == thu) {
-                        List<TkbDayThay> existing = tkbDayThayRepo.findByThoiKhoaBieuId(tkbSlot.getId());
-                        boolean already = existing.stream().anyMatch(dt -> dt.getNgay().equals(nghi.getNgay()));
-                        if (!already) {
-                            TkbDayThay dt = new TkbDayThay();
-                            dt.setThoiKhoaBieu(tkbSlot);
-                            dt.setGiaoVienThay(thay);
-                            dt.setNgay(nghi.getNgay());
-                            dt.setGhiChu("Dạy thay GV: " + gv.getHoTen());
-                            tkbDayThayRepo.save(dt);
+                String namHoc = nghi.getNamHoc();
+                NamHoc nh = (namHoc != null && !namHoc.isBlank())
+                        ? namHocRepo.findByTenNamHoc(namHoc).orElse(null)
+                        : null;
+
+                int hocKy = 1;
+                if (nh != null && nh.getNgayBatDauHk2() != null && !nghi.getNgay().isBefore(nh.getNgayBatDauHk2())) {
+                    hocKy = 2;
+                }
+
+                int tuan = nh != null ? SchoolWeekUtils.weekNumber(nh, nghi.getNgay()) : 1;
+                if (tuan < 1) tuan = 1;
+
+                List<ThoiKhoaBieu> gvSlots = tkbRepo.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, tuan);
+                if (gvSlots == null || gvSlots.isEmpty()) {
+                    gvSlots = tkbRepo.findByGiaoVienIdAndHocKyAndNamHocAndTuan(gv.getId(), hocKy, namHoc, 1);
+                }
+
+                if (gvSlots != null) {
+                    for (ThoiKhoaBieu tkbSlot : gvSlots) {
+                        if (tkbSlot.getThu() != null && tkbSlot.getThu() == thu) {
+                            List<TkbDayThay> existing = tkbDayThayRepo.findByThoiKhoaBieuId(tkbSlot.getId());
+                            boolean already = existing.stream().anyMatch(dt -> dt.getNgay().equals(nghi.getNgay()));
+                            if (!already) {
+                                TkbDayThay dt = new TkbDayThay();
+                                dt.setThoiKhoaBieu(tkbSlot);
+                                dt.setGiaoVienThay(thay);
+                                dt.setNgay(nghi.getNgay());
+                                dt.setGhiChu("Dạy thay GV: " + gv.getHoTen());
+                                tkbDayThayRepo.save(dt);
+                            }
                         }
                     }
                 }

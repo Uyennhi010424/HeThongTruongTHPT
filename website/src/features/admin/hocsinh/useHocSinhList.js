@@ -87,9 +87,17 @@ const compareClassThenGivenName = (a, b) => {
   const priorityB = getStudentSortPriority(b);
   if (priorityA !== priorityB) return priorityA - priorityB;
 
-  // 2. Nếu cùng có lớp: So sánh lớp học (10A1 -> 10A2 -> 11A1...)
-  const classA = String(a?.lopHoc?.tenLop || a?.lop?.tenLop || "").trim();
-  const classB = String(b?.lopHoc?.tenLop || b?.lop?.tenLop || "").trim();
+  // 2. Nếu cùng có lớp: So sánh khối (10 -> 11 -> 12) rồi tới lớp (10A1 -> 10A2 -> 11A1...)
+  const lopA = a?.lopHoc || a?.lop;
+  const lopB = b?.lopHoc || b?.lop;
+  const khoiA = Number(lopA?.khoi || 0);
+  const khoiB = Number(lopB?.khoi || 0);
+  if (khoiA && khoiB && khoiA !== khoiB) {
+    return khoiA - khoiB;
+  }
+
+  const classA = String(lopA?.tenLop || "").trim();
+  const classB = String(lopB?.tenLop || "").trim();
   if (classA && classB) {
     const classCompare = classA.localeCompare(classB, "vi", {
       numeric: true,
@@ -431,11 +439,12 @@ export function useHocSinhList() {
         }
         if (lopRes.status === "fulfilled") {
           const rawClasses = lopRes.value?.data?.data || [];
+          const sortedClasses = [...rawClasses].sort(sortClasses);
           if (visibleYears.length > 0) {
             const validYearSet = new Set(visibleYears.map(y => y.tenNamHoc));
-            setClasses(rawClasses.filter(c => !c.namHoc || validYearSet.has(c.namHoc)));
+            setClasses(sortedClasses.filter(c => !c.namHoc || validYearSet.has(c.namHoc)));
           } else {
-            setClasses(rawClasses);
+            setClasses(sortedClasses);
           }
         }
         if (phRes.status === "fulfilled") {
@@ -532,11 +541,21 @@ export function useHocSinhList() {
     });
 
     return Array.from(map.entries())
-      .sort(([a], [b]) => Number(a) - Number(b))
+      .sort(([a], [b]) => {
+        const numA = Number(a);
+        const numB = Number(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB; // 10 -> 11 -> 12
+        if (!isNaN(numA)) return -1;
+        if (!isNaN(numB)) return 1;
+        return String(a).localeCompare(String(b));
+      })
       .map(([grade, items]) => ({
         grade,
         items: [...items].sort((x, y) =>
-          String(x.tenLop || "").localeCompare(String(y.tenLop || ""))
+          String(x.tenLop || "").localeCompare(String(y.tenLop || ""), "vi", {
+            numeric: true,
+            sensitivity: "base",
+          })
         )
       }));
   }, [classes, yearFilter]);

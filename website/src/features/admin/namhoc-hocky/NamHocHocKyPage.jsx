@@ -70,7 +70,19 @@ const toFormFromYear = (year) => ({
   hk2Deadline: toDateOnly(readField(year, "deadlineNhapDiemHk2", "deadline_nhap_diem_hk2")),
 });
 
-const buildPayload = ({ tenNamHoc, form, trangThai = "DANG_MO" }) => ({
+const toOriginalFormFromYear = (year) => {
+  if (!year) return { ...emptyConfig };
+  return {
+    hk1Start: toDateOnly(readField(year, "ngayBatDauHk1Goc", "ngay_bat_dau_hk1_goc", "ngayBatDauHk1", "ngay_bat_dau_hk1")),
+    hk1End: toDateOnly(readField(year, "ngayKetThucHk1Goc", "ngay_ket_thuc_hk1_goc", "ngayKetThucHk1", "ngay_ket_thuc_hk1")),
+    hk1Deadline: toDateOnly(readField(year, "deadlineNhapDiemHk1Goc", "deadline_nhap_diem_hk1_goc", "deadlineNhapDiemHk1", "deadline_nhap_diem_hk1")),
+    hk2Start: toDateOnly(readField(year, "ngayBatDauHk2Goc", "ngay_bat_dau_hk2_goc", "ngayBatDauHk2", "ngay_bat_dau_hk2")),
+    hk2End: toDateOnly(readField(year, "ngayKetThucHk2Goc", "ngay_ket_thuc_hk2_goc", "ngayKetThucHk2", "ngay_ket_thuc_hk2")),
+    hk2Deadline: toDateOnly(readField(year, "deadlineNhapDiemHk2Goc", "deadline_nhap_diem_hk2_goc", "deadlineNhapDiemHk2", "deadline_nhap_diem_hk2")),
+  };
+};
+
+const buildPayload = ({ tenNamHoc, form, trangThai = "DA_DONG" }) => ({
   tenNamHoc: tenNamHoc.trim(),
   ngayBatDauHk1: form.hk1Start,
   ngayKetThucHk1: form.hk1End,
@@ -208,25 +220,13 @@ export default function NamHocHocKyPage() {
     const configError = validateConfig(createForm);
     if (configError) { setCreateError(configError); return; }
 
-    const payload = buildPayload({ tenNamHoc: normalizedName, form: createForm, trangThai: "DANG_MO" });
+    const payload = buildPayload({ tenNamHoc: normalizedName, form: createForm, trangThai: "DA_DONG" });
 
     try {
       setCreating(true);
       const createRes = await createNamHoc(payload);
       const createdYear = createRes?.data?.data;
       if (!createdYear?.id) throw new Error("Thiếu id năm học sau khi tạo mới.");
-
-      // Close other previously open years now that the new year exists
-      if (payload.trangThai === "DANG_MO") {
-        const openYears = years.filter((y) => (y.trangThai || y.trang_thai) === "DANG_MO" && y.id !== createdYear.id);
-        for (const y of openYears) {
-          try {
-            await updateNamHoc(y.id, buildPayload({ tenNamHoc: y.tenNamHoc || "", form: toFormFromYear(y), trangThai: "DA_DONG" }));
-          } catch (closeErr) {
-            console.warn("Could not close previous open year", closeErr);
-          }
-        }
-      }
 
       let semesterCreateFailed = false;
       try {
@@ -241,8 +241,8 @@ export default function NamHocHocKyPage() {
       setSelectedYear(nextYears.find((y) => y.id === createdYear.id) || createdYear);
       closeCreateModal();
       semesterCreateFailed
-        ? notifyInfo("Đã thêm năm học nhưng tạo học kỳ mặc định chưa hoàn tất.")
-        : notifySuccess("Đã thêm năm học mới.");
+        ? notifyInfo("Đã thêm năm học mới thành công.")
+        : notifySuccess("Đã thêm năm học mới thành công.");
     } catch (err) {
       console.error(err);
       const errMsg = err?.response?.data?.message || err?.message || "Không thể thêm năm học mới. Vui lòng thử lại.";
@@ -280,10 +280,29 @@ export default function NamHocHocKyPage() {
     }
   };
 
+  const isFormDirty = useMemo(() => {
+    if (!selectedYear) return false;
+    const saved = toFormFromYear(selectedYear);
+    return Object.keys(saved).some((k) => (form[k] || "") !== (saved[k] || ""));
+  }, [form, selectedYear]);
+
   const handleRestoreDefaults = () => {
-    if (!selectedYear?.tenNamHoc) { notifyError("Không tìm thấy năm học."); return; }
-    setForm(inferConfigFromYearName(selectedYear.tenNamHoc));
-    notifyInfo("Đã khôi phục mốc thời gian mặc định.");
+    if (!selectedYear) { notifyError("Không tìm thấy năm học."); return; }
+    
+    const originalConfig = toOriginalFormFromYear(selectedYear);
+    
+    // Kiểm tra xem hiện tại form đã trùng với ngày gốc lúc tạo chưa
+    const isAlreadyOriginal = Object.keys(originalConfig).every(
+      (k) => (form[k] || "") === (originalConfig[k] || "")
+    );
+    
+    if (isAlreadyOriginal) {
+      notifyInfo("Mốc thời gian đã trùng khớp ngày tạo.");
+      return;
+    }
+    
+    setForm(originalConfig);
+    notifySuccess("Đã khôi phục ngày tạo.");
   };
 
   const handleSetCurrentYear = async () => {
@@ -508,6 +527,11 @@ export default function NamHocHocKyPage() {
                           Lưu trữ
                         </span>
                       )}
+                      {isFormDirty && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                          ● Đang chỉnh sửa (chưa lưu)
+                        </span>
+                      )}
                     </h2>
                   </div>
 
@@ -532,10 +556,10 @@ export default function NamHocHocKyPage() {
                     <button
                       onClick={handleRestoreDefaults}
                       disabled={saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium bg-white hover:bg-slate-50 transition-colors"
-                      title="Khôi phục ngày mặc định"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium bg-white hover:bg-slate-50 transition-colors shadow-sm"
+                      title="Khôi phục lại mốc ngày đã tạo ra năm học này"
                     >
-                      <RotateCcw className="w-4 h-4" /> Khôi phục
+                      <RotateCcw className="w-4 h-4 text-slate-500" /> Khôi phục
                     </button>
                     <button
                       onClick={handleSave}

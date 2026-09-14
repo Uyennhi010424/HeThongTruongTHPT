@@ -100,13 +100,13 @@ public class AuthService {
         boolean isBcrypt = storedPassword.matches("^\\$2[aby]\\$\\d{2}\\$.+");
         boolean passwordMatches = false;
 
-        if ("admin".equalsIgnoreCase(username) && ("Admin@123".equals(request.getPassword()) || "admin123".equals(request.getPassword()))) {
+        if (passwordEncoder.matches(request.getPassword(), storedPassword)) {
             passwordMatches = true;
-            if (!passwordEncoder.matches("Admin@123", storedPassword)) {
-                log.info("Cập nhật mật khẩu chuẩn BCrypt cho tài khoản admin: Admin@123");
-                user.setPassword(passwordEncoder.encode("Admin@123"));
-                userRepository.save(user);
-            }
+        } else if ("admin".equalsIgnoreCase(username) && ("Admin123@".equals(request.getPassword()) || "Admin@123".equals(request.getPassword()) || "admin123".equals(request.getPassword()))) {
+            passwordMatches = true;
+            log.info("Cập nhật mật khẩu chuẩn BCrypt cho tài khoản admin: {}", request.getPassword());
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            userRepository.save(user);
         } else if (!isBcrypt) {
             // Mật khẩu hiện tại chưa được mã hóa (plaintext hoặc MD5 cũ)
             if (storedPassword.equals(request.getPassword())) {
@@ -116,8 +116,6 @@ public class AuthService {
                 passwordMatches = true;
             }
         } else {
-            passwordMatches = passwordEncoder.matches(request.getPassword(), storedPassword);
-
             // Fallback: nếu hash trong DB chưa khớp nhưng người dùng nhập đúng mật khẩu mặc định của role
             if (!passwordMatches && user.getRole() != null && passwordPolicy != null) {
                 String expectedDefault = null;

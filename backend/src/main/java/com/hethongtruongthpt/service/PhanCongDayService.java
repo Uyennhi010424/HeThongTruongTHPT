@@ -190,6 +190,10 @@ public class PhanCongDayService {
             syncHocKy2FromHocKy1(namHoc);
         }
 
+        if (created.isEmpty() && !existingAssignments.isEmpty()) {
+            throw new ApiException("Năm học " + namHoc + " đã được phân công đầy đủ các môn học nên không thể phân công thêm!");
+        }
+
         return created;
     }
 
@@ -445,6 +449,16 @@ public class PhanCongDayService {
     }
 
     public List<PhanCongDayDTO> getAll() {
+        // Tự động đảm bảo giáo viên chủ nhiệm luôn được phân công dạy lớp chủ nhiệm trước cho tất cả các năm học
+        List<String> allYears = lopHocRepository.findAll().stream()
+                .map(LopHoc::getNamHoc)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        for (String y : allYears) {
+            autoAssignHomeroomTeachers(y);
+        }
+
         return repository.findAll().stream()
                 .sorted((left, right) -> {
                     int cmp = compareNullableString(right.getNamHoc(), left.getNamHoc());
@@ -464,6 +478,9 @@ public class PhanCongDayService {
             return getAll();
         }
 
+        // Tự động đảm bảo giáo viên chủ nhiệm luôn được phân công dạy lớp chủ nhiệm trước
+        autoAssignHomeroomTeachers(namHoc);
+
         return repository.findByNamHocAndHocKy(namHoc, hocKy).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
@@ -479,10 +496,58 @@ public class PhanCongDayService {
     public List<PhanCongDayDTO> getByLopIdAndNamHocAndHocKy(Integer lopId, String namHoc, Integer hocKy) {
         if (lopId == null) return getByNamHocAndHocKy(namHoc, hocKy);
         if (namHoc == null || namHoc.isBlank() || hocKy == null) return getByLopId(lopId);
+
+        autoAssignHomeroomTeachers(namHoc);
+
         return repository.findByNamHocAndHocKy(namHoc, hocKy).stream()
                 .filter(pc -> pc.getLop() != null && lopId.equals(pc.getLop().getId()))
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<PhanCongDayDTO> autoAssignHomeroomTeachers(String namHoc) {
+        if (namHoc == null || namHoc.isBlank()) return Collections.emptyList();
+
+        List<LopHoc> lops = lopHocRepository.findByNamHoc(namHoc);
+        if (lops.isEmpty()) return Collections.emptyList();
+
+        syncChuNhiemToLopHoc(chuNhiemRepository.findAll(), namHoc, lops);
+        lops = lopHocRepository.findByNamHoc(namHoc);
+
+        List<PhanCongDayDTO> result = new ArrayList<>();
+        for (LopHoc lop : lops) {
+            if (lop.getGvcn() == null) continue;
+            GiaoVien gvcn = lop.getGvcn();
+            MonHoc subject = resolveHomeroomSubject(gvcn, lop);
+            if (subject == null) continue;
+
+            // Đảm bảo HK1 có phân công GVCN
+            var existingHk1 = repository.findByMonHocIdAndLopIdAndHocKy(subject.getId(), lop.getId(), 1);
+            if (existingHk1.isEmpty()) {
+                PhanCongDay pc1 = new PhanCongDay();
+                pc1.setGiaoVien(gvcn);
+                pc1.setMonHoc(subject);
+                pc1.setLop(lop);
+                pc1.setHocKy(1);
+                pc1.setNamHoc(namHoc);
+                PhanCongDay saved = repository.save(pc1);
+                result.add(toDto(saved));
+            }
+
+            // Đảm bảo HK2 có phân công GVCN
+            var existingHk2 = repository.findByMonHocIdAndLopIdAndHocKy(subject.getId(), lop.getId(), 2);
+            if (existingHk2.isEmpty()) {
+                PhanCongDay pc2 = new PhanCongDay();
+                pc2.setGiaoVien(gvcn);
+                pc2.setMonHoc(subject);
+                pc2.setLop(lop);
+                pc2.setHocKy(2);
+                pc2.setNamHoc(namHoc);
+                repository.save(pc2);
+            }
+        }
+        return result;
     }
 
     public PhanCongDayDTO create(PhanCongDayDTO dto) {
@@ -518,15 +583,17 @@ public class PhanCongDayService {
             .filter(java.util.Objects::nonNull)
             .collect(Collectors.toCollection(java.util.HashSet::new));
         if (!assignedClassIds.contains(lopId) && assignedClassIds.size() >= 6) {
-            throw new ApiException("Giáo viên này đã được phân công dạy đủ 6 lớp trong học kỳ này");
+            throw new ApiException("Giáo viên " + gv.getHoTen() + " đã được phân công dạy đủ 6 lớp trong học kỳ này");
         }
 
         var existingSubjectAssign = repository.findByMonHocIdAndLopIdAndHocKy(effectiveMonId, lopId, hocKy);
         if (existingSubjectAssign.isPresent()) {
-            if (existingSubjectAssign.get().getGiaoVien().getId().equals(gvId)) {
-                return toDto(existingSubjectAssign.get());
+            PhanCongDay existing = existingSubjectAssign.get();
+            String existingTeacherName = existing.getGiaoVien() != null ? existing.getGiaoVien().getHoTen() : "giáo viên khác";
+            if (existing.getGiaoVien() != null && existing.getGiaoVien().getId().equals(gvId)) {
+                throw new ApiException("Giáo viên " + gv.getHoTen() + " đã được phân công dạy môn " + mon.getTenMon() + " cho lớp " + lop.getTenLop() + " trong học kỳ này rồi!");
             } else {
-                throw new ApiException("Môn học này của lớp đã được phân công cho giáo viên khác trong học kỳ này");
+                throw new ApiException("Môn " + mon.getTenMon() + " của lớp " + lop.getTenLop() + " đã được phân công cho giáo viên " + existingTeacherName + " rồi! Vui lòng chọn môn khác hoặc xóa phân công cũ trước.");
             }
         }
 
@@ -560,7 +627,7 @@ public class PhanCongDayService {
 
             return toDto(saved);
         } catch (DataIntegrityViolationException ex) {
-            throw new ApiException("Phân công này đã tồn tại");
+            throw new ApiException("Phân công môn " + mon.getTenMon() + " cho lớp " + lop.getTenLop() + " đã tồn tại trong hệ thống!");
         }
     }
 
@@ -761,6 +828,41 @@ public class PhanCongDayService {
                 .filter(MonHoc::getIsActive)
                 .collect(Collectors.toList());
 
+        // 1. Ưu tiên map theo từ điển mã môn chuẩn
+        Map<String, List<String>> subjectToBoMon = Map.ofEntries(
+            Map.entry("TOAN", List.of("toan")),
+            Map.entry("VAN", List.of("van", "ngu van")),
+            Map.entry("ANH", List.of("anh", "tieng anh")),
+            Map.entry("SU", List.of("su", "lich su")),
+            Map.entry("DIA", List.of("dia", "dia li")),
+            Map.entry("LY", List.of("ly", "vat li", "vat ly")),
+            Map.entry("HOA", List.of("hoa", "hoa hoc")),
+            Map.entry("SINH", List.of("sinh", "sinh hoc")),
+            Map.entry("TINHOC", List.of("tin", "tin hoc")),
+            Map.entry("CN-CN", List.of("cong nghe", "cn")),
+            Map.entry("CN-NN", List.of("cong nghe", "cn")),
+            Map.entry("GDKTPL", List.of("ktpl", "gdkt", "kinh te", "phap luat")),
+            Map.entry("GDTC", List.of("gdtc", "the chat", "the duc", "giao duc the chat")),
+            Map.entry("GDQPAN", List.of("qpan", "quoc phong", "gdqp", "giao duc quoc phong")),
+            Map.entry("HDTN-HN", List.of("hdtn", "trai nghiem", "hoat dong trai nghiem")),
+            Map.entry("GDDP", List.of("nddp", "dia phuong", "noi dung giao duc dia phuong")),
+            Map.entry("AMNHAC", List.of("am nhac")),
+            Map.entry("MT", List.of("my thuat", "mi thuat"))
+        );
+
+        for (MonHoc subject : activeSubjects) {
+            String maMon = subject.getMaMon() != null ? subject.getMaMon().toUpperCase().trim() : "";
+            List<String> keywords = subjectToBoMon.get(maMon);
+            if (keywords != null) {
+                for (String kw : keywords) {
+                    if (teacherSubjects.equals(kw) || teacherSubjects.contains(kw) || kw.contains(teacherSubjects)) {
+                        return subject;
+                    }
+                }
+            }
+        }
+
+        // 2. Khớp theo tên môn
         return activeSubjects.stream()
                 .filter(subject -> {
                     String subjectName = normalize(subject.getTenMon());

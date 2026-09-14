@@ -6,6 +6,7 @@ import {
   UserCheck, AlertCircle, TrendingUp, Filter, GraduationCap, ArrowUpCircle, Eye, Shield,
   ChevronDown, ChevronUp
 } from "lucide-react";
+import axiosClient from "../../../api/axiosClient.js";
 import { createLop, createLopBulk, deleteLop, getLop, syncSiSo, updateLop, assignGvcn, promoteStudents } from "../../../api/lopApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
 import { getGiaoVien } from "../../../api/giaovienApi.js";
@@ -242,6 +243,7 @@ const AssignTeacherModal = ({ item, classes, onClose, onAssignSuccess }) => {
     try {
       setSaving(true);
       await assignGvcn(item.id, { gvcnId: selectedTeacherId ? Number(selectedTeacherId) : null });
+      axiosClient.invalidateCache("/phancong-day");
       notifySuccess("Phân công GVCN thành công!");
       onAssignSuccess();
     } catch (err) {
@@ -569,6 +571,11 @@ export default function LopList() {
     const nextYear = getNextAcademicYear(currentYear);
     const nextYearExists = allNamHoc.some((y) => y.tenNamHoc === nextYear);
 
+    if (!nextYearExists) {
+      notifyError(`Năm học mới ${nextYear} chưa được tạo. Vui lòng tạo năm học mới trước!`);
+      return;
+    }
+
     const confirmMessage = (
       <div className="text-left space-y-3 w-full mt-2">
         <p className="text-slate-800 text-[15px]">
@@ -587,12 +594,8 @@ export default function LopList() {
             <li>Khối 10, 11 sẽ tự động <strong>lên lớp tiếp theo</strong> ({nextYear}).</li>
             <li>Giáo viên chủ nhiệm sẽ được luân chuyển theo lớp mới (nếu có).</li>
             <li>
-              Cần thiết lập danh sách năm học <strong>{nextYear}</strong> trong hệ thống trước.
-              {nextYearExists ? (
-                <span className="text-green-700 font-semibold ml-1">(&#10003; Đã có sẵn trên hệ thống)</span>
-              ) : (
-                <span className="text-amber-700 font-semibold ml-1">(&#9888; Chưa tạo trong Năm học & Học kỳ)</span>
-              )}
+              Năm học tiếp theo: <strong>{nextYear}</strong>
+              <span className="text-green-700 font-semibold ml-1">(&#10003; Đã có sẵn trên hệ thống)</span>
             </li>
           </ul>
         </div>
@@ -606,7 +609,7 @@ export default function LopList() {
         notifySuccess("Lên lớp thành công!");
         loadData();
       } catch (err) {
-        notifyError("Lỗi lên lớp: " + (err.response?.data?.message || err.message));
+        notifyError(err.response?.data?.message || err.message || "Lỗi lên lớp");
       } finally {
         setLoading(false);
       }

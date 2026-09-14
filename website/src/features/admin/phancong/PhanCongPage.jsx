@@ -285,6 +285,47 @@ export default function PhanCongPage() {
     fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleClassChange = (classId) => {
+    setSelectedClassId(classId);
+    if (!classId) return;
+    const lop = classes.find((c) => String(c.id) === String(classId));
+    if (lop) {
+      const gvId = lop.gvcn?.id || lop.gvcnId;
+      const gvcn = teachers.find((t) => t.id === gvId);
+      if (gvcn) {
+        setSelectedTeacherId(String(gvcn.id));
+        const gvNorm = normalizeText(gvcn.boMon || "");
+        const matchedSub = subjects.find((m) => {
+          const mNorm = normalizeText(m.tenMon || "");
+          return gvNorm && (gvNorm.includes(mNorm) || mNorm.includes(gvNorm));
+        });
+        if (matchedSub) {
+          setSelectedSubject(matchedSub.tenMon);
+        }
+      }
+    }
+  };
+
+  const handleTeacherChange = (teacherId) => {
+    setSelectedTeacherId(teacherId);
+    if (!teacherId) return;
+    const teacher = teachers.find((t) => String(t.id) === String(teacherId));
+    if (teacher) {
+      const gvNorm = normalizeText(teacher.boMon || "");
+      const matchedSub = subjects.find((m) => {
+        const mNorm = normalizeText(m.tenMon || "");
+        return gvNorm && (gvNorm.includes(mNorm) || mNorm.includes(gvNorm));
+      });
+      if (matchedSub) {
+        setSelectedSubject(matchedSub.tenMon);
+      }
+      const homeroomClass = formClassList.find((c) => (c.gvcn?.id || c.gvcnId) === teacher.id);
+      if (homeroomClass) {
+        setSelectedClassId(String(homeroomClass.id));
+      }
+    }
+  };
+
   const handleAssign = async () => {
     const teacher = teachers.find((t) => String(t.id) === String(selectedTeacherId));
     if (!teacher) { notifyError("Vui lòng chọn giáo viên."); return; }
@@ -300,6 +341,23 @@ export default function PhanCongPage() {
 
     const lopObj = classes.find((c) => String(c.id) === String(selectedClassId));
     const namHocVal = formNamHoc || lopObj?.namHoc || filter.namHoc || autoNamHoc || "";
+
+    // Kiểm tra phân công trùng môn trong cùng một lớp
+    const normalizedSub = normalizeText(selectedSubject);
+    const duplicate = assignments.find((a) =>
+      a.namHoc === namHocVal &&
+      a.lop === lopObj?.tenLop &&
+      normalizeText(a.mon) === normalizedSub
+    );
+
+    if (duplicate) {
+      if (String(duplicate.ma) === String(teacher.maGiaoVien) || duplicate.gv === teacher.hoTen) {
+        notifyError(`Giáo viên ${teacher.hoTen} đã được phân công dạy môn ${selectedSubject} lớp ${lopObj?.tenLop || ""} năm học ${namHocVal} rồi!`);
+      } else {
+        notifyError(`Môn ${selectedSubject} của lớp ${lopObj?.tenLop || ""} đã được phân công cho giáo viên ${duplicate.gv} rồi! Vui lòng chọn môn khác hoặc xóa phân công cũ trước.`);
+      }
+      return;
+    }
 
     try {
       setSaving(true);
@@ -326,9 +384,35 @@ export default function PhanCongPage() {
   const handleOpenAddModal = () => {
     const defaultYear = filter.namHoc || autoNamHoc || academicYears[0] || "2025-2026";
     setFormNamHoc(defaultYear);
-    setSelectedTeacherId("");
-    setSelectedSubject("");
-    setSelectedClassId("");
+
+    const targetClasses = classes.filter((c) => !defaultYear || String(c.namHoc || "").trim() === String(defaultYear).trim());
+    const initialClass = targetClasses.find((c) => c.gvcn?.id || c.gvcnId) || targetClasses[0];
+
+    if (initialClass) {
+      setSelectedClassId(String(initialClass.id));
+      const gvId = initialClass.gvcn?.id || initialClass.gvcnId;
+      const gvcn = teachers.find((t) => t.id === gvId);
+      if (gvcn) {
+        setSelectedTeacherId(String(gvcn.id));
+        const gvNorm = normalizeText(gvcn.boMon || "");
+        const matchedSub = subjects.find((m) => {
+          const mNorm = normalizeText(m.tenMon || "");
+          return gvNorm && (gvNorm.includes(mNorm) || mNorm.includes(gvNorm));
+        });
+        if (matchedSub) {
+          setSelectedSubject(matchedSub.tenMon);
+        } else {
+          setSelectedSubject("");
+        }
+      } else {
+        setSelectedTeacherId("");
+        setSelectedSubject("");
+      }
+    } else {
+      setSelectedTeacherId("");
+      setSelectedSubject("");
+      setSelectedClassId("");
+    }
     setFormOpen(true);
   };
 
@@ -337,11 +421,17 @@ export default function PhanCongPage() {
     try {
       const res = await autoAssignAll(autoNamHoc, 1);
       const createdCount = (res?.data?.data || []).length;
-      notifySuccess(`Tự động phân công cả năm học ${autoNamHoc} thành công!`);
+      if (createdCount === 0) {
+        notifyError(`Năm học ${autoNamHoc} đã được phân công đầy đủ các môn học nên không thể phân công thêm!`);
+      } else {
+        notifySuccess(`Tự động phân công thành công (${createdCount} phân công mới cho cả năm học ${autoNamHoc})!`);
+      }
       axiosClient.invalidateCache("/phancong-day");
       fetchData();
       setAutoOpen(false);
-    } catch (err) { notifyError(err?.response?.data?.message || "Thất bại."); }
+    } catch (err) { 
+      notifyError(err?.response?.data?.message || err?.message || `Năm học ${autoNamHoc} đã được phân công đầy đủ các môn học nên không thể thêm!`); 
+    }
   };
 
   const handleDeleteAll = async () => {
@@ -701,10 +791,25 @@ export default function PhanCongPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Lớp <span className="text-red-500 font-bold ml-0.5">*</span></label>
+              <select 
+                value={selectedClassId} 
+                onChange={(e) => handleClassChange(e.target.value)}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">-- Chọn lớp --</option>
+                {formClassList.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.tenLop} {l.khoi ? `(Khối ${l.khoi})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700">Giáo viên <span className="text-red-500 font-bold ml-0.5">*</span></label>
               <select
                 value={selectedTeacherId}
-                onChange={(e) => { setSelectedTeacherId(e.target.value); setSelectedSubject(""); setSelectedClassId(""); }}
+                onChange={(e) => handleTeacherChange(e.target.value)}
                 className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 <option value="">-- Chọn GV --</option>
@@ -727,21 +832,6 @@ export default function PhanCongPage() {
                   }
                   return subjects.map((m) => <option key={m.id} value={m.tenMon}>{m.tenMon}</option>);
                 })()}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">Lớp <span className="text-red-500 font-bold ml-0.5">*</span></label>
-              <select 
-                value={selectedClassId} 
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              >
-                <option value="">-- Chọn lớp --</option>
-                {formClassList.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.tenLop} {l.khoi ? `(Khối ${l.khoi})` : ""}
-                  </option>
-                ))}
               </select>
             </div>
           </div>

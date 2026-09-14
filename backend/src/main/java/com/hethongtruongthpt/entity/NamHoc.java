@@ -32,6 +32,24 @@ public class NamHoc {
     @Column(name = "deadline_nhap_diem_hk2", nullable = false)
     private LocalDate deadlineNhapDiemHk2;
 
+    @Column(name = "ngay_bat_dau_hk1_goc")
+    private LocalDate ngayBatDauHk1Goc;
+
+    @Column(name = "ngay_ket_thuc_hk1_goc")
+    private LocalDate ngayKetThucHk1Goc;
+
+    @Column(name = "deadline_nhap_diem_hk1_goc")
+    private LocalDate deadlineNhapDiemHk1Goc;
+
+    @Column(name = "ngay_bat_dau_hk2_goc")
+    private LocalDate ngayBatDauHk2Goc;
+
+    @Column(name = "ngay_ket_thuc_hk2_goc")
+    private LocalDate ngayKetThucHk2Goc;
+
+    @Column(name = "deadline_nhap_diem_hk2_goc")
+    private LocalDate deadlineNhapDiemHk2Goc;
+
     @Column(name = "trang_thai", nullable = false)
     private String trangThai = "DANG_MO"; // DANG_MO or DA_DONG
 
@@ -97,6 +115,54 @@ public class NamHoc {
 
     public void setDeadlineNhapDiemHk2(LocalDate deadlineNhapDiemHk2) {
         this.deadlineNhapDiemHk2 = deadlineNhapDiemHk2;
+    }
+
+    public LocalDate getNgayBatDauHk1Goc() {
+        return ngayBatDauHk1Goc;
+    }
+
+    public void setNgayBatDauHk1Goc(LocalDate ngayBatDauHk1Goc) {
+        this.ngayBatDauHk1Goc = ngayBatDauHk1Goc;
+    }
+
+    public LocalDate getNgayKetThucHk1Goc() {
+        return ngayKetThucHk1Goc;
+    }
+
+    public void setNgayKetThucHk1Goc(LocalDate ngayKetThucHk1Goc) {
+        this.ngayKetThucHk1Goc = ngayKetThucHk1Goc;
+    }
+
+    public LocalDate getDeadlineNhapDiemHk1Goc() {
+        return deadlineNhapDiemHk1Goc;
+    }
+
+    public void setDeadlineNhapDiemHk1Goc(LocalDate deadlineNhapDiemHk1Goc) {
+        this.deadlineNhapDiemHk1Goc = deadlineNhapDiemHk1Goc;
+    }
+
+    public LocalDate getNgayBatDauHk2Goc() {
+        return ngayBatDauHk2Goc;
+    }
+
+    public void setNgayBatDauHk2Goc(LocalDate ngayBatDauHk2Goc) {
+        this.ngayBatDauHk2Goc = ngayBatDauHk2Goc;
+    }
+
+    public LocalDate getNgayKetThucHk2Goc() {
+        return ngayKetThucHk2Goc;
+    }
+
+    public void setNgayKetThucHk2Goc(LocalDate ngayKetThucHk2Goc) {
+        this.ngayKetThucHk2Goc = ngayKetThucHk2Goc;
+    }
+
+    public LocalDate getDeadlineNhapDiemHk2Goc() {
+        return deadlineNhapDiemHk2Goc;
+    }
+
+    public void setDeadlineNhapDiemHk2Goc(LocalDate deadlineNhapDiemHk2Goc) {
+        this.deadlineNhapDiemHk2Goc = deadlineNhapDiemHk2Goc;
     }
 
     public String getTrangThai() {

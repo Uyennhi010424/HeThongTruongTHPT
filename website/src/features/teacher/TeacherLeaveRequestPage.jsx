@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import PageHeader from "../../components/edu/PageHeader.jsx";
 import MaterialIcon from "../../components/edu/MaterialIcon.jsx";
@@ -13,6 +13,7 @@ import {
 import { notifyError, notifySuccess } from "../../utils/notify.js";
 import { useConfirm } from "../../contexts/ConfirmContext.jsx";
 import { getActiveAcademicYear, getVisibleAcademicYears } from "../../utils/helpers.js";
+import { getDefaultTuanInSemester, getWeekNumber } from "../../utils/schoolWeek.js";
 
 export default function TeacherLeaveRequestPage() {
   const { confirm } = useConfirm();
@@ -131,6 +132,16 @@ export default function TeacherLeaveRequestPage() {
     }
   };
 
+  const selectedWeek = useMemo(() => {
+    if (date && currentYearObj) {
+      return getWeekNumber(currentYearObj, date);
+    }
+    if (currentYearObj) {
+      return getDefaultTuanInSemester(currentYearObj, targetSemester);
+    }
+    return 1;
+  }, [date, currentYearObj, targetSemester]);
+
   const loadSchedule = async () => {
     if (!teacher?.id) return;
     const yearToFetch = targetYear || currentYear;
@@ -139,24 +150,18 @@ export default function TeacherLeaveRequestPage() {
       return;
     }
     try {
-      const tkbRes = await getThoiKhoaBieu({ namHoc: yearToFetch, hocKy: targetSemester });
-      const allSlots = tkbRes?.data?.data || [];
+      let tkbRes = await getThoiKhoaBieu({ namHoc: yearToFetch, hocKy: targetSemester, tuan: selectedWeek });
+      let allSlots = tkbRes?.data?.data || [];
+      if (allSlots.length === 0) {
+        tkbRes = await getThoiKhoaBieu({ namHoc: yearToFetch, hocKy: targetSemester, tuan: 1 });
+        allSlots = tkbRes?.data?.data || [];
+      }
       const teacherSlots = allSlots.filter(s => 
         String(s?.giaoVien?.id ?? s?.giaoVienId) === String(teacher.id)
       );
 
-      const uniqueSlots = [];
-      const seenKeys = new Set();
-      for (const slot of teacherSlots) {
-        const key = `${slot.thu}-${slot.tietBatDau}-${slot.lop?.id || slot.lopId}-${slot.monHoc?.id || slot.monHocId}`;
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          uniqueSlots.push(slot);
-        }
-      }
-
-      uniqueSlots.sort((a, b) => Number(a.thu) - Number(b.thu) || Number(a.tietBatDau) - Number(b.tietBatDau));
-      setTimetable(uniqueSlots);
+      teacherSlots.sort((a, b) => Number(a.thu) - Number(b.thu) || Number(a.tietBatDau) - Number(b.tietBatDau));
+      setTimetable(teacherSlots);
     } catch {
       setTimetable([]);
     }
@@ -173,7 +178,7 @@ export default function TeacherLeaveRequestPage() {
       loadSchedule();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacher?.id, targetYear, targetSemester]);
+  }, [teacher?.id, targetYear, targetSemester, selectedWeek]);
 
   // Tính toán ngày trong tuần dựa trên "Thứ" (2 = Thứ hai -> 7 = Thứ bảy)
   const getCalculatedDateForDay = (thuValue, fullFormat = false) => {
@@ -181,14 +186,32 @@ export default function TeacherLeaveRequestPage() {
     if (date) {
       baseDate = new Date(date + "T00:00:00");
     } else if (currentYearObj) {
-      const startHk1 = new Date(currentYearObj.ngayBatDauHk1 + "T00:00:00");
-      const startHk2 = currentYearObj.ngayBatDauHk2 ? new Date(currentYearObj.ngayBatDauHk2 + "T00:00:00") : startHk1;
-      baseDate = targetSemester === 2 ? startHk2 : startHk1;
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      const startHk1 = currentYearObj.ngayBatDauHk1 ? new Date(currentYearObj.ngayBatDauHk1 + "T00:00:00") : null;
+      const endHk1 = currentYearObj.ngayKetThucHk1 ? new Date(currentYearObj.ngayKetThucHk1 + "T23:59:59") : null;
+      const startHk2 = currentYearObj.ngayBatDauHk2 ? new Date(currentYearObj.ngayBatDauHk2 + "T00:00:00") : null;
+      const endHk2 = currentYearObj.ngayKetThucHk2 ? new Date(currentYearObj.ngayKetThucHk2 + "T23:59:59") : null;
+
+      if (targetSemester === 2) {
+        if (startHk2 && endHk2 && now >= startHk2 && now <= endHk2) {
+          baseDate = now;
+        } else {
+          baseDate = startHk2 || now;
+        }
+      } else {
+        if (startHk1 && endHk1 && now >= startHk1 && now <= endHk1) {
+          baseDate = now;
+        } else {
+          baseDate = startHk1 || now;
+        }
+      }
     } else {
       baseDate = new Date();
     }
 
-    if (isNaN(baseDate.getTime())) baseDate = new Date();
+    if (!baseDate || isNaN(baseDate.getTime())) baseDate = new Date();
 
     let currentDay = baseDate.getDay(); // 0 = Chủ nhật, 1 = Thứ hai,...
     if (currentDay === 0) currentDay = 7; // Coi Chủ nhật là ngày 7
@@ -409,7 +432,7 @@ export default function TeacherLeaveRequestPage() {
             </div>
 
             <p className="text-xs text-gray-400 mb-3">
-              Năm học {targetYear} · Học kỳ {targetSemester === 2 ? "II" : "I"} (Nhấn vào tiết để chọn ngày nghỉ)
+              Năm học {targetYear} · Học kỳ {targetSemester === 2 ? "II" : "I"} · Tuần {selectedWeek} ({getCalculatedDateForDay(2)} - {getCalculatedDateForDay(7)})
             </p>
 
             {timetable.length === 0 ? (

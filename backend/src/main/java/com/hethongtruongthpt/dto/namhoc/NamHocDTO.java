@@ -12,6 +12,12 @@ public class NamHocDTO {
     private LocalDate ngayKetThucHk2;
     private LocalDate deadlineNhapDiemHk1;
     private LocalDate deadlineNhapDiemHk2;
+    private LocalDate ngayBatDauHk1Goc;
+    private LocalDate ngayKetThucHk1Goc;
+    private LocalDate deadlineNhapDiemHk1Goc;
+    private LocalDate ngayBatDauHk2Goc;
+    private LocalDate ngayKetThucHk2Goc;
+    private LocalDate deadlineNhapDiemHk2Goc;
     private String trangThai;
 
     public Integer getId() {
@@ -76,6 +82,54 @@ public class NamHocDTO {
 
     public void setDeadlineNhapDiemHk2(LocalDate deadlineNhapDiemHk2) {
         this.deadlineNhapDiemHk2 = deadlineNhapDiemHk2;
+    }
+
+    public LocalDate getNgayBatDauHk1Goc() {
+        return ngayBatDauHk1Goc;
+    }
+
+    public void setNgayBatDauHk1Goc(LocalDate ngayBatDauHk1Goc) {
+        this.ngayBatDauHk1Goc = ngayBatDauHk1Goc;
+    }
+
+    public LocalDate getNgayKetThucHk1Goc() {
+        return ngayKetThucHk1Goc;
+    }
+
+    public void setNgayKetThucHk1Goc(LocalDate ngayKetThucHk1Goc) {
+        this.ngayKetThucHk1Goc = ngayKetThucHk1Goc;
+    }
+
+    public LocalDate getDeadlineNhapDiemHk1Goc() {
+        return deadlineNhapDiemHk1Goc;
+    }
+
+    public void setDeadlineNhapDiemHk1Goc(LocalDate deadlineNhapDiemHk1Goc) {
+        this.deadlineNhapDiemHk1Goc = deadlineNhapDiemHk1Goc;
+    }
+
+    public LocalDate getNgayBatDauHk2Goc() {
+        return ngayBatDauHk2Goc;
+    }
+
+    public void setNgayBatDauHk2Goc(LocalDate ngayBatDauHk2Goc) {
+        this.ngayBatDauHk2Goc = ngayBatDauHk2Goc;
+    }
+
+    public LocalDate getNgayKetThucHk2Goc() {
+        return ngayKetThucHk2Goc;
+    }
+
+    public void setNgayKetThucHk2Goc(LocalDate ngayKetThucHk2Goc) {
+        this.ngayKetThucHk2Goc = ngayKetThucHk2Goc;
+    }
+
+    public LocalDate getDeadlineNhapDiemHk2Goc() {
+        return deadlineNhapDiemHk2Goc;
+    }
+
+    public void setDeadlineNhapDiemHk2Goc(LocalDate deadlineNhapDiemHk2Goc) {
+        this.deadlineNhapDiemHk2Goc = deadlineNhapDiemHk2Goc;
     }
 
     public String getTrangThai() {
