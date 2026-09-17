@@ -1,14 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, Pressable, RefreshControl } from 'react-native';
 import { Calendar, Plus, X, AlertTriangle } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
 import api from '../../api/axiosClient';
 import { useParentStore } from '../../store/useParentStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { webSocketService } from '../../api/websocket';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function ParentLeaveScreen() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { selectedChild } = useParentStore();
+  const { userData } = useAuthStore();
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -30,27 +35,55 @@ export default function ParentLeaveScreen() {
     }
   }, [leaveType, startDate, endDate]);
 
-  useEffect(() => {
-    if (selectedChild?.id) {
-      fetchRequests();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChild?.id]);
-
-  const fetchRequests = async () => {
+  const fetchRequests = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await api.get('/don-xin-nghi/me');
       if (res.data?.data) {
-        setRequests(res.data.data.filter((r: any) => r.hocSinhId === selectedChild?.id));
+        if (selectedChild?.id) {
+          setRequests(res.data.data.filter((r: any) => r.hocSinhId === selectedChild.id));
+        } else {
+          setRequests(res.data.data);
+        }
       }
     } catch (error) {
       console.log('Lỗi lấy đơn xin nghỉ:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách đơn xin nghỉ.');
+      if (!silent) {
+        Alert.alert('Lỗi', 'Không thể tải danh sách đơn xin nghỉ.');
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchRequests(true);
+    }, [selectedChild?.id])
+  );
+
+  useEffect(() => {
+    webSocketService.connect(() => {
+      const handleRealtimeUpdate = () => {
+        fetchRequests(true);
+      };
+
+      webSocketService.subscribe('/topic/don-xin-nghi', handleRealtimeUpdate);
+      if (userData?.id) {
+        webSocketService.subscribe(`/topic/user/${userData.id}`, handleRealtimeUpdate);
+        webSocketService.subscribe(`/topic/notifications/${userData.id}`, handleRealtimeUpdate);
+      }
+    });
+
+    return () => {
+      webSocketService.unsubscribe('/topic/don-xin-nghi');
+      if (userData?.id) {
+        webSocketService.unsubscribe(`/topic/user/${userData.id}`);
+        webSocketService.unsubscribe(`/topic/notifications/${userData.id}`);
+      }
+    };
+  }, [userData?.id, selectedChild?.id]);
 
   const formatYMD = (d: Date | null) => {
     if (!d) return '';
@@ -118,30 +151,34 @@ export default function ParentLeaveScreen() {
   };
 
   const renderItem = ({ item }: { item: any }) => {
-    const isPending = item.trangThai === 'PENDING';
+    const isApproved = item.trangThai === 'APPROVED' || item.trangThai === 'DA_DUYET';
+    const isRejected = item.trangThai === 'REJECTED' || item.trangThai === 'TU_CHOI';
+    const isPending = !isApproved && !isRejected;
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardDate}>
-            {item.ngayBatDau.split('-').reverse().join('/')} {item.ngayBatDau !== item.ngayKetThuc && `- ${item.ngayKetThuc.split('-').reverse().join('/')}`}
+            {item.ngayBatDau ? item.ngayBatDau.split('-').reverse().join('/') : ''} 
+            {item.ngayBatDau && item.ngayKetThuc && item.ngayBatDau !== item.ngayKetThuc && ` - ${item.ngayKetThuc.split('-').reverse().join('/')}`}
           </Text>
           <View style={[styles.statusBadge, 
-            item.trangThai === 'APPROVED' ? styles.statusApproved : 
-            item.trangThai === 'REJECTED' ? styles.statusRejected : styles.statusPending]}>
+            isApproved ? styles.statusApproved : 
+            isRejected ? styles.statusRejected : styles.statusPending]}>
             <Text style={[styles.statusText, 
-              item.trangThai === 'APPROVED' ? styles.statusApprovedText : 
-              item.trangThai === 'REJECTED' ? styles.statusRejectedText : styles.statusPendingText]}>
-              {item.trangThai === 'APPROVED' ? 'Đã duyệt' : item.trangThai === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+              isApproved ? styles.statusApprovedText : 
+              isRejected ? styles.statusRejectedText : styles.statusPendingText]}>
+              {isApproved ? 'Đã duyệt' : isRejected ? 'Từ chối' : 'Chờ duyệt'}
             </Text>
           </View>
         </View>
-        <Text style={styles.lyDo} numberOfLines={2}>{item.lyDo}</Text>
-        {item.phanHoiGv && (
+        <Text style={styles.lyDo} numberOfLines={3}>{item.lyDo}</Text>
+        {item.phanHoiGv ? (
           <View style={styles.feedbackBox}>
             <Text style={styles.feedbackLabel}>GV Phản hồi:</Text>
             <Text style={styles.feedbackText}>{item.phanHoiGv}</Text>
           </View>
-        )}
+        ) : null}
         {isPending && (
           <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
             <Text style={styles.deleteBtnText}>Hủy đơn</Text>
@@ -162,6 +199,16 @@ export default function ParentLeaveScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchRequests(true);
+              }}
+              colors={['#2563eb']}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Calendar size={48} color="#cbd5e1" />

@@ -119,7 +119,12 @@ const StudentScoreRow = memo(({
   const yearAvg = calcYearAverage(hk1Avg, hk2Avg);
 
   if (selectedPolicy.mode === "COMMENT") {
-    const finalComment = fullRecord.HK1.nhanXet === "DAT" && fullRecord.HK2.nhanXet === "DAT" ? "DAT" : "CHUA_DAT";
+    const hasHk1 = !!current.HK1?.nhanXet;
+    const hasHk2 = !!current.HK2?.nhanXet;
+    const isBothEvaluated = hasHk1 && hasHk2;
+    const finalComment = isBothEvaluated
+      ? (fullRecord.HK1.nhanXet === "DAT" && fullRecord.HK2.nhanXet === "DAT" ? "DAT" : "CHUA_DAT")
+      : null;
     return (
       <tr className={`hover:bg-blue-50/50 transition-colors border-b border-slate-100 last:border-0 ${rowBg}`}>
         <td className={`px-4 py-3 sticky left-0 ${rowBg} border-r border-slate-200 z-10 hover:bg-inherit`}>
@@ -129,7 +134,7 @@ const StudentScoreRow = memo(({
         <td className="px-4 py-3 text-center">
           <select
             className="h-10 w-full max-w-[140px] rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-700 disabled:opacity-50 mx-auto"
-            value={semData.nhanXet}
+            value={semData.nhanXet || "DAT"}
             disabled={isColumnLocked("comment")}
             onChange={(event) => updateRecord(student.id, selectedSubject.id, selectedSemester, { nhanXet: event.target.value }, selectedSubject.tenMon)}
           >
@@ -138,12 +143,16 @@ const StudentScoreRow = memo(({
           </select>
         </td>
         <td className="px-4 py-3 text-center text-[14px] font-semibold text-slate-700">
-          {finalComment === "DAT" ? "Đạt" : "Chưa đạt"}
+          {finalComment === "DAT" ? "Đạt" : finalComment === "CHUA_DAT" ? "Chưa đạt" : "--"}
         </td>
         <td className="px-4 py-3 text-center">
-          <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold">
-            {finalComment === "DAT" ? "Đạt" : "Chưa đạt"}
-          </span>
+          {finalComment ? (
+            <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold">
+              {finalComment === "DAT" ? "Đạt" : "Chưa đạt"}
+            </span>
+          ) : (
+            <span className="text-slate-400 font-medium">--</span>
+          )}
         </td>
       </tr>
     );
@@ -229,16 +238,20 @@ const StudentScoreRow = memo(({
       </td>
 
       <td className="px-3 py-3 text-center text-[14px] font-bold text-blue-700 border-l border-slate-200">
-        {calcSemesterAverage(semData) ?? "--"}
+        {calcSemesterAverage(semData) !== null ? calcSemesterAverage(semData).toFixed(1) : "--"}
       </td>
       <td className="px-3 py-3 text-center text-[14px] font-bold text-emerald-700">
-        {yearAvg ?? "--"}
+        {yearAvg !== null ? yearAvg.toFixed(1) : "--"}
       </td>
 
       <td className="px-3 py-3 text-center border-l border-slate-200">
-        <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold whitespace-nowrap">
-          {getSingleSubjectLevel(calcSemesterAverage(semData))}
-        </span>
+        {calcSemesterAverage(semData) !== null ? (
+          <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-[12px] font-bold whitespace-nowrap">
+            {getSingleSubjectLevel(calcSemesterAverage(semData))}
+          </span>
+        ) : (
+          <span className="text-slate-400 font-medium">--</span>
+        )}
       </td>
     </tr>
   );
@@ -264,6 +277,7 @@ export default function NhapDiem() {
     selectedSubjectId,
     setSelectedSubjectId,
     allStudents: students,
+    classStudents,
     filteredClasses,
     allowedSubjects,
     allSubjects,
@@ -395,12 +409,15 @@ export default function NhapDiem() {
 
   const filteredStudents = useMemo(() => {
     if (!selectedClass) return [];
+    if (classStudents && classStudents.length > 0) {
+      return sortStudentsByGivenName(classStudents);
+    }
     let result = students.filter(
       (student) => student.trangThai === 1 && String(getStudentClassId(student) || "") === String(selectedClass)
     );
     result = sortStudentsByGivenName(result);
     return result;
-  }, [selectedClass, students]);
+  }, [selectedClass, classStudents, students]);
 
   // Reset page when filters change
   useEffect(() => {

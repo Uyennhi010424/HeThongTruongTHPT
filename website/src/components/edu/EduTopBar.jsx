@@ -134,17 +134,64 @@ export default function EduTopBar({
   useEffect(() => {
     let active = true;
     let userId = null;
+
+    const mergeNotices = (freshList) => {
+      setNotices(prev => {
+        const existingIds = new Set(prev.map(n => String(n.id)));
+        const newOnes = freshList.filter(n => !existingIds.has(String(n.id)));
+        const merged = [...prev.filter(p => freshList.some(f => String(f.id) === String(p.id)) || p._ws), ...newOnes];
+        return merged.sort((a, b) => new Date(b.ngayDang || b.createdAt || 0) - new Date(a.ngayDang || a.createdAt || 0));
+      });
+    };
+
     const fetchNotices = async () => {
       try {
-        const res = await getThongBao();
+        const [tbRes, appRes] = await Promise.all([
+          getThongBao().catch(() => null),
+          axiosClient.get('/notifications').catch(() => null),
+        ]);
         if (!active) return;
-        const list = res?.data?.data || [];
-        setNotices(list);
+
+        // Map ThongBao
+        const tbList = (tbRes?.data?.data || []).map(tb => ({
+          id: `tb_${tb.id}`,
+          tieuDe: tb.tieuDe,
+          noiDung: tb.noiDung,
+          ngayDang: tb.ngayDang,
+          type: 'THONG_BAO',
+          isRead: false,
+        }));
+
+        // Map AppNotifications
+        const appList = (appRes?.data?.data || []).map(n => ({
+          id: `app_${n.id}`,
+          _appId: n.id,
+          tieuDe: n.title,
+          noiDung: n.message,
+          ngayDang: n.createdAt,
+          type: n.type,
+          isRead: n.isRead ?? false,
+        }));
+
+        // Merge, AppNotification trước, ThongBao mirror sau — deduplicate theo tiêu đề
+        const all = [...appList, ...tbList];
+        const seenTitles = new Set();
+        const deduped = all.filter(n => {
+          const key = (n.tieuDe || '').trim();
+          if (!key || !seenTitles.has(key)) {
+            if (key) seenTitles.add(key);
+            return true;
+          }
+          return false;
+        });
+
+        const sorted = deduped.sort((a, b) => new Date(b.ngayDang || 0) - new Date(a.ngayDang || 0));
+        setNotices(sorted);
       } catch {
-        if (!active) return;
-        setNotices([]);
+        // giữ nguyên notices hiện tại khi lỗi
       }
     };
+
     const setupWebSocket = async () => {
       try {
         const userStr = localStorage.getItem('user');
@@ -155,32 +202,46 @@ export default function EduTopBar({
         if (userId) {
           webSocketService.subscribe(`/topic/user/${userId}`, (notification) => {
             if (!active) return;
-            setNotices((prev) => [
-              {
-                id: notification.id || Date.now(),
-                tieuDe: notification.tieuDe || notification.title || "Thông báo mới",
-                noiDung: notification.noiDung || notification.content || "",
-                ngayDang: notification.ngayDang || new Date().toISOString(),
-                daDoc: false
-              },
-              ...prev
-            ]);
+            const isAppNotif = !!notification.type && notification.type !== 'THONG_BAO';
+            setNotices((prev) => {
+              const wsId = isAppNotif ? `app_${notification.id}` : (notification.id ? `ws_${notification.id}` : `ws_${Date.now()}`);
+              if (prev.find(n => n.id === wsId || n.tieuDe === (notification.tieuDe || notification.title))) return prev;
+              return [
+                {
+                  id: wsId,
+                  _appId: isAppNotif ? notification.id : undefined,
+                  tieuDe: notification.tieuDe || notification.title || 'Thông báo mới',
+                  noiDung: notification.noiDung || notification.message || '',
+                  ngayDang: notification.ngayDang || notification.createdAt || new Date().toISOString(),
+                  type: notification.type || 'THONG_BAO',
+                  isRead: false,
+                  _ws: true,
+                },
+                ...prev
+              ];
+            });
           });
         }
         const role = getRole();
         if (role) {
           webSocketService.subscribe('/topic/notifications', (notification) => {
             if (!active) return;
-            setNotices((prev) => [
-              {
-                id: notification.id || Date.now(),
-                tieuDe: notification.tieuDe || notification.title || "Thông báo chung",
-                noiDung: notification.noiDung || notification.content || "",
-                ngayDang: notification.ngayDang || new Date().toISOString(),
-                daDoc: false
-              },
-              ...prev
-            ]);
+            setNotices((prev) => {
+              const wsId = notification.id ? `g_${notification.id}` : `g_${Date.now()}`;
+              if (prev.find(n => n.id === wsId || n.tieuDe === (notification.tieuDe || notification.title))) return prev;
+              return [
+                {
+                  id: wsId,
+                  tieuDe: notification.tieuDe || notification.title || 'Thông báo chung',
+                  noiDung: notification.noiDung || notification.message || '',
+                  ngayDang: notification.ngayDang || notification.createdAt || new Date().toISOString(),
+                  type: notification.type || 'THONG_BAO',
+                  isRead: false,
+                  _ws: true,
+                },
+                ...prev
+              ];
+            });
           });
         }
       } catch {}
@@ -253,20 +314,77 @@ export default function EduTopBar({
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const unreadNoticeCount = notices.filter(n => !readIds.includes(n.id)).length;
+  // Chưa đọc: AppNotification dùng isRead từ backend; ThongBao dùng readIds từ localStorage
+  const isNoticeUnread = (n) => {
+    if (n.type && n.type !== 'THONG_BAO') return !n.isRead;
+    return !readIds.includes(n.id);
+  };
+  const unreadNoticeCount = notices.filter(isNoticeUnread).length;
 
   const handleOpenNoti = () => {
     setNotiOpen(!notiOpen);
   };
 
-  const handleNoticeClick = (noticeId) => {
+  const handleNoticeClick = (notice) => {
+    const noticeId = notice?.id;
     setNotiOpen(false);
-    if (!readIds.includes(noticeId)) {
+    if (noticeId !== undefined && noticeId !== null && !readIds.includes(noticeId)) {
       const newReadIds = [...readIds, noticeId];
       setReadIds(newReadIds);
       try { localStorage.setItem('eduReadNoticeIds', JSON.stringify(newReadIds)); } catch {}
     }
-    navigate(`${resolveBasePath()}/thongbao`);
+    // Đánh dấu AppNotification đã đọc trên backend (nếu là AppNotification)
+    if (notice?._appId) {
+      axiosClient.put(`/notifications/${notice._appId}/read`).catch(() => {});
+      setNotices(prev => prev.map(n => n._appId === notice._appId ? { ...n, isRead: true } : n));
+    }
+    const basePath = resolveBasePath();
+    const noticeType = notice?.type;
+    const title = (notice?.tieuDe || notice?.title || "").toLowerCase();
+    const content = (notice?.noiDung || notice?.message || "").toLowerCase();
+    
+    // Điều hướng dựa theo type của thông báo
+    const TYPE_ROUTES = {
+      STUDENT_LEAVE_RESULT: "/parent/xinnghi",
+      STUDENT_LEAVE_REQUEST: "/teacher/duyet-nghi",
+      LEAVE_REQUEST:         "/admin/nghi-day",
+      LEAVE_RESULT:          "/teacher/xin-nghi",
+      SUBSTITUTE_TEACHING:   "/teacher/thoikhoabieu",
+    };
+    if (noticeType && TYPE_ROUTES[noticeType]) {
+      navigate(TYPE_ROUTES[noticeType]);
+      return;
+    }
+
+    const isLeaveRequest = title.includes("đơn xin nghỉ") || title.includes("xin nghỉ học") || content.includes("đơn xin nghỉ") || content.includes("xin nghỉ");
+    const isLeaveResult = title.includes("kết quả đơn") || content.includes("kết quả đơn");
+    const isSubstitute = title.includes("phân công dạy thay") || title.includes("dạy thay") || content.includes("dạy thay");
+
+    if (basePath === "/teacher") {
+      if (isSubstitute) {
+        navigate("/teacher/thoikhoabieu");
+      } else if (isLeaveResult) {
+        navigate("/teacher/xin-nghi");
+      } else if (isLeaveRequest) {
+        navigate("/teacher/duyet-nghi");
+      } else {
+        navigate("/teacher/thongbao");
+      }
+    } else if (basePath === "/parent") {
+      if (isLeaveRequest || isLeaveResult) {
+        navigate("/parent/xinnghi");
+      } else {
+        navigate("/parent/thongbao");
+      }
+    } else if (basePath === "/admin") {
+      if (isLeaveRequest || isLeaveResult) {
+        navigate("/admin/nghi-day");
+      } else {
+        navigate("/admin/thongbao");
+      }
+    } else {
+      navigate(`${basePath}/thongbao`);
+    }
   };
 
   const renderNavIcon = (icon, active = false, size = "text-[18px]", activeClass = "text-white") => {
@@ -456,9 +574,9 @@ export default function EduTopBar({
                     notices.map((n) => (
                       <div
                         key={n.id}
-                        onClick={() => handleNoticeClick(n.id)}
+                        onClick={() => handleNoticeClick(n)}
                         className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl transition-colors cursor-pointer border ${
-                          !readIds.includes(n.id)
+                          isNoticeUnread(n)
                             ? "bg-blue-50/60 border-blue-100 hover:bg-blue-50"
                             : "hover:bg-slate-50 border-transparent hover:border-slate-100"
                         }`}

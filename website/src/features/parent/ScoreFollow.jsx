@@ -313,12 +313,12 @@ export default function ScoreFollow() {
           hbObj = hocBaList[0];
       }
       
-      const hocLucDisplay = getHocLucLabel(hbObj?.hocLuc || classifyHocLuc(dtbCaNam, yearAverages, commentResults)?.value);
+      const hocLucDisplay = dtbCaNam !== null ? getHocLucLabel(hbObj?.hocLuc || classifyHocLuc(dtbCaNam, yearAverages, commentResults)?.value) : "--";
       
       const hk2Obj = hanhKiemList.find(hk => hk.hocKy === 2);
       const hk1Obj = hanhKiemList.find(hk => hk.hocKy === 1);
       const dynamicHanhKiem = hk2Obj?.xepLoai || hk1Obj?.xepLoai;
-      const hanhKiemDisplay = getHanhKiemLabel(dynamicHanhKiem || hbObj?.hanhKiem);
+      const hanhKiemDisplay = dtbCaNam !== null ? getHanhKiemLabel(dynamicHanhKiem || hbObj?.hanhKiem) : (dynamicHanhKiem ? getHanhKiemLabel(dynamicHanhKiem) : "--");
 
       return {
         label: "Điểm trung bình cả năm:",

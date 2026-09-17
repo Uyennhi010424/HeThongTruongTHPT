@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.hethongtruongthpt.entity.HocSinh;
+import com.hethongtruongthpt.repository.HocSinhRepository;
+import com.hethongtruongthpt.repository.PhuHuynhRepository;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,9 +26,15 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/phuhuynh-hocsinh")
 public class PhuHuynhHocSinhController {
     private final PhuHuynhHocSinhRepository repository;
+    private final PhuHuynhRepository phuHuynhRepository;
+    private final HocSinhRepository hocSinhRepository;
 
-    public PhuHuynhHocSinhController(PhuHuynhHocSinhRepository repository) {
+    public PhuHuynhHocSinhController(PhuHuynhHocSinhRepository repository,
+                                    PhuHuynhRepository phuHuynhRepository,
+                                    HocSinhRepository hocSinhRepository) {
         this.repository = repository;
+        this.phuHuynhRepository = phuHuynhRepository;
+        this.hocSinhRepository = hocSinhRepository;
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'GIAO_VIEN', 'HOC_SINH', 'PHU_HUYNH')")
@@ -58,24 +68,33 @@ public class PhuHuynhHocSinhController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/phuhuynh/{phId}")
-    @ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<ApiResponse<Object>> linkParentToStudent(@PathVariable("id") Integer id, @PathVariable("phId") Integer phId) {
-        // create mapping if not exists
         try {
+            List<PhuHuynhHocSinh> existingLinks = repository.findByHocSinhId(id);
+            boolean alreadyLinked = existingLinks.stream()
+                .anyMatch(l -> l.getPhuHuynh() != null && phId.equals(l.getPhuHuynh().getId()));
+            if (alreadyLinked) {
+                return ResponseEntity.ok(ApiResponse.ok("Đã liên kết trước đó", null));
+            }
+
+            PhuHuynh ph = phuHuynhRepository.findById(phId).orElse(null);
+            if (ph == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Phụ huynh không tồn tại"));
+            }
+            HocSinh hs = hocSinhRepository.findById(id).orElse(null);
+            if (hs == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Học sinh không tồn tại"));
+            }
+
             PhuHuynhHocSinh link = new PhuHuynhHocSinh();
-            PhuHuynh ph = new PhuHuynh();
-            ph.setId(phId);
             link.setPhuHuynh(ph);
-            com.hethongtruongthpt.entity.HocSinh hs = new com.hethongtruongthpt.entity.HocSinh();
-            hs.setId(id);
             link.setHocSinh(hs);
-            // required non-null fields on PhuHuynhHocSinh: set sensible defaults
-            link.setQuanHe("CHA");
-            link.setLaNguoiLienHeChinh(Boolean.TRUE);
+            link.setQuanHe(ph.getQuanHe() != null && !ph.getQuanHe().isBlank() ? ph.getQuanHe() : "CHA");
+            link.setLaNguoiLienHeChinh(existingLinks.isEmpty());
             repository.save(link);
             return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Linked", null));
         } catch (Exception ex) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("Không thể tạo liên kết"));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("Không thể tạo liên kết: " + ex.getMessage()));
         }
     }
 }

@@ -75,6 +75,11 @@ public class HocSinhService {
     }
 
     @jakarta.annotation.PostConstruct
+    public void autoFixData() {
+        autoFixStudentAdmissionYears();
+        autoLinkOrphanedStudentsAndParents();
+    }
+
     public void autoFixStudentAdmissionYears() {
         try {
             List<HocSinh> list = hocSinhRepository.findAll();
@@ -98,6 +103,56 @@ public class HocSinhService {
             }
         } catch (Exception e) {
             log.warn("Không thể tự động chuẩn hóa năm nhập học: {}", e.getMessage());
+        }
+    }
+
+    public void autoLinkOrphanedStudentsAndParents() {
+        try {
+            List<HocSinh> allStudents = hocSinhRepository.findAll();
+            if (allStudents.isEmpty()) return;
+
+            List<Integer> studentIds = allStudents.stream().map(HocSinh::getId).filter(Objects::nonNull).toList();
+            List<PhuHuynhHocSinh> existingLinks = phuHuynhHocSinhRepository.findByHocSinhIdIn(studentIds);
+            Set<Integer> linkedStudentIds = existingLinks.stream()
+                    .map(l -> l.getHocSinh() != null ? l.getHocSinh().getId() : null)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            Set<Integer> linkedParentIds = existingLinks.stream()
+                    .map(l -> l.getPhuHuynh() != null ? l.getPhuHuynh().getId() : null)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            List<HocSinh> unlinkedStudents = allStudents.stream()
+                    .filter(hs -> hs.getId() != null && !linkedStudentIds.contains(hs.getId()))
+                    .toList();
+
+            if (unlinkedStudents.isEmpty()) return;
+
+            List<PhuHuynh> allParents = phuHuynhRepository.findAll();
+            List<PhuHuynh> unlinkedParents = allParents.stream()
+                    .filter(p -> p.getId() != null && !linkedParentIds.contains(p.getId()))
+                    .toList();
+
+            int linkedCount = 0;
+            for (int i = 0; i < unlinkedStudents.size() && i < unlinkedParents.size(); i++) {
+                HocSinh hs = unlinkedStudents.get(i);
+                PhuHuynh ph = unlinkedParents.get(i);
+
+                PhuHuynhHocSinh link = new PhuHuynhHocSinh();
+                link.setHocSinh(hs);
+                link.setPhuHuynh(ph);
+                link.setQuanHe(ph.getQuanHe() != null && !ph.getQuanHe().isBlank() ? ph.getQuanHe() : "CHA");
+                link.setLaNguoiLienHeChinh(Boolean.TRUE);
+                phuHuynhHocSinhRepository.save(link);
+                linkedCount++;
+            }
+
+            if (linkedCount > 0) {
+                log.info("Đã tự động liên kết {} học sinh với phụ huynh tương ứng", linkedCount);
+            }
+        } catch (Exception e) {
+            log.warn("Không thể tự động liên kết phụ huynh cho học sinh mồ côi: {}", e.getMessage());
         }
     }
 
@@ -173,7 +228,7 @@ public class HocSinhService {
     @Cacheable(value = "hocSinhList", key = "#lopId")
     public List<HocSinh> getByLopId(Integer lopId) {
         List<LichSuHocTap> histories = lichSuHocTapRepository.findByLopHocId(lopId);
-        List<HocSinh> list;
+        List<HocSinh> list = new java.util.ArrayList<>();
         if (histories != null && !histories.isEmpty()) {
             java.util.Map<Integer, HocSinh> studentMap = new java.util.LinkedHashMap<>();
             for (LichSuHocTap ls : histories) {
@@ -181,10 +236,18 @@ public class HocSinhService {
                     studentMap.putIfAbsent(ls.getHocSinh().getId(), ls.getHocSinh());
                 }
             }
-            list = new java.util.ArrayList<>(studentMap.values());
-        } else {
-            list = hocSinhRepository.findByLopIdAndTrangThai(lopId, 1);
-            if (list == null) list = new java.util.ArrayList<>();
+            list.addAll(studentMap.values());
+        }
+        if (list.isEmpty()) {
+            List<HocSinh> activeStudents = hocSinhRepository.findByLopIdAndTrangThai(lopId, 1);
+            if (activeStudents != null && !activeStudents.isEmpty()) {
+                list.addAll(activeStudents);
+            } else {
+                List<HocSinh> allStudents = hocSinhRepository.findByLopId(lopId);
+                if (allStudents != null && !allStudents.isEmpty()) {
+                    list.addAll(allStudents);
+                }
+            }
         }
         assignParentIds(list);
         assignNamHocs(list);
@@ -402,6 +465,13 @@ public class HocSinhService {
         
         existing.setMaBhyt(hocSinh.getMaBhyt());
         existing.setDienChinhSach(hocSinh.getDienChinhSach());
+        if (hocSinh.getTrangThai() != null) {
+            existing.setTrangThai(hocSinh.getTrangThai());
+            if (existing.getUser() != null) {
+                existing.getUser().setIsActive(hocSinh.getTrangThai() == 1);
+                userRepository.save(existing.getUser());
+            }
+        }
         
         validateStudentRules(existing, existing.getLop());
         

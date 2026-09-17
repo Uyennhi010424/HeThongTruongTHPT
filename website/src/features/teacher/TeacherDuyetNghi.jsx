@@ -54,17 +54,23 @@ export default function TeacherDuyetNghi() {
   };
 
   const handleProcess = async (id, status) => {
+    const note = (feedbackNotes[id] || "").trim();
     if (!(await confirm(`Bạn có chắc chắn muốn ${status === "APPROVED" ? "DUYỆT" : "TỪ CHỐI"} đơn này?`))) return;
     try {
       setProcessingId(id);
-      await axiosClient.put(`/don-xin-nghi/${id}/duyet`, {
+      const res = await axiosClient.put(`/don-xin-nghi/${id}/duyet`, {
         trangThai: status,
-        phanHoi: feedbackNotes[id] || ""
+        phanHoi: note
       });
+      const updatedItem = res.data?.data;
       notifySuccess(`Đã ${status === "APPROVED" ? "duyệt" : "từ chối"} đơn xin nghỉ!`);
-      // Cập nhật state nội bộ để thấy kết quả ngay lập tức
+      // Cập nhật state nội bộ kèm ghi chú để thấy kết quả ngay lập tức
       setRequests((prev) => 
-        prev.map((req) => (req.id === id ? { ...req, trangThai: status } : req))
+        prev.map((req) => (req.id === id ? { 
+          ...req, 
+          trangThai: status,
+          phanHoiGv: updatedItem?.phanHoiGv !== undefined ? updatedItem.phanHoiGv : note
+        } : req))
       );
     } catch (err) {
       notifyError(err.response?.data?.message || "Có lỗi xảy ra");

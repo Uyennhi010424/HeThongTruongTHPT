@@ -75,16 +75,11 @@ export default function ParentDashboard() {
 
     const thu = day === 0 ? 8 : day + 1;
 
-    // Ngày bắt đầu năm học 2026-2027: Thứ Hai, 07/09/2026
-    const schoolStartDate = new Date(2026, 8, 7, 0, 0, 0);
-    const notStarted = sun.getTime() < schoolStartDate.getTime();
-
     return {
       monday: mon,
       sunday: sun,
       weekRangeStr: `từ ${formatShort(mon)} đến ${formatShort(sun)}`,
       todayThu: thu,
-      isNotStartedYet: notStarted,
     };
   }, []);
 
@@ -146,7 +141,7 @@ export default function ParentDashboard() {
     const now = new Date();
     const curMonth = now.getMonth();
     const curYear = now.getFullYear();
-    const currentNamHoc = selectedChild?.lop?.namHoc || (curMonth >= 7 ? `${curYear}-${curYear + 1}` : `${curYear - 1}-${curYear}`);
+    const currentNamHoc = dashboardData?.currentNamHoc || selectedChild?.lop?.namHoc || (curMonth >= 7 ? `${curYear}-${curYear + 1}` : `${curYear - 1}-${curYear}`);
 
     const currentYearConducts = conducts.filter((c: any) => {
       const yearStr = c.namHoc?.tenNamHoc || c.namHoc || c.tenNamHoc;
@@ -159,7 +154,7 @@ export default function ParentDashboard() {
 
     const latest = currentYearConducts.sort((a: any, b: any) => Number(b.hocKy || 0) - Number(a.hocKy || 0))[0];
     return formatConduct(latest?.xepLoai);
-  }, [dashboardData?.conducts, selectedChild?.lop?.namHoc]);
+  }, [dashboardData?.conducts, dashboardData?.currentNamHoc, selectedChild?.lop?.namHoc]);
 
   if (children.length === 0) {
     return (

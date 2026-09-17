@@ -26,11 +26,11 @@ public interface DiemRepository extends JpaRepository<Diem, Integer> {
     List<Diem> findByHocKyAndNamHoc(Integer hocKy, String namHoc);
     @EntityGraph(attributePaths = {"hocSinh", "hocSinh.lop", "monHoc", "giaoVienNhap"})
     List<Diem> findByHocSinhIdAndHocKyAndNamHoc(Integer hocSinhId, Integer hocKy, String namHoc);
-    @Query("SELECT d FROM Diem d WHERE (d.phanCongDay.lop.id = :lopId OR d.hocSinh.lop.id = :lopId) AND d.hocKy = :hocKy AND d.namHoc = :namHoc")
+    @Query("SELECT d FROM Diem d WHERE (d.phanCongDay.lop.id = :lopId OR d.hocSinh.lop.id = :lopId OR d.hocSinh.id IN (SELECT ls.hocSinh.id FROM LichSuHocTap ls WHERE ls.lopHoc.id = :lopId AND ls.namHoc = :namHoc)) AND d.hocKy = :hocKy AND d.namHoc = :namHoc")
     @EntityGraph(attributePaths = {"hocSinh", "hocSinh.lop", "monHoc", "giaoVienNhap", "phanCongDay"})
     List<Diem> findByHocSinhLopIdAndHocKyAndNamHoc(@Param("lopId") Integer lopId, @Param("hocKy") Integer hocKy, @Param("namHoc") String namHoc);
 
-    @Query("SELECT DISTINCT d.hocSinh.id FROM Diem d WHERE (d.phanCongDay.lop.id = :lopId OR d.hocSinh.lop.id = :lopId) AND d.namHoc = :namHoc")
+    @Query("SELECT DISTINCT d.hocSinh.id FROM Diem d WHERE (d.phanCongDay.lop.id = :lopId OR d.hocSinh.lop.id = :lopId OR d.hocSinh.id IN (SELECT ls.hocSinh.id FROM LichSuHocTap ls WHERE ls.lopHoc.id = :lopId AND ls.namHoc = :namHoc)) AND d.namHoc = :namHoc")
     List<Integer> findDistinctHocSinhIdsByLopIdAndNamHoc(@Param("lopId") Integer lopId, @Param("namHoc") String namHoc);
 
     @EntityGraph(attributePaths = {"hocSinh", "hocSinh.lop", "monHoc", "giaoVienNhap"})

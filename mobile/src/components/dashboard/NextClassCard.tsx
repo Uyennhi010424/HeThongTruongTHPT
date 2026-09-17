@@ -31,19 +31,14 @@ const getTietTimeStr = (tietBatDau: number, soTiet: number = 1) => {
 export const NextClassCard: React.FC<NextClassCardProps> = ({ timetable, studentClass }) => {
   const router = useRouter();
 
-  const { isBeforeStart, todayClasses } = useMemo(() => {
+  const { todayClasses } = useMemo(() => {
     const now = new Date();
-    // Ngày bắt đầu năm học 2026-2027: 07/09/2026
-    const schoolStartDate = new Date(2026, 8, 7, 0, 0, 0);
-    const beforeStart = now.getTime() < schoolStartDate.getTime();
-
     // Thu 2 -> 2, Thu 3 -> 3 ... Chu Nhat -> 8
     let currentDay = now.getDay() + 1; // 0=Sun->1, 1=Mon->2
     if (currentDay === 1) currentDay = 8;
 
     if (!timetable || timetable.length === 0) {
       return {
-        isBeforeStart: beforeStart,
         todayClasses: [],
       };
     }
@@ -53,20 +48,11 @@ export const NextClassCard: React.FC<NextClassCardProps> = ({ timetable, student
       .sort((a, b) => a.tietBatDau - b.tietBatDau);
 
     return {
-      isBeforeStart: beforeStart,
       todayClasses: filtered,
     };
   }, [timetable]);
 
   const renderContent = () => {
-    if (isBeforeStart) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Năm học mới bắt đầu từ 07/09/2026. Chưa có tiết học.</Text>
-        </View>
-      );
-    }
-
     if (todayClasses.length === 0) {
       return (
         <View style={styles.emptyContainer}>

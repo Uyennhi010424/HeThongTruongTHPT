@@ -28,26 +28,45 @@ public class HanhKiemService {
         this.hocSinhRepository = hocSinhRepository;
     }
 
+    private List<HanhKiem> cleanList(List<HanhKiem> list) {
+        if (list == null) return new ArrayList<>();
+        for (HanhKiem hk : list) {
+            if (hk != null) {
+                if (hk.getNhanXet() != null) {
+                    hk.setNhanXet(DashboardService.cleanVietnameseComments(hk.getNhanXet()));
+                }
+                if (hk.getHocSinh() != null && hk.getHocSinh().getLop() != null && hk.getHocSinh().getLop().getGvcn() != null) {
+                    hk.setGiaoVien(hk.getHocSinh().getLop().getGvcn());
+                }
+            }
+        }
+        return list;
+    }
+
     public List<HanhKiem> getAll() {
-        return hanhKiemRepository.findAll();
+        return cleanList(hanhKiemRepository.findAll());
     }
 
     public HanhKiem getById(Integer id) {
         if (id == null) throw new IllegalArgumentException("ID không được để trống");
-        return hanhKiemRepository.findById(id)
+        HanhKiem hk = hanhKiemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hạnh kiểm"));
+        if (hk.getNhanXet() != null) {
+            hk.setNhanXet(DashboardService.cleanVietnameseComments(hk.getNhanXet()));
+        }
+        return hk;
     }
 
     public List<HanhKiem> getByHocSinhId(Integer hocSinhId) {
-        return hanhKiemRepository.findByHocSinhId(hocSinhId);
+        return cleanList(hanhKiemRepository.findByHocSinhId(hocSinhId));
     }
 
     public List<HanhKiem> getByGiaoVienId(Integer giaoVienId) {
-        return hanhKiemRepository.findByGiaoVienId(giaoVienId);
+        return cleanList(hanhKiemRepository.findByGiaoVienId(giaoVienId));
     }
 
     public List<HanhKiem> getByHocSinhAndNamHoc(Integer hocSinhId, Integer namHocId) {
-        return hanhKiemRepository.findByHocSinhIdAndNamHocId(hocSinhId, namHocId);
+        return cleanList(hanhKiemRepository.findByHocSinhIdAndNamHocId(hocSinhId, namHocId));
     }
 
     public List<HanhKiem> getByLopAndNamHoc(Integer lopId, Integer namHocId) {
@@ -71,7 +90,7 @@ public class HanhKiemService {
         if (sIds.isEmpty()) {
             return new ArrayList<>();
         }
-        return hanhKiemRepository.findByHocSinhIdInAndNamHocId(new ArrayList<>(sIds), namHocId);
+        return cleanList(hanhKiemRepository.findByHocSinhIdInAndNamHocId(new ArrayList<>(sIds), namHocId));
     }
 
     public List<HanhKiem> getByLop(Integer lopId) {
@@ -95,11 +114,14 @@ public class HanhKiemService {
         if (sIds.isEmpty()) {
             return new ArrayList<>();
         }
-        return hanhKiemRepository.findByHocSinhIdIn(new ArrayList<>(sIds));
+        return cleanList(hanhKiemRepository.findByHocSinhIdIn(new ArrayList<>(sIds)));
     }
 
     public HanhKiem create(HanhKiem hanhKiem) {
         if (hanhKiem == null) throw new IllegalArgumentException("Hạnh kiểm không được để trống");
+        if (hanhKiem.getNhanXet() != null) {
+            hanhKiem.setNhanXet(DashboardService.cleanVietnameseComments(hanhKiem.getNhanXet()));
+        }
         // Upsert: tìm bản ghi trùng (học sinh + năm học + học kỳ) → cập nhật thay vì tạo mới
         HanhKiem existing = findExisting(hanhKiem);
         if (existing != null) {
@@ -124,6 +146,9 @@ public class HanhKiemService {
         if ("APPROVED".equals(existing.getStatus()) && !isAdmin) {
             throw new com.hethongtruongthpt.exception.ApiException("Đánh giá hạnh kiểm đã được duyệt và khóa, không thể sửa đổi.");
         }
+        if (hanhKiem.getNhanXet() != null) {
+            hanhKiem.setNhanXet(DashboardService.cleanVietnameseComments(hanhKiem.getNhanXet()));
+        }
         hanhKiem.setId(id);
         return hanhKiemRepository.save(hanhKiem);
     }
@@ -143,6 +168,9 @@ public class HanhKiemService {
         boolean isAdmin = isCurrentUserAdmin();
         List<HanhKiem> results = new ArrayList<>();
         for (HanhKiem hk : hanhKiemList) {
+            if (hk.getNhanXet() != null) {
+                hk.setNhanXet(DashboardService.cleanVietnameseComments(hk.getNhanXet()));
+            }
             // Nếu có id → cập nhật bản ghi hiện có
             if (hk.getId() != null) {
                 HanhKiem existing = getById(hk.getId());

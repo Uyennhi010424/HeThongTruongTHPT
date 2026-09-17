@@ -1,5 +1,7 @@
 package com.hethongtruongthpt.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -11,6 +13,7 @@ public class AppNotification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -44,6 +47,11 @@ public class AppNotification {
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+
+    @JsonProperty("userId")
+    public Integer getUserId() {
+        return user != null ? user.getId() : null;
+    }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

@@ -98,6 +98,7 @@ public class NamHocService {
         return namHocRepository.save(namHoc);
     }
 
+    @Transactional
     public NamHoc update(Integer id, NamHoc namHoc) {
         NamHoc existing = getById(id);
         if (namHoc.getTrangThai() != null
@@ -110,6 +111,16 @@ public class NamHocService {
         }
         validateNamHoc(namHoc);
         namHoc.setId(id);
+
+        if ("DANG_MO".equalsIgnoreCase(namHoc.getTrangThai())) {
+            List<NamHoc> allYears = namHocRepository.findAll();
+            for (NamHoc other : allYears) {
+                if (!other.getId().equals(id) && "DANG_MO".equalsIgnoreCase(other.getTrangThai())) {
+                    other.setTrangThai("DA_DONG");
+                    namHocRepository.save(other);
+                }
+            }
+        }
 
         // Luôn bảo toàn mốc thời gian ban đầu đã lưu từ lúc tạo
         namHoc.setNgayBatDauHk1Goc(existing.getNgayBatDauHk1Goc() != null ? existing.getNgayBatDauHk1Goc() : existing.getNgayBatDauHk1());

@@ -177,6 +177,30 @@ const StudentBaiKiemTra = () => {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const handleViewResult = async (examId) => {
+    try {
+      const res = await api.get(`/baikiemtra/student/${examId}/result`);
+      if (res.data?.success) {
+        setExamResult(res.data.data);
+        setResultModalVisible(true);
+      }
+    } catch (error) {
+      notifyError('Không thể tải chi tiết kết quả');
+    }
+  };
+
+  const totalPages = Math.ceil(exams.length / pageSize) || 1;
+  const paginatedExams = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return exams.slice(start, start + pageSize);
+  }, [exams, currentPage, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
+    }
+  }, [totalPages, currentPage]);
+
   if (isTakingExam) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
@@ -241,30 +265,6 @@ const StudentBaiKiemTra = () => {
       </div>
     );
   }
-
-  const handleViewResult = async (examId) => {
-    try {
-      const res = await api.get(`/baikiemtra/student/${examId}/result`);
-      if (res.data?.success) {
-        setExamResult(res.data.data);
-        setResultModalVisible(true);
-      }
-    } catch (error) {
-      notifyError('Không thể tải chi tiết kết quả');
-    }
-  };
-
-  const totalPages = Math.ceil(exams.length / pageSize) || 1;
-  const paginatedExams = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return exams.slice(start, start + pageSize);
-  }, [exams, currentPage, pageSize]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(Math.max(1, totalPages));
-    }
-  }, [totalPages, currentPage]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto relative pb-12">

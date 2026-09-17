@@ -24,6 +24,10 @@ public class DashboardDataDTO {
     private Double gpa;
     private Integer baiKiemTraCount;
     private boolean examWeek;
+    private String currentNamHoc;
+    private Integer currentHocKy;
+    private com.hethongtruongthpt.entity.NamHoc activeNamHoc;
+    private List<com.hethongtruongthpt.entity.NamHoc> allNamHocs;
 
     public static class SubjectScoreDTO {
         private Integer monHocId;
@@ -205,5 +209,37 @@ public class DashboardDataDTO {
 
     public void setExamWeek(boolean examWeek) {
         this.examWeek = examWeek;
+    }
+
+    public String getCurrentNamHoc() {
+        return currentNamHoc;
+    }
+
+    public void setCurrentNamHoc(String currentNamHoc) {
+        this.currentNamHoc = currentNamHoc;
+    }
+
+    public Integer getCurrentHocKy() {
+        return currentHocKy;
+    }
+
+    public void setCurrentHocKy(Integer currentHocKy) {
+        this.currentHocKy = currentHocKy;
+    }
+
+    public com.hethongtruongthpt.entity.NamHoc getActiveNamHoc() {
+        return activeNamHoc;
+    }
+
+    public void setActiveNamHoc(com.hethongtruongthpt.entity.NamHoc activeNamHoc) {
+        this.activeNamHoc = activeNamHoc;
+    }
+
+    public List<com.hethongtruongthpt.entity.NamHoc> getAllNamHocs() {
+        return allNamHocs;
+    }
+
+    public void setAllNamHocs(List<com.hethongtruongthpt.entity.NamHoc> allNamHocs) {
+        this.allNamHocs = allNamHocs;
     }
 }

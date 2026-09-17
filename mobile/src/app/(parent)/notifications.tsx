@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Bell, BellRing, Clock, User as UserIcon } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useParentStore } from '../../store/useParentStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { webSocketService } from '../../api/websocket';
 import axiosClient from '../../api/axiosClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -14,6 +16,7 @@ interface ThongBao {
   ngayDang?: string;
   doiTuong?: string;
   loai?: string;
+  recipientId?: number;
   nguoiTao?: {
     hoTen: string;
   };
@@ -22,6 +25,7 @@ interface ThongBao {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { userData } = useAuthStore();
   const [notifications, setNotifications] = useState<ThongBao[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,13 +52,15 @@ export default function NotificationsScreen() {
     }
   };
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (silent = false) => {
     try {
+      if (!silent) setLoading(true);
       setError(null);
       const response = await axiosClient.get('/thongbao');
       if (response.data && response.data.data) {
         // Filter for parent notifications
         const filtered = response.data.data.filter((item: ThongBao) => {
+          if (item.recipientId && userData?.id && item.recipientId === userData.id) return true;
           const dt = (item.doiTuong || item.loai || '').split(',').map((s: string) => s.trim());
           return dt.includes('PHU_HUYNH') || dt.includes('ALL');
         });
@@ -67,21 +73,45 @@ export default function NotificationsScreen() {
       }
     } catch (err: any) {
       console.log('Fetch notifications error:', err);
-      setError('Không thể tải thông báo. Vui lòng thử lại sau.');
+      if (!silent) setError('Không thể tải thông báo. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchReadIds();
+      fetchNotifications(true);
+    }, [userData?.id])
+  );
+
   useEffect(() => {
-    fetchReadIds();
-    fetchNotifications();
-  }, []);
+    webSocketService.connect(() => {
+      const handleRealtimeNotif = () => {
+        fetchNotifications(true);
+      };
+
+      webSocketService.subscribe('/topic/notifications', handleRealtimeNotif);
+      if (userData?.id) {
+        webSocketService.subscribe(`/topic/user/${userData.id}`, handleRealtimeNotif);
+        webSocketService.subscribe(`/topic/notifications/${userData.id}`, handleRealtimeNotif);
+      }
+    });
+
+    return () => {
+      webSocketService.unsubscribe('/topic/notifications');
+      if (userData?.id) {
+        webSocketService.unsubscribe(`/topic/user/${userData.id}`);
+        webSocketService.unsubscribe(`/topic/notifications/${userData.id}`);
+      }
+    };
+  }, [userData?.id]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchNotifications();
+    fetchNotifications(true);
   };
 
   const formatDateTime = (dateString?: string | null) => {

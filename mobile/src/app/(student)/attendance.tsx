@@ -13,6 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axiosClient from '../../api/axiosClient';
 import { useDashboardStore } from '../../store/useDashboardStore';
+import { fixCorruptedVietnameseText } from '../(parent)/conduct';
 
 interface AttendanceStats {
   tongNgayHoc: number;
@@ -67,11 +68,17 @@ export default function AttendanceScreen() {
     }
   }, [params.tab]);
 
-  const currentStudentNamHoc = data?.student?.lop?.namHoc || '2025-2026';
+  const currentStudentNamHoc = data?.currentNamHoc || data?.student?.lop?.namHoc || '2025-2026';
 
   const availableYears = useMemo(() => {
     const yearsSet = new Set<string>();
-    if (currentStudentNamHoc) yearsSet.add(currentStudentNamHoc);
+    if (data?.currentNamHoc) yearsSet.add(data.currentNamHoc);
+    if (data?.student?.lop?.namHoc) yearsSet.add(data.student.lop.namHoc);
+    if (data?.allNamHocs && Array.isArray(data.allNamHocs)) {
+      data.allNamHocs.forEach((nh: any) => {
+        if (nh?.tenNamHoc) yearsSet.add(nh.tenNamHoc);
+      });
+    }
     allScores.forEach((s: any) => {
       if (s.namHoc) yearsSet.add(s.namHoc);
     });
@@ -81,9 +88,17 @@ export default function AttendanceScreen() {
       return yB - yA;
     });
     return arr.length > 0 ? arr : [currentStudentNamHoc];
-  }, [allScores, currentStudentNamHoc]);
+  }, [allScores, data?.currentNamHoc, data?.student?.lop?.namHoc, data?.allNamHocs, currentStudentNamHoc]);
 
-  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || currentStudentNamHoc);
+  const [selectedYear, setSelectedYear] = useState<string>(data?.currentNamHoc || availableYears[0] || currentStudentNamHoc);
+
+  useEffect(() => {
+    if (data?.currentNamHoc) {
+      setSelectedYear(data.currentNamHoc);
+    } else if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [data?.currentNamHoc, availableYears]);
   const [showYearModal, setShowYearModal] = useState(false);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -312,15 +327,17 @@ export default function AttendanceScreen() {
                       <Text style={styles.commentLabel}>Nhận xét của giáo viên:</Text>
                       <Text style={styles.contentText}>
                         {record.nhanXet && record.nhanXet.trim() !== ''
-                          ? record.nhanXet
+                          ? fixCorruptedVietnameseText(record.nhanXet)
                           : 'Chưa có nhận xét chi tiết.'}
                       </Text>
 
-                      {record.giaoVien && (
+                      {Boolean(dashboardData?.student?.lop?.gvcn?.hoTen || dashboardData?.homeroomTeacher?.hoTen || record.giaoVien?.hoTen) && (
                         <View style={styles.teacherRow}>
                           <User size={14} color="#64748B" />
                           <Text style={styles.teacherText}>
-                            GV đánh giá: <Text style={{ fontWeight: '600', color: '#334155' }}>{record.giaoVien.hoTen}</Text>
+                            GV đánh giá: <Text style={{ fontWeight: '600', color: '#334155' }}>
+                              {dashboardData?.student?.lop?.gvcn?.hoTen || dashboardData?.homeroomTeacher?.hoTen || record.giaoVien?.hoTen}
+                            </Text>
                           </Text>
                         </View>
                       )}

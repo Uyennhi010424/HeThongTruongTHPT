@@ -22,6 +22,8 @@ const TYPE_CONFIG = {
   LEAVE_REQUEST: { nav: "/admin/nghi-day", label: "Đơn xin nghỉ" },
   LEAVE_RESULT:  { nav: "/teacher/xin-nghi", label: "Kết quả đơn nghỉ" },
   SUBSTITUTE_TEACHING: { nav: "/teacher/thoikhoabieu", label: "Phân công dạy thay" },
+  STUDENT_LEAVE_REQUEST: { nav: "/teacher/duyet-nghi", label: "Đơn xin nghỉ học sinh" },
+  STUDENT_LEAVE_RESULT:  { nav: "/parent/xinnghi", label: "Kết quả đơn nghỉ" },
 };
 
 // Helper: check if a thongbao was created by current admin/vanthu user
@@ -107,8 +109,12 @@ export default function NotificationBell({ role = "admin" }) {
         };
       });
 
+      const uniqueMappedTb = mappedTb.filter(tb => 
+        !appNotifs.some(an => an.title === tb.title && an.message === tb.message)
+      );
+
       setNotifications(prev => {
-        const allNew = [...appNotifs, ...mappedTb];
+        const allNew = [...appNotifs, ...uniqueMappedTb];
         // Preserve isRead state from prev for ThongBao
         const merged = allNew.map(n => {
           if (n.type === 'THONG_BAO') {
@@ -243,18 +249,46 @@ export default function NotificationBell({ role = "admin" }) {
         prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
       );
     }
-    if (n.type === 'THONG_BAO') {
-      const role = getRole();
-      if (role === "ADMIN" || role === "VAN_THU") {
+    const role = (getRole() || "").toUpperCase();
+    const title = (n.title || "").toLowerCase();
+    const content = (n.message || "").toLowerCase();
+    const isLeaveRequest = title.includes("đơn xin nghỉ") || title.includes("xin nghỉ học") || content.includes("đơn xin nghỉ") || content.includes("xin nghỉ");
+    const isLeaveResult = title.includes("kết quả đơn") || content.includes("kết quả đơn");
+    const isSubstitute = title.includes("phân công dạy thay") || title.includes("dạy thay") || content.includes("dạy thay");
+
+    if (n.type && n.type !== 'THONG_BAO') {
+      const cfg = TYPE_CONFIG[n.type];
+      if (cfg) {
+        navigate(cfg.nav, { state: { referenceId: n.referenceId } });
+        setOpen(false);
+        return;
+      }
+    }
+
+    if (role === "ADMIN" || role === "VAN_THU") {
+      if (isLeaveRequest) {
+        navigate("/admin/nghi-day");
+      } else {
         navigate("/admin/thongbao");
+      }
+    } else if (role === "PHUHUYNH" || role === "PHU_HUYNH") {
+      if (isLeaveRequest || isLeaveResult) {
+        navigate("/parent/xinnghi");
+      } else {
+        navigate("/parent/thongbao");
+      }
+    } else {
+      // Teacher
+      if (isSubstitute) {
+        navigate("/teacher/thoikhoabieu");
+      } else if (isLeaveResult) {
+        navigate("/teacher/xin-nghi");
+      } else if (isLeaveRequest) {
+        navigate("/teacher/duyet-nghi");
       } else {
         navigate("/teacher/thongbao");
       }
-      setOpen(false);
-      return;
     }
-    const cfg = TYPE_CONFIG[n.type];
-    if (cfg) navigate(cfg.nav, { state: { referenceId: n.referenceId } });
     setOpen(false);
   };
 

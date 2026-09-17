@@ -60,6 +60,8 @@ export default function TeacherBangDiem() {
     selectedSubjectId,
     setSelectedSubjectId,
     allStudents: students,
+    classStudents,
+    studentsLoading,
     filteredClasses,
     allowedSubjects
   } = filters;
@@ -116,10 +118,13 @@ export default function TeacherBangDiem() {
 
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return [];
+    if (classStudents && classStudents.length > 0) {
+      return sortStudentsByGivenName(classStudents);
+    }
     return sortStudentsByGivenName(
       students.filter((s) => s.trangThai === 1 && String(getStudentClass(s)?.id) === selectedClassId)
     );
-  }, [students, selectedClassId]);
+  }, [classStudents, students, selectedClassId]);
 
   // Reset page on filter changes
   useEffect(() => {
@@ -537,7 +542,7 @@ export default function TeacherBangDiem() {
                       >
                         <td style={{ ...tdStl("center"), position: "sticky", left: 0, background: isEven ? "#fff" : "#f9fafb" }}>{(currentPage - 1) * pageSize + idx + 1}</td>
                         <td style={{ ...tdStl("left", true), position: "sticky", left: 50, background: isEven ? "#fff" : "#f9fafb", borderRight: "1px solid #f1f5f9" }}>{s.hoTen}</td>
-                        <td style={tdStl("center")}>{getStudentClass(s)?.tenLop || "--"}</td>
+                        <td style={tdStl("center")}>{filters.selectedClassObj?.tenLop || getStudentClass(s)?.tenLop || "--"}</td>
                         {!isComment && data.tx.map((v, i) => (
                           <td key={i} style={{ ...tdStl("center"), color: getScoreColor(v), fontWeight: 600 }}>{v || "--"}</td>
                         ))}

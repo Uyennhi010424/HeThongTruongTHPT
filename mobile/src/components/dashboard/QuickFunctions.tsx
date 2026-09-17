@@ -20,7 +20,7 @@ export const QuickFunctions: React.FC<QuickFunctionsProps> = ({ data }) => {
     const now = new Date();
     const curMonth = now.getMonth();
     const curYear = now.getFullYear();
-    const currentNamHoc = data?.student?.lop?.namHoc || (curMonth >= 7 ? `${curYear}-${curYear + 1}` : `${curYear - 1}-${curYear}`);
+    const currentNamHoc = data?.currentNamHoc || data?.student?.lop?.namHoc || (curMonth >= 7 ? `${curYear}-${curYear + 1}` : `${curYear - 1}-${curYear}`);
 
     const currentYearConducts = data.conducts.filter((c: any) => {
       const yearStr = c.namHoc?.tenNamHoc || c.namHoc || c.tenNamHoc;

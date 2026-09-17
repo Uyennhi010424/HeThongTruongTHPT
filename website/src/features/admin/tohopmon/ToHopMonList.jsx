@@ -11,6 +11,7 @@ import {
 } from "../../../api/toHopMonApi.js";
 import { getMonHoc } from "../../../api/monhocApi.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
+import { normalizeText } from "../../../utils/normalizeText.js";
 
 const BAN_OPTIONS = ["Tự nhiên", "Xã hội", "Kết hợp"];
 
@@ -456,11 +457,28 @@ export default function ToHopMonList() {
 
   // Nhóm môn học theo loại (bắt buộc vs tự chọn) để hiển thị trong form
   const monHocByType = useMemo(() => {
-    const batBuoc = [
-      "Toán", "Ngữ văn", "Tiếng Anh", "Lịch sử", "Giáo dục thể chất",
-      "Giáo dục QP&AN", "Hoạt động trải nghiệm", "Nội dung giáo dục địa phương"
+    const batBuocKeywords = [
+      "toan",
+      "ngu van",
+      "tieng anh",
+      "ngoai ngu",
+      "lich su",
+      "giao duc the chat",
+      "the duc",
+      "gdtc",
+      "giao duc quoc phong",
+      "quoc phong",
+      "an ninh",
+      "gdqp",
+      "hoat dong trai nghiem",
+      "trai nghiem",
+      "huong nghiep",
+      "hdtn",
+      "giao duc dia phuong",
+      "dia phuong",
+      "gddp"
     ];
-    const excluded = ["SHDC", "SHL", "Sinh hoạt lớp", "Chào cờ", "Sinh hoạt dưới cờ"];
+    const excludedKeywords = ["shdc", "shl", "sinh hoat lop", "chao co", "sinh hoat duoi co"];
 
     const batBuocList = [];
     const tuChonList = [];
@@ -468,21 +486,19 @@ export default function ToHopMonList() {
     allMonHoc.forEach((m) => {
       const tenMon = String(m.tenMon || "").trim();
       const maMon = String(m.maMon || "").trim().toUpperCase();
-      const lower = tenMon.toLowerCase();
+      const norm = normalizeText(tenMon);
+      const lowerMa = maMon.toLowerCase();
 
       // Ẩn các môn/tiết SHDC, Sinh hoạt lớp, Chào cờ
       if (
-        excluded.some((ex) => tenMon.includes(ex) || ex.includes(tenMon)) ||
-        maMon === "SHDC" ||
-        maMon === "SHL" ||
-        lower.includes("shdc") ||
-        lower.includes("sinh hoạt lớp") ||
-        lower.includes("chào cờ")
+        excludedKeywords.some((ex) => norm.includes(ex) || lowerMa.includes(ex))
       ) {
         return;
       }
 
-      if (batBuoc.some((bb) => tenMon.includes(bb) || bb.includes(tenMon))) {
+      if (
+        batBuocKeywords.some((bb) => norm.includes(bb) || lowerMa.includes(bb))
+      ) {
         batBuocList.push(m);
       } else {
         tuChonList.push(m);

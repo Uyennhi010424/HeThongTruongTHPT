@@ -50,14 +50,15 @@ public class LeaveNotificationService {
         n.setIsRead(false);
         AppNotification savedAppNotif = notificationRepo.save(n);
 
-        // 2. Also save ThongBao record (so it appears in Teacher's ThongBao inbox/announcements)
+        // 2. Also save ThongBao record (so it appears in user's ThongBao inbox/announcements)
         try {
             ThongBao tb = new ThongBao();
             tb.setTieuDe(title);
             tb.setNoiDung(message);
-            tb.setLoai("GIAO_VIEN");
+            String roleName = user.getRole() != null ? user.getRole().name() : "PHU_HUYNH";
+            tb.setLoai(roleName);
             tb.setRecipientId(user.getId());
-            tb.setSenderRole("ADMIN");
+            tb.setSenderRole("STUDENT_LEAVE_REQUEST".equals(type) ? "PHU_HUYNH" : "GIAO_VIEN");
             tb.setNgayDang(LocalDateTime.now());
             tb.setTrangThai(1);
             thongBaoRepo.save(tb);
@@ -65,10 +66,13 @@ public class LeaveNotificationService {
             log.warn("Failed to create ThongBao mirror: {}", e.getMessage());
         }
 
-        // 3. Push real-time via WebSocket only to target user
+        // 3. Push real-time via WebSocket
         try {
             if (messagingTemplate != null) {
                 messagingTemplate.convertAndSend("/topic/user/" + user.getId(), savedAppNotif);
+                messagingTemplate.convertAndSend("/topic/notifications/" + user.getId(), savedAppNotif);
+                messagingTemplate.convertAndSend("/topic/notifications", savedAppNotif);
+                messagingTemplate.convertAndSend("/topic/don-xin-nghi", savedAppNotif);
             }
         } catch (Exception e) {
             log.warn("Failed to broadcast notification via WebSocket: {}", e.getMessage());

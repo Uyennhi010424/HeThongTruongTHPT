@@ -17,6 +17,7 @@ export default function ParentXinNghi() {
 
   // Form states
   const [showForm, setShowForm] = useState(false);
+  const [leaveType, setLeaveType] = useState("single"); // 'single' | 'multiple'
   const [formData, setFormData] = useState({
     ngayBatDau: "",
     ngayKetThuc: "",
@@ -24,20 +25,21 @@ export default function ParentXinNghi() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
   useEffect(() => {
     if (!currentStudent?.id) return;
     fetchRequests();
   }, [currentStudent?.id]);
 
   const fetchRequests = async () => {
+    if (!currentStudent?.id) return;
     try {
       setLoading(true);
       setError("");
-      // Vì API trả về list tất cả đơn của phụ huynh, ta sẽ lọc theo currentStudent nếu cần.
-      // Tuy nhiên hiện tại getMyRequests trả về toàn bộ đơn của Parent.
       const res = await axiosClient.get("/don-xin-nghi/me");
       if (res.data?.data) {
-        // Lọc theo current student
         const filtered = res.data.data.filter(r => r.hocSinhId === currentStudent.id);
         setRequests(filtered);
       }
@@ -51,23 +53,40 @@ export default function ParentXinNghi() {
 
   const handleCreateRequest = async (e) => {
     e.preventDefault();
-    if (!formData.ngayBatDau || !formData.ngayKetThuc || !formData.lyDo) {
+    if (!currentStudent?.id) {
+      notifyError("Không tìm thấy thông tin học sinh. Vui lòng chọn học sinh.");
+      return;
+    }
+
+    const ngayBatDau = formData.ngayBatDau;
+    const ngayKetThuc = leaveType === "single" ? ngayBatDau : formData.ngayKetThuc;
+
+    if (!ngayBatDau || !ngayKetThuc || !formData.lyDo?.trim()) {
       notifyError("Vui lòng điền đầy đủ thông tin");
       return;
     }
-    if (new Date(formData.ngayBatDau) > new Date(formData.ngayKetThuc)) {
-      notifyError("Ngày bắt đầu không thể sau ngày kết thúc");
+
+    if (ngayBatDau < todayStr) {
+      notifyError("Không thể xin nghỉ cho các ngày trong quá khứ");
+      return;
+    }
+
+    if (leaveType === "multiple" && ngayBatDau > ngayKetThuc) {
+      notifyError("Ngày kết thúc không thể trước ngày bắt đầu");
       return;
     }
 
     try {
       setSubmitting(true);
       await axiosClient.post("/don-xin-nghi", {
-        ...formData,
+        ngayBatDau,
+        ngayKetThuc,
+        lyDo: formData.lyDo.trim(),
         hocSinhId: currentStudent.id
       });
-      notifySuccess("Tạo đơn thành công!");
+      notifySuccess("Tạo đơn xin nghỉ thành công!");
       setShowForm(false);
+      setLeaveType("single");
       setFormData({ ngayBatDau: "", ngayKetThuc: "", lyDo: "" });
       fetchRequests();
     } catch (err) {
@@ -132,8 +151,12 @@ export default function ParentXinNghi() {
           <h2 className="text-xl font-bold text-on-surface">Lịch sử xin nghỉ</h2>
           {!showForm && (
             <button 
-              onClick={() => setShowForm(true)}
-              className="px-4 py-2 bg-primary text-white rounded-xl font-semibold shadow-sm hover:bg-primary-dark"
+              onClick={() => {
+                setLeaveType("single");
+                setFormData({ ngayBatDau: "", ngayKetThuc: "", lyDo: "" });
+                setShowForm(true);
+              }}
+              className="px-4 py-2 bg-primary text-white rounded-xl font-semibold shadow-sm hover:bg-primary-dark transition-all"
             >
               + Tạo đơn mới
             </button>
@@ -143,33 +166,88 @@ export default function ParentXinNghi() {
         {showForm && (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-outline-variant">
             <h3 className="text-lg font-bold mb-4">Tạo đơn xin nghỉ cho {currentStudent?.hoTen}</h3>
+            
+            {/* Toggle 1 Ngày / Nhiều ngày */}
+            <div className="flex bg-slate-100 p-1 rounded-xl max-w-xs mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setLeaveType("single");
+                  if (formData.ngayBatDau) {
+                    setFormData(prev => ({ ...prev, ngayKetThuc: prev.ngayBatDau }));
+                  }
+                }}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  leaveType === "single"
+                    ? "bg-white text-blue-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                1 Ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeaveType("multiple")}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  leaveType === "multiple"
+                    ? "bg-white text-blue-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Nhiều ngày
+              </button>
+            </div>
+
             <form onSubmit={handleCreateRequest} className="space-y-4 max-w-lg">
-              <div className="grid grid-cols-2 gap-4">
+              {leaveType === "single" ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nghỉ</label>
                   <input 
                     type="date" 
-                    className="w-full px-4 py-2 border rounded-xl"
+                    min={todayStr}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800"
                     value={formData.ngayBatDau}
-                    onChange={e => setFormData({...formData, ngayBatDau: e.target.value})}
+                    onChange={e => setFormData({ ...formData, ngayBatDau: e.target.value, ngayKetThuc: e.target.value })}
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
-                  <input 
-                    type="date" 
-                    className="w-full px-4 py-2 border rounded-xl"
-                    value={formData.ngayKetThuc}
-                    onChange={e => setFormData({...formData, ngayKetThuc: e.target.value})}
-                    required
-                  />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
+                    <input 
+                      type="date" 
+                      min={todayStr}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800"
+                      value={formData.ngayBatDau}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          ngayBatDau: val,
+                          ngayKetThuc: prev.ngayKetThuc && prev.ngayKetThuc < val ? val : prev.ngayKetThuc
+                        }));
+                      }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
+                    <input 
+                      type="date" 
+                      min={formData.ngayBatDau || todayStr}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800"
+                      value={formData.ngayKetThuc}
+                      onChange={e => setFormData({ ...formData, ngayKetThuc: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {(() => {
                 const isSun = (dStr) => dStr ? new Date(dStr + "T00:00:00").getDay() === 0 : false;
-                if (isSun(formData.ngayBatDau) || isSun(formData.ngayKetThuc)) {
+                if (isSun(formData.ngayBatDau) || (leaveType === "multiple" && isSun(formData.ngayKetThuc))) {
                   return (
                     <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
                       <span className="text-sm">⚠️</span>
@@ -179,13 +257,14 @@ export default function ParentXinNghi() {
                 }
                 return null;
               })()}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Lý do nghỉ</label>
                 <textarea 
-                  className="w-full px-4 py-2 border rounded-xl min-h-[100px]"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800"
                   placeholder="Nhập lý do xin nghỉ..."
                   value={formData.lyDo}
-                  onChange={e => setFormData({...formData, lyDo: e.target.value})}
+                  onChange={e => setFormData({ ...formData, lyDo: e.target.value })}
                   required
                 />
               </div>
@@ -193,14 +272,14 @@ export default function ParentXinNghi() {
                 <button 
                   type="submit" 
                   disabled={submitting}
-                  className="flex-1 bg-primary text-white py-2 rounded-xl font-semibold hover:bg-primary-dark disabled:opacity-50"
+                  className="flex-1 bg-primary text-white py-2 rounded-xl font-semibold hover:bg-primary-dark disabled:opacity-50 transition-all"
                 >
                   {submitting ? "Đang gửi..." : "Gửi đơn"}
                 </button>
                 <button 
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-xl font-semibold hover:bg-gray-200"
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-xl font-semibold hover:bg-gray-200 transition-all"
                 >
                   Hủy
                 </button>

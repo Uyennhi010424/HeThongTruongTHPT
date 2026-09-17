@@ -333,7 +333,7 @@ public class GiaoVienService {
                 return active.get(0).getTenNamHoc();
             }
         }
-        return "2026-2027";
+        return "2025-2026";
     }
 
     private GiaoVienDTO toDto(GiaoVien giaoVien) {

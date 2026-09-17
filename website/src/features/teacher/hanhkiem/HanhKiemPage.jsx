@@ -112,11 +112,14 @@ export default function HanhKiemPage() {
 
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return [];
+    if (filters.classStudents && filters.classStudents.length > 0) {
+      return sortStudentsByGivenName(filters.classStudents);
+    }
     const classStudents = students.filter(
       (s) => s.trangThai === 1 && String(getStudentClassId(s) || "") === selectedClassId
     );
     return sortStudentsByGivenName(classStudents);
-  }, [students, selectedClassId]);
+  }, [filters.classStudents, students, selectedClassId]);
 
   // Reset page on filter changes
   useEffect(() => {
@@ -381,7 +384,7 @@ export default function HanhKiemPage() {
                                 </td>
                                 <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
                                   <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
-                                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
+                                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{filters.selectedClassObj?.tenLop || getStudentClass(student)?.tenLop || "--"}</div>
                                 </td>
                                 <td style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
                                   <select

@@ -6,6 +6,7 @@ import { getNamHoc } from "../../api/namhocApi";
 import { getActiveAcademicYear, getVisibleAcademicYears, getStudentAcademicYears } from "../../utils/helpers";
 import { readCachedAvatar } from "../../utils/avatarCache";
 import { getCurrentUsernameFromToken } from "../../utils/teacherProfile";
+import { getPolicyBySubject } from "../../utils/scorePolicy";
 import StudentProfileWidget from "./dashboard/StudentProfileWidget";
 import TimetableWidget from "./dashboard/TimetableWidget";
 import StatCardsWidget from "./dashboard/StatCardsWidget";
@@ -89,22 +90,31 @@ export default function HomePage() {
   const subjectMap = useMemo(() => {
     const m = {};
     if (data?.subjects) {
-      for (const s of data.subjects) m[s.id] = s.tenMon || s.tenMonHoc || `Môn ${s.id}`;
+      for (const s of data.subjects) {
+        if (s?.id) m[s.id] = s.tenMon || s.tenMonHoc || `Môn ${s.id}`;
+      }
+    }
+    if (data?.scores) {
+      for (const s of data.scores) {
+        const id = s.monHoc?.id ?? s.monHocId;
+        if (id && !m[id]) {
+          m[id] = s.monHoc?.tenMon || s.monHoc?.tenMonHoc || `Môn ${id}`;
+        }
+      }
     }
     return m;
-  }, [data?.subjects]);
+  }, [data?.subjects, data?.scores]);
 
   const getSubjectName = (id) => subjectMap[id] || `Môn ${id}`;
 
   const subjectColorMap = useMemo(() => {
     const m = {};
-    if (data?.subjects) {
-      data.subjects.forEach((s, i) => {
-        m[s.id] = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
-      });
-    }
+    const allSubjectIds = Object.keys(subjectMap);
+    allSubjectIds.forEach((id, i) => {
+      m[id] = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
+    });
     return m;
-  }, [data?.subjects]);
+  }, [subjectMap]);
 
   const namHocList = useMemo(() => {
     const studentYears = getStudentAcademicYears(systemYears, data?.student);
@@ -119,62 +129,88 @@ export default function HomePage() {
   }, [namHocList, selectedNamHoc, activeYearName]);
 
   const dynamicSubjectScores = useMemo(() => {
-    if (!data?.scores || !data?.subjects || !selectedNamHoc || !selectedHK) return data?.subjectScores || [];
+    if (!data?.scores || !selectedNamHoc || !selectedHK) return data?.subjectScores || [];
     
-    const hkStr = String(selectedHK);
-    const filteredScores = data.scores.filter(s => 
-      s.namHoc === selectedNamHoc && String(s.hocKy) === hkStr
-    );
-    
-    return data.subjects.map(subj => {
-      const subjScores = filteredScores.filter(s => s.monHoc?.id === subj.id);
-      if (subjScores.length === 0) return { monHocId: subj.id, avgScore: null };
-      
-      if (subj.nhomDanhGia === "NHAN_XET" || subj.nhomDanhGia === "nhan_xet") {
-        return { monHocId: subj.id, avgScore: null };
-      }
-      
-      const txScores = subjScores.filter(s => {
-        const l = (s.loaiDiem || "").toUpperCase();
-        return l === "TX" && s.giaTriDiem != null;
-      });
-      const gkScore = subjScores.find(s => {
-        const l = (s.loaiDiem || "").toUpperCase();
-        return l === "GK" && s.giaTriDiem != null;
-      });
-      const ckScore = subjScores.find(s => {
-        const l = (s.loaiDiem || "").toUpperCase();
-        return l === "CK" && s.giaTriDiem != null;
-      });
-      
-      let txAvg = -1;
-      if (txScores.length > 0) {
-        const sum = txScores.reduce((acc, s) => acc + Number(s.giaTriDiem), 0);
-        txAvg = sum / txScores.length;
-      }
-      
-      let ws = 0;
-      let wt = 0;
-      if (txAvg !== -1) { ws += txAvg * 1; wt += 1; }
-      if (gkScore != null) { ws += Number(gkScore.giaTriDiem) * 2; wt += 2; }
-      if (ckScore != null) { ws += Number(ckScore.giaTriDiem) * 3; wt += 3; }
-      
-      let avgScore = null;
-      if (wt > 0) {
-        avgScore = Math.round((ws / wt) * 100) / 100;
-      }
-      
-      return { monHocId: subj.id, avgScore };
+    const clean = (str) => String(str || "").replace(/\s+/g, "").trim();
+    const selYearClean = clean(selectedNamHoc);
+    const selHK = Number(selectedHK);
+
+    const filteredScores = data.scores.filter(s => {
+      const sYear = clean(typeof s.namHoc === "object" ? s.namHoc?.tenNamHoc : s.namHoc);
+      const sHK = Number(s.hocKy);
+      return sYear === selYearClean && sHK === selHK;
     });
-  }, [data?.scores, data?.subjects, selectedNamHoc, selectedHK, data?.subjectScores]);
+
+    // Build subject list from data.subjects and any subjects found in filtered scores
+    const subjectsList = Array.isArray(data?.subjects) && data.subjects.length > 0 ? [...data.subjects] : [];
+    const seenIds = new Set(subjectsList.map(s => Number(s.id)));
+
+    filteredScores.forEach(s => {
+      const sId = Number(s.monHoc?.id ?? s.monHocId);
+      if (sId && !seenIds.has(sId)) {
+        seenIds.add(sId);
+        subjectsList.push(s.monHoc || { id: sId, tenMon: subjectMap[sId] || `Môn ${sId}` });
+      }
+    });
+
+    return subjectsList.map(subj => {
+      const subjId = Number(subj.id);
+      const subjScores = filteredScores.filter(s => Number(s.monHoc?.id ?? s.monHocId) === subjId);
+      if (subjScores.length === 0) return { monHocId: subjId, avgScore: null };
+      
+      const policy = getPolicyBySubject(subj);
+      if (policy.mode === "COMMENT" || subj.nhomDanhGia === "NHAN_XET" || subj.nhomDanhGia === "nhan_xet") {
+        return { monHocId: subjId, avgScore: null };
+      }
+      
+      const txScores = [];
+      let gkScore = null;
+      let ckScore = null;
+
+      subjScores.forEach(s => {
+        if (s.giaTriDiem == null && s.giaTri == null) return;
+        const val = Number(s.giaTriDiem ?? s.giaTri);
+        if (Number.isNaN(val)) return;
+
+        const loai = String(s.loaiDiem || "").toUpperCase().trim();
+        if (loai === "TX" || loai === "MIENG" || loai === "15P" || loai.startsWith("TX")) {
+          txScores.push(val);
+        } else if (loai === "GK" || loai === "1T") {
+          gkScore = val;
+        } else if (loai === "CK" || loai === "THI") {
+          ckScore = val;
+        }
+      });
+      
+      // Theo Thông tư 22/2021/TT-BGDĐT: ĐTB môn học kỳ = (sum(TX) + 2*GK + 3*CK) / (count(TX) + 5)
+      let avgScore = null;
+      if (txScores.length > 0 && gkScore != null && ckScore != null) {
+        const sumTx = txScores.reduce((acc, v) => acc + v, 0);
+        const avg = (sumTx + Number(gkScore) * 2 + Number(ckScore) * 3) / (txScores.length + 5);
+        avgScore = Math.round(avg * 10) / 10;
+      }
+      
+      return { monHocId: subjId, avgScore };
+    });
+  }, [data?.scores, data?.subjects, selectedNamHoc, selectedHK, data?.subjectScores, subjectMap]);
+
+  const dynamicGPA = useMemo(() => {
+    const scoredSubs = dynamicSubjectScores.filter(s => s.avgScore !== null);
+    if (scoredSubs.length === 0) return null;
+    const sum = scoredSubs.reduce((acc, curr) => acc + curr.avgScore, 0);
+    return Math.round((sum / scoredSubs.length) * 10) / 10;
+  }, [dynamicSubjectScores]);
 
   const hanhKiemRaw = useMemo(() => {
     if (!data?.conducts?.length) return null;
-    const hkStr = String(selectedHK);
+    const clean = (str) => String(str || "").replace(/\s+/g, "").trim();
+    const selYearClean = clean(selectedNamHoc);
+    const selHK = Number(selectedHK);
+
     const filtered = data.conducts.filter((c) => {
-      const tenNamHoc = c.namHoc?.tenNamHoc || c.tenNamHoc || "";
-      const matchNamHoc = selectedNamHoc ? tenNamHoc === selectedNamHoc : true;
-      const matchHK = String(c.hocKy) === hkStr || c.hocKy === selectedHK;
+      const tenNamHoc = clean(c.namHoc?.tenNamHoc || c.tenNamHoc || c.namHoc || "");
+      const matchNamHoc = selectedNamHoc ? tenNamHoc === selYearClean : true;
+      const matchHK = Number(c.hocKy) === selHK;
       return matchNamHoc && matchHK;
     });
     const approved = filtered.find((c) => c.trangThai === "APPROVED" || c.status === "APPROVED");
@@ -208,6 +244,52 @@ export default function HomePage() {
   const attendanceRate = data?.attendanceStats
     ? Math.max(0, 100 - (Number(data.attendanceStats.coPhep || 0) + Number(data.attendanceStats.khongPhep || 0)))
     : 100;
+
+  // Tính chính xác số môn học thực tế của học sinh THPT (Chuẩn GDPT 2018: 8 môn bắt buộc + 4 môn tự chọn = 12 môn)
+  const studentSubjectsCount = useMemo(() => {
+    if (!data?.subjects || data.subjects.length === 0) return 12;
+
+    const allSubs = data.subjects.filter((s) => {
+      const name = (s.tenMon || s.tenMonHoc || "").toLowerCase();
+      const ma = (s.maMon || "").toUpperCase();
+      return (
+        !name.includes("shdc") &&
+        !name.includes("shl") &&
+        !name.includes("chào cờ") &&
+        !name.includes("sinh hoạt lớp") &&
+        ma !== "SHDC" &&
+        ma !== "SHL"
+      );
+    });
+
+    const toHopIds =
+      data?.student?.lop?.toHopMonIds ||
+      data?.student?.lop?.toHop?.monHocIds ||
+      data?.toHopMon?.monHocIds ||
+      null;
+
+    if (toHopIds && toHopIds.length > 0) {
+      const toHopSet = new Set(toHopIds.map(Number));
+      const filtered = allSubs.filter((s) => {
+        const name = (s.tenMon || s.tenMonHoc || "").toLowerCase();
+        const isMandatory =
+          name.includes("toán") ||
+          name.includes("ngữ văn") ||
+          name.includes("tiếng anh") ||
+          name.includes("ngoại ngữ") ||
+          name.includes("lịch sử") ||
+          name.includes("thể chất") ||
+          name.includes("thể dục") ||
+          name.includes("quốc phòng") ||
+          name.includes("trải nghiệm") ||
+          name.includes("địa phương");
+        return isMandatory || toHopSet.has(Number(s.id));
+      });
+      if (filtered.length > 0) return filtered.length;
+    }
+
+    return 12;
+  }, [data?.subjects, data?.student, data?.toHopMon]);
 
   // Lấy thông tin lớp tương ứng với năm học đang chọn
   // PHẢI đặt trước early return để không vi phạm Rules of Hooks
@@ -272,11 +354,11 @@ export default function HomePage() {
         <div className="lg:col-span-5 flex flex-col gap-6 min-h-0 lg:h-full">
           <StudentProfileWidget
             student={data?.student}
-            classInfo={currentClassInfo}
+            classInfo={data?.student?.lop || currentClassInfo}
             avatarSrc={avatarSrc}
-            selectedNamHoc={selectedNamHoc}
-            selectedHK={selectedHK}
-            homeroomTeacher={currentClassInfo?.gvcn || data?.student?.lop?.gvcn}
+            selectedNamHoc={data?.currentNamHoc || activeYearName}
+            selectedHK={data?.currentHocKy || (activeYearObj?.ngayBatDauHk2 && todayDateStr >= activeYearObj.ngayBatDauHk2 ? 2 : 1)}
+            homeroomTeacher={data?.student?.lop?.gvcn || currentClassInfo?.gvcn || data?.homeroomTeacher}
           />
           <TimetableWidget
             timetable={data?.timetable || []}
@@ -294,8 +376,8 @@ export default function HomePage() {
         <div className="lg:col-span-7 flex flex-col gap-6">
           <StatCardsWidget
             weekTimetable={data?.timetable || []}
-            subjectsCount={data?.subjects?.length || 0}
-            dtb={data?.gpa}
+            subjectsCount={studentSubjectsCount}
+            dtb={dynamicGPA}
             hanhKiemLabel={hanhKiemLabel}
             hkColor={hkColor}
           />
@@ -342,7 +424,7 @@ export default function HomePage() {
             setSelectedHK={setSelectedHK}
           />
 
-          <NoticesWidget unreadNotices={data?.notices || []} attendanceRate={attendanceRate} dtb={data?.gpa} />
+          <NoticesWidget unreadNotices={data?.notices || []} attendanceRate={attendanceRate} dtb={dynamicGPA} />
         </div>
       </div>
     </div>

@@ -92,7 +92,7 @@ export default function MainLayout({
           <div className="mx-auto max-w-container-max p-lg print:p-0 print:max-w-none print:mx-0 w-full flex-grow">
             {children}
           </div>
-          <div className="mt-auto py-6 text-center text-sm font-medium text-gray-500 border-t border-outline-variant/30 print-hidden shrink-0 bg-background relative z-50">
+          <div className="mt-auto py-6 text-center text-sm font-medium text-gray-500 border-t border-outline-variant/30 print-hidden shrink-0 bg-background relative">
             {themeFooter}
           </div>
         </div>

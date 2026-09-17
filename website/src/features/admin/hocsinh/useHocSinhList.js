@@ -678,6 +678,8 @@ export function useHocSinhList() {
             ? Number(student.namNhapHoc)
             : new Date().getFullYear());
 
+      const validParentId = parentToUse?.id ? String(parentToUse.id) : (selectedParent?.id ? String(selectedParent.id) : "");
+
       setForm({
         hoTen: student.hoTen || "",
         ngaySinh: formatDateInput(student.ngaySinh),
@@ -685,15 +687,11 @@ export function useHocSinhList() {
         lopHocId: currentClassId ? String(currentClassId) : "",
         danTocTen: student?.danToc || "",
         tonGiao: student?.tonGiao || "Không",
-        phuHuynhId: student?.phuHuynhId
-          ? String(student.phuHuynhId)
-          : parentToUse?.id
-          ? String(parentToUse.id)
-          : "",
-        phuHuynhHoTen: parentToUse?.hoTen || selectedParent?.hoTen || "",
-        phuHuynhSdt: formatPhoneDisplay(parentToUse?.soDienThoai || selectedParent?.soDienThoai || ""),
-        phuHuynhEmail: parentToUse?.email || selectedParent?.email || "",
-        phuHuynhNgheNghiep: parentToUse?.ngheNghiep || selectedParent?.ngheNghiep || "",
+        phuHuynhId: validParentId,
+        phuHuynhHoTen: parentToUse?.hoTen || selectedParent?.hoTen || student?.phuHuynh?.hoTen || "",
+        phuHuynhSdt: formatPhoneDisplay(parentToUse?.soDienThoai || selectedParent?.soDienThoai || student?.phuHuynh?.soDienThoai || ""),
+        phuHuynhEmail: parentToUse?.email || selectedParent?.email || student?.phuHuynh?.email || "",
+        phuHuynhNgheNghiep: parentToUse?.ngheNghiep || selectedParent?.ngheNghiep || student?.phuHuynh?.ngheNghiep || "",
         sdt: student.sdt || "",
         email: student.email || "",
         diaChi: student.diaChi || "",
@@ -845,6 +843,9 @@ export function useHocSinhList() {
     // 2. Kiểm tra thông tin phụ huynh
     const danTocId = editingStudent?.danTocId || 1;
     let phuHuynhId = form.phuHuynhId ? Number(form.phuHuynhId) : null;
+    if (phuHuynhId && !parents.some((p) => Number(p.id) === phuHuynhId)) {
+      phuHuynhId = null;
+    }
 
     if (!phuHuynhId) {
       const parentName = form.phuHuynhHoTen.trim();
@@ -976,7 +977,7 @@ export function useHocSinhList() {
       gioiTinh: form.gioiTinh === "true" ? "NAM" : "NU",
       lop: form.lopHocId ? { id: Number(form.lopHocId) } : null,
       hocBaId: editingStudent?.hocBaId || 1,
-      danToc: danTocId ? { id: Number(danTocId) } : { id: 1 },
+      danToc: form.danTocTen ? form.danTocTen.trim() : "Kinh",
       phuHuynhId,
       tonGiao: form.tonGiao ? form.tonGiao.trim() : "Không",
       sdt: form.sdt.trim() || null,
@@ -1603,7 +1604,7 @@ export function useHocSinhList() {
           ) ? "NAM" : "NU",
           lop: { id: Number(classMatch.id) },
           hocBaId,
-          danToc: danTocId ? { id: Number(danTocId) } : { id: 1 },
+          danToc: String(findColumnValue(row, EXCEL_FIELD_ALIASES.danToc) || "").trim() || "Kinh",
           phuHuynhId,
           sdt: normalizePhone(findColumnValue(row, EXCEL_FIELD_ALIASES.sdt) || "") || null,
           email:

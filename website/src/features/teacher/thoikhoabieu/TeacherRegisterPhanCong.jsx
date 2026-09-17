@@ -5,7 +5,12 @@ import SimpleModal from "../../../components/modal/SimpleModal.jsx";
 import axiosClient from "../../../api/axiosClient.js";
 import { notifyError, notifySuccess } from "../../../utils/notify.js";
 import { updateTkbNote } from "../../../api/thoikhoabieuApi.js";
-import { getLimitedSemesterWeeks, mapTimeToPeriod } from "../../../utils/helpers.js";
+import {
+  getVisibleAcademicYears,
+  getActiveAcademicYear,
+  getLimitedSemesterWeeks,
+  mapTimeToPeriod
+} from "../../../utils/helpers.js";
 import { getCurrentGiaoVien } from "../../../api/giaovienApi.js";
 import { getLichThi } from "../../../api/lichthiApi.js";
 import { getNamHoc } from "../../../api/namhocApi.js";
@@ -44,7 +49,8 @@ export default function TeacherRegisterPhanCong() {
   const [swapTargetId, setSwapTargetId] = useState("");
   const [noteText, setNoteText] = useState("");
 
-  const [namHoc, setNamHoc] = useState("2025-2026");
+  const [namHocList, setNamHocList] = useState([]);
+  const [namHoc, setNamHoc] = useState("");
   const [hocKy, setHocKy] = useState(1);
   const [tuan, setTuan] = useState(1);
   const [allWeeks, setAllWeeks] = useState(Array.from({ length: 36 }, (_, i) => i + 1));
@@ -148,8 +154,9 @@ export default function TeacherRegisterPhanCong() {
 
         const yList = namHocRes?.data?.data || [];
         const visibleYears = getVisibleAcademicYears(yList);
+        setNamHocList(visibleYears);
         const currentYear = getActiveAcademicYear(visibleYears) || visibleYears[0] || null;
-        let selectedNamHoc = "2025-2026";
+        let selectedNamHoc = currentYear?.tenNamHoc || "2025-2026";
         let actualHk = 1;
         let currentWeek = 1;
 
@@ -191,11 +198,13 @@ export default function TeacherRegisterPhanCong() {
             actualHk = 2;
           }
           setHocKy(actualHk);
+        } else {
+          setNamHoc(selectedNamHoc);
         }
 
         await loadScheduleData(selectedNamHoc, actualHk, currentWeek, teacher, false);
       } catch (e) {
-        console.error(e);
+        console.error("fetchInit error in TeacherRegisterPhanCong:", e);
         if (active) setLoading(false);
       }
     };
@@ -217,7 +226,7 @@ export default function TeacherRegisterPhanCong() {
   }, [tuan]);
 
   const weekDates = useMemo(() => {
-    const startYear = parseInt(namHoc.split("-")[0]);
+    const startYear = parseInt((namHoc || "2025-2026").split("-")[0]) || 2025;
     const schoolStart = new Date(startYear, 8, 5); // Default to Sept 5th
     const dow = schoolStart.getDay();
     const monday = new Date(schoolStart);
@@ -402,9 +411,25 @@ export default function TeacherRegisterPhanCong() {
         title="Đăng ký lịch dạy theo tuần"
         actions={
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#00236f", marginLeft: 16 }}>
-              Năm học {namHoc} - Học kỳ {hocKy === 1 ? 'I' : 'II'}
-            </span>
+            {namHocList.length > 1 ? (
+              <select
+                value={namHoc}
+                onChange={(e) => {
+                  const newYear = e.target.value;
+                  setNamHoc(newYear);
+                  loadScheduleData(newYear, hocKy, tuan, teacherProfile, false);
+                }}
+                style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ccc", fontSize: 13, fontWeight: 600, color: "#00236f" }}
+              >
+                {namHocList.map((y) => (
+                  <option key={y.id || y.tenNamHoc} value={y.tenNamHoc}>Năm học {y.tenNamHoc}</option>
+                ))}
+              </select>
+            ) : (
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#00236f", marginLeft: 16 }}>
+                Năm học {namHoc || "2025-2026"} - Học kỳ {hocKy === 1 ? 'I' : 'II'}
+              </span>
+            )}
               <select
                 value={tuan}
                 onChange={(e) => setTuan(parseInt(e.target.value))}

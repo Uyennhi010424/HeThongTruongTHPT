@@ -68,7 +68,7 @@ export default function StudentLayout() {
           <div className="w-full flex-grow">
             <Outlet />
           </div>
-          <div className="mt-auto py-6 text-center text-sm font-medium text-gray-500 border-t border-outline-variant/30 print-hidden shrink-0 bg-background relative z-50">
+          <div className="mt-auto py-6 text-center text-sm font-medium text-gray-500 border-t border-outline-variant/30 print-hidden shrink-0 bg-background relative">
             {themeFooter}
           </div>
         </div>

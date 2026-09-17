@@ -179,7 +179,6 @@ public class DashboardService {
         }
 
         DashboardDataDTO dashboardData = new DashboardDataDTO();
-        dashboardData.setStudent(HocSinhResponseDTO.fromEntity(hocSinh));
 
         // Get current academic year and semester
         LocalDate now = LocalDate.now();
@@ -190,19 +189,69 @@ public class DashboardService {
         int curHocKy = (curMonth >= 8 || curMonth <= 1) ? 1 : 2;
 
         List<com.hethongtruongthpt.entity.NamHoc> activeNamHocs = namHocRepository.findByTrangThai("DANG_MO");
+        com.hethongtruongthpt.entity.NamHoc activeNamHoc = null;
         if (!activeNamHocs.isEmpty()) {
-            com.hethongtruongthpt.entity.NamHoc active = activeNamHocs.get(0);
-            curNamHoc = active.getTenNamHoc();
+            activeNamHoc = activeNamHocs.get(0);
+            curNamHoc = activeNamHoc.getTenNamHoc();
             
-            if (active.getNgayBatDauHk2() != null && !now.isBefore(active.getNgayBatDauHk2())) {
+            if (activeNamHoc.getNgayBatDauHk2() != null && !now.isBefore(activeNamHoc.getNgayBatDauHk2())) {
                 curHocKy = 2;
-            } else if (active.getNgayBatDauHk1() != null && !now.isBefore(active.getNgayBatDauHk1())) {
+            } else if (activeNamHoc.getNgayBatDauHk1() != null && !now.isBefore(activeNamHoc.getNgayBatDauHk1())) {
                 curHocKy = 1;
             }
         }
 
-        Integer lopId = hocSinh.getLop() != null ? hocSinh.getLop().getId() : null;
         Integer hocSinhId = hocSinh.getId();
+
+        // Resolve student's class for current school year (curNamHoc) from LichSuHocTap
+        List<LichSuHocTap> studentHistories = lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinhId);
+        dashboardData.setAcademicHistories(studentHistories);
+
+        com.hethongtruongthpt.entity.LopHoc activeLop = null;
+        for (LichSuHocTap ls : studentHistories) {
+            if (curNamHoc.equals(ls.getNamHoc()) && ls.getLopHoc() != null) {
+                activeLop = ls.getLopHoc();
+                break;
+            }
+        }
+        if (activeLop == null && hocSinh.getLop() != null) {
+            if (curNamHoc.equals(hocSinh.getLop().getNamHoc()) || hocSinh.getLop().getNamHoc() == null) {
+                activeLop = hocSinh.getLop();
+            } else if (studentHistories.isEmpty()) {
+                activeLop = hocSinh.getLop();
+            }
+        }
+        if (activeLop == null && hocSinh.getLop() != null) {
+            activeLop = hocSinh.getLop();
+        }
+
+        Integer lopId = activeLop != null ? activeLop.getId() : (hocSinh.getLop() != null ? hocSinh.getLop().getId() : null);
+
+        // Build student response DTO with active class for the selected school year
+        HocSinhResponseDTO studentDTO = HocSinhResponseDTO.fromEntity(hocSinh);
+        if (activeLop != null && studentDTO != null) {
+            com.hethongtruongthpt.dto.lophoc.LopHocDTO lopDto = new com.hethongtruongthpt.dto.lophoc.LopHocDTO();
+            lopDto.setId(activeLop.getId());
+            lopDto.setTenLop(activeLop.getTenLop());
+            lopDto.setKhoi(activeLop.getKhoi());
+            lopDto.setNamHoc(activeLop.getNamHoc());
+            lopDto.setSiSo(activeLop.getSiSo());
+            lopDto.setPhongHoc(activeLop.getPhongHoc());
+            if (activeLop.getGvcn() != null) {
+                com.hethongtruongthpt.dto.giaovien.GiaoVienDTO gvDto = new com.hethongtruongthpt.dto.giaovien.GiaoVienDTO();
+                gvDto.setId(activeLop.getGvcn().getId());
+                gvDto.setHoTen(activeLop.getGvcn().getHoTen());
+                gvDto.setEmail(activeLop.getGvcn().getEmail());
+                gvDto.setSdt(activeLop.getGvcn().getSoDienThoai());
+                lopDto.setGvcn(gvDto);
+            }
+            studentDTO.setLop(lopDto);
+        }
+        dashboardData.setStudent(studentDTO);
+        dashboardData.setCurrentNamHoc(curNamHoc);
+        dashboardData.setCurrentHocKy(curHocKy);
+        dashboardData.setActiveNamHoc(activeNamHoc);
+        dashboardData.setAllNamHocs(namHocRepository.findAll());
 
         // 1. Notices (Chỉ lấy thông báo dành cho học sinh hoặc toàn trường)
         List<ThongBao> notices = thongBaoRepository.findAll().stream()
@@ -236,8 +285,6 @@ public class DashboardService {
         if (lopId != null) {
             studentLopIds.add(lopId);
         }
-        List<LichSuHocTap> studentHistories = lichSuHocTapRepository.findByHocSinhIdOrderByNamHocDesc(hocSinhId);
-        dashboardData.setAcademicHistories(studentHistories);
         for (LichSuHocTap ls : studentHistories) {
             if (ls.getLopHoc() != null) {
                 studentLopIds.add(ls.getLopHoc().getId());
@@ -258,26 +305,29 @@ public class DashboardService {
             .collect(Collectors.toList());
         dashboardData.setExams(exams);
 
-        // 4. Subjects (Chỉ lấy các môn học thực tế của lớp học sinh)
-        List<MonHoc> subjects;
-        if (lopId != null) {
-            List<PhanCongDay> pcds = phanCongDayRepository.findByLopId(lopId);
-            subjects = pcds.stream()
-                    .map(PhanCongDay::getMonHoc)
-                    .filter(java.util.Objects::nonNull)
-                    .distinct()
-                    .sorted((a, b) -> Integer.compare(a.getId() != null ? a.getId() : 0, b.getId() != null ? b.getId() : 0))
-                    .collect(Collectors.toList());
-            if (subjects.isEmpty()) {
-                subjects = monHocRepository.findAll();
-            }
-        } else {
-            subjects = monHocRepository.findAll();
-        }
+        // 4. Subjects (Lấy toàn bộ môn học để hỗ trợ đầy đủ các năm học và xem điểm lịch sử)
+        List<MonHoc> subjects = monHocRepository.findAll().stream()
+                .filter(m -> !Boolean.TRUE.equals(m.getIsDeleted()))
+                .sorted((a, b) -> Integer.compare(a.getId() != null ? a.getId() : 0, b.getId() != null ? b.getId() : 0))
+                .collect(Collectors.toList());
         dashboardData.setSubjects(subjects);
 
         // 5. Conducts
         List<HanhKiem> conducts = hanhKiemRepository.findByHocSinhId(hocSinhId);
+        if (conducts != null) {
+            for (HanhKiem hk : conducts) {
+                if (hk != null) {
+                    if (hk.getNhanXet() != null) {
+                        hk.setNhanXet(cleanVietnameseComments(hk.getNhanXet()));
+                    }
+                    if (activeLop != null && activeLop.getGvcn() != null) {
+                        hk.setGiaoVien(activeLop.getGvcn());
+                    } else if (hocSinh.getLop() != null && hocSinh.getLop().getGvcn() != null) {
+                        hk.setGiaoVien(hocSinh.getLop().getGvcn());
+                    }
+                }
+            }
+        }
         dashboardData.setConducts(conducts);
 
         // 6. Attendance Stats
@@ -362,22 +412,14 @@ public class DashboardService {
                 }
 
                 Double avgScore = null;
-                double ws = 0;
-                int wt = 0;
-                if (avgTx != -1) {
-                    ws += avgTx * 1;
-                    wt += 1;
-                }
-                if (gk != null) {
-                    ws += gk * 2;
-                    wt += 2;
-                }
-                if (ck != null) {
-                    ws += ck * 3;
-                    wt += 3;
-                }
-                if (wt > 0) {
-                    avgScore = Math.round((ws / wt) * 100.0) / 100.0;
+                // Theo Thông tư 22/2021/TT-BGDĐT: Chỉ tính ĐTB môn khi có đủ điểm Thường xuyên (TX), Giữa kỳ (GK) và Cuối kỳ (CK)
+                if (!tx.isEmpty() && gk != null && ck != null) {
+                    double sumTx = 0;
+                    for (Double val : tx) {
+                        sumTx += val;
+                    }
+                    double avg = (sumTx + 2 * gk + 3 * ck) / (tx.size() + 5);
+                    avgScore = Math.round(avg * 10.0) / 10.0;
                     sumAvg += avgScore;
                     countAvg++;
                 }
@@ -391,11 +433,52 @@ public class DashboardService {
 
         // Simple GPA calculation for numeric subjects
         if (countAvg > 0) {
-            dashboardData.setGpa(Math.round((sumAvg / countAvg) * 100.0) / 100.0);
+            dashboardData.setGpa(Math.round((sumAvg / countAvg) * 10.0) / 10.0);
         } else {
             dashboardData.setGpa(null);
         }
 
         return dashboardData;
+    }
+
+    public static String cleanVietnameseComments(String text) {
+        if (text == null || !text.contains("?")) return text;
+        String s = text;
+        s = s.replaceAll("(?i)H\\?c sinh xu\\?t s\\?c,?\\s*tích c\\?c tham gia các phong trào thi \\?ua", "Học sinh xuất sắc, tích cực tham gia các phong trào thi đua");
+        s = s.replaceAll("(?i)H\\?c sinh ngoan,?\\s*ch\\?m ch\\?,?\\s*g\\?+ng m\\?u,?\\s*có ý th\\?c k\\? lu\\?t r\\?t t\\?t", "Học sinh ngoan, chăm chỉ, gương mẫu, có ý thức kỷ luật rất tốt");
+        s = s.replaceAll("(?i)tích c\\?c tham gia các phong trào thi \\?ua", "tích cực tham gia các phong trào thi đua");
+        s = s.replaceAll("(?i)có ý th\\?c k\\? lu\\?t r\\?t t\\?t", "có ý thức kỷ luật rất tốt");
+        s = s.replaceAll("(?i)ch\\?m ch\\?,?\\s*g\\?+ng m\\?u", "chăm chỉ, gương mẫu");
+        s = s.replaceAll("(?i)g\\?+ng m\\?u", "gương mẫu");
+        s = s.replaceAll("(?i)H\\?c sinh xu\\?t s\\?c", "Học sinh xuất sắc");
+        s = s.replaceAll("(?i)H\\?c sinh ngoan", "Học sinh ngoan");
+        s = s.replaceAll("(?i)H\\?c sinh", "Học sinh");
+        s = s.replaceAll("(?i)h\\?c sinh", "học sinh");
+        s = s.replaceAll("(?i)xu\\?t s\\?c", "xuất sắc");
+        s = s.replaceAll("(?i)ch\\?m ch\\?", "chăm chỉ");
+        s = s.replaceAll("(?i)ý th\\?c", "ý thức");
+        s = s.replaceAll("(?i)k\\? lu\\?t", "kỷ luật");
+        s = s.replaceAll("(?i)r\\?t t\\?t", "rất tốt");
+        s = s.replaceAll("(?i)t\\?t", "tốt");
+        s = s.replaceAll("(?i)tích c\\?c", "tích cực");
+        s = s.replaceAll("(?i)thi \\?ua", "thi đua");
+        s = s.replaceAll("(?i)ti\\?n b\\?", "tiến bộ");
+        s = s.replaceAll("(?i)c\\? g\\?ng", "cố gắng");
+        s = s.replaceAll("(?i)phát bi\\?u", "phát biểu");
+        s = s.replaceAll("(?i)xây d\\?ng", "xây dựng");
+        s = s.replaceAll("(?i)bài h\\?c", "bài học");
+        s = s.replaceAll("(?i)k\\?t qu\\?", "kết quả");
+        s = s.replaceAll("(?i)rèn luy\\?n", "rèn luyện");
+        s = s.replaceAll("(?i)đ\\?o đ\\?c", "đạo đức");
+        s = s.replaceAll("(?i)ch\\?p hành", "chấp hành");
+        s = s.replaceAll("(?i)n\\?i quy", "nội quy");
+        s = s.replaceAll("(?i)nhà tr\\?+ng", "nhà trường");
+        s = s.replaceAll("(?i)th\\?y cô", "thầy cô");
+        s = s.replaceAll("(?i)b\\?n bè", "bạn bè");
+        s = s.replaceAll("(?i)hòa đ\\?ng", "hòa đồng");
+        s = s.replaceAll("(?i)giúp đ\\?", "giúp đỡ");
+        s = s.replaceAll("(?i)trung th\\?c", "trung thực");
+        s = s.replaceAll("(?i)l\\? phép", "lễ phép");
+        return s;
     }
 }

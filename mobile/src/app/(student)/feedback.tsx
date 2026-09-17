@@ -9,8 +9,10 @@ import {
   Send, Clock, CheckCircle, XCircle, MessageSquare,
   Calendar, ChevronLeft, Trash2, RefreshCw,
 } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import axiosClient from "../../api/axiosClient";
+import { useAuthStore } from "../../store/useAuthStore";
+import { webSocketService } from "../../api/websocket";
 
 const formatDate = (date: any) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -21,21 +23,25 @@ const formatDisplay = (str: any) => {
   return `${p[2]}/${p[1]}/${p[0]}`;
 };
 
-const STATUS = {
+const STATUS: Record<string, { label: string; color: string; Icon: any }> = {
+  PENDING:   { label: "Chờ duyệt", color: "#F59E0B", Icon: Clock },
   CHO_DUYET: { label: "Chờ duyệt", color: "#F59E0B", Icon: Clock },
+  APPROVED:  { label: "Đã duyệt",  color: "#10B981", Icon: CheckCircle },
   DA_DUYET:  { label: "Đã duyệt",  color: "#10B981", Icon: CheckCircle },
+  REJECTED:  { label: "Từ chối",   color: "#EF4444", Icon: XCircle },
   TU_CHOI:   { label: "Từ chối",   color: "#EF4444", Icon: XCircle },
 };
 
 export default function FeedbackScreen() {
   const router = useRouter();
+  const { userData } = useAuthStore();
   const [lyDo, setLyDo] = useState("");
   const [start, setStart] = useState(new Date());
   const [end, setEnd]     = useState(new Date());
   const [showStart, setShowStart] = useState(false);
   const [showEnd,   setShowEnd]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [list, setList]   = useState([]);
+  const [list, setList]   = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,7 +54,33 @@ export default function FeedbackScreen() {
     finally { setLoading(false); setRefreshing(false); }
   };
 
-  useEffect(() => { fetchList(); }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchList(true);
+    }, [])
+  );
+
+  useEffect(() => {
+    webSocketService.connect(() => {
+      const handleRealtimeUpdate = () => {
+        fetchList(true);
+      };
+
+      webSocketService.subscribe('/topic/don-xin-nghi', handleRealtimeUpdate);
+      if (userData?.id) {
+        webSocketService.subscribe(`/topic/user/${userData.id}`, handleRealtimeUpdate);
+        webSocketService.subscribe(`/topic/notifications/${userData.id}`, handleRealtimeUpdate);
+      }
+    });
+
+    return () => {
+      webSocketService.unsubscribe('/topic/don-xin-nghi');
+      if (userData?.id) {
+        webSocketService.unsubscribe(`/topic/user/${userData.id}`);
+        webSocketService.unsubscribe(`/topic/notifications/${userData.id}`);
+      }
+    };
+  }, [userData?.id]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); fetchList(true); }, []);
 
@@ -90,7 +122,7 @@ export default function FeedbackScreen() {
             <Icon size={13} color={cfg.color} />
             <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
-          {item.trangThai === "CHO_DUYET" && (
+          {(item.trangThai === "CHO_DUYET" || item.trangThai === "PENDING") && (
             <TouchableOpacity onPress={() => handleDelete(item.id)} hitSlop={{ top:8,bottom:8,left:8,right:8 }}>
               <Trash2 size={18} color="#EF4444" />
             </TouchableOpacity>

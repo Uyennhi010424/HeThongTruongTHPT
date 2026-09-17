@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { HeaderSection } from '../../components/dashboard/HeaderSection';
 import { QuickFunctions } from '../../components/dashboard/QuickFunctions';
 import { NextClassCard } from '../../components/dashboard/NextClassCard';
@@ -8,9 +9,11 @@ import { useDashboardStore } from '../../store/useDashboardStore';
 export default function StudentDashboard() {
   const { data, isLoading, isRefreshing, error, fetchData, refreshData } = useDashboardStore();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   const onRefresh = React.useCallback(() => {
     refreshData();

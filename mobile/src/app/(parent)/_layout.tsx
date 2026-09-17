@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useParentStore } from '../../store/useParentStore';
+import { webSocketService } from '../../api/websocket';
 import axiosClient from '../../api/axiosClient';
 
 export default function ParentLayout() {
@@ -17,20 +18,55 @@ export default function ParentLayout() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const updateUnreadCount = useCallback(async () => {
+    try {
+      const res = await axiosClient.get('/thongbao');
+      if (res.data?.data) {
+        const stored = await AsyncStorage.getItem('readNotices');
+        const readIds: number[] = stored ? JSON.parse(stored) : [];
+        const filtered = res.data.data.filter((item: any) => {
+          if (item.recipientId && userData?.id && item.recipientId === userData.id) return true;
+          const dt = (item.doiTuong || item.loai || '').split(',').map((s: string) => s.trim());
+          return dt.includes('PHU_HUYNH') || dt.includes('ALL');
+        });
+        const unread = filtered.filter((n: any) => !readIds.includes(n.id)).length;
+        setUnreadCount(unread);
+      }
+    } catch (e) {
+      const stored = await AsyncStorage.getItem('readNotices');
+      const readIds = stored ? JSON.parse(stored) : [];
+      const notices = dashboardData?.notices || [];
+      const unread = notices.filter((n: any) => !readIds.includes(n.id)).length;
+      setUnreadCount(unread);
+    }
+  }, [userData?.id, dashboardData?.notices]);
+
   useFocusEffect(
     useCallback(() => {
-      const updateUnreadCount = async () => {
-        try {
-          const stored = await AsyncStorage.getItem('readNotices');
-          const readIds = stored ? JSON.parse(stored) : [];
-          const notices = dashboardData?.notices || [];
-          const unread = notices.filter((n: any) => !readIds.includes(n.id)).length;
-          setUnreadCount(unread);
-        } catch (e) {}
-      };
       updateUnreadCount();
-    }, [dashboardData?.notices])
+    }, [updateUnreadCount])
   );
+
+  useEffect(() => {
+    webSocketService.connect(() => {
+      const handleMsg = () => {
+        updateUnreadCount();
+      };
+      webSocketService.subscribe('/topic/notifications', handleMsg);
+      if (userData?.id) {
+        webSocketService.subscribe(`/topic/user/${userData.id}`, handleMsg);
+        webSocketService.subscribe(`/topic/notifications/${userData.id}`, handleMsg);
+      }
+    });
+
+    return () => {
+      webSocketService.unsubscribe('/topic/notifications');
+      if (userData?.id) {
+        webSocketService.unsubscribe(`/topic/user/${userData.id}`);
+        webSocketService.unsubscribe(`/topic/notifications/${userData.id}`);
+      }
+    };
+  }, [userData?.id, updateUnreadCount]);
 
   useEffect(() => {
     const fetchChildren = async () => {
@@ -43,7 +79,7 @@ export default function ParentLayout() {
             const updatedUser = { 
               ...userData, 
               phuHuynhId: parentId, 
-              id: parentId,
+              id: profileRes.data.data.user?.id || userData?.id || parentId,
               username: profileRes.data.data.hoTen || userData?.username 
             };
             useAuthStore.setState({ userData: updatedUser as any });

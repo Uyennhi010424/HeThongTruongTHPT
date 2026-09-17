@@ -234,9 +234,12 @@ export default function DiemDanhPage() {
 
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return [];
+    if (filters.classStudents && filters.classStudents.length > 0) {
+      return sortStudentsByGivenName(filters.classStudents);
+    }
     const classStudents = students.filter((s) => s.trangThai === 1 && String(getStudentClassId(s) || "") === selectedClassId);
     return sortStudentsByGivenName(classStudents);
-  }, [students, selectedClassId]);
+  }, [filters.classStudents, students, selectedClassId]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -741,7 +744,7 @@ export default function DiemDanhPage() {
                                 <tr key={student.id} style={{ background: isEven ? "#fff" : "#f8fafc", transition: "background 0.15s" }}>
                                   <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
                                     <div style={{ fontWeight: 600, color: "#0f172a" }}>{student.hoTen}</div>
-                                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{getStudentClass(student)?.tenLop || "--"}</div>
+                                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{filters.selectedClassObj?.tenLop || getStudentClass(student)?.tenLop || "--"}</div>
                                   </td>
                                   <td style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
                                     <div style={{ display: "flex", gap: 20, alignItems: "center" }}>

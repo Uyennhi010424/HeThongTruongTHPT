@@ -5,7 +5,8 @@ import { getNamHoc } from "../api/namhocApi.js";
 import { getPhanCongDay } from "../api/phancongDayApi.js";
 import { getCurrentGiaoVien } from "../api/giaovienApi.js";
 import { getChuNhiem } from "../api/chunhiemApi.js";
-import { getVisibleAcademicYears, getActiveAcademicYear, sortClasses } from "../utils/helpers.js";
+import { getHocSinh } from "../api/hocsinhApi.js";
+import { getVisibleAcademicYears, getActiveAcademicYear, sortClasses, getStudentClassId } from "../utils/helpers.js";
 
 /**
  * Custom hook to manage teacher filters across pages.
@@ -24,6 +25,8 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
   const [chuNhiemData, setChuNhiemData] = useState([]);
   const [currentTeacher, setCurrentTeacher] = useState(null);
   const [allStudents, setAllStudents] = useState([]);
+  const [classStudents, setClassStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
 
   const [selectedNamHoc, setSelectedNamHoc] = useState("");
   const [selectedSemester, setSelectedSemester] = useState(defaultSemester);
@@ -319,6 +322,41 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     }
   }, [allowedSubjects, selectedSubjectId, showSubject]);
 
+  // Fetch students for the currently selected class whenever selectedClassId changes
+  useEffect(() => {
+    if (!selectedClassId) {
+      setClassStudents([]);
+      return;
+    }
+    let active = true;
+    setStudentsLoading(true);
+    getHocSinh({ lopId: selectedClassId })
+      .then((res) => {
+        if (!active) return;
+        const list = res?.data?.data || [];
+        if (list.length === 0 && allStudents.length > 0) {
+          const fallback = allStudents.filter(
+            (s) => s.trangThai === 1 && String(getStudentClassId(s) || "") === String(selectedClassId)
+          );
+          setClassStudents(fallback);
+        } else {
+          setClassStudents(list);
+        }
+      })
+      .catch((err) => {
+        console.error("Lỗi khi tải học sinh theo lớp:", err);
+        if (!active) return;
+        const fallback = allStudents.filter(
+          (s) => s.trangThai === 1 && String(getStudentClassId(s) || "") === String(selectedClassId)
+        );
+        setClassStudents(fallback);
+      })
+      .finally(() => {
+        if (active) setStudentsLoading(false);
+      });
+    return () => { active = false; };
+  }, [selectedClassId, allStudents]);
+
   const selectedClassObj = useMemo(() => 
     allClasses.find(c => String(c.id) === selectedClassId) || null
   , [allClasses, selectedClassId]);
@@ -346,6 +384,8 @@ export function useTeacherFilters({ showSubject = true, showGrade = true, showCl
     filteredClasses,
     allowedSubjects,
     allStudents,
+    classStudents,
+    studentsLoading,
     allNamHoc,
     allSubjects,
     

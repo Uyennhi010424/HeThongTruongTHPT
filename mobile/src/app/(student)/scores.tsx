@@ -9,19 +9,15 @@ type FilterType = 1 | 2 | 'CA_NAM';
 
 const calculateTBM = (scores: any[]) => {
   if (!scores || scores.length === 0) return null;
-  const tx = scores.filter(s => s.loaiDiem === 'TX').map(s => s.giaTriDiem);
-  const gk = scores.filter(s => s.loaiDiem === 'GK').map(s => s.giaTriDiem);
-  const ck = scores.filter(s => s.loaiDiem === 'CK').map(s => s.giaTriDiem);
+  const tx = scores.filter(s => s.loaiDiem === 'TX' && s.giaTriDiem != null).map(s => Number(s.giaTriDiem));
+  const gkScore = scores.find(s => s.loaiDiem === 'GK' && s.giaTriDiem != null);
+  const ckScore = scores.find(s => s.loaiDiem === 'CK' && s.giaTriDiem != null);
 
-  let totalWeight = 0;
-  let totalScore = 0;
+  if (tx.length === 0 || !gkScore || !ckScore) return null;
 
-  tx.forEach(s => { totalScore += s; totalWeight += 1; });
-  gk.forEach(s => { totalScore += s * 2; totalWeight += 2; });
-  ck.forEach(s => { totalScore += s * 3; totalWeight += 3; });
-
-  if (totalWeight === 0) return null;
-  return (totalScore / totalWeight).toFixed(1);
+  const sumTx = tx.reduce((a, b) => a + b, 0);
+  const avg = (sumTx + Number(gkScore.giaTriDiem) * 2 + Number(ckScore.giaTriDiem) * 3) / (tx.length + 5);
+  return avg.toFixed(1);
 };
 
 export default function ScoresScreen() {
@@ -33,11 +29,17 @@ export default function ScoresScreen() {
   const subjects = data?.subjects || [];
   const allScores = data?.scores || [];
 
-  const currentStudentNamHoc = data?.student?.lop?.namHoc || '2025-2026';
+  const currentStudentNamHoc = data?.currentNamHoc || data?.student?.lop?.namHoc || '2025-2026';
 
   const availableYears = useMemo(() => {
     const yearsSet = new Set<string>();
-    if (currentStudentNamHoc) yearsSet.add(currentStudentNamHoc);
+    if (data?.currentNamHoc) yearsSet.add(data.currentNamHoc);
+    if (data?.student?.lop?.namHoc) yearsSet.add(data.student.lop.namHoc);
+    if (data?.allNamHocs && Array.isArray(data.allNamHocs)) {
+      data.allNamHocs.forEach((nh: any) => {
+        if (nh?.tenNamHoc) yearsSet.add(nh.tenNamHoc);
+      });
+    }
     allScores.forEach((s: any) => {
       if (s.namHoc) yearsSet.add(s.namHoc);
     });
@@ -47,15 +49,17 @@ export default function ScoresScreen() {
       return yB - yA;
     });
     return arr.length > 0 ? arr : [currentStudentNamHoc];
-  }, [allScores, currentStudentNamHoc]);
+  }, [allScores, data?.currentNamHoc, data?.student?.lop?.namHoc, data?.allNamHocs, currentStudentNamHoc]);
 
-  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] || currentStudentNamHoc);
+  const [selectedYear, setSelectedYear] = useState<string>(data?.currentNamHoc || availableYears[0] || currentStudentNamHoc);
 
   useEffect(() => {
-    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+    if (data?.currentNamHoc) {
+      setSelectedYear(data.currentNamHoc);
+    } else if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
       setSelectedYear(availableYears[0]);
     }
-  }, [availableYears]);
+  }, [data?.currentNamHoc, availableYears]);
 
   const yearScores = useMemo(() => {
     return allScores.filter((s: any) => !s.namHoc || s.namHoc === selectedYear);

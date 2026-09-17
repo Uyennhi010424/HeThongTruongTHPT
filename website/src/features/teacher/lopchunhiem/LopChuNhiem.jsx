@@ -69,10 +69,13 @@ export default function LopChuNhiem() {
 
   const homeroomStudents = useMemo(() => {
     if (!homeroomClassId) return [];
+    if (filters.classStudents && filters.classStudents.length > 0) {
+      return sortStudentsByGivenName(filters.classStudents);
+    }
     return sortStudentsByGivenName(
       students.filter((item) => String(getStudentClassId(item) || "") === String(homeroomClassId))
     );
-  }, [students, homeroomClassId]);
+  }, [filters.classStudents, students, homeroomClassId]);
 
   // Reset page on class or year change
   useEffect(() => {
@@ -233,7 +236,7 @@ export default function LopChuNhiem() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px", fontSize: 14, color: "#334155" }}>
               <div><span style={{ color: "#64748b" }}>Họ tên:</span> {selectedStudent.hoTen}</div>
-              <div><span style={{ color: "#64748b" }}>Lớp:</span> {getStudentClassName(selectedStudent) || "--"}</div>
+              <div><span style={{ color: "#64748b" }}>Lớp:</span> {filters.selectedClassObj?.tenLop || getStudentClassName(selectedStudent) || "--"}</div>
               <div><span style={{ color: "#64748b" }}>Ngày sinh:</span> {formatBirthDate(selectedStudent.ngaySinh)}</div>
               <div><span style={{ color: "#64748b" }}>Giới tính:</span> {getGenderLabel(selectedStudent.gioiTinh)}</div>
               <div><span style={{ color: "#64748b" }}>SĐT:</span> {selectedStudent.sdt || "--"}</div>

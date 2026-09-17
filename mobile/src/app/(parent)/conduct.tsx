@@ -11,6 +11,58 @@ const formatConduct = (val: string) => {
   return val || '--';
 };
 
+export const fixCorruptedVietnameseText = (text: string): string => {
+  if (!text || typeof text !== 'string') return text || '';
+  if (!text.includes('?')) return text;
+
+  let fixed = text;
+
+  const phraseMap: [RegExp, string][] = [
+    [/H\?c sinh xu\?t s\?c,?\s*tích c\?c tham gia các phong trào thi \?ua/gi, 'Học sinh xuất sắc, tích cực tham gia các phong trào thi đua'],
+    [/H\?c sinh ngoan,?\s*ch\?m ch\?,?\s*g\?+ng m\?u,?\s*có ý th\?c k\? lu\?t r\?t t\?t/gi, 'Học sinh ngoan, chăm chỉ, gương mẫu, có ý thức kỷ luật rất tốt'],
+    [/tích c\?c tham gia các phong trào thi \?ua/gi, 'tích cực tham gia các phong trào thi đua'],
+    [/có ý th\?c k\? lu\?t r\?t t\?t/gi, 'có ý thức kỷ luật rất tốt'],
+    [/ch\?m ch\?,?\s*g\?+ng m\?u/gi, 'chăm chỉ, gương mẫu'],
+    [/g\?+ng m\?u/gi, 'gương mẫu'],
+    [/H\?c sinh xu\?t s\?c/gi, 'Học sinh xuất sắc'],
+    [/H\?c sinh ngoan/gi, 'Học sinh ngoan'],
+    [/H\?c sinh/gi, 'Học sinh'],
+    [/h\?c sinh/gi, 'học sinh'],
+    [/xu\?t s\?c/gi, 'xuất sắc'],
+    [/ch\?m ch\?/gi, 'chăm chỉ'],
+    [/ý th\?c/gi, 'ý thức'],
+    [/k\? lu\?t/gi, 'kỷ luật'],
+    [/r\?t t\?t/gi, 'rất tốt'],
+    [/t\?t/gi, 'tốt'],
+    [/tích c\?c/gi, 'tích cực'],
+    [/thi \?ua/gi, 'thi đua'],
+    [/\?ua/gi, 'đua'],
+    [/ti\?n b\?/gi, 'tiến bộ'],
+    [/c\? g\?ng/gi, 'cố gắng'],
+    [/phát bi\?u/gi, 'phát biểu'],
+    [/xây d\?ng/gi, 'xây dựng'],
+    [/bài h\?c/gi, 'bài học'],
+    [/k\?t qu\?/gi, 'kết quả'],
+    [/rèn luy\?n/gi, 'rèn luyện'],
+    [/đ\?o đ\?c/gi, 'đạo đức'],
+    [/ch\?p hành/gi, 'chấp hành'],
+    [/n\?i quy/gi, 'nội quy'],
+    [/nhà tr\?+ng/gi, 'nhà trường'],
+    [/th\?y cô/gi, 'thầy cô'],
+    [/b\?n bè/gi, 'bạn bè'],
+    [/hòa đ\?ng/gi, 'hòa đồng'],
+    [/giúp đ\?/gi, 'giúp đỡ'],
+    [/trung th\?c/gi, 'trung thực'],
+    [/l\? phép/gi, 'lễ phép']
+  ];
+
+  for (const [regex, replacement] of phraseMap) {
+    fixed = fixed.replace(regex, replacement);
+  }
+
+  return fixed;
+};
+
 const getConductBadgeStyle = (val: string) => {
   switch (val) {
     case 'TOT':
@@ -135,15 +187,17 @@ export default function ParentConduct() {
                       <Text style={styles.commentLabel}>Nhận xét của giáo viên:</Text>
                       <Text style={styles.contentText}>
                         {record.nhanXet && record.nhanXet.trim() !== ''
-                          ? record.nhanXet
+                          ? fixCorruptedVietnameseText(record.nhanXet)
                           : 'Chưa có nhận xét chi tiết.'}
                       </Text>
 
-                      {record.giaoVien && (
+                      {Boolean(selectedChild?.lop?.gvcn?.hoTen || record.giaoVien?.hoTen) && (
                         <View style={styles.teacherRow}>
                           <User size={14} color="#64748b" />
                           <Text style={styles.teacherText}>
-                            GV đánh giá: <Text style={{ fontWeight: '600', color: '#334155' }}>{record.giaoVien.hoTen}</Text>
+                            GV đánh giá: <Text style={{ fontWeight: '600', color: '#334155' }}>
+                              {selectedChild?.lop?.gvcn?.hoTen || record.giaoVien?.hoTen}
+                            </Text>
                           </Text>
                         </View>
                       )}

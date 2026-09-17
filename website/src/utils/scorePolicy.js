@@ -127,12 +127,15 @@ export const calcSemesterAverage = (semesterData) => {
 };
 
 export const calcYearAverage = (hk1Avg, hk2Avg) => {
-  if (hk1Avg !== null && hk2Avg !== null) {
+  if (
+    hk1Avg !== null &&
+    hk2Avg !== null &&
+    hk1Avg !== undefined &&
+    hk2Avg !== undefined &&
+    !Number.isNaN(hk1Avg) &&
+    !Number.isNaN(hk2Avg)
+  ) {
     return Number(((hk1Avg + 2 * hk2Avg) / 3).toFixed(1));
-  } else if (hk1Avg !== null) {
-    return hk1Avg;
-  } else if (hk2Avg !== null) {
-    return hk2Avg;
   }
   return null;
 };

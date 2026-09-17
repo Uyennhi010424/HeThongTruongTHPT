@@ -88,4 +88,8 @@ export interface DashboardData {
   gpa: number | null;
   baiKiemTraCount?: number;
   examWeek?: boolean;
+  currentNamHoc?: string;
+  currentHocKy?: number;
+  activeNamHoc?: any;
+  allNamHocs?: any[];
 }
